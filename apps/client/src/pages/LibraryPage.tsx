@@ -8,6 +8,7 @@ import {
     Stack,
     Text,
     TextInput,
+    Title,
     Tooltip,
 } from '@mantine/core';
 import { useDebouncedValue } from '@mantine/hooks';
@@ -16,7 +17,13 @@ import { useState } from 'react';
 import { useSearchParams } from 'react-router';
 
 import { CoverCard } from '@/components/CoverCard';
-import { fetchLibraries, fetchSeriesList, scanLibrary } from '@/services/api';
+import { volumeLabel } from '@/components/readingStatus';
+import {
+    fetchInProgress,
+    fetchLibraries,
+    fetchSeriesList,
+    scanLibrary,
+} from '@/services/api';
 import { useCurrentUser } from '@/services/auth';
 import { useQuery } from '@/services/useQuery';
 
@@ -31,6 +38,7 @@ export const LibraryPage = () => {
     const isAdmin = useCurrentUser().role === 'admin';
 
     const libraries = useQuery(fetchLibraries, []);
+    const inProgress = useQuery(fetchInProgress, []);
     const libraryId =
         Number(params.get('library')) || libraries.data?.[0]?.id || undefined;
 
@@ -130,6 +138,24 @@ export const LibraryPage = () => {
                 </Alert>
             )}
 
+            {!debouncedSearch && !!inProgress.data?.length && (
+                <Stack gap="xs">
+                    <Title order={4}>Reprendre la lecture</Title>
+                    <SimpleGrid cols={{ base: 3, xs: 4, sm: 5, md: 6, lg: 8 }}>
+                        {inProgress.data.map((volume) => (
+                            <CoverCard
+                                key={volume.volumeId}
+                                to={`/read/${volume.volumeId}`}
+                                coverId={volume.volumeId}
+                                title={volume.seriesName}
+                                subtitle={`${volumeLabel(volume)} · p. ${volume.page + 1}/${volume.pageCount}`}
+                                progress={(volume.page + 1) / volume.pageCount}
+                            />
+                        ))}
+                    </SimpleGrid>
+                </Stack>
+            )}
+
             {series.error && <Alert color="red">{series.error.message}</Alert>}
             {series.loading && !series.data && <Loader mx="auto" />}
             {series.data?.length === 0 && (
@@ -146,7 +172,12 @@ export const LibraryPage = () => {
                         to={`/series/${item.id}`}
                         coverId={item.coverVolumeId}
                         title={item.name}
-                        subtitle={`${item.volumeCount} tome${item.volumeCount > 1 ? 's' : ''}`}
+                        subtitle={
+                            item.readCount > 0
+                                ? `${item.readCount} / ${item.volumeCount} lu${item.readCount > 1 ? 's' : ''}`
+                                : `${item.volumeCount} tome${item.volumeCount > 1 ? 's' : ''}`
+                        }
+                        progress={item.readCount / item.volumeCount}
                     />
                 ))}
             </SimpleGrid>

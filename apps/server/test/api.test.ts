@@ -156,6 +156,7 @@ describe('volumes', () => {
             direction: 'rtl',
             previousId: null,
             nextId: second.id,
+            progress: null,
         });
     });
 

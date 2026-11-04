@@ -1,10 +1,10 @@
-import { asc, count, eq, inArray, notInArray, sql } from 'drizzle-orm';
+import { and, asc, count, eq, inArray, notInArray, sql } from 'drizzle-orm';
 import { rm } from 'node:fs/promises';
 import path from 'node:path';
 
 import type { LibraryConfig } from '../config';
 import type { Db } from '../db';
-import { libraries, series, volumes } from '../db/schema';
+import { libraries, readProgress, series, volumes } from '../db/schema';
 import { notFound } from '../tools/errors';
 import { coverFile } from './scanner';
 
@@ -72,6 +72,7 @@ export const listLibraries = (db: Db) =>
 /** Séries, filtrées par bibliothèque et par nom (sans tenir compte de la casse). */
 export const listSeries = (
     db: Db,
+    userId: number,
     { libraryId, search }: { libraryId?: number; search?: string } = {},
 ) => {
     const text = search?.trim().toLowerCase();
@@ -87,6 +88,8 @@ export const listSeries = (
             // Couverture de la série : celle de son premier tome. Sous-requêtes en
             // SQL brut : Drizzle n'y préfixe pas les colonnes par leur table.
             coverVolumeId: sql<number>`(select v.id from volumes v where v.series_id = series.id order by v.sort_number is null, v.sort_number, v.file limit 1)`,
+            // Tomes lus par la personne.
+            readCount: sql<number>`(select count(*) from read_progress rp join volumes v on v.id = rp.volume_id where v.series_id = series.id and rp.user_id = ${userId} and rp.completed = 1)`,
         })
         .from(series)
         .leftJoin(volumes, eq(volumes.seriesId, series.id))
@@ -98,7 +101,7 @@ export const listSeries = (
         .all();
 };
 
-export const getSeries = (db: Db, id: number) => {
+export const getSeries = (db: Db, userId: number, id: number) => {
     const row = db
         .select({
             id: series.id,
@@ -129,8 +132,20 @@ export const getSeries = (db: Db, id: number) => {
             pageCount: volumes.pageCount,
             size: volumes.size,
             addedAt: volumes.addedAt,
+            // Progression de la personne ; null = pas commencé.
+            progress: {
+                page: readProgress.page,
+                completed: readProgress.completed,
+            },
         })
         .from(volumes)
+        .leftJoin(
+            readProgress,
+            and(
+                eq(readProgress.volumeId, volumes.id),
+                eq(readProgress.userId, userId),
+            ),
+        )
         .where(eq(volumes.seriesId, id))
         .orderBy(...volumeOrder)
         .all();

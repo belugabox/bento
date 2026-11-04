@@ -5,7 +5,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ReaderPage } from './ReaderPage';
 
-const volume = (direction: 'rtl' | 'ltr') => ({
+type Saved = { page?: number; completed?: boolean };
+
+const volume = (direction: 'rtl' | 'ltr', progress: Saved | null = null) => ({
     id: 7,
     seriesId: 3,
     seriesName: 'Spy x Family',
@@ -16,7 +18,11 @@ const volume = (direction: 'rtl' | 'ltr') => ({
     direction,
     previousId: null,
     nextId: 8,
+    progress,
 });
+
+// Progressions envoyées au serveur (PUT /api/volumes/7/progress).
+let saved: Saved[] = [];
 
 let location = '';
 const Location = () => {
@@ -24,12 +30,23 @@ const Location = () => {
     return null;
 };
 
-const open = async (direction: 'rtl' | 'ltr', url = '/read/7') => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-        new Response(JSON.stringify(volume(direction)), {
+const open = async (
+    direction: 'rtl' | 'ltr',
+    url = '/read/7',
+    progress: Saved | null = null,
+) => {
+    saved = [];
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+        const body =
+            init?.method === 'PUT'
+                ? (saved.push(JSON.parse(String(init.body))),
+                  { progress: null })
+                : volume(direction, progress);
+        expect(String(input)).toMatch(/^\/api\/volumes\/7/);
+        return new Response(JSON.stringify(body), {
             headers: { 'Content-Type': 'application/json' },
-        }),
-    );
+        });
+    });
     render(
         <MantineProvider>
             <MemoryRouter initialEntries={[url]}>
@@ -104,5 +121,23 @@ describe('ReaderPage', () => {
         press('Escape');
 
         expect(location).toBe('/series/3');
+    });
+
+    it('resumes where the person stopped, and saves each page reached', async () => {
+        await open('rtl', '/read/7', { page: 1, completed: false });
+
+        expect(shownPage()).toBe('/api/volumes/7/pages/1');
+        expect(location).toBe('/read/7?page=2');
+
+        press('ArrowLeft');
+        await vi.waitFor(() =>
+            expect(saved).toEqual([{ page: 1 }, { page: 2 }]),
+        );
+    });
+
+    it('starts over a volume already read', async () => {
+        await open('rtl', '/read/7', { page: 2, completed: true });
+
+        expect(shownPage()).toBe('/api/volumes/7/pages/0');
     });
 });

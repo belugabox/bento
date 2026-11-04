@@ -66,3 +66,20 @@ export type Volume = Awaited<ReturnType<typeof fetchVolume>>;
 export const coverUrl = (volumeId: number) => `/api/volumes/${volumeId}/cover`;
 export const pageUrl = (volumeId: number, index: number) =>
     `/api/volumes/${volumeId}/pages/${index}`;
+
+export const saveProgress = (
+    volumeId: number,
+    progress: { page?: number; completed?: boolean },
+) =>
+    json(
+        api.volumes[':id'].progress.$put({
+            ...id(volumeId),
+            json: progress,
+        }),
+    );
+
+export const fetchInProgress = () => json(api.continue.$get());
+
+export type InProgressVolume = Awaited<
+    ReturnType<typeof fetchInProgress>
+>[number];

@@ -18,6 +18,7 @@ import {
     listLibraries,
     listSeries,
 } from './library/catalog';
+import { getProgress, listInProgress, saveProgress } from './library/progress';
 import { type LibraryScanner, coverFile } from './library/scanner';
 import { AppError, notFound } from './tools/errors';
 import type { Logger } from './tools/logger';
@@ -101,10 +102,10 @@ export const createApi = ({
                     search: z.string().optional(),
                 }),
             ),
-            (c) => c.json(listSeries(db, c.req.valid('query'))),
+            (c) => c.json(listSeries(db, c.var.user.id, c.req.valid('query'))),
         )
         .get('/series/:id', zValidator('param', idParam), (c) =>
-            c.json(getSeries(db, c.req.valid('param').id)),
+            c.json(getSeries(db, c.var.user.id, c.req.valid('param').id)),
         )
         .get('/volumes/:id', zValidator('param', idParam), (c) => {
             // Le chemin sur disque reste côté serveur.
@@ -112,8 +113,33 @@ export const createApi = ({
                 db,
                 c.req.valid('param').id,
             );
-            return c.json(volume);
+            return c.json({
+                ...volume,
+                progress: getProgress(db, c.var.user.id, volume.id),
+            });
         })
+        .put(
+            '/volumes/:id/progress',
+            zValidator('param', idParam),
+            zValidator(
+                'json',
+                z.object({
+                    page: z.number().int().min(0).optional(),
+                    completed: z.boolean().optional(),
+                }),
+            ),
+            (c) =>
+                c.json({
+                    progress: saveProgress(
+                        db,
+                        c.var.user.id,
+                        c.req.valid('param').id,
+                        c.req.valid('json'),
+                    ),
+                }),
+        )
+        // Tomes commencés, pour « Reprendre la lecture ».
+        .get('/continue', (c) => c.json(listInProgress(db, c.var.user.id)))
         .get('/volumes/:id/cover', zValidator('param', idParam), async (c) => {
             const { id } = c.req.valid('param');
             const cover = await readFile(coverFile(coversPath, id)).catch(

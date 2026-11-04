@@ -5,6 +5,9 @@ import { getSeries, listSeries } from '../src/library/catalog';
 import { coverFile, seriesKeyOf } from '../src/library/scanner';
 import { setup, writeCbz } from './helpers';
 
+// Les listes donnent aussi la progression d'une personne : ici, personne.
+const NO_USER = 0;
+
 let ctx: Awaited<ReturnType<typeof setup>>;
 
 beforeEach(async () => {
@@ -40,9 +43,9 @@ describe('LibraryScanner', () => {
             removed: 0,
             errors: [],
         });
-        const [series] = listSeries(ctx.db);
+        const [series] = listSeries(ctx.db, NO_USER);
         expect(series).toMatchObject({ name: 'Spy x Family', volumeCount: 2 });
-        const details = getSeries(ctx.db, series!.id);
+        const details = getSeries(ctx.db, NO_USER, series!.id);
         expect(details).toMatchObject({
             summary: 'Un espion.',
             genre: 'Comédie',
@@ -68,10 +71,10 @@ describe('LibraryScanner', () => {
 
         await ctx.scanner.scan(ctx.library.id);
 
-        const [series] = listSeries(ctx.db);
+        const [series] = listSeries(ctx.db, NO_USER);
         expect(series?.name).toBe('Gantz');
         expect(
-            getSeries(ctx.db, series!.id).volumes.map((v) => v.number),
+            getSeries(ctx.db, NO_USER, series!.id).volumes.map((v) => v.number),
         ).toEqual(['2', '2.5', '10', null]);
     });
 
@@ -111,7 +114,9 @@ describe('LibraryScanner', () => {
 
         expect(result).toMatchObject({ updated: 1, removed: 1 });
         // Série vide supprimée.
-        expect(listSeries(ctx.db).map((s) => s.name)).toEqual(['Gantz']);
+        expect(listSeries(ctx.db, NO_USER).map((s) => s.name)).toEqual([
+            'Gantz',
+        ]);
     });
 
     it('keeps every series that still has volumes', async () => {
@@ -126,7 +131,9 @@ describe('LibraryScanner', () => {
 
         await ctx.scanner.scan(ctx.library.id);
 
-        expect(listSeries(ctx.db).map((s) => [s.name, s.volumeCount])).toEqual([
+        expect(
+            listSeries(ctx.db, NO_USER).map((s) => [s.name, s.volumeCount]),
+        ).toEqual([
             ['A', 3],
             ['B', 1],
         ]);

@@ -13,10 +13,16 @@ import {
 } from '@mantine/core';
 import { useLocalStorage } from '@mantine/hooks';
 import { IconArrowLeft } from '@tabler/icons-react';
-import { type CSSProperties, useCallback, useEffect, useState } from 'react';
+import {
+    type CSSProperties,
+    useCallback,
+    useEffect,
+    useRef,
+    useState,
+} from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 
-import { fetchVolume, pageUrl } from '@/services/api';
+import { fetchVolume, pageUrl, saveProgress } from '@/services/api';
 import { useQuery } from '@/services/useQuery';
 
 import {
@@ -61,10 +67,17 @@ export const ReaderPage = () => {
 
     const pageCount = volume?.pageCount ?? 0;
     const rawPage = params.get('page');
+    // Sans page dans l'adresse : reprendre là où la personne s'était arrêtée.
+    const resumePage =
+        volume?.progress && !volume.progress.completed
+            ? volume.progress.page
+            : 0;
     const page =
         rawPage === LAST_PAGE
             ? pageCount - 1
-            : clampPage(Number(rawPage ?? 1) - 1, pageCount);
+            : rawPage === null
+              ? clampPage(resumePage, pageCount)
+              : clampPage(Number(rawPage) - 1, pageCount);
     const direction =
         (volume && directions[volume.seriesId]) ?? volume?.direction ?? 'rtl';
 
@@ -101,8 +114,21 @@ export const ReaderPage = () => {
 
     // L'adresse garde toujours un numéro de page (reprise après rechargement).
     useEffect(() => {
-        if (volume && rawPage === LAST_PAGE) goTo(pageCount - 1);
-    }, [volume, rawPage, pageCount, goTo]);
+        if (volume && (rawPage === LAST_PAGE || rawPage === null)) goTo(page);
+    }, [volume, rawPage, page, goTo]);
+
+    // Enregistrer chaque page atteinte (une fois l'adresse fixée).
+    const savedPage = useRef<string>(undefined);
+    useEffect(() => {
+        if (!volume || rawPage === null || rawPage === LAST_PAGE) return;
+        const key = `${volume.id}:${page}`;
+        if (savedPage.current === key) return;
+        savedPage.current = key;
+        saveProgress(volume.id, { page }).catch(() => {
+            // Sans réseau, la lecture continue ; la page suivante réessaiera.
+            savedPage.current = undefined;
+        });
+    }, [volume, rawPage, page]);
 
     useEffect(() => {
         const onKey = (event: KeyboardEvent) => {

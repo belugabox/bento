@@ -1,4 +1,5 @@
 import {
+    ActionIcon,
     Alert,
     Anchor,
     Badge,
@@ -11,37 +12,63 @@ import {
     Stack,
     Text,
     Title,
+    Tooltip,
 } from '@mantine/core';
-import { IconArrowLeft, IconPlayerPlay } from '@tabler/icons-react';
+import { IconArrowLeft, IconCheck, IconPlayerPlay } from '@tabler/icons-react';
+import type { MouseEvent } from 'react';
 import { Link, useParams } from 'react-router';
 
 import { CoverCard } from '@/components/CoverCard';
-import { coverUrl, fetchSeries } from '@/services/api';
+import {
+    nextToRead,
+    progressRatio,
+    volumeLabel,
+} from '@/components/readingStatus';
+import { coverUrl, fetchSeries, saveProgress } from '@/services/api';
 import { useQuery } from '@/services/useQuery';
 
-const volumeLabel = (volume: {
-    number: string | null;
-    title: string | null;
-}) =>
-    volume.number ? `Tome ${volume.number}` : (volume.title ?? 'Hors-série');
+const ACTION_LABELS = {
+    start: 'Lire',
+    resume: 'Continuer',
+    reread: 'Relire',
+};
 
-/** Fiche d'une série : informations et tomes. */
+/** Fiche d'une série : informations, tomes et où en est la personne. */
 export const SeriesPage = () => {
     const seriesId = Number(useParams().id);
-    const { data: series, error } = useQuery(
-        () => fetchSeries(seriesId),
-        [seriesId],
-    );
+    const {
+        data: series,
+        error,
+        reload,
+    } = useQuery(() => fetchSeries(seriesId), [seriesId]);
 
     if (error) return <Alert color="red">{error.message}</Alert>;
     if (!series) return <Loader mx="auto" />;
 
     const first = series.volumes[0];
+    const next = nextToRead(series.volumes);
+    const readCount = series.volumes.filter(
+        (v) => v.progress?.completed,
+    ).length;
     const details = [
         series.year && String(series.year),
         series.writer,
         series.publisher,
     ].filter(Boolean);
+
+    /** Coche « lu » d'un tome (sans ouvrir le lecteur). */
+    const toggleRead = async (
+        event: MouseEvent,
+        volume: (typeof series.volumes)[number],
+    ) => {
+        // La vignette est un lien : ne pas le suivre.
+        event.preventDefault();
+        event.stopPropagation();
+        await saveProgress(volume.id, {
+            completed: !volume.progress?.completed,
+        });
+        reload();
+    };
 
     return (
         <Stack>
@@ -74,6 +101,11 @@ export const SeriesPage = () => {
                             {series.count ? ` / ${series.count}` : ''} tome
                             {series.volumes.length > 1 ? 's' : ''}
                         </Badge>
+                        {readCount > 0 && (
+                            <Badge variant="light" color="teal">
+                                {readCount} lu{readCount > 1 ? 's' : ''}
+                            </Badge>
+                        )}
                         {series.genre && (
                             <Badge variant="light" color="gray">
                                 {series.genre}
@@ -90,29 +122,66 @@ export const SeriesPage = () => {
                             {series.summary}
                         </Text>
                     )}
-                    {first && (
+                    {next && (
                         <Button
                             component={Link}
-                            to={`/read/${first.id}`}
+                            // Relire : repartir de la première page.
+                            to={`/read/${next.volume.id}${next.action === 'reread' ? '?page=1' : ''}`}
                             leftSection={<IconPlayerPlay size={16} />}
                             w="fit-content"
                         >
-                            Lire {volumeLabel(first).toLowerCase()}
+                            {ACTION_LABELS[next.action]}{' '}
+                            {volumeLabel(next.volume).toLowerCase()}
                         </Button>
                     )}
                 </Stack>
             </Flex>
 
             <SimpleGrid cols={{ base: 3, xs: 4, sm: 5, md: 6, lg: 8 }}>
-                {series.volumes.map((volume) => (
-                    <CoverCard
-                        key={volume.id}
-                        to={`/read/${volume.id}`}
-                        coverId={volume.id}
-                        title={volumeLabel(volume)}
-                        subtitle={`${volume.pageCount} pages`}
-                    />
-                ))}
+                {series.volumes.map((volume) => {
+                    const read = volume.progress?.completed ?? false;
+                    return (
+                        <CoverCard
+                            key={volume.id}
+                            to={`/read/${volume.id}`}
+                            coverId={volume.id}
+                            title={volumeLabel(volume)}
+                            subtitle={
+                                volume.progress && !read
+                                    ? `Page ${volume.progress.page + 1} / ${volume.pageCount}`
+                                    : `${volume.pageCount} pages`
+                            }
+                            progress={read ? undefined : progressRatio(volume)}
+                            corner={
+                                <Tooltip
+                                    label={
+                                        read
+                                            ? 'Marquer comme non lu'
+                                            : 'Marquer comme lu'
+                                    }
+                                >
+                                    <ActionIcon
+                                        radius="xl"
+                                        size="sm"
+                                        variant={read ? 'filled' : 'default'}
+                                        color="teal"
+                                        style={{ opacity: read ? 1 : 0.8 }}
+                                        aria-label={
+                                            read
+                                                ? `${volumeLabel(volume)} lu`
+                                                : `Marquer ${volumeLabel(volume)} comme lu`
+                                        }
+                                        onClick={(event) =>
+                                            void toggleRead(event, volume)
+                                        }
+                                    >
+                                        <IconCheck size={14} />
+                                    </ActionIcon>
+                                </Tooltip>
+                            }
+                        />
+                    );
+                })}
             </SimpleGrid>
         </Stack>
     );

@@ -2,6 +2,7 @@ import { sql } from 'drizzle-orm';
 import {
     index,
     integer,
+    primaryKey,
     real,
     sqliteTable,
     text,
@@ -111,4 +112,26 @@ export const sessions = sqliteTable(
         expiresAt: integer('expires_at', { mode: 'timestamp' }).notNull(),
     },
     (t) => [index('sessions_user').on(t.userId)],
+);
+
+/** Où en est chaque personne dans chaque tome. */
+export const readProgress = sqliteTable(
+    'read_progress',
+    {
+        userId: integer('user_id')
+            .notNull()
+            .references(() => users.id, { onDelete: 'cascade' }),
+        volumeId: integer('volume_id')
+            .notNull()
+            .references(() => volumes.id, { onDelete: 'cascade' }),
+        // Dernière page atteinte (index à partir de 0).
+        page: integer('page').notNull(),
+        completed: integer('completed', { mode: 'boolean' }).notNull(),
+        // À la milliseconde : ordre de « Reprendre la lecture ».
+        updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
+    },
+    (t) => [
+        primaryKey({ columns: [t.userId, t.volumeId] }),
+        index('read_progress_recent').on(t.userId, t.updatedAt),
+    ],
 );
