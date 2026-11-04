@@ -18,4 +18,25 @@ describe('loadConfig', () => {
             /Configuration invalide : LOG_LEVEL/,
         );
     });
+
+    it('reads the libraries from JSON and resolves their paths', () => {
+        const config = loadConfig({
+            LIBRARIES: '[{"name":"Mangas","path":"./manga","type":"manga"}]',
+        });
+
+        expect(config.LIBRARIES).toEqual([
+            { name: 'Mangas', path: path.resolve('./manga'), type: 'manga' },
+        ]);
+    });
+
+    it('rejects malformed libraries', () => {
+        expect(() => loadConfig({ LIBRARIES: '[{"name":' })).toThrow(
+            /LIBRARIES : JSON invalide/,
+        );
+        expect(() =>
+            loadConfig({
+                LIBRARIES: '[{"name":"BD","path":"./bd","type":"bd"}]',
+            }),
+        ).toThrow(/LIBRARIES\.0\.type/);
+    });
 });

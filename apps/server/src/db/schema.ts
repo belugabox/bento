@@ -1,5 +1,14 @@
 import { sql } from 'drizzle-orm';
-import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import {
+    index,
+    integer,
+    real,
+    sqliteTable,
+    text,
+    uniqueIndex,
+} from 'drizzle-orm/sqlite-core';
+
+import type { ComicInfo } from '../archive/comicInfo';
 
 /** Compte Bento, créé à la première connexion via Pocket ID. */
 export const users = sqliteTable('users', {
@@ -16,3 +25,76 @@ export const users = sqliteTable('users', {
         .default(sql`(unixepoch())`),
     lastLoginAt: integer('last_login_at', { mode: 'timestamp' }),
 });
+
+/** Bibliothèque : un dossier de tomes, déclaré dans la configuration. */
+export const libraries = sqliteTable('libraries', {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    name: text('name').notNull(),
+    path: text('path').notNull().unique(),
+    type: text('type', { enum: ['manga', 'comics'] }).notNull(),
+    lastScanAt: integer('last_scan_at', { mode: 'timestamp' }),
+});
+
+/** Série : un dossier de premier niveau de la bibliothèque. */
+export const series = sqliteTable(
+    'series',
+    {
+        id: integer('id').primaryKey({ autoIncrement: true }),
+        libraryId: integer('library_id')
+            .notNull()
+            .references(() => libraries.id, { onDelete: 'cascade' }),
+        // Dossier de la série (ou nom, pour un tome rangé à la racine).
+        key: text('key').notNull(),
+        name: text('name').notNull(),
+        // Métadonnées reprises du premier tome.
+        summary: text('summary'),
+        genre: text('genre'),
+        ageRating: text('age_rating'),
+        year: integer('year'),
+        count: integer('count'),
+        writer: text('writer'),
+        publisher: text('publisher'),
+        createdAt: integer('created_at', { mode: 'timestamp' })
+            .notNull()
+            .default(sql`(unixepoch())`),
+        updatedAt: integer('updated_at', { mode: 'timestamp' })
+            .notNull()
+            .default(sql`(unixepoch())`),
+    },
+    (t) => [uniqueIndex('series_library_key').on(t.libraryId, t.key)],
+);
+
+/** Tome : une archive CBZ. */
+export const volumes = sqliteTable(
+    'volumes',
+    {
+        id: integer('id').primaryKey({ autoIncrement: true }),
+        libraryId: integer('library_id')
+            .notNull()
+            .references(() => libraries.id, { onDelete: 'cascade' }),
+        seriesId: integer('series_id')
+            .notNull()
+            .references(() => series.id, { onDelete: 'cascade' }),
+        // Chemin relatif à la bibliothèque, séparé par « / ».
+        file: text('file').notNull(),
+        number: text('number'),
+        // Numéro en nombre, pour trier (« 12.5 » entre 12 et 13).
+        sortNumber: real('sort_number'),
+        title: text('title'),
+        // ComicInfo.xml complet du tome ({} s'il n'en a pas).
+        comicInfo: text('comic_info', { mode: 'json' })
+            .$type<ComicInfo>()
+            .notNull(),
+        pageCount: integer('page_count').notNull(),
+        size: integer('size').notNull(),
+        // Date de modification du fichier : un tome inchangé n'est pas relu.
+        mtimeMs: real('mtime_ms').notNull(),
+        addedAt: integer('added_at', { mode: 'timestamp' })
+            .notNull()
+            .default(sql`(unixepoch())`),
+    },
+    (t) => [
+        uniqueIndex('volumes_library_file').on(t.libraryId, t.file),
+        index('volumes_series').on(t.seriesId),
+    ],
+);

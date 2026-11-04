@@ -6,8 +6,11 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 
 import { createApi } from './api';
+import { PageReader } from './archive/archive';
 import { loadConfig } from './config';
 import { openDatabase } from './db';
+import { syncLibraries } from './library/catalog';
+import { LibraryScanner } from './library/scanner';
 import { createLogger } from './tools/logger';
 
 // Depuis `src` (dev) comme depuis `dist` (build).
@@ -27,8 +30,29 @@ process.on('unhandledRejection', (err) => {
 const database = openDatabase(config.DB_FILE);
 logger.info(`Base de données : ${config.DB_FILE}`);
 
+const scanner = new LibraryScanner(database.db, config.COVERS_PATH, logger);
+
+/** Scanne les bibliothèques l'une après l'autre. */
+const scanAll = async (libraryIds: number[]) => {
+    for (const id of libraryIds) {
+        await scanner
+            .scan(id)
+            .catch((err) => logger.error(err, `Scan de la bibliothèque ${id}`));
+    }
+};
+
 const app = new Hono()
-    .route('/api', createApi({ db: database.db, logger, version }))
+    .route(
+        '/api',
+        createApi({
+            db: database.db,
+            logger,
+            version,
+            scanner,
+            pages: new PageReader(),
+            coversPath: config.COVERS_PATH,
+        }),
+    )
     // Client compilé ; toute autre adresse renvoie l'appli (routage côté client).
     .use('/*', serveStatic({ root: path.relative(process.cwd(), CLIENT_DIST) }))
     .get('*', (c) =>
@@ -38,6 +62,27 @@ const app = new Hono()
 const server = serve({ fetch: app.fetch, port: config.PORT }, (info) =>
     logger.info(`Bento ${version} démarré sur http://localhost:${info.port}`),
 );
+
+// Bibliothèques de la configuration, scannées au démarrage puis à intervalle.
+void (async () => {
+    const synced = await syncLibraries(
+        database.db,
+        config.LIBRARIES,
+        config.COVERS_PATH,
+    );
+    if (synced.length === 0) {
+        logger.warn('Aucune bibliothèque configurée (variable LIBRARIES)');
+        return;
+    }
+    const ids = synced.map((library) => library.id);
+    await scanAll(ids);
+    if (config.SCAN_INTERVAL_MINUTES > 0) {
+        setInterval(
+            () => void scanAll(ids),
+            config.SCAN_INTERVAL_MINUTES * 60_000,
+        ).unref();
+    }
+})().catch((err) => logger.error(err, 'Initialisation des bibliothèques'));
 
 let shuttingDown = false;
 const shutdown = (signal: string) => {

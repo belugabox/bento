@@ -5,12 +5,14 @@ dist-ssr
 *.tsbuildinfo
 
 # Données locales (base, cache, config de dev) et secrets
-data
+/data
+apps/server/data
 .env
 *.local
 
 # Bibliothèques de test locales
-library
+/library
+apps/server/library
 
 # Logs
 *.log

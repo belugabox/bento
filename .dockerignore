@@ -7,9 +7,9 @@
 .git
 .env
 **/.env
-data
-**/data
-library
+/data
+apps/server/data
+/library
 
 # Fichiers inutiles au build
 Dockerfile
