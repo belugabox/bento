@@ -26,6 +26,8 @@ Après une modification du schéma, il faut générer la migration :
 pnpm --filter server db:generate --name <nom>
 ```
 
+Ne jamais modifier une migration déjà commitée : une base qui l'a déjà appliquée tenterait de la rejouer et le serveur ne démarrerait plus. Toujours en générer une nouvelle.
+
 ## Configuration
 
 Toute la configuration passe par des variables d'environnement :
