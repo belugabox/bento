@@ -37,7 +37,7 @@ Toute la configuration passe par des variables d'environnement :
 | `PORT` | `3001` | Port HTTP |
 | `LOG_LEVEL` | `info` | `debug`, `info`, `warn` ou `error` |
 | `DATA_PATH` | `./data` (`/config` dans Docker) | Base SQLite et couvertures |
-| `LIBRARIES` | `[]` | Bibliothèques, en JSON : `[{"name":"Mangas","path":"/manga","type":"manga"}]`. Type `manga` (lecture de droite à gauche) ou `comics` (de gauche à droite) |
+| `LIBRARIES` | `[]` | Bibliothèques, en JSON : `[{"name":"Mangas","path":"/manga","type":"manga"}]`. Type `manga` ou `comics`. La lecture se fait de gauche à droite par défaut ; le sens se change par série dans le lecteur |
 | `SCAN_INTERVAL_MINUTES` | `30` | Scan automatique des bibliothèques (`0` = seulement au démarrage et à la demande) |
 | `OIDC_ISSUER` | — (requis) | Adresse de Pocket ID, ex. `https://auth.belugabox.net` |
 | `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET` | — (requis) | Client OIDC « Bento » créé dans Pocket ID |

@@ -4,7 +4,6 @@ import { z } from 'zod';
 const librarySchema = z.object({
     name: z.string().min(1),
     path: z.string().min(1),
-    // Manga : lecture de droite à gauche par défaut ; BD : de gauche à droite.
     type: z.enum(['manga', 'comics']),
 });
 

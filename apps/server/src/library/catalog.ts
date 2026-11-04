@@ -183,9 +183,8 @@ export const getVolume = (db: Db, id: number) => {
     const { file, libraryPath, ...volume } = row;
     return {
         ...volume,
-        // Droite → gauche pour les mangas, gauche → droite pour les BD.
-        direction:
-            row.libraryType === 'manga' ? ('rtl' as const) : ('ltr' as const),
+        // Sens de lecture par défaut, réglable par série dans le lecteur.
+        direction: 'ltr' as 'ltr' | 'rtl',
         previousId: siblings[index - 1] ?? null,
         nextId: siblings[index + 1] ?? null,
         fullPath: path.join(libraryPath, ...file.split('/')),

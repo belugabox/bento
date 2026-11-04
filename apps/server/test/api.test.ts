@@ -153,7 +153,7 @@ describe('volumes', () => {
             title: null,
             pageCount: 3,
             libraryType: 'manga',
-            direction: 'rtl',
+            direction: 'ltr',
             previousId: null,
             nextId: second.id,
             progress: null,

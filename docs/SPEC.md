@@ -33,7 +33,7 @@ Bento est le serveur de lecture et de gestion des mangas et BD de la maison. Il 
 - **Comptes** : chaque compte Bento est créé à la première connexion. L'admin règle ensuite pour chacun la **classification d'âge maximale**.
 
 ### B. Bibliothèques et indexation
-- **Plusieurs bibliothèques**, chacune avec un nom, un dossier, un type (manga ou BD) et un sens de lecture par défaut : de droite à gauche pour les mangas, de gauche à droite pour les BD.
+- **Plusieurs bibliothèques**, chacune avec un nom, un dossier, et un type (manga ou BD). La lecture se fait de gauche à droite par défaut, pour toutes les bibliothèques.
 - **Scan** : il indexe les séries et les tomes en base (ComicInfo, nombre de pages, taille, dates) et génère les vignettes de couverture.
   - Il se relance à la demande, périodiquement, et après chaque publication.
 - **Brouillons** : un dossier `_draft` par bibliothèque pour les tomes à préparer. Les lecteurs ne le voient pas.
@@ -46,7 +46,7 @@ Bento est le serveur de lecture et de gestion des mangas et BD de la maison. Il 
 - **Contrôle parental** : un lecteur ne voit que les séries dont la classification (`AgeRating`) est sous sa limite. Une série sans classification est masquée pour un compte limité.
 
 ### D. Lecteur (tous)
-- **Sens de lecture** : de droite à gauche ou de gauche à droite, réglable par série.
+- **Sens de lecture** : de gauche à droite par défaut, ou de droite à gauche, réglable par série.
 - **Modes d'affichage** :
   - page simple ;
   - double page en paysage, en gérant les doubles pages déjà fusionnées dans l'archive ;

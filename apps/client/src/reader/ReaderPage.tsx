@@ -79,7 +79,7 @@ export const ReaderPage = () => {
               ? clampPage(resumePage, pageCount)
               : clampPage(Number(rawPage) - 1, pageCount);
     const direction =
-        (volume && directions[volume.seriesId]) ?? volume?.direction ?? 'rtl';
+        (volume && directions[volume.seriesId]) ?? volume?.direction ?? 'ltr';
 
     const goTo = useCallback(
         (next: number) => {
@@ -278,8 +278,8 @@ export const ReaderPage = () => {
                                     }))
                                 }
                                 data={[
-                                    { value: 'rtl', label: '← Manga' },
-                                    { value: 'ltr', label: 'BD →' },
+                                    { value: 'ltr', label: 'Gauche → droite' },
+                                    { value: 'rtl', label: 'Droite → gauche' },
                                 ]}
                             />
                             <SegmentedControl
