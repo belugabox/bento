@@ -23,6 +23,8 @@ export const notFound = (message: string) => new AppError(404, message);
 export const conflict = (message: string) => new AppError(409, message);
 // Requête valide, mais certaines données n'ont pas pu être traitées.
 export const unprocessable = (message: string) => new AppError(422, message);
+// Service externe (Pocket ID…) en erreur ou injoignable.
+export const badGateway = (message: string) => new AppError(502, message);
 
 /** Message lisible pour une erreur de validation zod (1re erreur seulement). */
 export const formatZodError = (error: ZodError): string => {

@@ -39,6 +39,15 @@ Toute la configuration passe par des variables d'environnement :
 | `DATA_PATH` | `./data` (`/config` dans Docker) | Base SQLite et couvertures |
 | `LIBRARIES` | `[]` | Bibliothèques, en JSON : `[{"name":"Mangas","path":"/manga","type":"manga"}]`. Type `manga` (lecture de droite à gauche) ou `comics` (de gauche à droite) |
 | `SCAN_INTERVAL_MINUTES` | `30` | Scan automatique des bibliothèques (`0` = seulement au démarrage et à la demande) |
+| `OIDC_ISSUER` | — (requis) | Adresse de Pocket ID, ex. `https://auth.belugabox.net` |
+| `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET` | — (requis) | Client OIDC « Bento » créé dans Pocket ID |
+| `PUBLIC_URL` | — (requis) | Adresse publique de Bento ; l'adresse de retour à déclarer dans Pocket ID est `PUBLIC_URL/api/auth/callback` |
+| `OIDC_ADMIN_GROUP` | `bento-admins` | Groupe Pocket ID des administrateurs |
+| `OIDC_READER_GROUP` | `bento-readers` | Groupe Pocket ID des lecteurs (sans l'un des deux groupes, l'accès est refusé) |
+
+### Connexion
+
+La connexion passe par Pocket ID, en OIDC : flux par code avec PKCE, côté serveur. Bento garde ensuite une session de 30 jours dans un cookie `HttpOnly`, prolongée tant qu'elle sert. Nom, e-mail et rôle sont repris de Pocket ID à chaque connexion. Seuls `/api/health` et `/api/auth/*` sont accessibles sans session.
 
 ### Organisation des bibliothèques
 
@@ -59,6 +68,10 @@ services:
       - '3003:3001'
     environment:
       LIBRARIES: '[{"name":"Mangas","path":"/manga","type":"manga"}]'
+      PUBLIC_URL: https://bento.belugabox.net
+      OIDC_ISSUER: https://auth.belugabox.net
+      OIDC_CLIENT_ID: ${BENTO_OIDC_CLIENT_ID}
+      OIDC_CLIENT_SECRET: ${BENTO_OIDC_CLIENT_SECRET}
     volumes:
       - ./bento:/config
       - /BLK/Books/Manga:/manga

@@ -1,10 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { createApi } from '../src/api';
-import { setup, silent, writeCbz } from './helpers';
+import { authDeps, sessionCookie, setup, silent, writeCbz } from './helpers';
 
 let ctx: Awaited<ReturnType<typeof setup>>;
 let api: ReturnType<typeof createApi>;
+let reader: string;
+let admin: string;
+
+/** Requête d'une personne connectée (lectrice par défaut). */
+const request = (path: string, init: RequestInit = {}, cookie = reader) =>
+    api.request(path, { ...init, headers: { Cookie: cookie } });
 
 beforeEach(async () => {
     ctx = await setup();
@@ -15,7 +21,10 @@ beforeEach(async () => {
         scanner: ctx.scanner,
         pages: ctx.pages,
         coversPath: ctx.coversPath,
+        auth: authDeps(),
     });
+    reader = sessionCookie(ctx.db, 'reader');
+    admin = sessionCookie(ctx.db, 'admin');
 });
 
 afterEach(async () => {
@@ -23,7 +32,7 @@ afterEach(async () => {
 });
 
 const get = async (path: string) => {
-    const response = await api.request(path);
+    const response = await request(path);
     return { status: response.status, body: await response.json() };
 };
 
@@ -52,7 +61,9 @@ describe('error handling', () => {
             throw new Error('secret internal detail');
         });
 
-        const response = await app.request('/boom');
+        const response = await app.request('/boom', {
+            headers: { Cookie: reader },
+        });
 
         expect(response.status).toBe(500);
         const body = await response.text();
@@ -73,9 +84,11 @@ describe('libraries', () => {
     it('lists libraries with their counts, and scans on demand', async () => {
         await writeCbz(ctx.file('Gantz/Gantz T01.cbz'));
 
-        const scan = await api.request(`/libraries/${ctx.library.id}/scan`, {
-            method: 'POST',
-        });
+        const scan = await request(
+            `/libraries/${ctx.library.id}/scan`,
+            { method: 'POST' },
+            admin,
+        );
         expect(await scan.json()).toMatchObject({ added: 1 });
 
         expect((await get('/libraries')).body).toEqual([
@@ -90,9 +103,11 @@ describe('libraries', () => {
     });
 
     it('refuses to scan an unknown library', async () => {
-        const response = await api.request('/libraries/999/scan', {
-            method: 'POST',
-        });
+        const response = await request(
+            '/libraries/999/scan',
+            { method: 'POST' },
+            admin,
+        );
         expect(response.status).toBe(404);
     });
 });
@@ -148,16 +163,53 @@ describe('volumes', () => {
         const seriesId = await library();
         const [first] = (await get(`/series/${seriesId}`)).body.volumes;
 
-        const cover = await api.request(`/volumes/${first.id}/cover`);
+        const cover = await request(`/volumes/${first.id}/cover`);
         expect(cover.status).toBe(200);
         expect(cover.headers.get('content-type')).toBe('image/webp');
 
-        const page = await api.request(`/volumes/${first.id}/pages/2`);
+        const page = await request(`/volumes/${first.id}/pages/2`);
         expect(page.status).toBe(200);
         expect(page.headers.get('content-type')).toBe('image/png');
 
-        expect((await api.request(`/volumes/${first.id}/pages/3`)).status).toBe(
+        expect((await request(`/volumes/${first.id}/pages/3`)).status).toBe(
             404,
         );
+    });
+});
+
+describe('access control', () => {
+    it('requires a session for everything but health and login', async () => {
+        expect((await api.request('/health')).status).toBe(200);
+        for (const path of [
+            '/me',
+            '/libraries',
+            '/series',
+            '/volumes/1/pages/0',
+        ]) {
+            const response = await api.request(path);
+            expect(response.status).toBe(401);
+            expect(await response.json()).toMatchObject({
+                message: 'Connexion requise',
+            });
+        }
+        const forged = await api.request('/series', {
+            headers: { Cookie: 'bento_session=forged' },
+        });
+        expect(forged.status).toBe(401);
+    });
+
+    it('tells who is logged in', async () => {
+        expect((await get('/me')).body).toMatchObject({
+            name: 'reader',
+            role: 'reader',
+            maxAgeRating: null,
+        });
+    });
+
+    it('keeps scanning for admins', async () => {
+        const response = await request(`/libraries/${ctx.library.id}/scan`, {
+            method: 'POST',
+        });
+        expect(response.status).toBe(403);
     });
 });

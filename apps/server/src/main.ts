@@ -7,6 +7,7 @@ import path from 'node:path';
 
 import { createApi } from './api';
 import { PageReader } from './archive/archive';
+import { OidcClient } from './auth/oidc';
 import { loadConfig } from './config';
 import { openDatabase } from './db';
 import { syncLibraries } from './library/catalog';
@@ -51,6 +52,17 @@ const app = new Hono()
             scanner,
             pages: new PageReader(),
             coversPath: config.COVERS_PATH,
+            auth: {
+                oidc: new OidcClient({
+                    issuer: config.OIDC_ISSUER,
+                    clientId: config.OIDC_CLIENT_ID,
+                    clientSecret: config.OIDC_CLIENT_SECRET,
+                    redirectUri: `${config.PUBLIC_URL}/api/auth/callback`,
+                }),
+                publicUrl: config.PUBLIC_URL,
+                adminGroup: config.OIDC_ADMIN_GROUP,
+                readerGroup: config.OIDC_READER_GROUP,
+            },
         }),
     )
     // Client compilé ; toute autre adresse renvoie l'appli (routage côté client).

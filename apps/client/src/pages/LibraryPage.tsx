@@ -17,6 +17,7 @@ import { useSearchParams } from 'react-router';
 
 import { CoverCard } from '@/components/CoverCard';
 import { fetchLibraries, fetchSeriesList, scanLibrary } from '@/services/api';
+import { useCurrentUser } from '@/services/auth';
 import { useQuery } from '@/services/useQuery';
 
 /** Grille des séries, avec choix de la bibliothèque et recherche. */
@@ -27,6 +28,7 @@ export const LibraryPage = () => {
     const [debouncedSearch] = useDebouncedValue(search, 250);
     const [scanning, setScanning] = useState(false);
     const [scanMessage, setScanMessage] = useState<string>();
+    const isAdmin = useCurrentUser().role === 'admin';
 
     const libraries = useQuery(fetchLibraries, []);
     const libraryId =
@@ -94,17 +96,19 @@ export const LibraryPage = () => {
                 ) : (
                     <Text fw={500}>{libraries.data?.[0]?.name}</Text>
                 )}
-                <Tooltip label="Rechercher les nouveaux tomes">
-                    <ActionIcon
-                        variant="default"
-                        size="lg"
-                        loading={scanning}
-                        onClick={scan}
-                        aria-label="Scanner la bibliothèque"
-                    >
-                        <IconRefresh size={18} />
-                    </ActionIcon>
-                </Tooltip>
+                {isAdmin && (
+                    <Tooltip label="Rechercher les nouveaux tomes">
+                        <ActionIcon
+                            variant="default"
+                            size="lg"
+                            loading={scanning}
+                            onClick={scan}
+                            aria-label="Scanner la bibliothèque"
+                        >
+                            <IconRefresh size={18} />
+                        </ActionIcon>
+                    </Tooltip>
+                )}
             </Group>
 
             <TextInput

@@ -5,11 +5,21 @@ import type { ApiType } from '@server/types';
 /** Client typé de l'API (`/api`, servie par le même domaine). */
 export const api = hc<ApiType>('/api');
 
+/** Page de connexion Pocket ID, avec retour sur la page actuelle. */
+export const loginUrl = (
+    redirect = window.location.pathname + window.location.search,
+) => `/api/auth/login?redirect=${encodeURIComponent(redirect)}`;
+
 /** Résultat JSON d'un appel, ou erreur avec le message renvoyé par le serveur. */
 export const json = async <T>(
     call: Promise<{ ok: boolean; status: number; json(): Promise<T> }>,
 ): Promise<T> => {
     const response = await call;
+    // Session absente ou expirée : passer par la connexion Pocket ID.
+    if (response.status === 401) {
+        window.location.assign(loginUrl());
+        throw new Error('Connexion requise');
+    }
     if (!response.ok) {
         const body = (await response.json().catch(() => ({}))) as {
             message?: string;

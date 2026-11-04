@@ -32,6 +32,17 @@ const schema = z.object({
     LIBRARIES: librariesSchema,
     // Intervalle entre deux scans automatiques (0 = jamais).
     SCAN_INTERVAL_MINUTES: z.coerce.number().int().min(0).default(30),
+    // Connexion OIDC (Pocket ID).
+    OIDC_ISSUER: z.string().url(),
+    OIDC_CLIENT_ID: z.string().min(1),
+    OIDC_CLIENT_SECRET: z.string().min(1),
+    OIDC_ADMIN_GROUP: z.string().min(1).default('bento-admins'),
+    OIDC_READER_GROUP: z.string().min(1).default('bento-readers'),
+    // Adresse publique de l'appli, sans « / » final.
+    PUBLIC_URL: z
+        .string()
+        .url()
+        .transform((url) => url.replace(/\/+$/, '')),
 });
 
 export type Config = z.infer<typeof schema> & {

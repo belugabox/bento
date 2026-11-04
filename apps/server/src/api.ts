@@ -4,6 +4,13 @@ import { readFile } from 'node:fs/promises';
 import { z } from 'zod';
 
 import type { PageReader } from './archive/archive';
+import {
+    type AuthDeps,
+    type AuthEnv,
+    createAuthRoutes,
+    requireAdmin,
+    requireUser,
+} from './auth/routes';
 import type { Db } from './db';
 import {
     getSeries,
@@ -23,6 +30,7 @@ export type ApiDeps = {
     scanner: LibraryScanner;
     pages: PageReader;
     coversPath: string;
+    auth: Omit<AuthDeps, 'db' | 'logger'>;
 };
 
 const idParam = z.object({ id: z.coerce.number().int().positive() });
@@ -35,8 +43,9 @@ export const createApi = ({
     scanner,
     pages,
     coversPath,
+    auth,
 }: ApiDeps) =>
-    new Hono()
+    new Hono<AuthEnv>()
         .onError((err, c) => {
             const route = `${c.req.method} ${c.req.path}`;
             // Erreur métier attendue : message destiné à l'utilisateur.
@@ -59,6 +68,10 @@ export const createApi = ({
             db.run(sql`select 1`);
             return c.json({ status: 'ok' as const, version });
         })
+        .route('/auth', createAuthRoutes({ db, logger, ...auth }))
+        // Tout ce qui suit exige une session.
+        .use('*', requireUser(db))
+        .get('/me', (c) => c.json(c.var.user))
         .get('/libraries', (c) =>
             c.json(
                 listLibraries(db).map((library) => ({
@@ -69,6 +82,7 @@ export const createApi = ({
         )
         .post(
             '/libraries/:id/scan',
+            requireAdmin,
             zValidator('param', idParam),
             async (c) => {
                 const { id } = c.req.valid('param');

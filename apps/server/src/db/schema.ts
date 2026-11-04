@@ -98,3 +98,17 @@ export const volumes = sqliteTable(
         index('volumes_series').on(t.seriesId),
     ],
 );
+
+/** Session de connexion ; le cookie ne contient que son identifiant. */
+export const sessions = sqliteTable(
+    'sessions',
+    {
+        // Empreinte SHA-256 du jeton du cookie (jamais le jeton lui-même).
+        id: text('id').primaryKey(),
+        userId: integer('user_id')
+            .notNull()
+            .references(() => users.id, { onDelete: 'cascade' }),
+        expiresAt: integer('expires_at', { mode: 'timestamp' }).notNull(),
+    },
+    (t) => [index('sessions_user').on(t.userId)],
+);
