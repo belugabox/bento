@@ -1,52 +1,41 @@
-import {
-    AppShell,
-    Badge,
-    Center,
-    Group,
-    Stack,
-    Text,
-    Title,
-} from '@mantine/core';
-import { useEffect, useState } from 'react';
+import { Anchor, AppShell, Container, Group, Title } from '@mantine/core';
+import { Link, Outlet, Route, Routes } from 'react-router';
 
-import { api, json } from '@/services/api';
+import { LibraryPage } from '@/pages/LibraryPage';
+import { SeriesPage } from '@/pages/SeriesPage';
+import { ReaderPage } from '@/reader/ReaderPage';
 
-type Health = { status: 'ok'; version: string };
-
-export const App = () => {
-    const [health, setHealth] = useState<Health>();
-    const [error, setError] = useState<string>();
-
-    useEffect(() => {
-        json(api.health.$get())
-            .then(setHealth)
-            .catch((e: Error) => setError(e.message));
-    }, []);
-
-    return (
-        <AppShell header={{ height: 56 }} padding="md">
-            <AppShell.Header>
-                <Group h="100%" px="md">
-                    <Title order={3}>🍱 Bento</Title>
+/** Mise en page des écrans de navigation (le lecteur est en plein écran). */
+const Layout = () => (
+    <AppShell header={{ height: 56 }} padding="md">
+        <AppShell.Header>
+            <Container size="xl" h="100%">
+                <Group h="100%">
+                    <Anchor
+                        component={Link}
+                        to="/"
+                        underline="never"
+                        c="inherit"
+                    >
+                        <Title order={3}>🍱 Bento</Title>
+                    </Anchor>
                 </Group>
-            </AppShell.Header>
-            <AppShell.Main>
-                <Center mih="60vh">
-                    <Stack align="center" gap="xs">
-                        <Text c="dimmed">Bibliothèque de mangas et BD</Text>
-                        {health && (
-                            <Badge color="teal" variant="light">
-                                Serveur en ligne · v{health.version}
-                            </Badge>
-                        )}
-                        {error && (
-                            <Badge color="red" variant="light">
-                                Serveur injoignable : {error}
-                            </Badge>
-                        )}
-                    </Stack>
-                </Center>
-            </AppShell.Main>
-        </AppShell>
-    );
-};
+            </Container>
+        </AppShell.Header>
+        <AppShell.Main>
+            <Container size="xl">
+                <Outlet />
+            </Container>
+        </AppShell.Main>
+    </AppShell>
+);
+
+export const App = () => (
+    <Routes>
+        <Route element={<Layout />}>
+            <Route index element={<LibraryPage />} />
+            <Route path="series/:id" element={<SeriesPage />} />
+        </Route>
+        <Route path="read/:id" element={<ReaderPage />} />
+    </Routes>
+);

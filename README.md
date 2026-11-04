@@ -34,7 +34,15 @@ Toute la configuration passe par des variables d'environnement :
 |---|---|---|
 | `PORT` | `3001` | Port HTTP |
 | `LOG_LEVEL` | `info` | `debug`, `info`, `warn` ou `error` |
-| `DATA_PATH` | `./data` (`/config` dans Docker) | Base SQLite et cache |
+| `DATA_PATH` | `./data` (`/config` dans Docker) | Base SQLite et couvertures |
+| `LIBRARIES` | `[]` | Bibliothèques, en JSON : `[{"name":"Mangas","path":"/manga","type":"manga"}]`. Type `manga` (lecture de droite à gauche) ou `comics` (de gauche à droite) |
+| `SCAN_INTERVAL_MINUTES` | `30` | Scan automatique des bibliothèques (`0` = seulement au démarrage et à la demande) |
+
+### Organisation des bibliothèques
+
+- **Séries** : une série par dossier de premier niveau, par exemple `Spy x Family/Spy x Family #01 (2020).cbz`. Un tome rangé à la racine forme sa propre série, nommée d'après son ComicInfo ou son nom de fichier.
+- **Numéro de tome** : il vient du ComicInfo (`Number`), ou à défaut du nom de fichier (`T05`, `Tome 5`, `Vol. 5`, `#05`).
+- **Dossiers ignorés** : ceux qui commencent par `_` (comme `_draft`, les brouillons) ou par `.`.
 
 ## Déploiement
 
@@ -47,8 +55,11 @@ services:
     restart: unless-stopped
     ports:
       - '3003:3001'
+    environment:
+      LIBRARIES: '[{"name":"Mangas","path":"/manga","type":"manga"}]'
     volumes:
       - ./bento:/config
+      - /BLK/Books/Manga:/manga
 ```
 
-Le conteneur tourne avec l'utilisateur `node` : il doit pouvoir écrire dans `/config`.
+Le conteneur tourne avec l'utilisateur `node` : il doit pouvoir écrire dans `/config`. Pour la lecture, un accès en lecture seule aux bibliothèques suffit.
