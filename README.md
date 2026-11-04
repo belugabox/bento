@@ -26,7 +26,7 @@ Après une modification du schéma, il faut générer la migration :
 pnpm --filter server db:generate --name <nom>
 ```
 
-Ne jamais modifier une migration déjà commitée : une base qui l'a déjà appliquée tenterait de la rejouer et le serveur ne démarrerait plus. Toujours en générer une nouvelle.
+Ne jamais modifier ni régénérer une migration qu'une base a pu appliquer, même en local (`pnpm dev` les applique dès qu'elles apparaissent) : Drizzle repère les migrations à jouer par leur date dans `drizzle/meta/_journal.json`, et une base qui l'a déjà appliquée tenterait de la rejouer, le serveur ne démarrerait plus. Toujours en générer une nouvelle.
 
 ## Configuration
 
