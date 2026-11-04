@@ -1,0 +1,7 @@
+packages:
+    - 'apps/*'
+
+# pnpm 10 n'exécute les scripts d'installation que des paquets listés ici.
+onlyBuiltDependencies:
+    - better-sqlite3
+    - esbuild
