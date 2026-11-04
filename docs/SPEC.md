@@ -108,8 +108,10 @@ Bento est le serveur de lecture et de gestion des mangas et BD de la maison. Il 
 6. **Tomes manquants et sorties.**
 7. **Bascule** : retirer le module manga de beluga-box (la synchro vers `_draft` reste en place) et arrêter Kavita.
 
-## À décider
+## Décisions de déploiement
 
-- **Pocket ID** : adresse du serveur, et noms exacts des groupes (`bento-admins` et `bento-readers` sont proposés).
-- **Dossiers des bibliothèques** : Mangas dans `/BLK/Books/Manga` ; dossier des BD à préciser.
-- **Sous-domaine** : par exemple `bento.belugabox.net`.
+- **Pocket ID** : `https://auth.belugabox.net`, avec les groupes `bento-admins` et `bento-readers`.
+- **Adresse de Bento** : `https://bento.belugabox.net`.
+- **Bibliothèques** :
+  - Mangas : `/BLK/Books/Manga`.
+  - BD : pas de dossier sur le serveur pour l'instant. La bibliothèque BD sera ajoutée quand elle en aura un ; en attendant, elle est testée en local.
