@@ -12,7 +12,7 @@ import {
 } from 'node:fs/promises';
 import path from 'node:path';
 
-import { type PageReader, openArchive, pageEntries } from '../archive/archive';
+import { type PageReader, pageEntries, readArchive } from '../archive/archive';
 import {
     convertCbrToCbz,
     isCbr,
@@ -173,18 +173,18 @@ export class LibraryFiles {
 
         let info: Pick<FileInfo, 'pageCount' | 'comicInfo' | 'error'>;
         try {
-            const zip = await openArchive(fullPath);
-            const pages = pageEntries(zip);
+            const entries = await readArchive(fullPath);
+            const pages = pageEntries(entries);
             info = {
                 pageCount: pages.length,
-                comicInfo: await readComicInfo(zip.getEntries()),
+                comicInfo: await readComicInfo(entries),
                 error:
                     pages.length === 0 ? 'aucune image dans l’archive' : null,
             };
             if (pages[0]) {
                 const cover = this.coverPath(fullPath);
                 await mkdir(path.dirname(cover), { recursive: true });
-                await readImage(pages[0].getData())
+                await readImage(await pages[0].getData())
                     .resize(COVER_SIZE)
                     .webp({ quality: 80 })
                     .toFile(cover)

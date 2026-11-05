@@ -2,7 +2,7 @@ import { and, asc, eq, inArray, notInArray, sql } from 'drizzle-orm';
 import { mkdir, readdir, rm, stat } from 'node:fs/promises';
 import path from 'node:path';
 
-import { openArchive, pageEntries } from '../archive/archive';
+import { pageEntries, readArchive } from '../archive/archive';
 import { readComicInfo } from '../archive/comicInfo';
 import { parseVolumeFileName } from '../archive/fileName';
 import { readImage } from '../archive/image';
@@ -201,10 +201,10 @@ export class LibraryScanner {
 
     /** Lit une archive et l'enregistre (série comprise), avec sa couverture. */
     private index = async (libraryId: number, archive: FoundArchive) => {
-        const zip = await openArchive(archive.fullPath);
-        const pages = pageEntries(zip);
+        const entries = await readArchive(archive.fullPath);
+        const pages = pageEntries(entries);
         if (pages.length === 0) throw new Error('aucune image dans l’archive');
-        const comicInfo = await readComicInfo(zip.getEntries());
+        const comicInfo = await readComicInfo(entries);
         const fromName = parseVolumeFileName(stem(archive.file));
 
         const key = seriesKeyOf(archive.file, comicInfo.Series);
@@ -245,7 +245,7 @@ export class LibraryScanner {
 
         // Couverture : sans elle, le tome reste lisible.
         try {
-            await readImage(pages[0]!.getData())
+            await readImage(await pages[0]!.getData())
                 .resize(COVER_SIZE)
                 .webp({ quality: 80 })
                 .toFile(coverFile(this.coversPath, volume.id));
