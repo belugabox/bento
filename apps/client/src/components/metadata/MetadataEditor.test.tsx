@@ -92,6 +92,16 @@ describe('MetadataEditor', () => {
         fireEvent.click(await screen.findByText('Depuis les noms de fichiers'));
         expect(numberOf(1).value).toBe('1');
         expect(numberOf(2).value).toBe('2');
+        // Champs remplis : surlignés jusqu'à l'enregistrement.
+        expect(numberOf(1).getAttribute('data-changed')).toBe('true');
+        expect(
+            screen
+                .getByLabelText('Titre de Gantz T01 (2017).cbz')
+                .getAttribute('data-changed'),
+        ).toBeNull();
+        expect(
+            screen.getByText('En orange : modifié, pas encore enregistré.'),
+        ).toBeTruthy();
 
         await act(async () => {
             fireEvent.click(

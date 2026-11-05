@@ -149,15 +149,28 @@ export const fillFromWikipedia = (
     }
     const first = paths[0];
     if (first && wiki.summary && fillable(next[first]?.Summary, overwrite)) {
-        next = setVolumeField(
-            next,
-            first,
-            'Summary',
-            `${wiki.summary}\n\n(Source : Wikipédia)`,
-        );
+        next = setVolumeField(next, first, 'Summary', wiki.summary);
     }
     return next;
 };
+
+const same = (a: unknown, b: unknown) => String(a ?? '') === String(b ?? '');
+
+/** Le champ d'un tome diffère de sa valeur enregistrée. */
+export const isFieldChanged = (
+    original: Edits,
+    edits: Edits,
+    path: string,
+    field: keyof ComicInfo,
+) => !same(original[path]?.[field], edits[path]?.[field]);
+
+/** Le champ de série diffère, sur au moins un tome, de sa valeur enregistrée. */
+export const isSeriesFieldChanged = (
+    original: Edits,
+    edits: Edits,
+    paths: string[],
+    field: SeriesField,
+) => paths.some((path) => isFieldChanged(original, edits, path, field));
 
 /** Champs modifiés d'un tome (null : champ retiré). */
 export const changesOf = (
@@ -173,7 +186,7 @@ export const changesOf = (
     for (const field of fields) {
         const before = original[field];
         const after = edited[field];
-        if (String(before ?? '') === String(after ?? '')) continue;
+        if (same(before, after)) continue;
         changes[field] = isEmpty(after) ? null : (after as string | number);
     }
     return changes;

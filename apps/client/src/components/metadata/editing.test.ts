@@ -6,7 +6,9 @@ import {
     fillFromFileNames,
     fillFromWikipedia,
     initialEdits,
+    isFieldChanged,
     isMixed,
+    isSeriesFieldChanged,
     seriesValue,
     setSeriesField,
 } from './editing';
@@ -101,7 +103,7 @@ describe('fillFromWikipedia', () => {
             Penciller: 'Tatsuya Endō',
             Publisher: 'Kurokawa',
             Count: 17,
-            Summary: 'Un espion.\n\n(Source : Wikipédia)',
+            Summary: 'Un espion.',
         });
         expect(edits[second]?.Series).toBe('Spy × Family');
         expect(edits[second]?.Summary).toBeUndefined();
@@ -127,5 +129,21 @@ describe('changesOf', () => {
             ),
         ).toEqual({ Series: 'B', Year: null, Writer: 'X' });
         expect(changesOf({ Count: 3 }, { Count: 3 })).toEqual({});
+    });
+});
+
+describe('changed fields', () => {
+    it('spots fields that differ from what is saved', () => {
+        const original = initialEdits(volumes);
+        const edits = fillFromFileNames(original, volumes, false);
+
+        expect(isFieldChanged(original, edits, first, 'Year')).toBe(true);
+        expect(isFieldChanged(original, edits, first, 'Number')).toBe(false);
+        expect(isSeriesFieldChanged(original, edits, paths, 'Series')).toBe(
+            true,
+        );
+        expect(isSeriesFieldChanged(original, edits, paths, 'Genre')).toBe(
+            false,
+        );
     });
 });

@@ -39,7 +39,9 @@ import {
     fillFromFileNames,
     fillFromWikipedia,
     initialEdits,
+    isFieldChanged,
     isMixed,
+    isSeriesFieldChanged,
     seriesValue,
     setSeriesField,
     setVolumeField,
@@ -52,6 +54,20 @@ export type EditorVolume = EditableVolume & {
 };
 
 type Report = { color: string; lines: string[] };
+
+/** Champ modifié, pas encore enregistré : bordure et fond orange. */
+const changed = (isChanged: boolean) =>
+    isChanged
+        ? {
+              'data-changed': true,
+              styles: {
+                  input: {
+                      borderColor: 'var(--mantine-color-orange-6)',
+                      backgroundColor: 'var(--mantine-color-orange-light)',
+                  },
+              },
+          }
+        : {};
 
 const SERIES_TEXT_FIELDS: { field: SeriesField; label: string }[] = [
     { field: 'Genre', label: 'Genre' },
@@ -95,6 +111,11 @@ export const MetadataEditor = ({
 
     // Nouvelles données (après enregistrement) : repartir de celles-ci.
     useEffect(() => setEdits(initialEdits(readable)), [readable]);
+    const original = useMemo(() => initialEdits(readable), [readable]);
+    const seriesChanged = (field: SeriesField) =>
+        isSeriesFieldChanged(original, edits, paths, field);
+    const volumeChanged = (path: string, field: keyof ComicInfo) =>
+        isFieldChanged(original, edits, path, field);
 
     const changes = readable
         .map((v) => ({
@@ -277,6 +298,11 @@ export const MetadataEditor = ({
                         {publishReason}
                     </Text>
                 )}
+            {changes.length > 0 && (
+                <Text size="xs" c="orange">
+                    En orange : modifié, pas encore enregistré.
+                </Text>
+            )}
             {report && (
                 <Alert
                     color={report.color}
@@ -297,6 +323,7 @@ export const MetadataEditor = ({
                     <SimpleGrid cols={{ base: 1, sm: 3 }}>
                         <TextInput
                             label="Nom"
+                            {...changed(seriesChanged('Series'))}
                             value={String(series('Series'))}
                             description={
                                 isMixed(edits, paths, 'Series')
@@ -309,6 +336,7 @@ export const MetadataEditor = ({
                         />
                         <NumberInput
                             label="Nombre de tomes parus"
+                            {...changed(seriesChanged('Count'))}
                             min={0}
                             value={series('Count')}
                             onChange={(value) =>
@@ -320,6 +348,7 @@ export const MetadataEditor = ({
                         />
                         <Select
                             label="Classification"
+                            {...changed(seriesChanged('AgeRating'))}
                             clearable
                             placeholder="Aucune"
                             value={String(series('AgeRating')) || null}
@@ -331,6 +360,7 @@ export const MetadataEditor = ({
                         {SERIES_TEXT_FIELDS.map(({ field, label }) => (
                             <TextInput
                                 key={field}
+                                {...changed(seriesChanged(field))}
                                 label={label}
                                 value={String(series(field))}
                                 onChange={(e) =>
@@ -342,6 +372,7 @@ export const MetadataEditor = ({
                     {first && (
                         <Textarea
                             label="Résumé (enregistré sur le premier tome)"
+                            {...changed(volumeChanged(first, 'Summary'))}
                             autosize
                             minRows={3}
                             maxRows={10}
@@ -434,6 +465,12 @@ export const MetadataEditor = ({
                                             size="xs"
                                             disabled={!!volume.error}
                                             aria-label={`Numéro de ${volume.name}`}
+                                            {...changed(
+                                                volumeChanged(
+                                                    volume.path,
+                                                    'Number',
+                                                ),
+                                            )}
                                             value={info.Number ?? ''}
                                             onChange={(e) =>
                                                 set(
@@ -448,6 +485,12 @@ export const MetadataEditor = ({
                                             size="xs"
                                             disabled={!!volume.error}
                                             aria-label={`Titre de ${volume.name}`}
+                                            {...changed(
+                                                volumeChanged(
+                                                    volume.path,
+                                                    'Title',
+                                                ),
+                                            )}
                                             value={info.Title ?? ''}
                                             onChange={(e) =>
                                                 set(
@@ -462,6 +505,12 @@ export const MetadataEditor = ({
                                             size="xs"
                                             disabled={!!volume.error}
                                             aria-label={`Année de ${volume.name}`}
+                                            {...changed(
+                                                volumeChanged(
+                                                    volume.path,
+                                                    'Year',
+                                                ),
+                                            )}
                                             hideControls
                                             value={info.Year ?? ''}
                                             onChange={(value) =>
