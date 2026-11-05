@@ -82,6 +82,8 @@ beforeEach(async () => {
         pages: ctx.pages,
         coversPath: ctx.coversPath,
         files: ctx.files,
+        covers: ctx.covers,
+        wikipedia: ctx.wikipedia,
         auth: authDeps(),
     });
     admin = sessionCookie(ctx.db, 'admin');
@@ -289,11 +291,11 @@ describe('publishing', () => {
     it('needs a series and a number', async () => {
         await writeCbz(ctx.file('_draft/T01.cbz'));
 
-        const { body } = await ctx.files
-            .publish(ctx.library.id, ['_draft/T01.cbz'])
-            .then((result) => ({ body: result }));
+        const { failures } = await ctx.files.publish(ctx.library.id, [
+            '_draft/T01.cbz',
+        ]);
 
-        expect(body.failures[0].reason).toMatch(/série et le numéro/);
+        expect(failures[0]?.reason).toMatch(/série et le numéro/);
         expect(await exists('_draft/T01.cbz')).toBe(true);
     });
 

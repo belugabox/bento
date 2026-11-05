@@ -11,8 +11,10 @@ import { type Role, createSession, upsertUser } from '../src/auth/sessions';
 import type { Db } from '../src/db';
 import { openDatabase } from '../src/db';
 import { syncLibraries } from '../src/library/catalog';
+import { SeriesCovers } from '../src/library/covers';
 import { LibraryFiles } from '../src/library/files';
 import { LibraryScanner } from '../src/library/scanner';
+import { Wikipedia } from '../src/metadata/wikipedia';
 
 export const silent = pino({ level: 'silent' });
 
@@ -73,6 +75,9 @@ export const setup = async (type: 'manga' | 'comics' = 'manga') => {
             coversPath,
             silent,
         ),
+        covers: new SeriesCovers(database.db, pages, coversPath),
+        // Pas de réseau dans les tests : toute requête échoue.
+        wikipedia: new Wikipedia(() => Promise.reject(new Error('hors ligne'))),
         file: (relative: string) => path.join(root, ...relative.split('/')),
         cleanup: async () => {
             database.close();

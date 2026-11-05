@@ -22,9 +22,12 @@ import {
     listLibraries,
     listSeries,
     savePageSizes,
+    seriesCoverOf,
     setSeriesAgeRating,
 } from './library/catalog';
+import { type SeriesCovers, seriesCoverFile } from './library/covers';
 import type { LibraryFiles } from './library/files';
+import type { Wikipedia } from './metadata/wikipedia';
 import { getProgress, listInProgress, saveProgress } from './library/progress';
 import { type LibraryScanner, coverFile } from './library/scanner';
 import { AppError, notFound } from './tools/errors';
@@ -39,6 +42,8 @@ export type ApiDeps = {
     pages: PageReader;
     coversPath: string;
     files: LibraryFiles;
+    covers: SeriesCovers;
+    wikipedia: Wikipedia;
     auth: Omit<AuthDeps, 'db' | 'logger'>;
 };
 
@@ -81,6 +86,8 @@ export const createApi = ({
     pages,
     coversPath,
     files,
+    covers,
+    wikipedia,
     auth,
 }: ApiDeps) =>
     new Hono<AuthEnv>()
@@ -143,6 +150,73 @@ export const createApi = ({
         )
         .get('/series/:id', zValidator('param', idParam), (c) =>
             c.json(getSeries(db, c.var.user, c.req.valid('param').id)),
+        )
+        // Couverture de la série : celle choisie, sinon celle du premier tome.
+        .get('/series/:id/cover', zValidator('param', idParam), async (c) => {
+            const { id } = c.req.valid('param');
+            const { coverUpdatedAt, firstVolumeId } = seriesCoverOf(
+                db,
+                c.var.user,
+                id,
+            );
+            const file = coverUpdatedAt
+                ? seriesCoverFile(coversPath, id)
+                : firstVolumeId && coverFile(coversPath, firstVolumeId);
+            const cover = file
+                ? await readFile(file).catch(() => undefined)
+                : undefined;
+            if (!cover) throw notFound('Couverture introuvable');
+            return c.body(new Uint8Array(cover), 200, {
+                'Content-Type': 'image/webp',
+                // L'adresse du client change avec la couverture (?v=).
+                'Cache-Control': 'private, max-age=3600',
+            });
+        })
+        .put(
+            '/series/:id/cover',
+            requireAdmin,
+            zValidator('param', idParam),
+            zValidator(
+                'json',
+                z.discriminatedUnion('type', [
+                    z.object({
+                        type: z.literal('volume'),
+                        volumeId: z.number().int().positive(),
+                        page: z.number().int().min(0).optional(),
+                    }),
+                    z.object({ type: z.literal('url'), url: z.string() }),
+                    z.object({ type: z.literal('default') }),
+                ]),
+            ),
+            async (c) =>
+                c.json(
+                    await covers.set(
+                        c.req.valid('param').id,
+                        c.req.valid('json'),
+                    ),
+                ),
+        )
+        // --- Métadonnées Wikipédia (admin).
+        .get(
+            '/metadata/wikipedia/search',
+            requireAdmin,
+            zValidator(
+                'query',
+                z.object({
+                    q: z.string().trim().min(1),
+                    kind: z.enum(['manga', 'comics']).default('manga'),
+                }),
+            ),
+            async (c) => {
+                const { q, kind } = c.req.valid('query');
+                return c.json(await wikipedia.search(q, kind));
+            },
+        )
+        .get(
+            '/metadata/wikipedia/:id',
+            requireAdmin,
+            zValidator('param', idParam),
+            async (c) => c.json(await wikipedia.series(c.req.valid('param').id)),
         )
         // Classification choisie dans Bento (null : celle des tomes).
         .put(

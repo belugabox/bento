@@ -11,7 +11,9 @@ import { OidcClient } from './auth/oidc';
 import { loadConfig } from './config';
 import { openDatabase } from './db';
 import { syncLibraries } from './library/catalog';
+import { SeriesCovers } from './library/covers';
 import { LibraryFiles } from './library/files';
+import { Wikipedia } from './metadata/wikipedia';
 import { LibraryScanner } from './library/scanner';
 import { createLogger } from './tools/logger';
 
@@ -61,6 +63,8 @@ const app = new Hono()
                 config.COVERS_PATH,
                 logger,
             ),
+            covers: new SeriesCovers(database.db, pages, config.COVERS_PATH),
+            wikipedia: new Wikipedia(),
             auth: {
                 oidc: new OidcClient({
                     issuer: config.OIDC_ISSUER,

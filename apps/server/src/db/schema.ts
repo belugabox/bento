@@ -55,6 +55,9 @@ export const series = sqliteTable(
         ageRatingOverride: text('age_rating_override'),
         // Âge minimal pour la lire, déduit de la classification ; null = inconnu.
         minAge: integer('min_age'),
+        // Couverture choisie (fichier covers/series-<id>.webp) : date de mise
+        // à jour, pour les caches ; null = celle du premier tome.
+        coverUpdatedAt: integer('cover_updated_at', { mode: 'timestamp_ms' }),
         year: integer('year'),
         count: integer('count'),
         writer: text('writer'),

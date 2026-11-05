@@ -89,6 +89,7 @@ export const listSeries = (
             volumeCount: count(volumes.id),
             // Couverture de la série : celle de son premier tome. Sous-requêtes en
             // SQL brut : Drizzle n'y préfixe pas les colonnes par leur table.
+            coverUpdatedAt: series.coverUpdatedAt,
             coverVolumeId: sql<number>`(select v.id from volumes v where v.series_id = series.id order by v.sort_number is null, v.sort_number, v.file limit 1)`,
             // Tomes lus par la personne.
             readCount: sql<number>`(select count(*) from read_progress rp join volumes v on v.id = rp.volume_id where v.series_id = series.id and rp.user_id = ${viewer.id} and rp.completed = 1)`,
@@ -121,6 +122,7 @@ export const getSeries = (db: Db, viewer: Viewer, id: number) => {
             ageRating: series.ageRating,
             ageRatingOverride: series.ageRatingOverride,
             minAge: series.minAge,
+            coverUpdatedAt: series.coverUpdatedAt,
             year: series.year,
             count: series.count,
             writer: series.writer,
@@ -244,3 +246,22 @@ export const savePageSizes = (
         .set({ pageSizes: sizes })
         .where(eq(volumes.id, volumeId))
         .run();
+
+/**
+ * Couverture à servir pour une série visible par la personne : celle
+ * choisie, sinon celle de son premier tome.
+ */
+export const seriesCoverOf = (db: Db, viewer: Viewer, id: number) => {
+    const row = db
+        .select({
+            coverUpdatedAt: series.coverUpdatedAt,
+            firstVolumeId: sql<
+                number | null
+            >`(select v.id from volumes v where v.series_id = series.id order by v.sort_number is null, v.sort_number, v.file limit 1)`,
+        })
+        .from(series)
+        .where(and(eq(series.id, id), visibleTo(viewer)))
+        .get();
+    if (!row) throw notFound('Série introuvable');
+    return row;
+};

@@ -46,6 +46,8 @@ beforeEach(async () => {
         pages: ctx.pages,
         coversPath: ctx.coversPath,
         files: ctx.files,
+        covers: ctx.covers,
+        wikipedia: ctx.wikipedia,
         auth: authDeps(),
     });
     alice = sessionCookie(ctx.db, 'reader', 'alice');

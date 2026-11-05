@@ -24,6 +24,8 @@ const build = (publicUrl?: string) =>
         pages: ctx.pages,
         coversPath: ctx.coversPath,
         files: ctx.files,
+        covers: ctx.covers,
+        wikipedia: ctx.wikipedia,
         auth: { ...authDeps(oidc.client), ...(publicUrl && { publicUrl }) },
     });
 
