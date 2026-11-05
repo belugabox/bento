@@ -27,7 +27,12 @@ import {
 } from './library/catalog';
 import { type SeriesCovers, seriesCoverFile } from './library/covers';
 import type { LibraryFiles } from './library/files';
-import { getProgress, listInProgress, saveProgress } from './library/progress';
+import {
+    getProgress,
+    listInProgress,
+    markSeries,
+    saveProgress,
+} from './library/progress';
 import { type LibraryScanner, coverFile } from './library/scanner';
 import { getStats } from './library/stats';
 import type { Wikipedia } from './metadata/wikipedia';
@@ -173,6 +178,21 @@ export const createApi = ({
                         db,
                         c.req.valid('param').id,
                         c.req.valid('json').status,
+                    ),
+                ),
+        )
+        // Toute la série lue ou non lue, pour la personne.
+        .put(
+            '/series/:id/read',
+            zValidator('param', idParam),
+            zValidator('json', z.object({ read: z.boolean() })),
+            (c) =>
+                c.json(
+                    markSeries(
+                        db,
+                        c.var.user,
+                        c.req.valid('param').id,
+                        c.req.valid('json').read,
                     ),
                 ),
         )

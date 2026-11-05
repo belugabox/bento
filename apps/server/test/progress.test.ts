@@ -165,4 +165,35 @@ describe('reading progress', () => {
         });
         expect((await call('/continue', bob)).body).toEqual([]);
     });
+
+    it('marks a whole series read or unread, per person', async () => {
+        await save(gantz[1]!, { page: 1 });
+
+        const read = await call(`/series/${gantzSeries}/read`, alice, {
+            method: 'PUT',
+            json: { read: true },
+        });
+        expect(read.body).toEqual({ volumes: 3, read: true });
+        expect(
+            (await call(`/series/${gantzSeries}`, alice)).body.volumes.map(
+                (v: { progress: { completed: boolean } | null }) =>
+                    v.progress?.completed,
+            ),
+        ).toEqual([true, true, true]);
+        expect(await progressOf(gantz[0]!, bob)).toBeNull();
+
+        await call(`/series/${gantzSeries}/read`, alice, {
+            method: 'PUT',
+            json: { read: false },
+        });
+        for (const id of gantz) expect(await progressOf(id)).toBeNull();
+        expect(
+            (
+                await call('/series/999/read', alice, {
+                    method: 'PUT',
+                    json: { read: true },
+                })
+            ).status,
+        ).toBe(404);
+    });
 });

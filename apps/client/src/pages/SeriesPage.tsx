@@ -8,6 +8,7 @@ import {
     Group,
     Image,
     Loader,
+    Menu,
     SimpleGrid,
     Stack,
     Text,
@@ -17,8 +18,11 @@ import {
 import {
     IconArrowLeft,
     IconCheck,
+    IconChecks,
+    IconDots,
     IconPencil,
     IconPlayerPlay,
+    IconRestore,
 } from '@tabler/icons-react';
 import type { MouseEvent } from 'react';
 import { Link, useParams } from 'react-router';
@@ -33,6 +37,7 @@ import {
 import {
     coverUrl,
     fetchSeries,
+    markSeriesRead,
     saveProgress,
     seriesCoverUrl,
 } from '@/services/api';
@@ -68,6 +73,20 @@ export const SeriesPage = () => {
         series.writer,
         series.publisher,
     ].filter(Boolean);
+
+    /** Toute la série lue, ou non lue (la progression est alors effacée). */
+    const markAll = async (read: boolean) => {
+        if (
+            !read &&
+            !window.confirm(
+                'Marquer toute la série comme non lue ? La progression de chaque tome sera effacée.',
+            )
+        ) {
+            return;
+        }
+        await markSeriesRead(series.id, read);
+        reload();
+    };
 
     /** Coche « lu » d'un tome (sans ouvrir le lecteur). */
     const toggleRead = async (
@@ -163,18 +182,51 @@ export const SeriesPage = () => {
                             {series.summary}
                         </Text>
                     )}
-                    {next && (
-                        <Button
-                            component={Link}
-                            // Relire : repartir de la première page.
-                            to={`/read/${next.volume.id}${next.action === 'reread' ? '?page=1' : ''}`}
-                            leftSection={<IconPlayerPlay size={16} />}
-                            w="fit-content"
-                        >
-                            {ACTION_LABELS[next.action]}{' '}
-                            {volumeLabel(next.volume).toLowerCase()}
-                        </Button>
-                    )}
+                    <Group gap="xs">
+                        {next && (
+                            <Button
+                                component={Link}
+                                // Relire : repartir de la première page.
+                                to={`/read/${next.volume.id}${next.action === 'reread' ? '?page=1' : ''}`}
+                                leftSection={<IconPlayerPlay size={16} />}
+                                w="fit-content"
+                            >
+                                {ACTION_LABELS[next.action]}{' '}
+                                {volumeLabel(next.volume).toLowerCase()}
+                            </Button>
+                        )}
+                        <Menu position="bottom-start">
+                            <Menu.Target>
+                                <ActionIcon
+                                    variant="default"
+                                    size="lg"
+                                    aria-label="Lecture de la série"
+                                >
+                                    <IconDots size={18} />
+                                </ActionIcon>
+                            </Menu.Target>
+                            <Menu.Dropdown>
+                                <Menu.Item
+                                    leftSection={<IconChecks size={14} />}
+                                    disabled={
+                                        readCount === series.volumes.length
+                                    }
+                                    onClick={() => void markAll(true)}
+                                >
+                                    Marquer toute la série comme lue
+                                </Menu.Item>
+                                <Menu.Item
+                                    leftSection={<IconRestore size={14} />}
+                                    disabled={
+                                        !series.volumes.some((v) => v.progress)
+                                    }
+                                    onClick={() => void markAll(false)}
+                                >
+                                    Marquer toute la série comme non lue
+                                </Menu.Item>
+                            </Menu.Dropdown>
+                        </Menu>
+                    </Group>
                 </Stack>
             </Flex>
 

@@ -201,3 +201,7 @@ export const setDraftStatus = (
             json: { folder, status },
         }),
     );
+
+/** Toute la série lue (`true`) ou non lue (progression effacée). */
+export const markSeriesRead = (seriesId: number, read: boolean) =>
+    json(api.series[':id'].read.$put({ ...id(seriesId), json: { read } }));

@@ -1,11 +1,9 @@
 import {
     Alert,
-    Badge,
     Button,
     Checkbox,
     Group,
     Image,
-    Menu,
     NumberInput,
     Paper,
     Select,
@@ -17,12 +15,7 @@ import {
     Textarea,
 } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
-import {
-    IconChevronDown,
-    IconFileText,
-    IconUpload,
-    IconWorld,
-} from '@tabler/icons-react';
+import { IconFileText, IconUpload, IconWand } from '@tabler/icons-react';
 import { useEffect, useMemo, useState } from 'react';
 
 import { type ComicInfo, publicationPathOf } from '@server/types';
@@ -124,6 +117,8 @@ export const MetadataEditor = ({
     const paths = readable.map((v) => v.path);
     const [edits, setEdits] = useState<Edits>(() => initialEdits(readable));
     const [overwrite, setOverwrite] = useState(false);
+    // Après Wikipédia, compléter numéros, titres et années des tomes.
+    const [alsoFileNames, setAlsoFileNames] = useState(true);
     // Statut de la série (publiée) : « unknown » pour « inconnu ».
     const savedStatus = seriesStatus?.value ?? UNKNOWN;
     const [status, setStatus] = useState<string>(savedStatus);
@@ -233,56 +228,13 @@ export const MetadataEditor = ({
     return (
         <Stack>
             <Group justify="space-between">
-                <Group gap="xs">
-                    <Menu position="bottom-start" closeOnItemClick>
-                        <Menu.Target>
-                            <Button
-                                variant="default"
-                                rightSection={<IconChevronDown size={14} />}
-                            >
-                                Remplir
-                            </Button>
-                        </Menu.Target>
-                        <Menu.Dropdown>
-                            <Menu.Item
-                                leftSection={<IconWorld size={14} />}
-                                onClick={wiki.open}
-                            >
-                                Depuis Wikipédia…
-                            </Menu.Item>
-                            <Menu.Item
-                                leftSection={<IconFileText size={14} />}
-                                onClick={() =>
-                                    setEdits((current) =>
-                                        fillFromFileNames(
-                                            current,
-                                            readable,
-                                            overwrite,
-                                        ),
-                                    )
-                                }
-                            >
-                                Depuis les noms de fichiers
-                            </Menu.Item>
-                            <Menu.Divider />
-                            <Menu.Item closeMenuOnClick={false}>
-                                <Checkbox
-                                    size="xs"
-                                    label="Écraser les valeurs existantes"
-                                    checked={overwrite}
-                                    onChange={(e) =>
-                                        setOverwrite(e.currentTarget.checked)
-                                    }
-                                />
-                            </Menu.Item>
-                        </Menu.Dropdown>
-                    </Menu>
-                    {overwrite && (
-                        <Badge color="orange" variant="light">
-                            Écrasement activé
-                        </Badge>
-                    )}
-                </Group>
+                <Button
+                    variant="default"
+                    leftSection={<IconWand size={16} />}
+                    onClick={wiki.open}
+                >
+                    Remplir
+                </Button>
                 <Group gap="xs">
                     <Button
                         variant="default"
@@ -561,14 +513,58 @@ export const MetadataEditor = ({
                 kind={kind}
                 initialQuery={String(series('Series'))}
                 onPick={(details) => {
-                    setEdits((current) =>
-                        fillFromWikipedia(current, paths, details, overwrite),
-                    );
+                    setEdits((current) => {
+                        const filled = fillFromWikipedia(
+                            current,
+                            paths,
+                            details,
+                            overwrite,
+                        );
+                        return alsoFileNames
+                            ? fillFromFileNames(filled, readable, overwrite)
+                            : filled;
+                    });
                     const fromWiki = statusFromWikipedia(details);
                     if (fromWiki && (overwrite || status === UNKNOWN)) {
                         setStatus(fromWiki);
                     }
                 }}
+                footer={
+                    <Stack gap="xs">
+                        <Checkbox
+                            label="Puis compléter depuis les noms de fichiers (numéro, titre, année)"
+                            checked={alsoFileNames}
+                            onChange={(e) =>
+                                setAlsoFileNames(e.currentTarget.checked)
+                            }
+                        />
+                        <Checkbox
+                            label="Écraser les valeurs existantes"
+                            checked={overwrite}
+                            onChange={(e) =>
+                                setOverwrite(e.currentTarget.checked)
+                            }
+                        />
+                        <Group justify="flex-end">
+                            <Button
+                                variant="subtle"
+                                leftSection={<IconFileText size={16} />}
+                                onClick={() => {
+                                    setEdits((current) =>
+                                        fillFromFileNames(
+                                            current,
+                                            readable,
+                                            overwrite,
+                                        ),
+                                    );
+                                    wiki.close();
+                                }}
+                            >
+                                Sans Wikipédia : noms de fichiers seulement
+                            </Button>
+                        </Group>
+                    </Stack>
+                }
             />
         </Stack>
     );

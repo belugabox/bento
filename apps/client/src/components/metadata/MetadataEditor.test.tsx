@@ -89,7 +89,11 @@ describe('MetadataEditor', () => {
         render(<Editor onChanged={onChanged} />);
 
         fireEvent.click(screen.getByRole('button', { name: /Remplir/ }));
-        fireEvent.click(await screen.findByText('Depuis les noms de fichiers'));
+        fireEvent.click(
+            await screen.findByRole('button', {
+                name: /noms de fichiers seulement/,
+            }),
+        );
         expect(numberOf(1).value).toBe('1');
         expect(numberOf(2).value).toBe('2');
         // Champs remplis : surlignés jusqu'à l'enregistrement.
@@ -220,5 +224,65 @@ describe('MetadataEditor', () => {
         expect(save).toHaveBeenCalledWith('completed');
         expect(screen.getByText('Statut de la série enregistré.')).toBeTruthy();
         expect(screen.queryByText(/tome\(s\) enregistré/)).toBeNull();
+    });
+
+    it('fills from Wikipedia, then from the file names', async () => {
+        vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+            const url = String(input);
+            const body = url.includes('/metadata/wikipedia/search')
+                ? [
+                      {
+                          id: 7,
+                          title: 'Gantz',
+                          url: 'https://fr.wikipedia.org/wiki/Gantz',
+                      },
+                  ]
+                : {
+                      id: 7,
+                      title: 'Gantz',
+                      url: 'https://fr.wikipedia.org/wiki/Gantz',
+                      summary: 'Des aliens.',
+                      genre: 'Science-fiction',
+                      writer: 'Hiroya Oku',
+                      penciller: 'Hiroya Oku',
+                      publisher: 'Tonkam',
+                      volumeCount: 37,
+                      firstYear: 2000,
+                      lastYear: 2013,
+                      ongoing: false,
+                  };
+            return new Response(JSON.stringify(body), {
+                headers: { 'Content-Type': 'application/json' },
+            });
+        });
+        render(<Editor />);
+
+        fireEvent.click(screen.getByRole('button', { name: /Remplir/ }));
+        const searchButton = await screen.findByRole('button', {
+            name: 'Rechercher',
+        });
+        // La recherche part du nom de la série en cours d'édition.
+        expect(
+            (screen.getByPlaceholderText('Nom de la série') as HTMLInputElement)
+                .value,
+        ).toBe('Gantz');
+        fireEvent.click(searchButton);
+        fireEvent.click(await screen.findByRole('button', { name: 'Gantz' }));
+        fireEvent.click(
+            await screen.findByRole('button', { name: 'Utiliser cette fiche' }),
+        );
+
+        expect((screen.getByLabelText('Genre') as HTMLInputElement).value).toBe(
+            'Science-fiction',
+        );
+        // Puis les noms de fichiers : numéros, titres, années.
+        expect(numberOf(2).value).toBe('2');
+        expect(
+            (
+                screen.getByLabelText(
+                    'Titre de Gantz T02 (2017).cbz',
+                ) as HTMLInputElement
+            ).value,
+        ).toBe('Tome 2');
     });
 });

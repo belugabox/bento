@@ -99,3 +99,28 @@ export const listInProgress = (db: Db, viewer: Viewer, limit = 12) =>
         .orderBy(desc(readProgress.updatedAt))
         .limit(limit)
         .all();
+
+/**
+ * Marque tous les tomes d'une série comme lus (`read`) ou non lus
+ * (progression effacée), pour la personne. Introuvable si la série lui
+ * est masquée.
+ */
+export const markSeries = (
+    db: Db,
+    viewer: Viewer,
+    seriesId: number,
+    read: boolean,
+) => {
+    const ids = db
+        .select({ id: volumes.id })
+        .from(volumes)
+        .innerJoin(series, eq(series.id, volumes.seriesId))
+        .where(and(eq(series.id, seriesId), visibleTo(viewer)))
+        .all()
+        .map((v) => v.id);
+    if (ids.length === 0) throw notFound('Série introuvable');
+    for (const id of ids) {
+        saveProgress(db, viewer.id, id, { completed: read });
+    }
+    return { volumes: ids.length, read };
+};

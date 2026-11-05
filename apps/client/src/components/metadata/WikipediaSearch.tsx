@@ -2,6 +2,7 @@ import {
     Alert,
     Anchor,
     Button,
+    Divider,
     Group,
     Image,
     Loader,
@@ -11,7 +12,7 @@ import {
     TextInput,
 } from '@mantine/core';
 import { IconSearch } from '@tabler/icons-react';
-import { type FormEvent, useEffect, useState } from 'react';
+import { type FormEvent, type ReactNode, useEffect, useState } from 'react';
 
 import {
     type WikipediaDetails,
@@ -31,6 +32,7 @@ export const WikipediaSearch = ({
     initialQuery,
     actionLabel = 'Utiliser cette fiche',
     onPick,
+    footer,
 }: {
     opened: boolean;
     onClose: () => void;
@@ -38,6 +40,8 @@ export const WikipediaSearch = ({
     initialQuery: string;
     actionLabel?: string;
     onPick: (details: WikipediaDetails) => void;
+    /** Options et actions en bas de la fenêtre. */
+    footer?: ReactNode;
 }) => {
     const [query, setQuery] = useState(initialQuery);
     const [results, setResults] = useState<WikipediaResult[]>();
@@ -191,6 +195,12 @@ export const WikipediaSearch = ({
                             </Button>
                         ))}
                     </Stack>
+                )}
+                {footer && (
+                    <>
+                        <Divider />
+                        {footer}
+                    </>
                 )}
             </Stack>
         </Modal>
