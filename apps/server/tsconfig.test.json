@@ -1,0 +1,9 @@
+{
+    // Vérification des types des tests (vitest ne la fait pas).
+    "extends": "./tsconfig.json",
+    "compilerOptions": {
+        "noEmit": true,
+        "rootDir": "."
+    },
+    "include": ["src/**/*.ts", "test/**/*.ts"]
+}

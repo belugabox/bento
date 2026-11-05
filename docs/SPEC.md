@@ -20,7 +20,7 @@ Bento est le serveur de lecture et de gestion des mangas et BD de la maison. Il 
 | Contenus | Mangas et BD/comics en CBZ | EPUB, PDF |
 | Appareils | Navigateur, tablette et téléphone (appli installable), lecture hors ligne | Liseuses (OPDS) |
 | Utilisateurs | L'admin (gestion) et la famille (lecture) | Accès public |
-| Métadonnées | Wikipédia FR (mangas et BD), noms de fichiers, saisie | Bedetheque (bloque les robots) |
+| Métadonnées | Wikipédia FR (mangas et BD), manga-news (mangas, prévu), noms de fichiers, saisie | Bedetheque (bloque les robots) |
 
 ## Fonctionnalités
 
@@ -33,7 +33,7 @@ Bento est le serveur de lecture et de gestion des mangas et BD de la maison. Il 
 - **Comptes** : chaque compte Bento est créé à la première connexion. L'admin règle ensuite pour chacun la **classification d'âge maximale**.
 
 ### B. Bibliothèques et indexation
-- **Plusieurs bibliothèques**, chacune avec un nom, un dossier, un type (manga ou BD) et un sens de lecture par défaut : de droite à gauche pour les mangas, de gauche à droite pour les BD.
+- **Plusieurs bibliothèques**, chacune avec un nom, un dossier, et un type (manga ou BD). La lecture se fait de gauche à droite par défaut, pour toutes les bibliothèques.
 - **Scan** : il indexe les séries et les tomes en base (ComicInfo, nombre de pages, taille, dates) et génère les vignettes de couverture.
   - Il se relance à la demande, périodiquement, et après chaque publication.
 - **Brouillons** : un dossier `_draft` par bibliothèque pour les tomes à préparer. Les lecteurs ne le voient pas.
@@ -46,7 +46,7 @@ Bento est le serveur de lecture et de gestion des mangas et BD de la maison. Il 
 - **Contrôle parental** : un lecteur ne voit que les séries dont la classification (`AgeRating`) est sous sa limite. Une série sans classification est masquée pour un compte limité.
 
 ### D. Lecteur (tous)
-- **Sens de lecture** : de droite à gauche ou de gauche à droite, réglable par série.
+- **Mode de lecture**, fixé par série par l'admin et modifiable par chacun : BD (gauche → droite), manga de gauche à droite (doubles pages inversées), manga de droite à gauche, ou webtoon (défilement vertical).
 - **Modes d'affichage** :
   - page simple ;
   - double page en paysage, en gérant les doubles pages déjà fusionnées dans l'archive ;
@@ -65,7 +65,12 @@ Bento est le serveur de lecture et de gestion des mangas et BD de la maison. Il 
 
 ### F. Gestion (admin)
 - **Brouillons** : liste des tomes et fiche de chaque tome avec sa couverture et son ComicInfo modifiable.
+- **Réglages de la future série dès les brouillons** : statut, mode de lecture et couverture, appliqués à la publication.
 - **Métadonnées** : recherche Wikipédia FR, remplissage depuis les noms de fichiers, option « écraser les valeurs existantes ».
+- **Manga-news** (prévu) : deuxième source de « Remplir », par défaut pour les mangas.
+  - Série : auteurs, traducteurs, éditeurs VF et VO, type, genres, origine et année, **âge conseillé** (classification), résumé.
+  - Tomes : année, titre et résumé de chaque tome, d'après leurs pages.
+  - Pas d'API : lecture du HTML, à la demande seulement (jamais d'aspiration en masse), avec des tests sur des pages enregistrées. Si le site affiche un contrôle anti-robot (Cloudflare), Bento ne le contourne pas : Wikipédia reste disponible.
 - **Publication** : rangement en `Série/Série #NN (Année).cbz`, l'année étant facultative.
   - Ajout de tomes à une série existante.
   - Remplacement d'un tome de même numéro.
@@ -94,19 +99,22 @@ Bento est le serveur de lecture et de gestion des mangas et BD de la maison. Il 
   - la progression, les listes et les collections.
 - **Images** : vignettes et images redimensionnées gardées dans un cache disque, générées avec sharp.
 - **Déploiement** :
-  - image Docker `beuuun/bento` ;
+  - image Docker `ghcr.io/belugabox/bento`, publiée par GitHub Actions ;
   - volume `/config` pour la config, la base et le cache, plus un volume par dossier de bibliothèque ;
   - un sous-domaine derrière Cloudflare.
 
 ## Feuille de route
 
-1. **Socle de lecture** : dépôt, connexion Pocket ID, bibliothèques, scan et base, grille et fiche série, lecteur de base (sens de lecture, ajustement), progression. À la fin de cette étape, la famille peut lire dans Bento.
-2. **Gestion** : brouillons, métadonnées, Wikipédia, publication, réparations, compression. La logique et les tests sont repris de beluga-box.
-3. **Famille** : contrôle parental, listes, favoris et collections, accueil personnalisé, recherche et filtres complets.
-4. **Lecteur avancé** : double page, défilement vertical, gestes tactiles, zoom.
-5. **Hors ligne** : appli installable, téléchargements, synchronisation de la progression.
-6. **Tomes manquants et sorties.**
-7. **Bascule** : retirer le module manga de beluga-box (la synchro vers `_draft` reste en place) et arrêter Kavita.
+État au 5 novembre 2026 (branche `feat/reading-foundation`).
+
+1. **Socle de lecture** — fait : dépôt, connexion Pocket ID, bibliothèques, scan (à la demande, toutes les 30 min, après publication), grille et fiche série, lecteur, progression.
+2. **Gestion** — fait : brouillons, métadonnées, Wikipédia, publication, réparations, couvertures, statut et mode de lecture dès les brouillons, aperçu de lecture, compression des images.
+3. **Famille** — fait : contrôle parental, vue lecteur pour l'admin, thèmes, statistiques, série lue / non lue, favoris et liste « à lire », collections partagées, filtres par liste, genre et statut, « La suite de tes séries » et « Nouveautés » sur l'accueil.
+4. **Lecteur avancé** — fait : double page, modes BD / manga / webtoon, gestes tactiles, zoom. Reste : images redimensionnées selon l'écran (les pages sont servies en taille d'origine).
+5. **Manga-news** : deuxième source de métadonnées pour les mangas (voir F).
+6. **Hors ligne** : appli installable, téléchargements, synchronisation de la progression.
+7. **Tomes manquants et sorties** : trous dans la numérotation, tomes parus (Wikipédia, puis manga-news) absents de la bibliothèque.
+8. **Bascule** : déployer Bento (image Docker et publication déjà prêtes), retirer le module manga de beluga-box (la synchro vers `_draft` reste en place), arrêter Kavita.
 
 ## Décisions de déploiement
 

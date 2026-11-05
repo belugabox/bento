@@ -1,0 +1,215 @@
+import { and, desc, eq, sql } from 'drizzle-orm';
+
+import type { Db } from '../db';
+import { readProgress, series, volumes } from '../db/schema';
+import { notFound } from '../tools/errors';
+import { volumeOrder } from './catalog';
+import { type Viewer, visibleTo } from './visibility';
+
+export type Progress = { page: number; completed: boolean };
+
+export const getProgress = (
+    db: Db,
+    userId: number,
+    volumeId: number,
+): Progress | null =>
+    db
+        .select({ page: readProgress.page, completed: readProgress.completed })
+        .from(readProgress)
+        .where(
+            and(
+                eq(readProgress.userId, userId),
+                eq(readProgress.volumeId, volumeId),
+            ),
+        )
+        .get() ?? null;
+
+/**
+ * Enregistre où en est la personne. Atteindre la dernière page marque le
+ * tome comme lu, et il le reste si on le relit ; `completed: false` le
+ * remet à « non lu » (progression effacée), `completed: true` le marque lu.
+ */
+export const saveProgress = (
+    db: Db,
+    userId: number,
+    volumeId: number,
+    update: { page?: number; completed?: boolean },
+): Progress | null => {
+    const volume = db
+        .select({ pageCount: volumes.pageCount })
+        .from(volumes)
+        .where(eq(volumes.id, volumeId))
+        .get();
+    if (!volume) throw notFound('Tome introuvable');
+    const where = and(
+        eq(readProgress.userId, userId),
+        eq(readProgress.volumeId, volumeId),
+    );
+
+    if (update.completed === false) {
+        db.delete(readProgress).where(where).run();
+        return null;
+    }
+
+    const lastPage = Math.max(volume.pageCount - 1, 0);
+    const page =
+        update.completed === true
+            ? lastPage
+            : Math.min(update.page ?? 0, lastPage);
+    const previous = getProgress(db, userId, volumeId);
+    const progress = {
+        page,
+        completed:
+            update.completed === true ||
+            previous?.completed === true ||
+            page >= lastPage,
+    };
+    db.insert(readProgress)
+        .values({ userId, volumeId, ...progress, updatedAt: new Date() })
+        .onConflictDoUpdate({
+            target: [readProgress.userId, readProgress.volumeId],
+            set: { ...progress, updatedAt: new Date() },
+        })
+        .run();
+    return progress;
+};
+
+/** Tomes commencés et pas finis, du plus récemment lu au plus ancien. */
+export const listInProgress = (db: Db, viewer: Viewer, limit = 12) =>
+    db
+        .select({
+            volumeId: volumes.id,
+            seriesId: series.id,
+            seriesName: series.name,
+            number: volumes.number,
+            title: volumes.title,
+            page: readProgress.page,
+            pageCount: volumes.pageCount,
+            updatedAt: readProgress.updatedAt,
+        })
+        .from(readProgress)
+        .innerJoin(volumes, eq(volumes.id, readProgress.volumeId))
+        .innerJoin(series, eq(series.id, volumes.seriesId))
+        .where(
+            and(
+                eq(readProgress.userId, viewer.id),
+                eq(readProgress.completed, false),
+                visibleTo(viewer),
+            ),
+        )
+        .orderBy(desc(readProgress.updatedAt))
+        .limit(limit)
+        .all();
+
+/**
+ * Marque tous les tomes d'une série comme lus (`read`) ou non lus
+ * (progression effacée), pour la personne. Introuvable si la série lui
+ * est masquée.
+ */
+export const markSeries = (
+    db: Db,
+    viewer: Viewer,
+    seriesId: number,
+    read: boolean,
+) => {
+    const ids = db
+        .select({ id: volumes.id })
+        .from(volumes)
+        .innerJoin(series, eq(series.id, volumes.seriesId))
+        .where(and(eq(series.id, seriesId), visibleTo(viewer)))
+        .all()
+        .map((v) => v.id);
+    if (ids.length === 0) throw notFound('Série introuvable');
+    for (const id of ids) {
+        saveProgress(db, viewer.id, id, { completed: read });
+    }
+    return { volumes: ids.length, read };
+};
+
+/**
+ * Derniers ajouts : le tome le plus récent de chaque série, des séries
+ * enrichies le plus récemment aux plus anciennes.
+ */
+export const listRecentVolumes = (db: Db, viewer: Viewer, limit = 12) => {
+    const rows = db
+        .select({
+            volumeId: volumes.id,
+            seriesId: series.id,
+            seriesName: series.name,
+            number: volumes.number,
+            title: volumes.title,
+            addedAt: volumes.addedAt,
+        })
+        .from(volumes)
+        .innerJoin(series, eq(series.id, volumes.seriesId))
+        .where(visibleTo(viewer))
+        .orderBy(desc(volumes.addedAt), desc(volumes.sortNumber))
+        .all();
+    const seen = new Set<number>();
+    return rows
+        .filter((row) => !seen.has(row.seriesId) && seen.add(row.seriesId))
+        .slice(0, limit);
+};
+
+/**
+ * Suite des séries entamées : le premier tome pas encore ouvert des séries
+ * dont la personne a fini au moins un tome, sans tome en cours (ceux-là
+ * sont dans « Reprendre la lecture »). Séries lues le plus récemment
+ * d'abord.
+ */
+export const listNextVolumes = (db: Db, viewer: Viewer, limit = 12) => {
+    const rows = db
+        .select({
+            volumeId: volumes.id,
+            seriesId: series.id,
+            seriesName: series.name,
+            number: volumes.number,
+            title: volumes.title,
+            completed: readProgress.completed,
+            updatedAt: readProgress.updatedAt,
+        })
+        .from(volumes)
+        .innerJoin(series, eq(series.id, volumes.seriesId))
+        .leftJoin(
+            readProgress,
+            and(
+                eq(readProgress.volumeId, volumes.id),
+                eq(readProgress.userId, viewer.id),
+            ),
+        )
+        .where(
+            and(
+                visibleTo(viewer),
+                sql`${volumes.seriesId} in (select v.series_id from read_progress rp join volumes v on v.id = rp.volume_id where rp.user_id = ${viewer.id} and rp.completed = 1)`,
+            ),
+        )
+        .orderBy(...volumeOrder)
+        .all();
+    const bySeries = new Map<number, typeof rows>();
+    for (const row of rows) {
+        bySeries.set(row.seriesId, [
+            ...(bySeries.get(row.seriesId) ?? []),
+            row,
+        ]);
+    }
+    const next: ((typeof rows)[number] & { lastReadAt: number })[] = [];
+    for (const items of bySeries.values()) {
+        if (items.some((v) => v.updatedAt && !v.completed)) continue;
+        const unread = items.find((v) => !v.updatedAt);
+        if (!unread) continue;
+        const lastReadAt = Math.max(
+            ...items.map((v) => v.updatedAt?.getTime() ?? 0),
+        );
+        next.push({ ...unread, lastReadAt });
+    }
+    return next
+        .sort((a, b) => b.lastReadAt - a.lastReadAt)
+        .slice(0, limit)
+        .map(({ volumeId, seriesId, seriesName, number, title }) => ({
+            volumeId,
+            seriesId,
+            seriesName,
+            number,
+            title,
+        }));
+};

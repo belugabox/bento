@@ -1,0 +1,18 @@
+# Dépendances et artefacts de build (réinstallés/reconstruits dans l'image)
+**/node_modules
+**/dist
+**/dist-ssr
+
+# Ne jamais embarquer secrets, historique ni données locales
+.git
+.env
+**/.env
+/data
+apps/server/data
+/library
+
+# Fichiers inutiles au build
+Dockerfile
+.dockerignore
+*.md
+*.log

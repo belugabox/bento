@@ -1,0 +1,24 @@
+# Dépendances et builds
+node_modules
+dist
+dist-ssr
+*.tsbuildinfo
+
+# Données locales (base, cache, config de dev) et secrets
+/data
+apps/server/data
+.env
+*.local
+
+# Bibliothèques de test locales
+/library
+apps/server/library
+
+# Logs
+*.log
+
+# Éditeurs
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store

@@ -1,0 +1,19 @@
+{
+    "name": "bento",
+    "version": "0.1.0",
+    "private": true,
+    "description": "Serveur de lecture et de gestion de mangas et BD",
+    "packageManager": "pnpm@10.6.5",
+    "scripts": {
+        "format": "prettier --write \"apps/**/*.{ts,tsx}\"",
+        "build": "pnpm -r build",
+        "dev": "pnpm --parallel dev",
+        "test": "pnpm -r test",
+        "lint": "pnpm --filter client lint",
+        "start": "pnpm --filter server start"
+    },
+    "devDependencies": {
+        "@trivago/prettier-plugin-sort-imports": "^5.2.2",
+        "prettier": "^3.7.4"
+    }
+}
