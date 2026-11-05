@@ -46,7 +46,7 @@ Bento est le serveur de lecture et de gestion des mangas et BD de la maison. Il 
 - **Contrôle parental** : un lecteur ne voit que les séries dont la classification (`AgeRating`) est sous sa limite. Une série sans classification est masquée pour un compte limité.
 
 ### D. Lecteur (tous)
-- **Sens de lecture** : de gauche à droite par défaut, ou de droite à gauche, réglable par série.
+- **Mode de lecture**, fixé par série par l'admin et modifiable par chacun : BD (gauche → droite), manga de gauche à droite (doubles pages inversées), manga de droite à gauche, ou webtoon (défilement vertical).
 - **Modes d'affichage** :
   - page simple ;
   - double page en paysage, en gérant les doubles pages déjà fusionnées dans l'archive ;

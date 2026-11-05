@@ -8,6 +8,7 @@ import {
     Loader,
     Popover,
     SegmentedControl,
+    Select,
     Slider,
     Stack,
     Text,
@@ -44,16 +45,20 @@ import {
 } from '@/services/api';
 import { useQuery } from '@/services/useQuery';
 
+import { WebtoonView } from './WebtoonView';
 import {
-    type Direction,
     type Fit,
     type Move,
+    READING_MODES,
+    type ReadingMode,
     clampPage,
     doubleSpreads,
     moveForKey,
     moveForSide,
     moveForSwipe,
+    navigationDirection,
     pagesToPreload,
+    reversesSpreads,
     sideOfTap,
     singleSpreads,
     spreadIndexOf,
@@ -99,22 +104,29 @@ export const ReaderPage = () => {
         key: 'bento:reader:pages',
         defaultValue: 'auto',
     });
-    // Sens réglable par série ; par défaut celui renvoyé par le serveur.
-    const [directions, setDirections] = useLocalStorage<
-        Record<string, Direction>
-    >({ key: 'bento:reader:directions', defaultValue: {} });
+    // Mode de lecture réglable par série ; par défaut celui de la série.
+    const [modes, setModes] = useLocalStorage<Record<string, ReadingMode>>({
+        key: 'bento:reader:modes',
+        defaultValue: {},
+    });
     const [toolbar, setToolbar] = useState(true);
     const [ended, setEnded] = useState(false);
     const [zoomed, setZoomed] = useState(false);
     const zoom = useRef<ReactZoomPanPinchRef>(null);
 
     const landscape = useMediaQuery('(orientation: landscape)') ?? false;
+    const mode: ReadingMode =
+        (volume && modes[volume.seriesId]) ?? volume?.readingMode ?? 'ltr';
+    const webtoon = mode === 'webtoon';
+    const direction = navigationDirection(mode);
     const wantDouble =
-        pageMode === 'double' || (pageMode === 'auto' && landscape);
-    // Dimensions des pages : seulement pour la double page.
+        !webtoon &&
+        (pageMode === 'double' || (pageMode === 'auto' && landscape));
+    // Dimensions des pages : double page, ou place des pages d'un webtoon.
+    const needSizes = wantDouble || webtoon;
     const { data: sizes } = useQuery(
-        () => (wantDouble ? fetchPageSizes(volumeId) : Promise.resolve(null)),
-        [volumeId, wantDouble],
+        () => (needSizes ? fetchPageSizes(volumeId) : Promise.resolve(null)),
+        [volumeId, needSizes],
     );
 
     const pageCount = volume?.pageCount ?? 0;
@@ -139,8 +151,6 @@ export const ReaderPage = () => {
     const shown = spreads[spreadIndex] ?? [page];
     // Dernière page affichée : c'est elle qui compte pour la progression.
     const lastShown = Math.max(...shown);
-    const direction =
-        (volume && directions[volume.seriesId]) ?? volume?.direction ?? 'ltr';
 
     const goTo = useCallback(
         (next: number) => {
@@ -153,6 +163,8 @@ export const ReaderPage = () => {
         },
         [pageCount, setParams],
     );
+
+    const onWebtoonPage = useCallback((next: number) => goTo(next), [goTo]);
 
     const move = useCallback(
         (to: Move) => {
@@ -202,7 +214,7 @@ export const ReaderPage = () => {
                 navigate(`/series/${volume.seriesId}`);
                 return;
             }
-            const to = moveForKey(event.key, direction);
+            const to = webtoon ? undefined : moveForKey(event.key, direction);
             if (to) {
                 event.preventDefault();
                 move(to);
@@ -210,18 +222,19 @@ export const ReaderPage = () => {
         };
         window.addEventListener('keydown', onKey);
         return () => window.removeEventListener('keydown', onKey);
-    }, [direction, move, navigate, volume]);
+    }, [direction, move, navigate, volume, webtoon]);
 
     // Précharger les pages voisines (cache du navigateur).
     useEffect(() => {
-        if (!volume) return;
+        // Webtoon : les pages se chargent au fil du défilement.
+        if (!volume || webtoon) return;
         for (const index of pagesToPreload(lastShown, pageCount, {
             ahead: 4,
             behind: 2,
         })) {
             new Image().src = pageUrl(volume.id, index);
         }
-    }, [volume, lastShown, pageCount]);
+    }, [volume, lastShown, pageCount, webtoon]);
 
     // --- Gestes : balayage et toucher ---------------------------------------
     const gesture = useRef<{
@@ -291,8 +304,8 @@ export const ReaderPage = () => {
     const title = `${volume.seriesName} — ${volume.number ? `Tome ${volume.number}` : (volume.title ?? '')}`;
     // Le curseur suit le sens de lecture : de droite à gauche, la fin est à gauche.
     const sliderValue = direction === 'rtl' ? pageCount - page : page + 1;
-    // Ordre à l'écran : la première page à droite en lecture droite → gauche.
-    const onScreen = direction === 'rtl' ? [...shown].reverse() : shown;
+    // Ordre à l'écran : la première page à droite pour les mangas.
+    const onScreen = reversesSpreads(mode) ? [...shown].reverse() : shown;
     const pageLabel =
         shown.length > 1
             ? `${shown[0]! + 1}-${lastShown + 1}`
@@ -331,43 +344,58 @@ export const ReaderPage = () => {
             pos="relative"
             style={{ userSelect: 'none' }}
         >
-            <Box
-                onPointerDown={onPointerDown}
-                onPointerUp={onPointerUp}
-                onPointerCancel={(event) =>
-                    pointers.current.delete(event.pointerId)
-                }
-                onClick={onClick}
-                style={{
-                    overflowX: fit === 'height' ? 'auto' : 'hidden',
-                    // Écran : le zoom gère les doigts ; sinon, défilement normal.
-                    touchAction: fit === 'screen' ? 'none' : 'pan-x pan-y',
-                }}
-            >
-                {fit === 'screen' ? (
-                    <TransformWrapper
-                        ref={zoom}
-                        minScale={1}
-                        maxScale={5}
-                        limitToBounds
-                        wheel={{ disabled: true }}
-                        doubleClick={{ disabled: true }}
-                        // Sans zoom, le doigt sert à tourner les pages.
-                        panning={{ disabled: !zoomed }}
-                        onTransformed={(_, state) =>
-                            setZoomed(state.scale > 1.01)
-                        }
-                    >
-                        <TransformComponent
-                            wrapperStyle={{ width: '100vw', height: '100dvh' }}
+            {webtoon ? (
+                <WebtoonView
+                    volumeId={volume.id}
+                    sizes={sizes ?? undefined}
+                    initialPage={page}
+                    onPage={onWebtoonPage}
+                    onTap={() => setToolbar((visible) => !visible)}
+                    seriesId={volume.seriesId}
+                    nextId={volume.nextId}
+                />
+            ) : (
+                <Box
+                    onPointerDown={onPointerDown}
+                    onPointerUp={onPointerUp}
+                    onPointerCancel={(event) =>
+                        pointers.current.delete(event.pointerId)
+                    }
+                    onClick={onClick}
+                    style={{
+                        overflowX: fit === 'height' ? 'auto' : 'hidden',
+                        // Écran : le zoom gère les doigts ; sinon, défilement normal.
+                        touchAction: fit === 'screen' ? 'none' : 'pan-x pan-y',
+                    }}
+                >
+                    {fit === 'screen' ? (
+                        <TransformWrapper
+                            ref={zoom}
+                            minScale={1}
+                            maxScale={5}
+                            limitToBounds
+                            wheel={{ disabled: true }}
+                            doubleClick={{ disabled: true }}
+                            // Sans zoom, le doigt sert à tourner les pages.
+                            panning={{ disabled: !zoomed }}
+                            onTransformed={(_, state) =>
+                                setZoomed(state.scale > 1.01)
+                            }
                         >
-                            {images}
-                        </TransformComponent>
-                    </TransformWrapper>
-                ) : (
-                    images
-                )}
-            </Box>
+                            <TransformComponent
+                                wrapperStyle={{
+                                    width: '100vw',
+                                    height: '100dvh',
+                                }}
+                            >
+                                {images}
+                            </TransformComponent>
+                        </TransformWrapper>
+                    ) : (
+                        images
+                    )}
+                </Box>
+            )}
 
             {ended && (
                 <Center pos="fixed" inset={0} style={{ pointerEvents: 'none' }}>
@@ -428,7 +456,7 @@ export const ReaderPage = () => {
                             </Text>
                         </Group>
                         <Group gap={4} wrap="nowrap">
-                            {fit === 'screen' && (
+                            {fit === 'screen' && !webtoon && (
                                 <>
                                     <ActionIcon
                                         variant="subtle"
@@ -472,81 +500,80 @@ export const ReaderPage = () => {
                                 </Popover.Target>
                                 <Popover.Dropdown>
                                     <Stack gap="xs">
-                                        <Text size="xs" c="dimmed">
-                                            Sens de lecture (cette série)
-                                        </Text>
-                                        <SegmentedControl
+                                        <Select
                                             size="xs"
-                                            fullWidth
-                                            value={direction}
+                                            label="Mode de lecture (cette série)"
+                                            allowDeselect={false}
+                                            value={mode}
                                             onChange={(value) =>
-                                                setDirections((current) => ({
+                                                value &&
+                                                setModes((current) => ({
                                                     ...current,
                                                     [volume.seriesId]:
-                                                        value as Direction,
+                                                        value as ReadingMode,
                                                 }))
                                             }
-                                            data={[
-                                                {
-                                                    value: 'ltr',
-                                                    label: 'Gauche → droite',
-                                                },
-                                                {
-                                                    value: 'rtl',
-                                                    label: 'Droite → gauche',
-                                                },
-                                            ]}
+                                            data={READING_MODES}
+                                            comboboxProps={{
+                                                withinPortal: false,
+                                            }}
                                         />
-                                        <Text size="xs" c="dimmed">
-                                            Pages par écran
-                                        </Text>
-                                        <SegmentedControl
-                                            size="xs"
-                                            fullWidth
-                                            value={pageMode}
-                                            onChange={(value) =>
-                                                setPageMode(value as PageMode)
-                                            }
-                                            data={[
-                                                {
-                                                    value: 'auto',
-                                                    label: 'Auto',
-                                                },
-                                                {
-                                                    value: 'single',
-                                                    label: 'Une',
-                                                },
-                                                {
-                                                    value: 'double',
-                                                    label: 'Deux',
-                                                },
-                                            ]}
-                                        />
-                                        <Text size="xs" c="dimmed">
-                                            Ajustement
-                                        </Text>
-                                        <SegmentedControl
-                                            size="xs"
-                                            fullWidth
-                                            value={fit}
-                                            onChange={(value) =>
-                                                setFit(value as Fit)
-                                            }
-                                            data={[
-                                                {
-                                                    value: 'screen',
-                                                    label: 'Écran',
-                                                },
-                                                {
-                                                    value: 'width',
-                                                    label: 'Largeur',
-                                                },
-                                                {
-                                                    value: 'height',
-                                                    label: 'Hauteur',
-                                                },
-                                            ]}
-                                        />
+                                        {!webtoon && (
+                                            <>
+                                                <Text size="xs" c="dimmed">
+                                                    Pages par écran
+                                                </Text>
+                                                <SegmentedControl
+                                                    size="xs"
+                                                    fullWidth
+                                                    value={pageMode}
+                                                    onChange={(value) =>
+                                                        setPageMode(
+                                                            value as PageMode,
+                                                        )
+                                                    }
+                                                    data={[
+                                                        {
+                                                            value: 'auto',
+                                                            label: 'Auto',
+                                                        },
+                                                        {
+                                                            value: 'single',
+                                                            label: 'Une',
+                                                        },
+                                                        {
+                                                            value: 'double',
+                                                            label: 'Deux',
+                                                        },
+                                                    ]}
+                                                />
+                                                <Text size="xs" c="dimmed">
+                                                    Ajustement
+                                                </Text>
+                                                <SegmentedControl
+                                                    size="xs"
+                                                    fullWidth
+                                                    value={fit}
+                                                    onChange={(value) =>
+                                                        setFit(value as Fit)
+                                                    }
+                                                    data={[
+                                                        {
+                                                            value: 'screen',
+                                                            label: 'Écran',
+                                                        },
+                                                        {
+                                                            value: 'width',
+                                                            label: 'Largeur',
+                                                        },
+                                                        {
+                                                            value: 'height',
+                                                            label: 'Hauteur',
+                                                        },
+                                                    ]}
+                                                />
+                                            </>
+                                        )}
                                     </Stack>
                                 </Popover.Dropdown>
                             </Popover>
@@ -562,21 +589,23 @@ export const ReaderPage = () => {
                         wrap="nowrap"
                         bg="rgba(0,0,0,0.75)"
                     >
-                        <Slider
-                            style={{ flex: 1 }}
-                            min={1}
-                            max={Math.max(pageCount, 1)}
-                            value={sliderValue}
-                            onChange={(value) =>
-                                goTo(
-                                    direction === 'rtl'
-                                        ? pageCount - value
-                                        : value - 1,
-                                )
-                            }
-                            label={null}
-                            color="gray"
-                        />
+                        {!webtoon && (
+                            <Slider
+                                style={{ flex: 1 }}
+                                min={1}
+                                max={Math.max(pageCount, 1)}
+                                value={sliderValue}
+                                onChange={(value) =>
+                                    goTo(
+                                        direction === 'rtl'
+                                            ? pageCount - value
+                                            : value - 1,
+                                    )
+                                }
+                                label={null}
+                                color="gray"
+                            />
+                        )}
                         <Text
                             c="white"
                             size="sm"

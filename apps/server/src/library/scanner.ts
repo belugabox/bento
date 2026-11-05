@@ -26,7 +26,14 @@ type FoundArchive = {
     mtimeMs: number;
 };
 
-const COVER_WIDTH = 400;
+// Format d'une couverture (2:3), recadrée depuis le haut : une page très
+// haute (webtoon) ne donne pas une vignette interminable.
+const COVER_SIZE = {
+    width: 400,
+    height: 600,
+    fit: 'cover',
+    position: 'top',
+} as const;
 
 export const coverFile = (coversPath: string, volumeId: number) =>
     path.join(coversPath, `${volumeId}.webp`);
@@ -221,7 +228,7 @@ export class LibraryScanner {
         // Couverture : sans elle, le tome reste lisible.
         try {
             await sharp(pages[0]!.getData())
-                .resize({ width: COVER_WIDTH, withoutEnlargement: true })
+                .resize(COVER_SIZE)
                 .webp({ quality: 80 })
                 .toFile(coverFile(this.coversPath, volume.id));
         } catch (error) {

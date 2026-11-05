@@ -61,6 +61,10 @@ export const series = sqliteTable(
         // En cours de parution ou terminée, réglé dans Bento (pas dans les
         // tomes) ; null = inconnu.
         status: text('status', { enum: ['ongoing', 'completed'] }),
+        // Mode de lecture choisi pour la série ; null = celui de la bibliothèque.
+        readingMode: text('reading_mode', {
+            enum: ['ltr', 'ltr-manga', 'rtl', 'webtoon'],
+        }),
         writer: text('writer'),
         publisher: text('publisher'),
         createdAt: integer('created_at', { mode: 'timestamp' })

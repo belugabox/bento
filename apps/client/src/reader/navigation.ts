@@ -112,3 +112,27 @@ export const spreadIndexOf = (spreads: Spread[], page: number) =>
         spreads.findIndex((spread) => spread.includes(page)),
         0,
     );
+
+/** Mode de lecture d'une série. */
+export type ReadingMode = 'ltr' | 'ltr-manga' | 'rtl' | 'webtoon';
+
+export const READING_MODES: { value: ReadingMode; label: string }[] = [
+    { value: 'ltr', label: 'BD (gauche → droite)' },
+    { value: 'ltr-manga', label: 'Manga (gauche → droite)' },
+    { value: 'rtl', label: 'Manga (droite → gauche)' },
+    { value: 'webtoon', label: 'Webtoon (défilement vertical)' },
+];
+
+export const readingModeLabel = (mode: ReadingMode) =>
+    READING_MODES.find((m) => m.value === mode)?.label ?? mode;
+
+/** Sens pour tourner les pages (clavier, toucher, balayage). */
+export const navigationDirection = (mode: ReadingMode): Direction =>
+    mode === 'rtl' ? 'rtl' : 'ltr';
+
+/**
+ * En double page, la première page est à droite pour les mangas, qu'on
+ * tourne les pages vers la gauche ou vers la droite.
+ */
+export const reversesSpreads = (mode: ReadingMode) =>
+    mode === 'rtl' || mode === 'ltr-manga';

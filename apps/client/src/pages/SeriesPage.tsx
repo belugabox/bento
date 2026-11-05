@@ -119,6 +119,8 @@ export const SeriesPage = () => {
                         })}
                         alt={series.name}
                         w={{ base: 160, sm: 200 }}
+                        h={{ base: 240, sm: 300 }}
+                        fit="cover"
                         radius="md"
                         style={{ flexShrink: 0, alignSelf: 'flex-start' }}
                     />

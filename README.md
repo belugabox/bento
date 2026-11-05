@@ -37,7 +37,7 @@ Toute la configuration passe par des variables d'environnement :
 | `PORT` | `3001` | Port HTTP |
 | `LOG_LEVEL` | `info` | `debug`, `info`, `warn` ou `error` |
 | `DATA_PATH` | `./data` (`/config` dans Docker) | Base SQLite et couvertures |
-| `LIBRARIES` | `[]` | Bibliothèques, en JSON : `[{"name":"Mangas","path":"/manga","type":"manga"}]`. Type `manga` ou `comics`. La lecture se fait de gauche à droite par défaut ; le sens se change par série dans le lecteur |
+| `LIBRARIES` | `[]` | Bibliothèques, en JSON : `[{"name":"Mangas","path":"/manga","type":"manga"}]`. Type `manga` ou `comics` : mode de lecture par défaut « Manga (gauche → droite) » ou « BD » |
 | `SCAN_INTERVAL_MINUTES` | `30` | Scan automatique des bibliothèques (`0` = seulement au démarrage et à la demande) |
 | `OIDC_ISSUER` | — (requis) | Adresse de Pocket ID, ex. `https://auth.belugabox.net` |
 | `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET` | — (requis) | Client OIDC « Bento » créé dans Pocket ID |
@@ -54,6 +54,15 @@ Toute la configuration passe par des variables d'environnement :
 - **Couverture** : celle d'un tome, une page au choix, ou l'image de l'article Wikipédia.
 
 Bento écrit dans les fichiers (ComicInfo, rangement) : le conteneur doit pouvoir écrire dans les dossiers des bibliothèques.
+
+### Modes de lecture
+
+- **BD** : de gauche à droite.
+- **Manga (gauche → droite)** : on tourne les pages vers la droite, mais en double page la première page est à droite, comme dans un manga.
+- **Manga (droite → gauche)** : sens japonais, y compris pour tourner les pages.
+- **Webtoon** : toutes les pages à la suite, en défilement vertical.
+
+L'admin fixe le mode de chaque série dans « Modifier les métadonnées » (par défaut : manga de gauche à droite pour une bibliothèque de mangas, BD sinon) ; chacun peut le changer pour lui-même dans les réglages du lecteur.
 
 ### Apparence
 

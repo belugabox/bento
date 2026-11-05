@@ -1,5 +1,6 @@
 import {
     Alert,
+    AspectRatio,
     Button,
     Group,
     Image,
@@ -97,11 +98,14 @@ export const CoverPicker = ({
                                             })
                                         }
                                     >
-                                        <Image
-                                            src={coverUrl(v.id)}
-                                            radius="sm"
-                                            alt=""
-                                        />
+                                        <AspectRatio ratio={2 / 3}>
+                                            <Image
+                                                src={coverUrl(v.id)}
+                                                radius="sm"
+                                                fit="cover"
+                                                alt=""
+                                            />
+                                        </AspectRatio>
                                         <Text size="xs" ta="center">
                                             {v.label}
                                         </Text>
@@ -154,6 +158,8 @@ export const CoverPicker = ({
                                     <Image
                                         src={pageUrl(volume.id, page - 1)}
                                         w={160}
+                                        mah={320}
+                                        fit="contain"
                                         radius="sm"
                                         alt={`Page ${page}`}
                                     />

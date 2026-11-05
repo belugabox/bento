@@ -27,7 +27,12 @@ export const seriesCoverFile = (coversPath: string, seriesId: number) =>
 
 const toCover = (image: Buffer, destination: string) =>
     sharp(image)
-        .resize({ width: COVER_WIDTH, withoutEnlargement: true })
+        .resize({
+            width: COVER_WIDTH,
+            height: COVER_WIDTH * 1.5,
+            fit: 'cover',
+            position: 'top',
+        })
         .webp({ quality: 85 })
         .toFile(destination);
 

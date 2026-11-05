@@ -23,6 +23,7 @@ import {
     listSeries,
     savePageSizes,
     seriesCoverOf,
+    setSeriesReadingMode,
     setSeriesStatus,
 } from './library/catalog';
 import { type SeriesCovers, seriesCoverFile } from './library/covers';
@@ -178,6 +179,27 @@ export const createApi = ({
                         db,
                         c.req.valid('param').id,
                         c.req.valid('json').status,
+                    ),
+                ),
+        )
+        .put(
+            '/series/:id/reading-mode',
+            requireAdmin,
+            zValidator('param', idParam),
+            zValidator(
+                'json',
+                z.object({
+                    readingMode: z
+                        .enum(['ltr', 'ltr-manga', 'rtl', 'webtoon'])
+                        .nullable(),
+                }),
+            ),
+            (c) =>
+                c.json(
+                    setSeriesReadingMode(
+                        db,
+                        c.req.valid('param').id,
+                        c.req.valid('json').readingMode,
                     ),
                 ),
         )

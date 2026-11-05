@@ -6,7 +6,10 @@ import {
     moveForKey,
     moveForSide,
     moveForSwipe,
+    navigationDirection,
     pagesToPreload,
+    readingModeLabel,
+    reversesSpreads,
     sideOfTap,
     singleSpreads,
     spreadIndexOf,
@@ -111,5 +114,25 @@ describe('spreads', () => {
         expect(spreadIndexOf(spreads, 2)).toBe(1);
         expect(spreadIndexOf(spreads, 3)).toBe(2);
         expect(spreadIndexOf(spreads, 9)).toBe(0);
+    });
+});
+
+describe('reading modes', () => {
+    it('turns pages right to left only in right-to-left manga', () => {
+        expect(navigationDirection('ltr')).toBe('ltr');
+        expect(navigationDirection('ltr-manga')).toBe('ltr');
+        expect(navigationDirection('rtl')).toBe('rtl');
+    });
+
+    it('puts the first page on the right for manga spreads', () => {
+        expect(reversesSpreads('ltr')).toBe(false);
+        expect(reversesSpreads('ltr-manga')).toBe(true);
+        expect(reversesSpreads('rtl')).toBe(true);
+    });
+
+    it('names each mode', () => {
+        expect(readingModeLabel('webtoon')).toBe(
+            'Webtoon (défilement vertical)',
+        );
     });
 });

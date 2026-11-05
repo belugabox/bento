@@ -58,7 +58,14 @@ export type ComicInfoChanges = {
 
 type Failure = { path: string; reason: string };
 
-const COVER_WIDTH = 400;
+// Format d'une couverture (2:3), recadrée depuis le haut : une page très
+// haute (webtoon) ne donne pas une vignette interminable.
+const COVER_SIZE = {
+    width: 400,
+    height: 600,
+    fit: 'cover',
+    position: 'top',
+} as const;
 
 const exists = (fullPath: string) =>
     access(fullPath).then(
@@ -158,7 +165,7 @@ export class LibraryFiles {
                 const cover = this.coverPath(fullPath);
                 await mkdir(path.dirname(cover), { recursive: true });
                 await sharp(pages[0].getData())
-                    .resize({ width: COVER_WIDTH, withoutEnlargement: true })
+                    .resize(COVER_SIZE)
                     .webp({ quality: 80 })
                     .toFile(cover)
                     .catch(() => undefined);

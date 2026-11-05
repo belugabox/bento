@@ -1,4 +1,13 @@
-import { access, rm, utimes, writeFile } from 'node:fs/promises';
+import AdmZip from 'adm-zip';
+import {
+    access,
+    mkdir,
+    readFile,
+    rm,
+    utimes,
+    writeFile,
+} from 'node:fs/promises';
+import sharp from 'sharp';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { getSeries, listSeries } from '../src/library/catalog';
@@ -62,6 +71,34 @@ describe('LibraryScanner', () => {
                 true,
             );
         }
+    });
+
+    it('crops covers of very tall pages to a 2:3 cover from the top', async () => {
+        const zip = new AdmZip();
+        zip.addFile(
+            'p1.png',
+            await sharp({
+                create: {
+                    width: 100,
+                    height: 2000,
+                    channels: 3,
+                    background: '#888',
+                },
+            })
+                .png()
+                .toBuffer(),
+        );
+        await mkdir(ctx.file('Boxer'), { recursive: true });
+        await writeFile(ctx.file('Boxer/Boxer #01.cbz'), zip.toBuffer());
+
+        await ctx.scanner.scan(ctx.library.id);
+
+        const [series] = listSeries(ctx.db, NO_USER);
+        // Lu en mémoire : sharp garderait le fichier ouvert (Windows).
+        const { width, height } = await sharp(
+            await readFile(coverFile(ctx.coversPath, series!.coverVolumeId)),
+        ).metadata();
+        expect(height! / width!).toBe(1.5);
     });
 
     it('sorts volumes by number, using the file name without ComicInfo', async () => {

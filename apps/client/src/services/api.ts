@@ -205,3 +205,15 @@ export const setDraftStatus = (
 /** Toute la série lue (`true`) ou non lue (progression effacée). */
 export const markSeriesRead = (seriesId: number, read: boolean) =>
     json(api.series[':id'].read.$put({ ...id(seriesId), json: { read } }));
+
+/** Mode de lecture d'une série (null : celui de la bibliothèque). */
+export const setSeriesReadingMode = (
+    seriesId: number,
+    readingMode: 'ltr' | 'ltr-manga' | 'rtl' | 'webtoon' | null,
+) =>
+    json(
+        api.series[':id']['reading-mode'].$put({
+            ...id(seriesId),
+            json: { readingMode },
+        }),
+    );

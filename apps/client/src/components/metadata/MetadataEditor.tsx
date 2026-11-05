@@ -21,6 +21,11 @@ import { useEffect, useMemo, useState } from 'react';
 import { type ComicInfo, publicationPathOf } from '@server/types';
 
 import { AGE_RATING_OPTIONS, canonicalRating } from '@/components/ageLimits';
+import {
+    READING_MODES,
+    type ReadingMode,
+    readingModeLabel,
+} from '@/reader/navigation';
 import { publishFiles, saveComicInfo } from '@/services/api';
 
 import { WikipediaSearch } from './WikipediaSearch';
@@ -66,6 +71,7 @@ const changed = (isChanged: boolean) =>
 
 // Valeur du statut « inconnu » (Select n'accepte pas de valeur vide).
 const UNKNOWN = 'unknown';
+const DEFAULT_MODE = 'default';
 const STATUS_OPTIONS = [
     { value: 'ongoing', label: 'En cours de parution' },
     { value: 'completed', label: 'Terminée' },
@@ -90,6 +96,7 @@ export const MetadataEditor = ({
     mode,
     onChanged,
     status: seriesStatus,
+    readingMode: seriesMode,
 }: {
     libraryId: number;
     kind: 'manga' | 'comics';
@@ -105,6 +112,12 @@ export const MetadataEditor = ({
     status?: {
         value: SeriesStatus | null;
         save: (status: SeriesStatus | null) => Promise<unknown>;
+    };
+    /** Série publiée : mode de lecture (null : celui de la bibliothèque). */
+    readingMode?: {
+        value: ReadingMode | null;
+        defaultMode: ReadingMode;
+        save: (mode: ReadingMode | null) => Promise<unknown>;
     };
 }) => {
     // Contenu des données reçues : le parent peut recréer la liste à chaque
@@ -124,6 +137,13 @@ export const MetadataEditor = ({
     const [status, setStatus] = useState<string>(savedStatus);
     useEffect(() => setStatus(savedStatus), [savedStatus]);
     const statusChanged = !!seriesStatus && status !== savedStatus;
+    // Mode de lecture de la série : « default » pour celui de la bibliothèque.
+    const savedMode = seriesMode?.value ?? DEFAULT_MODE;
+    const [modeValue, setModeValue] = useState<string>(savedMode);
+    useEffect(() => setModeValue(savedMode), [savedMode]);
+    const modeChanged = !!seriesMode && modeValue !== savedMode;
+    // Réglages de la série modifiés (enregistrés avec les tomes).
+    const settingsChanged = statusChanged || modeChanged;
     // Action en cours : roue de chargement sur son seul bouton.
     const [busy, setBusy] = useState<'save' | 'publish'>();
     const [report, setReport] = useState<Report>();
@@ -184,6 +204,14 @@ export const MetadataEditor = ({
                 );
                 lines.push('Statut de la série enregistré.');
             }
+            if (seriesMode && modeChanged) {
+                await seriesMode.save(
+                    modeValue === DEFAULT_MODE
+                        ? null
+                        : (modeValue as ReadingMode),
+                );
+                lines.push('Mode de lecture enregistré.');
+            }
             setReport({ color, lines });
             onChanged();
         } catch (e) {
@@ -238,17 +266,18 @@ export const MetadataEditor = ({
                 <Group gap="xs">
                     <Button
                         variant="default"
-                        disabled={changes.length === 0 && !statusChanged}
+                        disabled={changes.length === 0 && !settingsChanged}
                         onClick={() => {
                             setEdits(initialEdits(readable));
                             setStatus(savedStatus);
+                            setModeValue(savedMode);
                         }}
                     >
                         Annuler
                     </Button>
                     <Button
                         disabled={
-                            (changes.length === 0 && !statusChanged) ||
+                            (changes.length === 0 && !settingsChanged) ||
                             busy === 'publish'
                         }
                         loading={busy === 'save'}
@@ -321,6 +350,24 @@ export const MetadataEditor = ({
                                 onChange={(value) => value && setStatus(value)}
                                 data={STATUS_OPTIONS}
                                 {...changed(statusChanged)}
+                            />
+                        )}
+                        {seriesMode && (
+                            <Select
+                                label="Mode de lecture"
+                                allowDeselect={false}
+                                value={modeValue}
+                                onChange={(value) =>
+                                    value && setModeValue(value)
+                                }
+                                data={[
+                                    {
+                                        value: DEFAULT_MODE,
+                                        label: `Par défaut : ${readingModeLabel(seriesMode.defaultMode)}`,
+                                    },
+                                    ...READING_MODES,
+                                ]}
+                                {...changed(modeChanged)}
                             />
                         )}
                         <Select
@@ -406,6 +453,8 @@ export const MetadataEditor = ({
                                             <Image
                                                 src={volume.cover}
                                                 w={40}
+                                                h={60}
+                                                fit="cover"
                                                 radius="xs"
                                                 alt=""
                                             />

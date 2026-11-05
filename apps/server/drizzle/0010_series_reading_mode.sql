@@ -1,0 +1,1 @@
+ALTER TABLE `series` ADD `reading_mode` text;

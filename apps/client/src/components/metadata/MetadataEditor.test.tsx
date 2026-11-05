@@ -285,4 +285,42 @@ describe('MetadataEditor', () => {
             ).value,
         ).toBe('Tome 2');
     });
+
+    it('saves the reading mode of a published series', async () => {
+        const save = vi.fn().mockResolvedValue({});
+        render(
+            <MantineProvider>
+                <MetadataEditor
+                    libraryId={1}
+                    kind="manga"
+                    mode="series"
+                    volumes={volumes()}
+                    readingMode={{
+                        value: null,
+                        defaultMode: 'ltr-manga',
+                        save,
+                    }}
+                    onChanged={() => {}}
+                />
+            </MantineProvider>,
+        );
+        expect(
+            screen.getByDisplayValue('Par défaut : Manga (gauche → droite)'),
+        ).toBeTruthy();
+
+        fireEvent.click(
+            screen.getByRole('textbox', { name: 'Mode de lecture' }),
+        );
+        fireEvent.click(
+            await screen.findByText('Webtoon (défilement vertical)'),
+        );
+        await act(async () => {
+            fireEvent.click(
+                screen.getByRole('button', { name: /Enregistrer/ }),
+            );
+        });
+
+        expect(save).toHaveBeenCalledWith('webtoon');
+        expect(screen.getByText('Mode de lecture enregistré.')).toBeTruthy();
+    });
 });

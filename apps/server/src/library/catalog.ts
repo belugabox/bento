@@ -130,6 +130,7 @@ export const getSeries = (db: Db, viewer: Viewer, id: number) => {
             coverUpdatedAt: series.coverUpdatedAt,
             year: series.year,
             status: series.status,
+            readingMode: series.readingMode,
             writer: series.writer,
             publisher: series.publisher,
             library: {
@@ -172,6 +173,7 @@ export const getSeries = (db: Db, viewer: Viewer, id: number) => {
         .all();
     return {
         ...row,
+        defaultReadingMode: defaultReadingMode(row.library.type),
         volumes: items.map(({ file, comicInfo, ...volume }) => ({
             ...volume,
             // Gestion des métadonnées : seulement pour un admin.
@@ -204,6 +206,7 @@ export const getVolume = (db: Db, viewer: Viewer, id: number) => {
             file: volumes.file,
             libraryPath: libraries.path,
             libraryType: libraries.type,
+            seriesReadingMode: series.readingMode,
         })
         .from(volumes)
         .innerJoin(series, eq(series.id, volumes.seriesId))
@@ -219,11 +222,11 @@ export const getVolume = (db: Db, viewer: Viewer, id: number) => {
         .all()
         .map((v) => v.id);
     const index = siblings.indexOf(row.id);
-    const { file, libraryPath, ...volume } = row;
+    const { file, libraryPath, seriesReadingMode: _mode, ...volume } = row;
     return {
         ...volume,
-        // Sens de lecture par défaut, réglable par série dans le lecteur.
-        direction: 'ltr' as 'ltr' | 'rtl',
+        readingMode:
+            row.seriesReadingMode ?? defaultReadingMode(row.libraryType),
         previousId: siblings[index - 1] ?? null,
         nextId: siblings[index + 1] ?? null,
         fullPath: path.join(libraryPath, ...file.split('/')),
@@ -273,6 +276,32 @@ export const setSeriesStatus = (
         .set({ status })
         .where(eq(series.id, id))
         .returning({ status: series.status })
+        .get();
+    if (!updated) throw notFound('Série introuvable');
+    return updated;
+};
+
+export type ReadingMode = 'ltr' | 'ltr-manga' | 'rtl' | 'webtoon';
+
+/**
+ * Mode de lecture par défaut : manga de gauche à droite (doubles pages
+ * inversées) pour une bibliothèque de mangas, BD sinon.
+ */
+export const defaultReadingMode = (
+    libraryType: 'manga' | 'comics',
+): ReadingMode => (libraryType === 'manga' ? 'ltr-manga' : 'ltr');
+
+/** Mode de lecture d'une série (null : celui de la bibliothèque). */
+export const setSeriesReadingMode = (
+    db: Db,
+    id: number,
+    readingMode: ReadingMode | null,
+) => {
+    const updated = db
+        .update(series)
+        .set({ readingMode })
+        .where(eq(series.id, id))
+        .returning({ readingMode: series.readingMode })
         .get();
     if (!updated) throw notFound('Série introuvable');
     return updated;

@@ -162,7 +162,7 @@ describe('volumes', () => {
             title: null,
             pageCount: 3,
             libraryType: 'manga',
-            direction: 'ltr',
+            readingMode: 'ltr-manga',
             previousId: null,
             nextId: second.id,
             progress: null,
@@ -249,5 +249,41 @@ describe('series status', () => {
         expect((await put(null)).status).toBe(200);
         expect((await put('finished')).status).toBe(400);
         expect((await put('ongoing', reader)).status).toBe(403);
+    });
+});
+
+describe('reading mode', () => {
+    it('defaults to the library one, and can be set by admins', async () => {
+        const id = await library();
+        const firstVolume = async () =>
+            (
+                await get(
+                    `/volumes/${(await get(`/series/${id}`)).body.volumes[0].id}`,
+                )
+            ).body.readingMode;
+        const put = (readingMode: unknown, cookie = admin) =>
+            request(
+                `/series/${id}/reading-mode`,
+                {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ readingMode }),
+                },
+                cookie,
+            );
+
+        expect((await get(`/series/${id}`)).body).toMatchObject({
+            readingMode: null,
+            defaultReadingMode: 'ltr-manga',
+        });
+        expect(await firstVolume()).toBe('ltr-manga');
+
+        expect((await put('webtoon')).status).toBe(200);
+        expect(await firstVolume()).toBe('webtoon');
+
+        await put(null);
+        expect(await firstVolume()).toBe('ltr-manga');
+        expect((await put('vertical')).status).toBe(400);
+        expect((await put('rtl', reader)).status).toBe(403);
     });
 });

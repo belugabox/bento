@@ -20,6 +20,7 @@ import {
     fetchSeries,
     fetchVolume,
     seriesCoverUrl,
+    setSeriesReadingMode,
     setSeriesStatus,
 } from '@/services/api';
 import { useQuery } from '@/services/useQuery';
@@ -69,6 +70,8 @@ export const SeriesEditPage = () => {
                                 coverVolumeId: first.id,
                             })}
                             w={64}
+                            h={96}
+                            fit="cover"
                             radius="sm"
                             alt=""
                         />
@@ -90,6 +93,11 @@ export const SeriesEditPage = () => {
                 status={{
                     value: series.status,
                     save: (status) => setSeriesStatus(series.id, status),
+                }}
+                readingMode={{
+                    value: series.readingMode,
+                    defaultMode: series.defaultReadingMode,
+                    save: (mode) => setSeriesReadingMode(series.id, mode),
                 }}
                 volumes={series.volumes.flatMap((volume) =>
                     volume.admin

@@ -14,15 +14,17 @@ const PAGE_SIZES = [
     [20, 30],
 ];
 
-const volume = (direction: 'rtl' | 'ltr', progress: Saved | null = null) => ({
+type Mode = 'rtl' | 'ltr' | 'ltr-manga' | 'webtoon';
+
+const volume = (mode: Mode, progress: Saved | null = null) => ({
     id: 7,
     seriesId: 3,
     seriesName: 'Spy x Family',
     number: '1',
     title: null,
     pageCount: PAGE_SIZES.length,
-    libraryType: direction === 'rtl' ? 'manga' : 'comics',
-    direction,
+    libraryType: mode === 'ltr' ? 'comics' : 'manga',
+    readingMode: mode,
     previousId: null,
     nextId: 8,
     progress,
@@ -38,7 +40,7 @@ const Location = () => {
 };
 
 const open = async (
-    direction: 'rtl' | 'ltr',
+    direction: Mode,
     url = '/read/7',
     progress: Saved | null = null,
 ) => {
@@ -67,7 +69,7 @@ const open = async (
             </MemoryRouter>
         </MantineProvider>,
     );
-    await screen.findByAltText(/^Page /);
+    await screen.findAllByAltText(/^Page /);
 };
 
 const shownPage = () => screen.getByAltText(/^Page /).getAttribute('src');
@@ -251,5 +253,37 @@ describe('ReaderPage', () => {
                 '/api/volumes/7/pages/1',
             ]),
         );
+    });
+
+    it('turns manga pages left to right, first page of a spread on the right', async () => {
+        landscape();
+        await open('ltr-manga');
+
+        press('ArrowRight');
+
+        await vi.waitFor(() =>
+            expect(shownPages()).toEqual([
+                '/api/volumes/7/pages/2',
+                '/api/volumes/7/pages/1',
+            ]),
+        );
+    });
+
+    it('scrolls a webtoon: every page in a column, no page slider', async () => {
+        await open('webtoon');
+
+        await vi.waitFor(() =>
+            expect(shownPages()).toEqual([
+                '/api/volumes/7/pages/0',
+                '/api/volumes/7/pages/1',
+                '/api/volumes/7/pages/2',
+            ]),
+        );
+        expect(screen.queryByRole('slider')).toBeNull();
+        expect(screen.getByText('Fin du tome')).toBeTruthy();
+        // Les flèches ne tournent pas de page : le défilement reste natif.
+        await vi.waitFor(() => expect(location).toBe('/read/7?page=1'));
+        press('ArrowRight');
+        expect(location).toBe('/read/7?page=1');
     });
 });
