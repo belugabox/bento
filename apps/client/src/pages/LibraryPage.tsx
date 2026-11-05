@@ -1,84 +1,78 @@
 import {
-    ActionIcon,
     Alert,
+    Box,
+    Chip,
     Group,
     Loader,
+    ScrollArea,
     SegmentedControl,
+    Select,
     SimpleGrid,
     Stack,
     Text,
     TextInput,
+    ThemeIcon,
     Title,
-    Tooltip,
 } from '@mantine/core';
 import { useDebouncedValue } from '@mantine/hooks';
-import { IconRefresh, IconSearch } from '@tabler/icons-react';
+import { IconCheck, IconSearch } from '@tabler/icons-react';
 import { useState } from 'react';
 import { useSearchParams } from 'react-router';
 
 import { CoverCard } from '@/components/CoverCard';
 import { volumeLabel } from '@/components/readingStatus';
 import {
+    READING_FILTERS,
+    type ReadingFilter,
+    SERIES_SORTS,
+    type SeriesSort,
+    filterSeries,
+    readingStateOf,
+} from '@/components/seriesFilters';
+import {
     coverUrl,
     fetchInProgress,
     fetchLibraries,
     fetchSeriesList,
-    scanLibrary,
     seriesCoverUrl,
 } from '@/services/api';
-import { useCurrentUser } from '@/services/auth';
 import { useQuery } from '@/services/useQuery';
 
-/** Grille des séries, avec choix de la bibliothèque et recherche. */
+// Largeur des vignettes de « Reprendre la lecture » (défilement horizontal).
+const RESUME_CARD_WIDTH = 132;
+
+/** Accueil : reprendre la lecture, puis toutes les séries. */
 export const LibraryPage = () => {
-    // Bibliothèque et recherche dans l'adresse : le retour arrière les garde.
+    // Bibliothèque, recherche, filtre et tri dans l'adresse : le retour
+    // arrière les garde.
     const [params, setParams] = useSearchParams();
     const [search, setSearch] = useState(params.get('q') ?? '');
     const [debouncedSearch] = useDebouncedValue(search, 250);
-    const [scanning, setScanning] = useState(false);
-    const [scanMessage, setScanMessage] = useState<string>();
-    const isAdmin = useCurrentUser().role === 'admin';
+    const filter = (params.get('filter') as ReadingFilter | null) ?? 'all';
+    const sort = (params.get('sort') as SeriesSort | null) ?? 'name';
 
     const libraries = useQuery(fetchLibraries, []);
     const inProgress = useQuery(fetchInProgress, []);
     const libraryId =
         Number(params.get('library')) || libraries.data?.[0]?.id || undefined;
-
     const series = useQuery(
-        () => fetchSeriesList({ libraryId, search: debouncedSearch }),
+        () =>
+            libraryId
+                ? fetchSeriesList({ libraryId, search: debouncedSearch })
+                : Promise.resolve(undefined),
         [libraryId, debouncedSearch],
     );
 
-    const update = (key: string, value: string) =>
+    const update = (key: string, value: string, fallback = '') =>
         setParams(
             (current) => {
                 const next = new URLSearchParams(current);
-                if (value) next.set(key, value);
+                if (value && value !== fallback) next.set(key, value);
                 else next.delete(key);
                 return next;
             },
             { replace: true },
         );
-
-    const scan = async () => {
-        if (!libraryId) return;
-        setScanning(true);
-        setScanMessage(undefined);
-        try {
-            const result = await scanLibrary(libraryId);
-            setScanMessage(
-                `${result.added} ajouté(s), ${result.updated} mis à jour, ${result.removed} retiré(s)` +
-                    (result.errors.length
-                        ? `, ${result.errors.length} illisible(s) : ${result.errors.map((e) => e.file).join(', ')}`
-                        : ''),
-            );
-            series.reload();
-        } catch (error) {
-            setScanMessage((error as Error).message);
-        } finally {
-            setScanning(false);
-        }
-    };
 
     if (libraries.error) {
         return <Alert color="red">{libraries.error.message}</Alert>;
@@ -91,9 +85,12 @@ export const LibraryPage = () => {
         );
     }
 
+    const visible = filterSeries(series.data ?? [], { filter, sort });
+    const resume = debouncedSearch ? [] : (inProgress.data ?? []);
+
     return (
-        <Stack>
-            <Group justify="space-between" wrap="nowrap">
+        <Stack gap="xl">
+            <Group justify="space-between" gap="sm">
                 {libraries.data && libraries.data.length > 1 ? (
                     <SegmentedControl
                         value={String(libraryId)}
@@ -104,85 +101,134 @@ export const LibraryPage = () => {
                         }))}
                     />
                 ) : (
-                    <Text fw={500}>{libraries.data?.[0]?.name}</Text>
+                    <Title order={2}>{libraries.data?.[0]?.name}</Title>
                 )}
-                {isAdmin && (
-                    <Tooltip label="Rechercher les nouveaux tomes">
-                        <ActionIcon
-                            variant="default"
-                            size="lg"
-                            loading={scanning}
-                            onClick={scan}
-                            aria-label="Scanner la bibliothèque"
-                        >
-                            <IconRefresh size={18} />
-                        </ActionIcon>
-                    </Tooltip>
-                )}
+                <TextInput
+                    w={{ base: '100%', xs: 260 }}
+                    placeholder="Rechercher une série"
+                    leftSection={<IconSearch size={16} />}
+                    value={search}
+                    onChange={(event) => {
+                        setSearch(event.currentTarget.value);
+                        update('q', event.currentTarget.value);
+                    }}
+                />
             </Group>
 
-            <TextInput
-                placeholder="Rechercher une série"
-                leftSection={<IconSearch size={16} />}
-                value={search}
-                onChange={(event) => {
-                    setSearch(event.currentTarget.value);
-                    update('q', event.currentTarget.value);
-                }}
-            />
-
-            {scanMessage && (
-                <Alert
-                    withCloseButton
-                    onClose={() => setScanMessage(undefined)}
-                >
-                    {scanMessage}
-                </Alert>
-            )}
-
-            {!debouncedSearch && !!inProgress.data?.length && (
+            {resume.length > 0 && (
                 <Stack gap="xs">
                     <Title order={4}>Reprendre la lecture</Title>
-                    <SimpleGrid cols={{ base: 3, xs: 4, sm: 5, md: 6, lg: 8 }}>
-                        {inProgress.data.map((volume) => (
-                            <CoverCard
-                                key={volume.volumeId}
-                                to={`/read/${volume.volumeId}`}
-                                cover={coverUrl(volume.volumeId)}
-                                title={volume.seriesName}
-                                subtitle={`${volumeLabel(volume)} · p. ${volume.page + 1}/${volume.pageCount}`}
-                                progress={(volume.page + 1) / volume.pageCount}
-                            />
-                        ))}
-                    </SimpleGrid>
+                    <ScrollArea type="hover" offsetScrollbars>
+                        <Group gap="sm" wrap="nowrap" align="flex-start">
+                            {resume.map((volume) => (
+                                <Box
+                                    key={volume.volumeId}
+                                    w={RESUME_CARD_WIDTH}
+                                    style={{ flexShrink: 0 }}
+                                >
+                                    <CoverCard
+                                        to={`/read/${volume.volumeId}`}
+                                        cover={coverUrl(volume.volumeId)}
+                                        title={volume.seriesName}
+                                        subtitle={volumeLabel(volume)}
+                                        progress={
+                                            (volume.page + 1) / volume.pageCount
+                                        }
+                                    />
+                                </Box>
+                            ))}
+                        </Group>
+                    </ScrollArea>
                 </Stack>
             )}
 
-            {series.error && <Alert color="red">{series.error.message}</Alert>}
-            {series.loading && !series.data && <Loader mx="auto" />}
-            {series.data?.length === 0 && (
-                <Text c="dimmed" ta="center">
-                    {debouncedSearch
-                        ? 'Aucune série trouvée'
-                        : 'Bibliothèque vide'}
-                </Text>
-            )}
-            <SimpleGrid cols={{ base: 2, xs: 3, sm: 4, md: 5, lg: 6 }}>
-                {series.data?.map((item) => (
-                    <CoverCard
-                        key={item.id}
-                        to={`/series/${item.id}`}
-                        cover={seriesCoverUrl(item)}
-                        title={item.name}
-                        subtitle={
-                            item.readCount > 0
-                                ? `${item.readCount} / ${item.volumeCount} lu${item.readCount > 1 ? 's' : ''}`
-                                : `${item.volumeCount} tome${item.volumeCount > 1 ? 's' : ''}`
+            <Stack gap="sm">
+                <Group justify="space-between" gap="sm">
+                    <Chip.Group
+                        value={filter}
+                        onChange={(value) =>
+                            update('filter', value as string, 'all')
                         }
-                        progress={item.readCount / item.volumeCount}
+                    >
+                        <Group gap={6}>
+                            {READING_FILTERS.map((option) => (
+                                <Chip
+                                    key={option.value}
+                                    value={option.value}
+                                    size="sm"
+                                    variant="light"
+                                >
+                                    {option.label}
+                                </Chip>
+                            ))}
+                        </Group>
+                    </Chip.Group>
+                    <Select
+                        size="xs"
+                        w={150}
+                        allowDeselect={false}
+                        aria-label="Trier les séries"
+                        value={sort}
+                        onChange={(value) =>
+                            update('sort', value ?? 'name', 'name')
+                        }
+                        data={SERIES_SORTS}
                     />
-                ))}
-            </SimpleGrid>
+                </Group>
+
+                {series.error && (
+                    <Alert color="red">{series.error.message}</Alert>
+                )}
+                {!series.data && !series.error && <Loader mx="auto" />}
+                {series.data && visible.length === 0 && (
+                    <Text c="dimmed" ta="center" py="xl">
+                        {debouncedSearch
+                            ? 'Aucune série ne correspond à la recherche.'
+                            : filter !== 'all'
+                              ? 'Aucune série dans ce filtre.'
+                              : 'Bibliothèque vide.'}
+                    </Text>
+                )}
+                <SimpleGrid
+                    cols={{ base: 3, xs: 4, sm: 5, md: 6, lg: 7 }}
+                    spacing="sm"
+                    data-testid="series-grid"
+                >
+                    {visible.map((item) => {
+                        const state = readingStateOf(item);
+                        return (
+                            <CoverCard
+                                key={item.id}
+                                to={`/series/${item.id}`}
+                                cover={seriesCoverUrl(item)}
+                                title={item.name}
+                                subtitle={
+                                    state === 'started'
+                                        ? `${item.readCount} / ${item.volumeCount} lus`
+                                        : `${item.volumeCount} tome${item.volumeCount > 1 ? 's' : ''}`
+                                }
+                                progress={
+                                    state === 'started'
+                                        ? item.readCount / item.volumeCount
+                                        : undefined
+                                }
+                                corner={
+                                    state === 'read' && (
+                                        <ThemeIcon
+                                            size="sm"
+                                            radius="xl"
+                                            color="teal"
+                                            aria-label="Série lue"
+                                        >
+                                            <IconCheck size={12} />
+                                        </ThemeIcon>
+                                    )
+                                }
+                            />
+                        );
+                    })}
+                </SimpleGrid>
+            </Stack>
         </Stack>
     );
 };

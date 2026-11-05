@@ -59,7 +59,7 @@ export const CoverCard = ({
                 />
             )}
         </Box>
-        <Text size="sm" fw={500} lineClamp={2} px="xs" pt={6} title={title}>
+        <Text size="sm" fw={500} lineClamp={1} px="xs" pt={6} title={title}>
             {title}
         </Text>
         {subtitle && (

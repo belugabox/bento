@@ -25,3 +25,6 @@ class ResizeObserver {
     disconnect() {}
 }
 window.ResizeObserver = ResizeObserver;
+
+// Utilisé par les listes déroulantes de Mantine.
+Element.prototype.scrollIntoView = () => {};
