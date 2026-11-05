@@ -9,6 +9,7 @@ import { parseVolumeFileName } from '../archive/fileName';
 import type { Db } from '../db';
 import { libraries, series, volumes } from '../db/schema';
 import type { Logger } from '../tools/logger';
+import { seriesAge } from './ageRating';
 
 export type ScanResult = {
     added: number;
@@ -255,7 +256,8 @@ export class LibraryScanner {
 
     /**
      * Supprime les séries vides et recopie dans chaque série les
-     * métadonnées de son premier tome.
+     * métadonnées de son premier tome ; la classification est la plus
+     * restrictive de ses tomes (ou celle choisie dans Bento).
      */
     private refreshSeries = (libraryId: number) => {
         this.db
@@ -270,12 +272,16 @@ export class LibraryScanner {
             .run();
 
         const rows = this.db
-            .select({ id: series.id, key: series.key })
+            .select({
+                id: series.id,
+                key: series.key,
+                ageRatingOverride: series.ageRatingOverride,
+            })
             .from(series)
             .where(eq(series.libraryId, libraryId))
             .all();
         for (const row of rows) {
-            const first = this.db
+            const infos = this.db
                 .select({ comicInfo: volumes.comicInfo })
                 .from(volumes)
                 .where(eq(volumes.seriesId, row.id))
@@ -284,16 +290,19 @@ export class LibraryScanner {
                     asc(volumes.sortNumber),
                     asc(volumes.file),
                 )
-                .limit(1)
-                .get();
-            const info = first?.comicInfo ?? {};
+                .all()
+                .map((v) => v.comicInfo);
+            const info = infos[0] ?? {};
             this.db
                 .update(series)
                 .set({
                     name: info.Series ?? row.key,
                     summary: info.Summary ?? null,
                     genre: info.Genre ?? null,
-                    ageRating: info.AgeRating ?? null,
+                    ...seriesAge(
+                        row.ageRatingOverride,
+                        infos.map((i) => i.AgeRating),
+                    ),
                     year: info.Year ?? null,
                     count: info.Count ?? null,
                     writer: info.Writer ?? null,

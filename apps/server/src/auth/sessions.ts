@@ -13,7 +13,7 @@ export type SessionUser = {
     name: string;
     email: string | null;
     role: Role;
-    maxAgeRating: string | null;
+    maxAge: number | null;
 };
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -89,7 +89,7 @@ export const userForSession = (
                 name: users.name,
                 email: users.email,
                 role: users.role,
-                maxAgeRating: users.maxAgeRating,
+                maxAge: users.maxAge,
             },
         })
         .from(sessions)

@@ -6,7 +6,9 @@ import type { LibraryConfig } from '../config';
 import type { Db } from '../db';
 import { libraries, readProgress, series, volumes } from '../db/schema';
 import { notFound } from '../tools/errors';
+import { seriesAge } from './ageRating';
 import { coverFile } from './scanner';
+import { type Viewer, visibleTo } from './visibility';
 
 // Tomes sans numéro en dernier, puis par numéro, puis par fichier.
 const volumeOrder = [
@@ -72,7 +74,7 @@ export const listLibraries = (db: Db) =>
 /** Séries, filtrées par bibliothèque et par nom (sans tenir compte de la casse). */
 export const listSeries = (
     db: Db,
-    userId: number,
+    viewer: Viewer,
     { libraryId, search }: { libraryId?: number; search?: string } = {},
 ) => {
     const text = search?.trim().toLowerCase();
@@ -89,19 +91,27 @@ export const listSeries = (
             // SQL brut : Drizzle n'y préfixe pas les colonnes par leur table.
             coverVolumeId: sql<number>`(select v.id from volumes v where v.series_id = series.id order by v.sort_number is null, v.sort_number, v.file limit 1)`,
             // Tomes lus par la personne.
-            readCount: sql<number>`(select count(*) from read_progress rp join volumes v on v.id = rp.volume_id where v.series_id = series.id and rp.user_id = ${userId} and rp.completed = 1)`,
+            readCount: sql<number>`(select count(*) from read_progress rp join volumes v on v.id = rp.volume_id where v.series_id = series.id and rp.user_id = ${viewer.id} and rp.completed = 1)`,
         })
         .from(series)
         .leftJoin(volumes, eq(volumes.seriesId, series.id))
         .where(
-            sql`${libraryId === undefined ? sql`1` : eq(series.libraryId, libraryId)} and ${text ? sql`lower(${series.name}) like ${`%${text}%`}` : sql`1`}`,
+            and(
+                libraryId === undefined
+                    ? undefined
+                    : eq(series.libraryId, libraryId),
+                text
+                    ? sql`lower(${series.name}) like ${`%${text}%`}`
+                    : undefined,
+                visibleTo(viewer),
+            ),
         )
         .groupBy(series.id)
         .orderBy(sql`${series.name} collate nocase`)
         .all();
 };
 
-export const getSeries = (db: Db, userId: number, id: number) => {
+export const getSeries = (db: Db, viewer: Viewer, id: number) => {
     const row = db
         .select({
             id: series.id,
@@ -109,6 +119,8 @@ export const getSeries = (db: Db, userId: number, id: number) => {
             summary: series.summary,
             genre: series.genre,
             ageRating: series.ageRating,
+            ageRatingOverride: series.ageRatingOverride,
+            minAge: series.minAge,
             year: series.year,
             count: series.count,
             writer: series.writer,
@@ -121,7 +133,7 @@ export const getSeries = (db: Db, userId: number, id: number) => {
         })
         .from(series)
         .innerJoin(libraries, eq(libraries.id, series.libraryId))
-        .where(eq(series.id, id))
+        .where(and(eq(series.id, id), visibleTo(viewer)))
         .get();
     if (!row) throw notFound('Série introuvable');
     const items = db
@@ -143,7 +155,7 @@ export const getSeries = (db: Db, userId: number, id: number) => {
             readProgress,
             and(
                 eq(readProgress.volumeId, volumes.id),
-                eq(readProgress.userId, userId),
+                eq(readProgress.userId, viewer.id),
             ),
         )
         .where(eq(volumes.seriesId, id))
@@ -152,8 +164,11 @@ export const getSeries = (db: Db, userId: number, id: number) => {
     return { ...row, volumes: items };
 };
 
-/** Un tome, avec ce qu'il faut pour le lire et passer au précédent / suivant. */
-export const getVolume = (db: Db, id: number) => {
+/**
+ * Un tome, avec ce qu'il faut pour le lire et passer au précédent / suivant.
+ * Introuvable si sa série est masquée à la personne.
+ */
+export const getVolume = (db: Db, viewer: Viewer, id: number) => {
     const row = db
         .select({
             id: volumes.id,
@@ -169,7 +184,7 @@ export const getVolume = (db: Db, id: number) => {
         .from(volumes)
         .innerJoin(series, eq(series.id, volumes.seriesId))
         .innerJoin(libraries, eq(libraries.id, volumes.libraryId))
-        .where(eq(volumes.id, id))
+        .where(and(eq(volumes.id, id), visibleTo(viewer)))
         .get();
     if (!row) throw notFound('Tome introuvable');
     const siblings = db
@@ -189,4 +204,29 @@ export const getVolume = (db: Db, id: number) => {
         nextId: siblings[index + 1] ?? null,
         fullPath: path.join(libraryPath, ...file.split('/')),
     };
+};
+
+/**
+ * Classification d'une série choisie dans Bento (`null` : revenir à celle
+ * des tomes). Recalcule aussitôt son âge minimal.
+ */
+export const setSeriesAgeRating = (
+    db: Db,
+    id: number,
+    override: string | null,
+) => {
+    const ratings = db
+        .select({ comicInfo: volumes.comicInfo })
+        .from(volumes)
+        .where(eq(volumes.seriesId, id))
+        .all()
+        .map((v) => v.comicInfo.AgeRating);
+    const updated = db
+        .update(series)
+        .set({ ageRatingOverride: override, ...seriesAge(override, ratings) })
+        .where(eq(series.id, id))
+        .returning({ ageRating: series.ageRating, minAge: series.minAge })
+        .get();
+    if (!updated) throw notFound('Série introuvable');
+    return { ...updated, ageRatingOverride: override };
 };

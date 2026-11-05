@@ -5,8 +5,8 @@ import { getSeries, listSeries } from '../src/library/catalog';
 import { coverFile, seriesKeyOf } from '../src/library/scanner';
 import { setup, writeCbz } from './helpers';
 
-// Les listes donnent aussi la progression d'une personne : ici, personne.
-const NO_USER = 0;
+// Les listes dépendent de la personne : ici un admin sans compte, qui voit tout.
+const NO_USER = { id: 0, role: 'admin' as const, maxAge: null };
 
 let ctx: Awaited<ReturnType<typeof setup>>;
 

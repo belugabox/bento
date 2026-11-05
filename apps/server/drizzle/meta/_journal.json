@@ -22,6 +22,20 @@
       "when": 1793823559044,
       "tag": "0002_read_progress",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1793824411117,
+      "tag": "0003_parental_control",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1793824412652,
+      "tag": "0004_drop_max_age_rating",
+      "breakpoints": true
     }
   ]
 }

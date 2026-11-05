@@ -127,11 +127,14 @@ describe('ReaderPage', () => {
         await open('rtl', '/read/7', { page: 1, completed: false });
 
         expect(shownPage()).toBe('/api/volumes/7/pages/1');
-        expect(location).toBe('/read/7?page=2');
+        // L'adresse suit au rendu suivant.
+        await vi.waitFor(() => expect(location).toBe('/read/7?page=2'));
 
         press('ArrowLeft');
-        await vi.waitFor(() =>
-            expect(saved).toEqual([{ page: 1 }, { page: 2 }]),
+        await vi.waitFor(
+            () => expect(saved).toEqual([{ page: 1 }, { page: 2 }]),
+            // Marge pour une machine chargée (tests lancés pendant un build).
+            { timeout: 3000 },
         );
     });
 

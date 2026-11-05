@@ -11,12 +11,15 @@ import {
     requireAdmin,
     requireUser,
 } from './auth/routes';
+import { listUsers, setUserMaxAge } from './auth/users';
 import type { Db } from './db';
+import { isAgeRating } from './library/ageRating';
 import {
     getSeries,
     getVolume,
     listLibraries,
     listSeries,
+    setSeriesAgeRating,
 } from './library/catalog';
 import { getProgress, listInProgress, saveProgress } from './library/progress';
 import { type LibraryScanner, coverFile } from './library/scanner';
@@ -102,15 +105,39 @@ export const createApi = ({
                     search: z.string().optional(),
                 }),
             ),
-            (c) => c.json(listSeries(db, c.var.user.id, c.req.valid('query'))),
+            (c) => c.json(listSeries(db, c.var.user, c.req.valid('query'))),
         )
         .get('/series/:id', zValidator('param', idParam), (c) =>
-            c.json(getSeries(db, c.var.user.id, c.req.valid('param').id)),
+            c.json(getSeries(db, c.var.user, c.req.valid('param').id)),
+        )
+        // Classification choisie dans Bento (null : celle des tomes).
+        .put(
+            '/series/:id/age-rating',
+            requireAdmin,
+            zValidator('param', idParam),
+            zValidator(
+                'json',
+                z.object({
+                    ageRating: z
+                        .string()
+                        .refine(isAgeRating, 'classification inconnue')
+                        .nullable(),
+                }),
+            ),
+            (c) =>
+                c.json(
+                    setSeriesAgeRating(
+                        db,
+                        c.req.valid('param').id,
+                        c.req.valid('json').ageRating,
+                    ),
+                ),
         )
         .get('/volumes/:id', zValidator('param', idParam), (c) => {
             // Le chemin sur disque reste côté serveur.
             const { fullPath: _fullPath, ...volume } = getVolume(
                 db,
+                c.var.user,
                 c.req.valid('param').id,
             );
             return c.json({
@@ -128,20 +155,27 @@ export const createApi = ({
                     completed: z.boolean().optional(),
                 }),
             ),
-            (c) =>
-                c.json({
+            (c) => {
+                // Tome d'une série masquée : introuvable.
+                const { id } = getVolume(
+                    db,
+                    c.var.user,
+                    c.req.valid('param').id,
+                );
+                return c.json({
                     progress: saveProgress(
                         db,
                         c.var.user.id,
-                        c.req.valid('param').id,
+                        id,
                         c.req.valid('json'),
                     ),
-                }),
+                });
+            },
         )
         // Tomes commencés, pour « Reprendre la lecture ».
-        .get('/continue', (c) => c.json(listInProgress(db, c.var.user.id)))
+        .get('/continue', (c) => c.json(listInProgress(db, c.var.user)))
         .get('/volumes/:id/cover', zValidator('param', idParam), async (c) => {
-            const { id } = c.req.valid('param');
+            const { id } = getVolume(db, c.var.user, c.req.valid('param').id);
             const cover = await readFile(coverFile(coversPath, id)).catch(
                 () => {
                     throw notFound('Couverture introuvable');
@@ -161,7 +195,7 @@ export const createApi = ({
             async (c) => {
                 const { id, index } = c.req.valid('param');
                 const { data, type } = await pages.page(
-                    getVolume(db, id).fullPath,
+                    getVolume(db, c.var.user, id).fullPath,
                     index,
                 );
                 return c.body(new Uint8Array(data), 200, {
@@ -169,6 +203,27 @@ export const createApi = ({
                     'Cache-Control': 'private, max-age=3600',
                 });
             },
+        )
+        // Comptes et contrôle parental (admin).
+        .get('/users', requireAdmin, (c) => c.json(listUsers(db)))
+        .patch(
+            '/users/:id',
+            requireAdmin,
+            zValidator('param', idParam),
+            zValidator(
+                'json',
+                z.object({
+                    maxAge: z.number().int().min(0).max(18).nullable(),
+                }),
+            ),
+            (c) =>
+                c.json(
+                    setUserMaxAge(
+                        db,
+                        c.req.valid('param').id,
+                        c.req.valid('json').maxAge,
+                    ),
+                ),
         );
 
 export type ApiType = ReturnType<typeof createApi>;

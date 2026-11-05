@@ -83,3 +83,21 @@ export const fetchInProgress = () => json(api.continue.$get());
 export type InProgressVolume = Awaited<
     ReturnType<typeof fetchInProgress>
 >[number];
+
+export const fetchUsers = () => json(api.users.$get());
+
+export type Account = Awaited<ReturnType<typeof fetchUsers>>[number];
+
+export const setUserMaxAge = (userId: number, maxAge: number | null) =>
+    json(api.users[':id'].$patch({ ...id(userId), json: { maxAge } }));
+
+export const setSeriesAgeRating = (
+    seriesId: number,
+    ageRating: string | null,
+) =>
+    json(
+        api.series[':id']['age-rating'].$put({
+            ...id(seriesId),
+            json: { ageRating },
+        }),
+    );

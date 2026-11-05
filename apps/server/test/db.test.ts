@@ -30,7 +30,7 @@ describe('openDatabase', () => {
         expect(user).toMatchObject({
             oidcSubject: 'abc',
             role: 'admin',
-            maxAgeRating: null,
+            maxAge: null,
         });
         expect(user?.createdAt).toBeInstanceOf(Date);
     });

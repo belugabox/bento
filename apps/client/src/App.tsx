@@ -9,13 +9,14 @@ import {
     Title,
     UnstyledButton,
 } from '@mantine/core';
-import { IconLogout } from '@tabler/icons-react';
-import { Link, Outlet, Route, Routes } from 'react-router';
+import { IconLogout, IconUsers } from '@tabler/icons-react';
+import { Link, Navigate, Outlet, Route, Routes } from 'react-router';
 
 import { RequireUser } from '@/components/RequireUser';
 import { DeniedPage } from '@/pages/DeniedPage';
 import { LibraryPage } from '@/pages/LibraryPage';
 import { SeriesPage } from '@/pages/SeriesPage';
+import { UsersPage } from '@/pages/UsersPage';
 import { ReaderPage } from '@/reader/ReaderPage';
 import { logout, useCurrentUser } from '@/services/auth';
 
@@ -35,6 +36,15 @@ const UserMenu = () => {
                     </Text>
                     {user.role === 'admin' ? 'Administrateur' : 'Lecteur'}
                 </Menu.Label>
+                {user.role === 'admin' && (
+                    <Menu.Item
+                        component={Link}
+                        to="/users"
+                        leftSection={<IconUsers size={14} />}
+                    >
+                        Comptes et contrôle parental
+                    </Menu.Item>
+                )}
                 <Menu.Item
                     leftSection={<IconLogout size={14} />}
                     onClick={() => void logout()}
@@ -45,6 +55,10 @@ const UserMenu = () => {
         </Menu>
     );
 };
+
+/** Réservé aux admins ; les autres reviennent à l'accueil. */
+const AdminOnly = ({ children }: { children: React.ReactNode }) =>
+    useCurrentUser().role === 'admin' ? children : <Navigate to="/" replace />;
 
 /** Mise en page des écrans de navigation (le lecteur est en plein écran). */
 const Layout = () => (
@@ -86,6 +100,14 @@ export const App = () => (
             <Route element={<Layout />}>
                 <Route index element={<LibraryPage />} />
                 <Route path="series/:id" element={<SeriesPage />} />
+                <Route
+                    path="users"
+                    element={
+                        <AdminOnly>
+                            <UsersPage />
+                        </AdminOnly>
+                    }
+                />
             </Route>
             <Route path="read/:id" element={<ReaderPage />} />
         </Route>

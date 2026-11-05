@@ -8,6 +8,7 @@ import {
     Group,
     Image,
     Loader,
+    Select,
     SimpleGrid,
     Stack,
     Text,
@@ -19,13 +20,23 @@ import type { MouseEvent } from 'react';
 import { Link, useParams } from 'react-router';
 
 import { CoverCard } from '@/components/CoverCard';
+import { AGE_RATING_OPTIONS } from '@/components/ageLimits';
 import {
     nextToRead,
     progressRatio,
     volumeLabel,
 } from '@/components/readingStatus';
-import { coverUrl, fetchSeries, saveProgress } from '@/services/api';
+import {
+    coverUrl,
+    fetchSeries,
+    saveProgress,
+    setSeriesAgeRating,
+} from '@/services/api';
+import { useCurrentUser } from '@/services/auth';
 import { useQuery } from '@/services/useQuery';
+
+// Valeur du choix « classification des tomes » (pas de classification forcée).
+const FROM_VOLUMES = 'auto';
 
 const ACTION_LABELS = {
     start: 'Lire',
@@ -36,6 +47,7 @@ const ACTION_LABELS = {
 /** Fiche d'une série : informations, tomes et où en est la personne. */
 export const SeriesPage = () => {
     const seriesId = Number(useParams().id);
+    const isAdmin = useCurrentUser().role === 'admin';
     const {
         data: series,
         error,
@@ -117,6 +129,34 @@ export const SeriesPage = () => {
                             </Badge>
                         )}
                     </Group>
+                    {isAdmin && (
+                        <Select
+                            size="xs"
+                            w={260}
+                            label="Classification (contrôle parental)"
+                            description={
+                                series.minAge === null
+                                    ? 'Inconnue : série masquée aux comptes limités'
+                                    : undefined
+                            }
+                            allowDeselect={false}
+                            value={series.ageRatingOverride ?? FROM_VOLUMES}
+                            onChange={async (value) => {
+                                await setSeriesAgeRating(
+                                    series.id,
+                                    value === FROM_VOLUMES ? null : value,
+                                );
+                                reload();
+                            }}
+                            data={[
+                                {
+                                    value: FROM_VOLUMES,
+                                    label: 'Celle des tomes',
+                                },
+                                ...AGE_RATING_OPTIONS,
+                            ]}
+                        />
+                    )}
                     {series.summary && (
                         <Text size="sm" style={{ whiteSpace: 'pre-line' }}>
                             {series.summary}

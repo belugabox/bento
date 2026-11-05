@@ -45,6 +45,13 @@ Toute la configuration passe par des variables d'environnement :
 | `OIDC_ADMIN_GROUP` | `bento-admins` | Groupe Pocket ID des administrateurs |
 | `OIDC_READER_GROUP` | `bento-readers` | Groupe Pocket ID des lecteurs (sans l'un des deux groupes, l'accès est refusé) |
 
+### Contrôle parental
+
+- **Âge maximal** : l'admin le règle pour chaque personne dans « Comptes et contrôle parental », depuis le menu de l'avatar.
+- **Classification d'une série** : la plus restrictive de ses tomes (`AgeRating` du ComicInfo), ou celle choisie par l'admin sur la fiche série.
+- **Comptes limités** : ils ne voient que les séries classées sous leur limite. Une série sans classification leur est masquée, partout : liste, fiche, tomes, pages, couvertures, « Reprendre la lecture ».
+- **Admins** : ils voient tout.
+
 ### Connexion
 
 La connexion passe par Pocket ID, en OIDC : flux par code avec PKCE, côté serveur. Bento garde ensuite une session de 30 jours dans un cookie `HttpOnly`, prolongée tant qu'elle sert. Nom, e-mail et rôle sont repris de Pocket ID à chaque connexion. Seuls `/api/health` et `/api/auth/*` sont accessibles sans session.

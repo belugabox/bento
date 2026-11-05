@@ -3,6 +3,7 @@ import { and, desc, eq } from 'drizzle-orm';
 import type { Db } from '../db';
 import { readProgress, series, volumes } from '../db/schema';
 import { notFound } from '../tools/errors';
+import { type Viewer, visibleTo } from './visibility';
 
 export type Progress = { page: number; completed: boolean };
 
@@ -73,7 +74,7 @@ export const saveProgress = (
 };
 
 /** Tomes commencés et pas finis, du plus récemment lu au plus ancien. */
-export const listInProgress = (db: Db, userId: number, limit = 12) =>
+export const listInProgress = (db: Db, viewer: Viewer, limit = 12) =>
     db
         .select({
             volumeId: volumes.id,
@@ -90,8 +91,9 @@ export const listInProgress = (db: Db, userId: number, limit = 12) =>
         .innerJoin(series, eq(series.id, volumes.seriesId))
         .where(
             and(
-                eq(readProgress.userId, userId),
+                eq(readProgress.userId, viewer.id),
                 eq(readProgress.completed, false),
+                visibleTo(viewer),
             ),
         )
         .orderBy(desc(readProgress.updatedAt))

@@ -203,7 +203,7 @@ describe('access control', () => {
         expect((await get('/me')).body).toMatchObject({
             name: 'reader',
             role: 'reader',
-            maxAgeRating: null,
+            maxAge: null,
         });
     });
 
