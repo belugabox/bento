@@ -10,6 +10,7 @@ import {
     type AuthDeps,
     type AuthEnv,
     createAuthRoutes,
+    createPreviewRoutes,
     requireAdmin,
     requireUser,
 } from './auth/routes';
@@ -116,7 +117,12 @@ export const createApi = ({
         .route('/auth', createAuthRoutes({ db, logger, ...auth }))
         // Tout ce qui suit exige une session.
         .use('*', requireUser(db))
-        .get('/me', (c) => c.json(c.var.user))
+        .get('/me', (c) => c.json({ ...c.var.user, preview: c.var.preview }))
+        // Vue lecteur d'un admin (âge choisi), et retour à la vue admin.
+        .route(
+            '/preview',
+            createPreviewRoutes(auth.publicUrl.startsWith('https://')),
+        )
         .get('/libraries', (c) =>
             c.json(
                 listLibraries(db).map((library) => ({
@@ -330,6 +336,10 @@ export const createApi = ({
             },
         )
         // --- Gestion des fichiers (admin) : brouillons, ComicInfo, rangement.
+        // Nombre de séries en attente (pastille de l'en-tête).
+        .get('/drafts/pending', requireAdmin, async (c) =>
+            c.json({ series: await files.pendingSeries() }),
+        )
         .get(
             '/libraries/:id/drafts',
             requireAdmin,

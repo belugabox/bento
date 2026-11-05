@@ -47,7 +47,7 @@ Toute la configuration passe par des variables d'environnement :
 
 ### Gestion des tomes (admin)
 
-- **Brouillons** : les tomes déposés dans le dossier `_draft` d'une bibliothèque (par la synchro de beluga-box, par exemple) apparaissent dans « Brouillons », depuis le menu de l'avatar. Les `.cbr` et les RAR déguisés en `.cbz` sont convertis au passage.
+- **Brouillons** : les tomes déposés dans le dossier `_draft` d'une bibliothèque (par la synchro de beluga-box, par exemple) apparaissent dans « Brouillons » : l'icône en haut à droite indique le nombre de séries en attente. Les `.cbr` et les RAR déguisés en `.cbz` sont convertis au passage.
 - **Métadonnées** : on les complète à la main, depuis Wikipédia FR ou depuis les noms de fichiers. « Publier » range chaque tome en `Série/Série #NN (Année).cbz` ; un brouillon remplace le tome publié du même numéro.
 - **Séries publiées** : « Modifier les métadonnées » sur la fiche série. Si la série est renommée, « Renommer les fichiers » déplace les tomes, sans perdre la progression de lecture.
 - **Couverture** : celle d'un tome, une page au choix, ou l'image de l'article Wikipédia.
@@ -59,7 +59,8 @@ Bento écrit dans les fichiers (ComicInfo, rangement) : le conteneur doit pouvoi
 - **Âge maximal** : l'admin le règle pour chaque personne dans « Comptes et contrôle parental », depuis le menu de l'avatar.
 - **Classification d'une série** : la plus restrictive de ses tomes (`AgeRating` du ComicInfo), ou celle choisie par l'admin sur la fiche série.
 - **Comptes limités** : ils ne voient que les séries classées sous leur limite. Une série sans classification leur est masquée, partout : liste, fiche, tomes, pages, couvertures, « Reprendre la lecture ».
-- **Admins** : ils voient tout.
+- **Admins** : ils voient tout. Le menu de l'avatar leur permet de **voir l'appli comme un lecteur** d'un âge donné, pour vérifier ce qu'un enfant verra ; un bandeau permet de revenir à la vue admin.
+- **Classifications** : les variantes du ComicInfo sont regroupées par âge (« 10 ans et + » regroupe « Everyone 10+ » et « PG », par exemple).
 
 ### Connexion
 

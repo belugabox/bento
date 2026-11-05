@@ -1,10 +1,12 @@
 import { Hono } from 'hono';
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie';
 import { createMiddleware } from 'hono/factory';
+import { z } from 'zod';
 
 import type { Db } from '../db';
 import { forbidden, unauthorized } from '../tools/errors';
 import type { Logger } from '../tools/logger';
+import { zValidator } from '../tools/validator';
 import { type OidcClient, randomToken } from './oidc';
 import {
     SESSION_DAYS,
@@ -16,7 +18,14 @@ import {
     userForSession,
 } from './sessions';
 
-export type AuthEnv = { Variables: { user: SessionUser } };
+export type AuthEnv = {
+    Variables: {
+        // Personne telle que vue par le catalogue (lecteur en vue lecteur).
+        user: SessionUser;
+        // Vue lecteur d'un admin : son âge maximal (null : sans limite).
+        preview: { maxAge: number | null } | null;
+    };
+};
 
 export type AuthDeps = {
     db: Db;
@@ -28,6 +37,8 @@ export type AuthDeps = {
 };
 
 const SESSION_COOKIE = 'bento_session';
+// Vue lecteur d'un admin : âge maximal (« all » : sans limite).
+const PREVIEW_COOKIE = 'bento_preview';
 // Le temps d'aller-retour chez Pocket ID : state, code_verifier, page visée.
 const FLOW_COOKIE = 'bento_oidc';
 const FLOW_MINUTES = 10;
@@ -152,9 +163,62 @@ export const requireUser = (db: Db) =>
         const token = getCookie(c, SESSION_COOKIE);
         const user = token ? userForSession(db, token) : undefined;
         if (!user) throw unauthorized('Connexion requise');
-        c.set('user', user);
+        const preview =
+            user.role === 'admin'
+                ? previewOf(getCookie(c, PREVIEW_COOKIE))
+                : null;
+        c.set('preview', preview);
+        // En vue lecteur, l'admin voit et agit comme un lecteur de cet âge.
+        c.set(
+            'user',
+            preview
+                ? { ...user, role: 'reader', maxAge: preview.maxAge }
+                : user,
+        );
         await next();
     });
+
+const previewOf = (value: string | undefined) => {
+    if (value === 'all') return { maxAge: null };
+    const age = Number(value);
+    return value !== undefined && Number.isInteger(age) && age >= 0 && age <= 18
+        ? { maxAge: age }
+        : null;
+};
+
+/**
+ * Vue lecteur pour un admin : `maxAge` (null : sans limite) pose le
+ * cookie, `undefined` revient à la vue admin. Utilisable aussi depuis la
+ * vue lecteur (le rôle réel reste admin).
+ */
+export const createPreviewRoutes = (secure: boolean) =>
+    new Hono<AuthEnv>()
+        .put(
+            '/',
+            zValidator(
+                'json',
+                z.object({
+                    maxAge: z.number().int().min(0).max(18).nullable(),
+                }),
+            ),
+            (c) => {
+                if (c.var.user.role !== 'admin' && !c.var.preview) {
+                    throw forbidden('Réservé aux administrateurs');
+                }
+                const { maxAge } = c.req.valid('json');
+                setCookie(
+                    c,
+                    PREVIEW_COOKIE,
+                    maxAge === null ? 'all' : String(maxAge),
+                    { httpOnly: true, secure, sameSite: 'Lax', path: '/' },
+                );
+                return c.json({ preview: { maxAge } });
+            },
+        )
+        .delete('/', (c) => {
+            deleteCookie(c, PREVIEW_COOKIE, { path: '/' });
+            return c.json({ preview: null });
+        });
 
 export const requireAdmin = createMiddleware<AuthEnv>(async (c, next) => {
     if (c.var.user.role !== 'admin') {

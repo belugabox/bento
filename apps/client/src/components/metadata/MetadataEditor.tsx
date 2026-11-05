@@ -27,7 +27,7 @@ import { useEffect, useMemo, useState } from 'react';
 
 import { type ComicInfo, publicationPathOf } from '@server/types';
 
-import { AGE_RATING_OPTIONS } from '@/components/ageLimits';
+import { AGE_RATING_OPTIONS, canonicalRating } from '@/components/ageLimits';
 import { publishFiles, saveComicInfo } from '@/services/api';
 
 import { WikipediaSearch } from './WikipediaSearch';
@@ -105,7 +105,8 @@ export const MetadataEditor = ({
     const paths = readable.map((v) => v.path);
     const [edits, setEdits] = useState<Edits>(() => initialEdits(readable));
     const [overwrite, setOverwrite] = useState(false);
-    const [busy, setBusy] = useState(false);
+    // Action en cours : roue de chargement sur son seul bouton.
+    const [busy, setBusy] = useState<'save' | 'publish'>();
     const [report, setReport] = useState<Report>();
     const [wikiOpened, wiki] = useDisclosure(false);
 
@@ -142,7 +143,7 @@ export const MetadataEditor = ({
     const first = paths[0];
 
     const save = async () => {
-        setBusy(true);
+        setBusy('save');
         setReport(undefined);
         try {
             const result = await saveComicInfo(libraryId, changes);
@@ -168,12 +169,12 @@ export const MetadataEditor = ({
         } catch (e) {
             setReport({ color: 'red', lines: [(e as Error).message] });
         } finally {
-            setBusy(false);
+            setBusy(undefined);
         }
     };
 
     const publish = async () => {
-        setBusy(true);
+        setBusy('publish');
         setReport(undefined);
         try {
             const result = await publishFiles(
@@ -191,7 +192,7 @@ export const MetadataEditor = ({
         } catch (e) {
             setReport({ color: 'red', lines: [(e as Error).message] });
         } finally {
-            setBusy(false);
+            setBusy(undefined);
         }
     };
 
@@ -266,8 +267,8 @@ export const MetadataEditor = ({
                         Annuler
                     </Button>
                     <Button
-                        disabled={changes.length === 0}
-                        loading={busy}
+                        disabled={changes.length === 0 || busy === 'publish'}
+                        loading={busy === 'save'}
                         onClick={() => void save()}
                     >
                         Enregistrer
@@ -276,9 +277,9 @@ export const MetadataEditor = ({
                     <Button
                         color="teal"
                         leftSection={<IconUpload size={16} />}
-                        disabled={!!publishReason}
+                        disabled={!!publishReason || busy === 'save'}
                         title={publishReason}
-                        loading={busy}
+                        loading={busy === 'publish'}
                         onClick={() => void publish()}
                     >
                         {mode === 'drafts'
@@ -298,11 +299,6 @@ export const MetadataEditor = ({
                         {publishReason}
                     </Text>
                 )}
-            {changes.length > 0 && (
-                <Text size="xs" c="orange">
-                    En orange : modifié, pas encore enregistré.
-                </Text>
-            )}
             {report && (
                 <Alert
                     color={report.color}
@@ -351,7 +347,7 @@ export const MetadataEditor = ({
                             {...changed(seriesChanged('AgeRating'))}
                             clearable
                             placeholder="Aucune"
-                            value={String(series('AgeRating')) || null}
+                            value={canonicalRating(String(series('AgeRating')))}
                             onChange={(value) =>
                                 setSeries('AgeRating', value ?? undefined)
                             }

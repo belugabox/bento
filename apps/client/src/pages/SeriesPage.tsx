@@ -25,7 +25,11 @@ import type { MouseEvent } from 'react';
 import { Link, useParams } from 'react-router';
 
 import { CoverCard } from '@/components/CoverCard';
-import { AGE_RATING_OPTIONS } from '@/components/ageLimits';
+import {
+    AGE_RATING_OPTIONS,
+    ageRatingLabel,
+    canonicalRating,
+} from '@/components/ageLimits';
 import {
     nextToRead,
     progressRatio,
@@ -132,9 +136,9 @@ export const SeriesPage = () => {
                                 {series.genre}
                             </Badge>
                         )}
-                        {series.ageRating && series.ageRating !== 'Unknown' && (
+                        {ageRatingLabel(series.ageRating) && (
                             <Badge variant="light" color="orange">
-                                {series.ageRating}
+                                {ageRatingLabel(series.ageRating)}
                             </Badge>
                         )}
                     </Group>
@@ -161,7 +165,10 @@ export const SeriesPage = () => {
                                     : undefined
                             }
                             allowDeselect={false}
-                            value={series.ageRatingOverride ?? FROM_VOLUMES}
+                            value={
+                                canonicalRating(series.ageRatingOverride) ??
+                                FROM_VOLUMES
+                            }
                             onChange={async (value) => {
                                 await setSeriesAgeRating(
                                     series.id,

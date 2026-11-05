@@ -170,3 +170,12 @@ export const seriesCoverUrl = (series: {
     coverVolumeId?: number | null;
 }) =>
     `/api/series/${series.id}/cover?v=${encodeURIComponent(series.coverUpdatedAt ?? String(series.coverVolumeId ?? ''))}`;
+
+/** Séries en attente dans les brouillons (pastille de l'en-tête). */
+export const fetchPendingDrafts = () => json(api.drafts.pending.$get());
+
+/** Vue lecteur d'un admin : âge maximal (null : sans limite). */
+export const startPreview = (maxAge: number | null) =>
+    json(api.preview.$put({ json: { maxAge } }));
+
+export const stopPreview = () => json(api.preview.$delete());

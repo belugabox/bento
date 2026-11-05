@@ -99,9 +99,6 @@ describe('MetadataEditor', () => {
                 .getByLabelText('Titre de Gantz T01 (2017).cbz')
                 .getAttribute('data-changed'),
         ).toBeNull();
-        expect(
-            screen.getByText('En orange : modifié, pas encore enregistré.'),
-        ).toBeTruthy();
 
         await act(async () => {
             fireEvent.click(

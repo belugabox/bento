@@ -1,17 +1,7 @@
-import {
-    Anchor,
-    AppShell,
-    Avatar,
-    Container,
-    Group,
-    Menu,
-    Text,
-    Title,
-    UnstyledButton,
-} from '@mantine/core';
-import { IconInbox, IconLogout, IconUsers } from '@tabler/icons-react';
-import { Link, Navigate, Outlet, Route, Routes } from 'react-router';
+import { AppShell, Container } from '@mantine/core';
+import { Navigate, Outlet, Route, Routes } from 'react-router';
 
+import { AppHeader, PreviewBanner } from '@/components/AppHeader';
 import { RequireUser } from '@/components/RequireUser';
 import { DeniedPage } from '@/pages/DeniedPage';
 import { DraftsPage } from '@/pages/DraftsPage';
@@ -20,52 +10,7 @@ import { SeriesEditPage } from '@/pages/SeriesEditPage';
 import { SeriesPage } from '@/pages/SeriesPage';
 import { UsersPage } from '@/pages/UsersPage';
 import { ReaderPage } from '@/reader/ReaderPage';
-import { logout, useCurrentUser } from '@/services/auth';
-
-const UserMenu = () => {
-    const user = useCurrentUser();
-    return (
-        <Menu position="bottom-end">
-            <Menu.Target>
-                <UnstyledButton aria-label="Mon compte">
-                    <Avatar name={user.name} color="initials" size="md" />
-                </UnstyledButton>
-            </Menu.Target>
-            <Menu.Dropdown>
-                <Menu.Label>
-                    <Text size="sm" fw={500} c="bright">
-                        {user.name}
-                    </Text>
-                    {user.role === 'admin' ? 'Administrateur' : 'Lecteur'}
-                </Menu.Label>
-                {user.role === 'admin' && (
-                    <Menu.Item
-                        component={Link}
-                        to="/drafts"
-                        leftSection={<IconInbox size={14} />}
-                    >
-                        Brouillons
-                    </Menu.Item>
-                )}
-                {user.role === 'admin' && (
-                    <Menu.Item
-                        component={Link}
-                        to="/users"
-                        leftSection={<IconUsers size={14} />}
-                    >
-                        Comptes et contrôle parental
-                    </Menu.Item>
-                )}
-                <Menu.Item
-                    leftSection={<IconLogout size={14} />}
-                    onClick={() => void logout()}
-                >
-                    Se déconnecter
-                </Menu.Item>
-            </Menu.Dropdown>
-        </Menu>
-    );
-};
+import { useCurrentUser } from '@/services/auth';
 
 /** Réservé aux admins ; les autres reviennent à l'accueil. */
 const AdminOnly = ({ children }: { children: React.ReactNode }) =>
@@ -76,21 +21,12 @@ const Layout = () => (
     <AppShell header={{ height: 56 }} padding="md">
         <AppShell.Header>
             <Container size="xl" h="100%">
-                <Group h="100%" justify="space-between">
-                    <Anchor
-                        component={Link}
-                        to="/"
-                        underline="never"
-                        c="inherit"
-                    >
-                        <Title order={3}>🍱 Bento</Title>
-                    </Anchor>
-                    <UserMenu />
-                </Group>
+                <AppHeader />
             </Container>
         </AppShell.Header>
         <AppShell.Main>
             <Container size="xl">
+                <PreviewBanner />
                 <Outlet />
             </Container>
         </AppShell.Main>

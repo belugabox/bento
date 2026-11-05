@@ -259,6 +259,41 @@ export class LibraryFiles {
         }
     };
 
+    /**
+     * Séries en attente dans les brouillons de toutes les bibliothèques :
+     * dossiers contenant des archives (un tome à la racine de _draft compte
+     * pour une série). Sans ouvrir les archives : appelé souvent.
+     */
+    pendingSeries = async () => {
+        let count = 0;
+        for (const library of this.db.select().from(libraries).all()) {
+            const draftRoot = path.join(library.path, DRAFT_FOLDER);
+            const entries = await readdir(draftRoot, {
+                withFileTypes: true,
+                recursive: true,
+            }).catch(() => []);
+            const folders = new Set<string>();
+            for (const entry of entries) {
+                const extension = path.extname(entry.name).toLowerCase();
+                if (
+                    !entry.isFile() ||
+                    (extension !== '.cbz' && extension !== '.cbr')
+                ) {
+                    continue;
+                }
+                const atRoot =
+                    path.resolve(entry.parentPath) === path.resolve(draftRoot);
+                folders.add(
+                    atRoot
+                        ? path.join(entry.parentPath, entry.name)
+                        : entry.parentPath,
+                );
+            }
+            count += folders.size;
+        }
+        return count;
+    };
+
     /** Brouillons de la bibliothèque, par dossier. */
     drafts = async (libraryId: number) => {
         const library = this.library(libraryId);
