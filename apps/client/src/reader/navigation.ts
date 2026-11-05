@@ -51,3 +51,64 @@ export const pagesToPreload = (
     for (let i = 1; i <= behind; i++) pages.push(page - i);
     return pages.filter((p) => p >= 0 && p < pageCount);
 };
+
+/** Tiers de l'écran touché : gauche et droite tournent, le milieu affiche la barre. */
+export const sideOfTap = (x: number, width: number) =>
+    x < width / 3 ? 'left' : x > (width * 2) / 3 ? 'right' : 'middle';
+
+// Déplacement horizontal minimal (px) pour qu'un geste soit un balayage.
+const SWIPE_MIN = 50;
+
+/**
+ * Déplacement pour un balayage : pousser la page vers la gauche revient à
+ * toucher le côté droit (page suivante de gauche à droite).
+ */
+export const moveForSwipe = (
+    dx: number,
+    dy: number,
+    direction: Direction,
+): Move | undefined => {
+    if (Math.abs(dx) < SWIPE_MIN || Math.abs(dx) < Math.abs(dy)) {
+        return undefined;
+    }
+    return moveForSide(dx < 0 ? 'right' : 'left', direction);
+};
+
+/** Pages affichées ensemble : une seule, ou deux en double page. */
+export type Spread = number[];
+
+/** Une page par écran. */
+export const singleSpreads = (pageCount: number): Spread[] =>
+    Array.from({ length: pageCount }, (_, page) => [page]);
+
+/**
+ * Doubles pages : la couverture seule, puis les pages par deux. Une page
+ * plus large que haute (double page déjà fusionnée) reste seule, et la
+ * page qui la précède aussi.
+ */
+export const doubleSpreads = (sizes: [number, number][]): Spread[] => {
+    if (sizes.length === 0) return [];
+    const wide = (page: number) => {
+        const [width, height] = sizes[page]!;
+        return width > height;
+    };
+    const spreads: Spread[] = [[0]];
+    let page = 1;
+    while (page < sizes.length) {
+        if (!wide(page) && page + 1 < sizes.length && !wide(page + 1)) {
+            spreads.push([page, page + 1]);
+            page += 2;
+        } else {
+            spreads.push([page]);
+            page += 1;
+        }
+    }
+    return spreads;
+};
+
+/** Index de l'écran qui contient la page. */
+export const spreadIndexOf = (spreads: Spread[], page: number) =>
+    Math.max(
+        spreads.findIndex((spread) => spread.includes(page)),
+        0,
+    );

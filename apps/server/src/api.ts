@@ -19,6 +19,7 @@ import {
     getVolume,
     listLibraries,
     listSeries,
+    savePageSizes,
     setSeriesAgeRating,
 } from './library/catalog';
 import { getProgress, listInProgress, saveProgress } from './library/progress';
@@ -135,11 +136,11 @@ export const createApi = ({
         )
         .get('/volumes/:id', zValidator('param', idParam), (c) => {
             // Le chemin sur disque reste côté serveur.
-            const { fullPath: _fullPath, ...volume } = getVolume(
-                db,
-                c.var.user,
-                c.req.valid('param').id,
-            );
+            const {
+                fullPath: _fullPath,
+                pageSizes: _pageSizes,
+                ...volume
+            } = getVolume(db, c.var.user, c.req.valid('param').id);
             return c.json({
                 ...volume,
                 progress: getProgress(db, c.var.user.id, volume.id),
@@ -170,6 +171,22 @@ export const createApi = ({
                         c.req.valid('json'),
                     ),
                 });
+            },
+        )
+        // Dimensions des pages (double page), calculées à la première demande.
+        .get(
+            '/volumes/:id/page-sizes',
+            zValidator('param', idParam),
+            async (c) => {
+                const volume = getVolume(
+                    db,
+                    c.var.user,
+                    c.req.valid('param').id,
+                );
+                if (volume.pageSizes) return c.json(volume.pageSizes);
+                const sizes = await pages.sizes(volume.fullPath);
+                savePageSizes(db, volume.id, sizes);
+                return c.json(sizes);
             },
         )
         // Tomes commencés, pour « Reprendre la lecture ».

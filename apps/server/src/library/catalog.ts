@@ -177,6 +177,7 @@ export const getVolume = (db: Db, viewer: Viewer, id: number) => {
             number: volumes.number,
             title: volumes.title,
             pageCount: volumes.pageCount,
+            pageSizes: volumes.pageSizes,
             file: volumes.file,
             libraryPath: libraries.path,
             libraryType: libraries.type,
@@ -230,3 +231,14 @@ export const setSeriesAgeRating = (
     if (!updated) throw notFound('Série introuvable');
     return { ...updated, ageRatingOverride: override };
 };
+
+export const savePageSizes = (
+    db: Db,
+    volumeId: number,
+    sizes: [number, number][],
+) =>
+    db
+        .update(volumes)
+        .set({ pageSizes: sizes })
+        .where(eq(volumes.id, volumeId))
+        .run();

@@ -91,6 +91,11 @@ export const volumes = sqliteTable(
             .$type<ComicInfo>()
             .notNull(),
         pageCount: integer('page_count').notNull(),
+        // Largeur et hauteur de chaque page, calculées à la première demande
+        // (double page) ; null tant qu'elles ne l'ont pas été.
+        pageSizes: text('page_sizes', { mode: 'json' }).$type<
+            [number, number][]
+        >(),
         size: integer('size').notNull(),
         // Date de modification du fichier : un tome inchangé n'est pas relu.
         mtimeMs: real('mtime_ms').notNull(),

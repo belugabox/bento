@@ -6,23 +6,42 @@ import {
     Center,
     Group,
     Loader,
+    Popover,
     SegmentedControl,
     Slider,
     Stack,
     Text,
 } from '@mantine/core';
-import { useLocalStorage } from '@mantine/hooks';
-import { IconArrowLeft } from '@tabler/icons-react';
+import { useLocalStorage, useMediaQuery } from '@mantine/hooks';
+import {
+    IconArrowLeft,
+    IconSettings,
+    IconZoomIn,
+    IconZoomOut,
+    IconZoomReset,
+} from '@tabler/icons-react';
 import {
     type CSSProperties,
+    type MouseEvent,
+    type PointerEvent,
     useCallback,
     useEffect,
     useRef,
     useState,
 } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
+import {
+    type ReactZoomPanPinchRef,
+    TransformComponent,
+    TransformWrapper,
+} from 'react-zoom-pan-pinch';
 
-import { fetchVolume, pageUrl, saveProgress } from '@/services/api';
+import {
+    fetchPageSizes,
+    fetchVolume,
+    pageUrl,
+    saveProgress,
+} from '@/services/api';
 import { useQuery } from '@/services/useQuery';
 
 import {
@@ -30,15 +49,33 @@ import {
     type Fit,
     type Move,
     clampPage,
+    doubleSpreads,
     moveForKey,
     moveForSide,
+    moveForSwipe,
     pagesToPreload,
+    sideOfTap,
+    singleSpreads,
+    spreadIndexOf,
 } from './navigation';
 
-const FIT_STYLES: Record<Fit, CSSProperties> = {
-    screen: { maxWidth: '100%', maxHeight: '100dvh', objectFit: 'contain' },
-    width: { width: '100%', height: 'auto' },
-    height: { height: '100dvh', width: 'auto' },
+/** Une page ou deux par écran ; `auto` : deux en paysage. */
+type PageMode = 'auto' | 'single' | 'double';
+
+/** Taille de chaque image selon l'ajustement et le nombre de pages affichées. */
+const imageStyle = (fit: Fit, count: number): CSSProperties => {
+    switch (fit) {
+        case 'screen':
+            return {
+                maxWidth: `${100 / count}vw`,
+                maxHeight: '100dvh',
+                objectFit: 'contain',
+            };
+        case 'width':
+            return { width: `${100 / count}vw`, height: 'auto' };
+        case 'height':
+            return { height: '100dvh', width: 'auto' };
+    }
 };
 
 // `?page=last` : dernière page (en revenant du tome suivant).
@@ -58,14 +95,34 @@ export const ReaderPage = () => {
         key: 'bento:reader:fit',
         defaultValue: 'screen',
     });
-    // Sens réglable par série ; par défaut celui de la bibliothèque.
+    const [pageMode, setPageMode] = useLocalStorage<PageMode>({
+        key: 'bento:reader:pages',
+        defaultValue: 'auto',
+    });
+    // Sens réglable par série ; par défaut celui renvoyé par le serveur.
     const [directions, setDirections] = useLocalStorage<
         Record<string, Direction>
     >({ key: 'bento:reader:directions', defaultValue: {} });
     const [toolbar, setToolbar] = useState(true);
     const [ended, setEnded] = useState(false);
+    const [zoomed, setZoomed] = useState(false);
+    const zoom = useRef<ReactZoomPanPinchRef>(null);
+
+    const landscape = useMediaQuery('(orientation: landscape)') ?? false;
+    const wantDouble =
+        pageMode === 'double' || (pageMode === 'auto' && landscape);
+    // Dimensions des pages : seulement pour la double page.
+    const { data: sizes } = useQuery(
+        () => (wantDouble ? fetchPageSizes(volumeId) : Promise.resolve(null)),
+        [volumeId, wantDouble],
+    );
 
     const pageCount = volume?.pageCount ?? 0;
+    const spreads =
+        wantDouble && sizes && sizes.length === pageCount
+            ? doubleSpreads(sizes)
+            : singleSpreads(pageCount);
+
     const rawPage = params.get('page');
     // Sans page dans l'adresse : reprendre là où la personne s'était arrêtée.
     const resumePage =
@@ -78,6 +135,10 @@ export const ReaderPage = () => {
             : rawPage === null
               ? clampPage(resumePage, pageCount)
               : clampPage(Number(rawPage) - 1, pageCount);
+    const spreadIndex = spreadIndexOf(spreads, page);
+    const shown = spreads[spreadIndex] ?? [page];
+    // Dernière page affichée : c'est elle qui compte pour la progression.
+    const lastShown = Math.max(...shown);
     const direction =
         (volume && directions[volume.seriesId]) ?? volume?.direction ?? 'ltr';
 
@@ -87,9 +148,7 @@ export const ReaderPage = () => {
             // Page affichée en partant de 1 dans l'adresse.
             setParams(
                 { page: String(clampPage(next, pageCount) + 1) },
-                {
-                    replace: true,
-                },
+                { replace: true },
             );
         },
         [pageCount, setParams],
@@ -99,17 +158,18 @@ export const ReaderPage = () => {
         (to: Move) => {
             if (!volume) return;
             if (to === 'next') {
-                if (page < pageCount - 1) goTo(page + 1);
+                const next = spreads[spreadIndex + 1];
+                if (next) goTo(next[0]!);
                 else setEnded(true);
             } else if (ended) {
                 setEnded(false);
-            } else if (page > 0) {
-                goTo(page - 1);
+            } else if (spreadIndex > 0) {
+                goTo(spreads[spreadIndex - 1]![0]!);
             } else if (volume.previousId) {
                 navigate(`/read/${volume.previousId}?page=${LAST_PAGE}`);
             }
         },
-        [volume, page, pageCount, ended, goTo, navigate],
+        [volume, spreads, spreadIndex, ended, goTo, navigate],
     );
 
     // L'adresse garde toujours un numéro de page (reprise après rechargement).
@@ -121,14 +181,20 @@ export const ReaderPage = () => {
     const savedPage = useRef<string>(undefined);
     useEffect(() => {
         if (!volume || rawPage === null || rawPage === LAST_PAGE) return;
-        const key = `${volume.id}:${page}`;
+        const key = `${volume.id}:${lastShown}`;
         if (savedPage.current === key) return;
         savedPage.current = key;
-        saveProgress(volume.id, { page }).catch(() => {
+        saveProgress(volume.id, { page: lastShown }).catch(() => {
             // Sans réseau, la lecture continue ; la page suivante réessaiera.
             savedPage.current = undefined;
         });
-    }, [volume, rawPage, page]);
+    }, [volume, rawPage, lastShown]);
+
+    // Nouvelle page : revenir à la taille normale.
+    useEffect(() => {
+        zoom.current?.resetTransform(0);
+        setZoomed(false);
+    }, [page, fit]);
 
     useEffect(() => {
         const onKey = (event: KeyboardEvent) => {
@@ -149,10 +215,63 @@ export const ReaderPage = () => {
     // Précharger les pages voisines (cache du navigateur).
     useEffect(() => {
         if (!volume) return;
-        for (const index of pagesToPreload(page, pageCount)) {
+        for (const index of pagesToPreload(lastShown, pageCount, {
+            ahead: 4,
+            behind: 2,
+        })) {
             new Image().src = pageUrl(volume.id, index);
         }
-    }, [volume, page, pageCount]);
+    }, [volume, lastShown, pageCount]);
+
+    // --- Gestes : balayage et toucher ---------------------------------------
+    const gesture = useRef<{
+        x: number;
+        y: number;
+        // Plusieurs doigts (pincement) : pas un balayage.
+        multi: boolean;
+        swiped: boolean;
+    }>({ x: 0, y: 0, multi: false, swiped: false });
+    const pointers = useRef(new Set<number>());
+
+    const onPointerDown = (event: PointerEvent) => {
+        pointers.current.add(event.pointerId);
+        if (pointers.current.size === 1) {
+            gesture.current = {
+                x: event.clientX,
+                y: event.clientY,
+                multi: false,
+                swiped: false,
+            };
+        } else {
+            gesture.current.multi = true;
+        }
+    };
+
+    const onPointerUp = (event: PointerEvent) => {
+        pointers.current.delete(event.pointerId);
+        const { x, y, multi } = gesture.current;
+        if (multi || zoomed || event.pointerType === 'mouse') return;
+        const to = moveForSwipe(
+            event.clientX - x,
+            event.clientY - y,
+            direction,
+        );
+        if (to) {
+            gesture.current.swiped = true;
+            move(to);
+        }
+    };
+
+    const onClick = (event: MouseEvent) => {
+        // Le clic qui suit un balayage ou un pincement ne compte pas.
+        if (gesture.current.swiped || gesture.current.multi) {
+            gesture.current.swiped = false;
+            return;
+        }
+        const side = sideOfTap(event.clientX, window.innerWidth);
+        if (side === 'middle' || zoomed) setToolbar((visible) => !visible);
+        else move(moveForSide(side, direction));
+    };
 
     if (error) {
         return (
@@ -170,8 +289,40 @@ export const ReaderPage = () => {
     }
 
     const title = `${volume.seriesName} — ${volume.number ? `Tome ${volume.number}` : (volume.title ?? '')}`;
-    // Le curseur suit le sens de lecture : en manga, la fin est à gauche.
+    // Le curseur suit le sens de lecture : de droite à gauche, la fin est à gauche.
     const sliderValue = direction === 'rtl' ? pageCount - page : page + 1;
+    // Ordre à l'écran : la première page à droite en lecture droite → gauche.
+    const onScreen = direction === 'rtl' ? [...shown].reverse() : shown;
+    const pageLabel =
+        shown.length > 1
+            ? `${shown[0]! + 1}-${lastShown + 1}`
+            : String(page + 1);
+
+    const images = (
+        <Box
+            style={{
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: fit === 'width' ? 'flex-start' : 'center',
+                minHeight: '100dvh',
+                width: fit === 'height' ? 'max-content' : '100vw',
+                margin: '0 auto',
+            }}
+        >
+            {onScreen.map((index) => (
+                <img
+                    key={index}
+                    src={pageUrl(volume.id, index)}
+                    alt={`Page ${index + 1}`}
+                    style={{
+                        display: 'block',
+                        ...imageStyle(fit, shown.length),
+                    }}
+                    draggable={false}
+                />
+            ))}
+        </Box>
+    );
 
     return (
         <Box
@@ -181,32 +332,41 @@ export const ReaderPage = () => {
             style={{ userSelect: 'none' }}
         >
             <Box
+                onPointerDown={onPointerDown}
+                onPointerUp={onPointerUp}
+                onPointerCancel={(event) =>
+                    pointers.current.delete(event.pointerId)
+                }
+                onClick={onClick}
                 style={{
-                    display: 'flex',
-                    justifyContent: 'center',
-                    alignItems: fit === 'width' ? 'flex-start' : 'center',
-                    minHeight: '100dvh',
                     overflowX: fit === 'height' ? 'auto' : 'hidden',
+                    // Écran : le zoom gère les doigts ; sinon, défilement normal.
+                    touchAction: fit === 'screen' ? 'none' : 'pan-x pan-y',
                 }}
             >
-                <img
-                    key={page}
-                    src={pageUrl(volume.id, page)}
-                    alt={`Page ${page + 1}`}
-                    style={{ display: 'block', ...FIT_STYLES[fit] }}
-                    draggable={false}
-                />
-            </Box>
-
-            {/* Zones de clic : un tiers de chaque côté, le milieu affiche la barre. */}
-            <Box
-                pos="fixed"
-                inset={0}
-                style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr' }}
-            >
-                <Box onClick={() => move(moveForSide('left', direction))} />
-                <Box onClick={() => setToolbar((shown) => !shown)} />
-                <Box onClick={() => move(moveForSide('right', direction))} />
+                {fit === 'screen' ? (
+                    <TransformWrapper
+                        ref={zoom}
+                        minScale={1}
+                        maxScale={5}
+                        limitToBounds
+                        wheel={{ disabled: true }}
+                        doubleClick={{ disabled: true }}
+                        // Sans zoom, le doigt sert à tourner les pages.
+                        panning={{ disabled: !zoomed }}
+                        onTransformed={(_, state) =>
+                            setZoomed(state.scale > 1.01)
+                        }
+                    >
+                        <TransformComponent
+                            wrapperStyle={{ width: '100vw', height: '100dvh' }}
+                        >
+                            {images}
+                        </TransformComponent>
+                    </TransformWrapper>
+                ) : (
+                    images
+                )}
             </Box>
 
             {ended && (
@@ -267,31 +427,129 @@ export const ReaderPage = () => {
                                 {title}
                             </Text>
                         </Group>
-                        <Group gap="xs" wrap="nowrap">
-                            <SegmentedControl
-                                size="xs"
-                                value={direction}
-                                onChange={(value) =>
-                                    setDirections((current) => ({
-                                        ...current,
-                                        [volume.seriesId]: value as Direction,
-                                    }))
-                                }
-                                data={[
-                                    { value: 'ltr', label: 'Gauche → droite' },
-                                    { value: 'rtl', label: 'Droite → gauche' },
-                                ]}
-                            />
-                            <SegmentedControl
-                                size="xs"
-                                value={fit}
-                                onChange={(value) => setFit(value as Fit)}
-                                data={[
-                                    { value: 'screen', label: 'Écran' },
-                                    { value: 'width', label: 'Largeur' },
-                                    { value: 'height', label: 'Hauteur' },
-                                ]}
-                            />
+                        <Group gap={4} wrap="nowrap">
+                            {fit === 'screen' && (
+                                <>
+                                    <ActionIcon
+                                        variant="subtle"
+                                        color="gray"
+                                        aria-label="Zoom arrière"
+                                        onClick={() => zoom.current?.zoomOut()}
+                                    >
+                                        <IconZoomOut size={18} />
+                                    </ActionIcon>
+                                    {zoomed && (
+                                        <ActionIcon
+                                            variant="subtle"
+                                            color="gray"
+                                            aria-label="Taille normale"
+                                            onClick={() =>
+                                                zoom.current?.resetTransform()
+                                            }
+                                        >
+                                            <IconZoomReset size={18} />
+                                        </ActionIcon>
+                                    )}
+                                    <ActionIcon
+                                        variant="subtle"
+                                        color="gray"
+                                        aria-label="Zoom avant"
+                                        onClick={() => zoom.current?.zoomIn()}
+                                    >
+                                        <IconZoomIn size={18} />
+                                    </ActionIcon>
+                                </>
+                            )}
+                            <Popover position="bottom-end" withinPortal>
+                                <Popover.Target>
+                                    <ActionIcon
+                                        variant="subtle"
+                                        color="gray"
+                                        aria-label="Réglages de lecture"
+                                    >
+                                        <IconSettings size={18} />
+                                    </ActionIcon>
+                                </Popover.Target>
+                                <Popover.Dropdown>
+                                    <Stack gap="xs">
+                                        <Text size="xs" c="dimmed">
+                                            Sens de lecture (cette série)
+                                        </Text>
+                                        <SegmentedControl
+                                            size="xs"
+                                            fullWidth
+                                            value={direction}
+                                            onChange={(value) =>
+                                                setDirections((current) => ({
+                                                    ...current,
+                                                    [volume.seriesId]:
+                                                        value as Direction,
+                                                }))
+                                            }
+                                            data={[
+                                                {
+                                                    value: 'ltr',
+                                                    label: 'Gauche → droite',
+                                                },
+                                                {
+                                                    value: 'rtl',
+                                                    label: 'Droite → gauche',
+                                                },
+                                            ]}
+                                        />
+                                        <Text size="xs" c="dimmed">
+                                            Pages par écran
+                                        </Text>
+                                        <SegmentedControl
+                                            size="xs"
+                                            fullWidth
+                                            value={pageMode}
+                                            onChange={(value) =>
+                                                setPageMode(value as PageMode)
+                                            }
+                                            data={[
+                                                {
+                                                    value: 'auto',
+                                                    label: 'Auto',
+                                                },
+                                                {
+                                                    value: 'single',
+                                                    label: 'Une',
+                                                },
+                                                {
+                                                    value: 'double',
+                                                    label: 'Deux',
+                                                },
+                                            ]}
+                                        />
+                                        <Text size="xs" c="dimmed">
+                                            Ajustement
+                                        </Text>
+                                        <SegmentedControl
+                                            size="xs"
+                                            fullWidth
+                                            value={fit}
+                                            onChange={(value) =>
+                                                setFit(value as Fit)
+                                            }
+                                            data={[
+                                                {
+                                                    value: 'screen',
+                                                    label: 'Écran',
+                                                },
+                                                {
+                                                    value: 'width',
+                                                    label: 'Largeur',
+                                                },
+                                                {
+                                                    value: 'height',
+                                                    label: 'Hauteur',
+                                                },
+                                            ]}
+                                        />
+                                    </Stack>
+                                </Popover.Dropdown>
+                            </Popover>
                         </Group>
                     </Group>
 
@@ -324,7 +582,7 @@ export const ReaderPage = () => {
                             size="sm"
                             style={{ whiteSpace: 'nowrap' }}
                         >
-                            {page + 1} / {pageCount}
+                            {pageLabel} / {pageCount}
                         </Text>
                     </Group>
                 </>

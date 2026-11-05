@@ -203,6 +203,8 @@ export class LibraryScanner {
             title: comicInfo.Title ?? null,
             comicInfo,
             pageCount: pages.length,
+            // Fichier nouveau ou modifié : dimensions à recalculer.
+            pageSizes: null,
             size: archive.size,
             mtimeMs: archive.mtimeMs,
         };

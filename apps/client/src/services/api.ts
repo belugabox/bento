@@ -101,3 +101,7 @@ export const setSeriesAgeRating = (
             json: { ageRating },
         }),
     );
+
+/** Largeur et hauteur de chaque page (double page). */
+export const fetchPageSizes = (volumeId: number) =>
+    json(api.volumes[':id']['page-sizes'].$get(id(volumeId)));

@@ -7,13 +7,20 @@ import { ReaderPage } from './ReaderPage';
 
 type Saved = { page?: number; completed?: boolean };
 
+// Couverture, puis pages simples (largeur, hauteur).
+const PAGE_SIZES = [
+    [20, 30],
+    [20, 30],
+    [20, 30],
+];
+
 const volume = (direction: 'rtl' | 'ltr', progress: Saved | null = null) => ({
     id: 7,
     seriesId: 3,
     seriesName: 'Spy x Family',
     number: '1',
     title: null,
-    pageCount: 3,
+    pageCount: PAGE_SIZES.length,
     libraryType: direction === 'rtl' ? 'manga' : 'comics',
     direction,
     previousId: null,
@@ -41,7 +48,9 @@ const open = async (
             init?.method === 'PUT'
                 ? (saved.push(JSON.parse(String(init.body))),
                   { progress: null })
-                : volume(direction, progress);
+                : String(input).endsWith('/page-sizes')
+                  ? PAGE_SIZES
+                  : volume(direction, progress);
         expect(String(input)).toMatch(/^\/api\/volumes\/7/);
         return new Response(JSON.stringify(body), {
             headers: { 'Content-Type': 'application/json' },
@@ -62,6 +71,54 @@ const open = async (
 };
 
 const shownPage = () => screen.getByAltText(/^Page /).getAttribute('src');
+const shownPages = () =>
+    screen.getAllByAltText(/^Page /).map((img) => img.getAttribute('src'));
+
+/** Écran en paysage (double page automatique). */
+const landscape = () =>
+    vi.spyOn(window, 'matchMedia').mockImplementation(
+        (query: string) =>
+            ({
+                matches: query.includes('landscape'),
+                media: query,
+                addEventListener: () => {},
+                removeEventListener: () => {},
+                addListener: () => {},
+                removeListener: () => {},
+            }) as unknown as MediaQueryList,
+    );
+
+/** Balayage tactile horizontal sur la page affichée. */
+const swipe = (fromX: number, toX: number) =>
+    act(() => {
+        const target = screen.getAllByAltText(/^Page /)[0]!;
+        fireEvent.pointerDown(target, {
+            pointerId: 1,
+            pointerType: 'touch',
+            clientX: fromX,
+            clientY: 200,
+        });
+        fireEvent.pointerUp(target, {
+            pointerId: 1,
+            pointerType: 'touch',
+            clientX: toX,
+            clientY: 210,
+        });
+        fireEvent.click(target, { clientX: toX, clientY: 210 });
+    });
+
+/** Toucher sans glisser, à l'abscisse donnée (écran de 1024 px). */
+const tap = (x: number) =>
+    act(() => {
+        const target = screen.getAllByAltText(/^Page /)[0]!;
+        fireEvent.pointerDown(target, {
+            pointerId: 1,
+            clientX: x,
+            clientY: 200,
+        });
+        fireEvent.pointerUp(target, { pointerId: 1, clientX: x, clientY: 200 });
+        fireEvent.click(target, { clientX: x, clientY: 200 });
+    });
 const press = (key: string) =>
     act(() => {
         fireEvent.keyDown(window, { key });
@@ -142,5 +199,57 @@ describe('ReaderPage', () => {
         await open('rtl', '/read/7', { page: 2, completed: true });
 
         expect(shownPage()).toBe('/api/volumes/7/pages/0');
+    });
+
+    it('turns the page with a swipe, following the direction', async () => {
+        await open('ltr');
+
+        swipe(600, 300);
+        expect(shownPage()).toBe('/api/volumes/7/pages/1');
+
+        swipe(300, 600);
+        expect(shownPage()).toBe('/api/volumes/7/pages/0');
+    });
+
+    it('turns the page when tapping a side, and ignores the middle', async () => {
+        await open('ltr');
+
+        tap(900);
+        expect(shownPage()).toBe('/api/volumes/7/pages/1');
+        tap(500);
+        expect(shownPage()).toBe('/api/volumes/7/pages/1');
+        tap(100);
+        expect(shownPage()).toBe('/api/volumes/7/pages/0');
+    });
+
+    it('shows two pages side by side in landscape, cover alone', async () => {
+        landscape();
+        await open('ltr');
+        expect(shownPages()).toEqual(['/api/volumes/7/pages/0']);
+
+        press('ArrowRight');
+
+        await vi.waitFor(() =>
+            expect(shownPages()).toEqual([
+                '/api/volumes/7/pages/1',
+                '/api/volumes/7/pages/2',
+            ]),
+        );
+        // La progression retient la dernière page affichée.
+        await vi.waitFor(() => expect(saved.at(-1)).toEqual({ page: 2 }));
+    });
+
+    it('puts the first page on the right when reading right to left', async () => {
+        landscape();
+        await open('rtl');
+
+        press('ArrowLeft');
+
+        await vi.waitFor(() =>
+            expect(shownPages()).toEqual([
+                '/api/volumes/7/pages/2',
+                '/api/volumes/7/pages/1',
+            ]),
+        );
     });
 });

@@ -1,0 +1,1 @@
+ALTER TABLE `volumes` ADD `page_sizes` text;

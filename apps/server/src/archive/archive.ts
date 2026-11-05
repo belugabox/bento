@@ -1,6 +1,7 @@
 import AdmZip from 'adm-zip';
 import { open, stat } from 'node:fs/promises';
 import path from 'node:path';
+import sharp from 'sharp';
 
 import { notFound, unprocessable } from '../tools/errors';
 
@@ -112,6 +113,22 @@ export class PageReader {
             this.archives.delete(oldest);
         }
         return archive;
+    };
+
+    /**
+     * Largeur et hauteur de chaque page ([0, 0] pour une image illisible).
+     * Décompresse tout le tome : à garder en cache.
+     */
+    sizes = async (fullPath: string): Promise<[number, number][]> => {
+        const { pages } = await this.open(fullPath);
+        const sizes: [number, number][] = [];
+        for (const entry of pages) {
+            const { width = 0, height = 0 } = await sharp(entry.getData())
+                .metadata()
+                .catch(() => ({ width: 0, height: 0 }));
+            sizes.push([width, height]);
+        }
+        return sizes;
     };
 
     page = async (
