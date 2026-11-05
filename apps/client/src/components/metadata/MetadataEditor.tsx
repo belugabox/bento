@@ -28,13 +28,14 @@ import { useEffect, useMemo, useState } from 'react';
 import { type ComicInfo, publicationPathOf } from '@server/types';
 
 import { AGE_RATING_OPTIONS, canonicalRating } from '@/components/ageLimits';
-import { publishFiles, saveComicInfo } from '@/services/api';
+import { publishFiles, saveComicInfo, setSeriesStatus } from '@/services/api';
 
 import { WikipediaSearch } from './WikipediaSearch';
 import {
     type EditableVolume,
     type Edits,
     type SeriesField,
+    type SeriesStatus,
     changesOf,
     fillFromFileNames,
     fillFromWikipedia,
@@ -45,6 +46,7 @@ import {
     seriesValue,
     setSeriesField,
     setVolumeField,
+    statusFromWikipedia,
 } from './editing';
 
 export type EditorVolume = EditableVolume & {
@@ -69,6 +71,14 @@ const changed = (isChanged: boolean) =>
           }
         : {};
 
+// Valeur du statut « inconnu » (Select n'accepte pas de valeur vide).
+const UNKNOWN = 'unknown';
+const STATUS_OPTIONS = [
+    { value: 'ongoing', label: 'En cours de parution' },
+    { value: 'completed', label: 'Terminée' },
+    { value: UNKNOWN, label: 'Inconnu' },
+];
+
 const SERIES_TEXT_FIELDS: { field: SeriesField; label: string }[] = [
     { field: 'Genre', label: 'Genre' },
     { field: 'Writer', label: 'Scénario' },
@@ -86,6 +96,7 @@ export const MetadataEditor = ({
     volumes,
     mode,
     onChanged,
+    series: publishedSeries,
 }: {
     libraryId: number;
     kind: 'manga' | 'comics';
@@ -94,6 +105,8 @@ export const MetadataEditor = ({
     mode: 'drafts' | 'series';
     /** Après un enregistrement ou un rangement (recharger les données). */
     onChanged: (moved?: { from: string; to: string }[]) => void;
+    /** Série publiée : son statut, enregistré avec le reste. */
+    series?: { id: number; status: SeriesStatus | null };
 }) => {
     // Contenu des données reçues : le parent peut recréer la liste à chaque
     // rendu, seule une vraie nouveauté (enregistrement) doit tout reprendre.
@@ -105,6 +118,11 @@ export const MetadataEditor = ({
     const paths = readable.map((v) => v.path);
     const [edits, setEdits] = useState<Edits>(() => initialEdits(readable));
     const [overwrite, setOverwrite] = useState(false);
+    // Statut de la série (publiée) : « unknown » pour « inconnu ».
+    const savedStatus = publishedSeries?.status ?? UNKNOWN;
+    const [status, setStatus] = useState<string>(savedStatus);
+    useEffect(() => setStatus(savedStatus), [savedStatus]);
+    const statusChanged = !!publishedSeries && status !== savedStatus;
     // Action en cours : roue de chargement sur son seul bouton.
     const [busy, setBusy] = useState<'save' | 'publish'>();
     const [report, setReport] = useState<Report>();
@@ -146,7 +164,15 @@ export const MetadataEditor = ({
         setBusy('save');
         setReport(undefined);
         try {
-            const result = await saveComicInfo(libraryId, changes);
+            if (publishedSeries && statusChanged) {
+                await setSeriesStatus(
+                    publishedSeries.id,
+                    status === UNKNOWN ? null : (status as SeriesStatus),
+                );
+            }
+            const result = changes.length
+                ? await saveComicInfo(libraryId, changes)
+                : { updated: [], failures: [] };
             setReport(
                 result.failures.length
                     ? {
@@ -261,13 +287,19 @@ export const MetadataEditor = ({
                 <Group gap="xs">
                     <Button
                         variant="default"
-                        disabled={changes.length === 0}
-                        onClick={() => setEdits(initialEdits(readable))}
+                        disabled={changes.length === 0 && !statusChanged}
+                        onClick={() => {
+                            setEdits(initialEdits(readable));
+                            setStatus(savedStatus);
+                        }}
                     >
                         Annuler
                     </Button>
                     <Button
-                        disabled={changes.length === 0 || busy === 'publish'}
+                        disabled={
+                            (changes.length === 0 && !statusChanged) ||
+                            busy === 'publish'
+                        }
                         loading={busy === 'save'}
                         onClick={() => void save()}
                     >
@@ -330,18 +362,16 @@ export const MetadataEditor = ({
                                 setSeries('Series', e.currentTarget.value)
                             }
                         />
-                        <NumberInput
-                            label="Nombre de tomes parus"
-                            {...changed(seriesChanged('Count'))}
-                            min={0}
-                            value={series('Count')}
-                            onChange={(value) =>
-                                setSeries(
-                                    'Count',
-                                    value === '' ? undefined : Number(value),
-                                )
-                            }
-                        />
+                        {publishedSeries && (
+                            <Select
+                                label="Statut"
+                                allowDeselect={false}
+                                value={status}
+                                onChange={(value) => value && setStatus(value)}
+                                data={STATUS_OPTIONS}
+                                {...changed(statusChanged)}
+                            />
+                        )}
                         <Select
                             label="Classification"
                             {...changed(seriesChanged('AgeRating'))}
@@ -531,11 +561,15 @@ export const MetadataEditor = ({
                 onClose={wiki.close}
                 kind={kind}
                 initialQuery={String(series('Series'))}
-                onPick={(details) =>
+                onPick={(details) => {
                     setEdits((current) =>
                         fillFromWikipedia(current, paths, details, overwrite),
-                    )
-                }
+                    );
+                    const fromWiki = statusFromWikipedia(details);
+                    if (fromWiki && (overwrite || status === UNKNOWN)) {
+                        setStatus(fromWiki);
+                    }
+                }}
             />
         </Stack>
     );

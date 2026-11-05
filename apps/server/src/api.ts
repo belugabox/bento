@@ -23,6 +23,7 @@ import {
     listSeries,
     savePageSizes,
     seriesCoverOf,
+    setSeriesStatus,
 } from './library/catalog';
 import { type SeriesCovers, seriesCoverFile } from './library/covers';
 import type { LibraryFiles } from './library/files';
@@ -154,6 +155,25 @@ export const createApi = ({
         )
         .get('/series/:id', zValidator('param', idParam), (c) =>
             c.json(getSeries(db, c.var.user, c.req.valid('param').id)),
+        )
+        .put(
+            '/series/:id/status',
+            requireAdmin,
+            zValidator('param', idParam),
+            zValidator(
+                'json',
+                z.object({
+                    status: z.enum(['ongoing', 'completed']).nullable(),
+                }),
+            ),
+            (c) =>
+                c.json(
+                    setSeriesStatus(
+                        db,
+                        c.req.valid('param').id,
+                        c.req.valid('json').status,
+                    ),
+                ),
         )
         // Couverture de la série : celle choisie, sinon celle du premier tome.
         .get('/series/:id/cover', zValidator('param', idParam), async (c) => {

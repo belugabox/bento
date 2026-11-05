@@ -3,7 +3,6 @@ import { type ComicInfo, parseVolumeFileName } from '@server/types';
 /** Champs communs à toute la série, appliqués à chaque tome. */
 export const SERIES_FIELDS = [
     'Series',
-    'Count',
     'Genre',
     'Writer',
     'Penciller',
@@ -114,8 +113,17 @@ export type WikipediaSeries = {
     writer: string;
     penciller: string;
     publisher: string;
-    volumeCount: number;
+    ongoing: boolean;
+    lastYear?: number;
 };
+
+export type SeriesStatus = 'ongoing' | 'completed';
+
+/** Statut d'après Wikipédia : terminée avec une année de fin, sinon en cours. */
+export const statusFromWikipedia = (
+    wiki: Pick<WikipediaSeries, 'ongoing' | 'lastYear'>,
+): SeriesStatus | undefined =>
+    wiki.lastYear ? 'completed' : wiki.ongoing ? 'ongoing' : undefined;
 
 /**
  * Champs de série depuis Wikipédia. Le résumé ne va que sur le premier
@@ -133,7 +141,6 @@ export const fillFromWikipedia = (
         Writer: wiki.writer,
         Penciller: wiki.penciller,
         Publisher: wiki.publisher,
-        ...(wiki.volumeCount > 0 && { Count: wiki.volumeCount }),
     };
     let next = edits;
     for (const [field, value] of Object.entries(values) as [

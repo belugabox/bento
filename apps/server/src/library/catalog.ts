@@ -85,8 +85,12 @@ export const listSeries = (
             name: series.name,
             year: series.year,
             genre: series.genre,
-            count: series.count,
+            status: series.status,
             volumeCount: count(volumes.id),
+            // Dernier tome ajouté (tri « ajouts récents »).
+            lastAddedAt: sql<number>`max(${volumes.addedAt})`.mapWith(
+                (value: number) => new Date(value * 1000),
+            ),
             // Couverture de la série : celle de son premier tome. Sous-requêtes en
             // SQL brut : Drizzle n'y préfixe pas les colonnes par leur table.
             coverUpdatedAt: series.coverUpdatedAt,
@@ -123,7 +127,7 @@ export const getSeries = (db: Db, viewer: Viewer, id: number) => {
             minAge: series.minAge,
             coverUpdatedAt: series.coverUpdatedAt,
             year: series.year,
-            count: series.count,
+            status: series.status,
             writer: series.writer,
             publisher: series.publisher,
             library: {
@@ -252,4 +256,22 @@ export const seriesCoverOf = (db: Db, viewer: Viewer, id: number) => {
         .get();
     if (!row) throw notFound('Série introuvable');
     return row;
+};
+
+export type SeriesStatus = 'ongoing' | 'completed';
+
+/** Série en cours de parution ou terminée (null : inconnu). */
+export const setSeriesStatus = (
+    db: Db,
+    id: number,
+    status: SeriesStatus | null,
+) => {
+    const updated = db
+        .update(series)
+        .set({ status })
+        .where(eq(series.id, id))
+        .returning({ status: series.status })
+        .get();
+    if (!updated) throw notFound('Série introuvable');
+    return updated;
 };

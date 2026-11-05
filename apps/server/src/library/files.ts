@@ -1,4 +1,4 @@
-import { and, eq } from 'drizzle-orm';
+import { and, eq, inArray, isNull } from 'drizzle-orm';
 import { createHash } from 'node:crypto';
 import {
     access,
@@ -23,7 +23,7 @@ import {
 import { type ComicInfo, readComicInfo } from '../archive/comicInfo';
 import { updateComicInfo } from '../archive/write';
 import type { Db } from '../db';
-import { libraries, volumes } from '../db/schema';
+import { libraries, series, volumes } from '../db/schema';
 import { conflict, notFound } from '../tools/errors';
 import type { Logger } from '../tools/logger';
 import {
@@ -415,6 +415,22 @@ export class LibraryFiles {
         const published: { from: string; to: string }[] = [];
         const failures: Failure[] = [];
         const folders = new Set<string>();
+        // Statut des séries des tomes publiés déplacés, à reporter ensuite.
+        const statuses = new Map(
+            this.db
+                .select({ file: volumes.file, status: series.status })
+                .from(volumes)
+                .innerJoin(series, eq(series.id, volumes.seriesId))
+                .where(
+                    and(
+                        eq(volumes.libraryId, libraryId),
+                        inArray(volumes.file, paths),
+                    ),
+                )
+                .all()
+                .filter((row) => row.status)
+                .map((row) => [row.file, row.status]),
+        );
 
         for (const relative of paths) {
             try {
@@ -440,6 +456,29 @@ export class LibraryFiles {
             );
         }
         if (published.length > 0) await this.scanner.scan(libraryId);
+        for (const { from, to } of published) {
+            const status = statuses.get(from);
+            if (!status) continue;
+            const moved = this.db
+                .select({ seriesId: volumes.seriesId })
+                .from(volumes)
+                .where(
+                    and(eq(volumes.libraryId, libraryId), eq(volumes.file, to)),
+                )
+                .get();
+            if (moved) {
+                this.db
+                    .update(series)
+                    .set({ status })
+                    .where(
+                        and(
+                            eq(series.id, moved.seriesId),
+                            isNull(series.status),
+                        ),
+                    )
+                    .run();
+            }
+        }
         return { published, failures };
     };
 

@@ -10,7 +10,13 @@ let admin: string;
 
 /** Requête d'une personne connectée (lectrice par défaut). */
 const request = (path: string, init: RequestInit = {}, cookie = reader) =>
-    api.request(path, { ...init, headers: { Cookie: cookie } });
+    api.request(path, {
+        ...init,
+        headers: {
+            ...(init.headers as Record<string, string>),
+            Cookie: cookie,
+        },
+    });
 
 beforeEach(async () => {
     ctx = await setup();
@@ -215,5 +221,33 @@ describe('access control', () => {
             method: 'POST',
         });
         expect(response.status).toBe(403);
+    });
+});
+
+describe('series status', () => {
+    it('is set by admins, and shown in lists and details', async () => {
+        const id = await library();
+        const put = (status: unknown, cookie = admin) =>
+            request(
+                `/series/${id}/status`,
+                {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ status }),
+                },
+                cookie,
+            );
+
+        expect((await put('completed')).status).toBe(200);
+        expect((await get(`/series/${id}`)).body.status).toBe('completed');
+        const list = (await get('/series')).body;
+        expect(list.find((s: { id: number }) => s.id === id)).toMatchObject({
+            status: 'completed',
+            lastAddedAt: expect.any(String),
+        });
+
+        expect((await put(null)).status).toBe(200);
+        expect((await put('finished')).status).toBe(400);
+        expect((await put('ongoing', reader)).status).toBe(403);
     });
 });

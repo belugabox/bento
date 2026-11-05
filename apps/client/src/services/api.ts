@@ -178,3 +178,8 @@ export const startPreview = (maxAge: number | null) =>
     json(api.preview.$put({ json: { maxAge } }));
 
 export const stopPreview = () => json(api.preview.$delete());
+
+export const setSeriesStatus = (
+    seriesId: number,
+    status: 'ongoing' | 'completed' | null,
+) => json(api.series[':id'].status.$put({ ...id(seriesId), json: { status } }));

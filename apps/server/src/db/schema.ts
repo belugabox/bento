@@ -58,6 +58,9 @@ export const series = sqliteTable(
         coverUpdatedAt: integer('cover_updated_at', { mode: 'timestamp_ms' }),
         year: integer('year'),
         count: integer('count'),
+        // En cours de parution ou terminée, réglé dans Bento (pas dans les
+        // tomes) ; null = inconnu.
+        status: text('status', { enum: ['ongoing', 'completed'] }),
         writer: text('writer'),
         publisher: text('publisher'),
         createdAt: integer('created_at', { mode: 'timestamp' })

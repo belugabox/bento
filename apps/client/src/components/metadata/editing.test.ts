@@ -11,6 +11,7 @@ import {
     isSeriesFieldChanged,
     seriesValue,
     setSeriesField,
+    statusFromWikipedia,
 } from './editing';
 
 const volumes: EditableVolume[] = [
@@ -35,7 +36,7 @@ const wiki = {
     writer: 'Tatsuya Endō',
     penciller: 'Tatsuya Endō',
     publisher: 'Kurokawa',
-    volumeCount: 17,
+    ongoing: true,
 };
 
 describe('series fields', () => {
@@ -102,7 +103,6 @@ describe('fillFromWikipedia', () => {
             Writer: 'Tatsuya Endō',
             Penciller: 'Tatsuya Endō',
             Publisher: 'Kurokawa',
-            Count: 17,
             Summary: 'Un espion.',
         });
         expect(edits[second]?.Series).toBe('Spy × Family');
@@ -145,5 +145,15 @@ describe('changed fields', () => {
         expect(isSeriesFieldChanged(original, edits, paths, 'Genre')).toBe(
             false,
         );
+    });
+});
+
+describe('statusFromWikipedia', () => {
+    it('reads finished and ongoing series', () => {
+        expect(statusFromWikipedia({ ongoing: false, lastYear: 2021 })).toBe(
+            'completed',
+        );
+        expect(statusFromWikipedia({ ongoing: true })).toBe('ongoing');
+        expect(statusFromWikipedia({ ongoing: false })).toBeUndefined();
     });
 });

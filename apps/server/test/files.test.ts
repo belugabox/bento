@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { createApi } from '../src/api';
 import { users, volumes } from '../src/db/schema';
-import { listSeries } from '../src/library/catalog';
+import { listSeries, setSeriesStatus } from '../src/library/catalog';
 import { publicationPathOf } from '../src/library/paths';
 import { getProgress, saveProgress } from '../src/library/progress';
 import {
@@ -384,6 +384,8 @@ describe('publishing', () => {
         const id = volumeIdOf('Spy X Family/Spy X Family #01.cbz')!;
         sessionCookie(ctx.db, 'reader');
         saveProgress(ctx.db, readerId(), id, { completed: true });
+        const oldSeries = listSeries(ctx.db, ADMIN_VIEW)[0]!;
+        setSeriesStatus(ctx.db, oldSeries.id, 'completed');
         const paths = [
             'Spy X Family/Spy X Family #01.cbz',
             'Spy X Family/Spy X Family #02.cbz',
@@ -413,6 +415,8 @@ describe('publishing', () => {
         expect(
             listSeries(ctx.db, ADMIN_VIEW).map((s) => [s.name, s.volumeCount]),
         ).toEqual([['Spy x Family', 2]]);
+        // La série renommée garde son statut.
+        expect(listSeries(ctx.db, ADMIN_VIEW)[0]?.status).toBe('completed');
     });
 
     it('never overwrites another published volume when moving', async () => {

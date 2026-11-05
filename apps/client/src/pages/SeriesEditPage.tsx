@@ -86,6 +86,7 @@ export const SeriesEditPage = () => {
                 libraryId={series.library.id}
                 kind={series.library.type}
                 mode="series"
+                series={{ id: series.id, status: series.status }}
                 volumes={series.volumes.flatMap((volume) =>
                     volume.admin
                         ? [

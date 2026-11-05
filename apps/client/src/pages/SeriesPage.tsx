@@ -113,10 +113,23 @@ export const SeriesPage = () => {
                     )}
                     <Group gap="xs">
                         <Badge variant="light">
-                            {series.volumes.length}
-                            {series.count ? ` / ${series.count}` : ''} tome
+                            {series.volumes.length} tome
                             {series.volumes.length > 1 ? 's' : ''}
                         </Badge>
+                        {series.status && (
+                            <Badge
+                                variant="light"
+                                color={
+                                    series.status === 'completed'
+                                        ? 'grape'
+                                        : 'blue'
+                                }
+                            >
+                                {series.status === 'completed'
+                                    ? 'Série terminée'
+                                    : 'En cours de parution'}
+                            </Badge>
+                        )}
                         {readCount > 0 && (
                             <Badge variant="light" color="teal">
                                 {readCount} lu{readCount > 1 ? 's' : ''}

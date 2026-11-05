@@ -57,6 +57,13 @@
       "when": 1793870015869,
       "tag": "0007_drop_age_rating_override",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1793870872840,
+      "tag": "0008_series_status",
+      "breakpoints": true
     }
   ]
 }
