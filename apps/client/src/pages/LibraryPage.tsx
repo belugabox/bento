@@ -1,9 +1,15 @@
 import {
+    ActionIcon,
     Alert,
+    Badge,
     Box,
-    Chip,
+    Button,
+    CloseButton,
     Group,
+    Indicator,
     Loader,
+    Menu,
+    Popover,
     ScrollArea,
     SegmentedControl,
     Select,
@@ -15,7 +21,13 @@ import {
     Title,
 } from '@mantine/core';
 import { useDebouncedValue } from '@mantine/hooks';
-import { IconCheck, IconSearch } from '@tabler/icons-react';
+import {
+    IconAdjustmentsHorizontal,
+    IconArrowsSort,
+    IconCheck,
+    IconSearch,
+    IconX,
+} from '@tabler/icons-react';
 import { type ReactNode, useState } from 'react';
 import { useSearchParams } from 'react-router';
 
@@ -34,7 +46,8 @@ import {
     readingStateOf,
 } from '@/components/seriesFilters';
 import {
-    type HomeVolume,
+    type InProgressVolume,
+    type NextVolume,
     coverUrl,
     fetchCollections,
     fetchHome,
@@ -62,25 +75,42 @@ const Shelf = ({ title, children }: { title: string; children: ReactNode }) => (
 
 const ShelfCard = ({
     volume,
+    subtitle = volumeLabel(volume),
     progress,
 }: {
-    volume: Pick<HomeVolume, 'volumeId' | 'seriesName' | 'number' | 'title'>;
+    volume: Pick<NextVolume, 'volumeId' | 'seriesName' | 'number' | 'title'>;
+    subtitle?: string;
     progress?: number;
 }) => (
     <Box w={SHELF_CARD_WIDTH} style={{ flexShrink: 0 }}>
         <CoverCard
             to={`/read/${volume.volumeId}`}
-            cover={coverUrl(volume.volumeId)}
+            cover={coverUrl(volume.volumeId, 'small')}
             title={volume.seriesName}
-            subtitle={volumeLabel(volume)}
+            subtitle={subtitle}
             progress={progress}
         />
     </Box>
 );
 
 /**
- * Accueil : reprendre la lecture, suite des séries entamées, nouveautés,
- * puis toutes les séries.
+ * Avancement dans la série d'un tome commencé : tomes lus, plus la part
+ * lue du tome en cours.
+ */
+const seriesProgress = (volume: InProgressVolume) =>
+    volume.volumeCount > 0
+        ? (volume.readCount + (volume.page + 1) / volume.pageCount) /
+          volume.volumeCount
+        : 0;
+
+const LIST_LABELS: Record<string, string> = {
+    favorite: 'Mes favoris',
+    toread: 'À lire',
+};
+
+/**
+ * Accueil : reprendre la lecture, suite des séries entamées, puis toutes
+ * les séries (recherche, filtres et tri).
  */
 export const LibraryPage = () => {
     // Bibliothèque, recherche, filtre et tri dans l'adresse : le retour
@@ -108,16 +138,22 @@ export const LibraryPage = () => {
         [libraryId, debouncedSearch],
     );
 
-    const update = (key: string, value: string, fallback = '') =>
+    const update = (changes: Record<string, string>, fallback = '') =>
         setParams(
             (current) => {
                 const next = new URLSearchParams(current);
-                if (value && value !== fallback) next.set(key, value);
-                else next.delete(key);
+                for (const [key, value] of Object.entries(changes)) {
+                    if (value && value !== fallback) next.set(key, value);
+                    else next.delete(key);
+                }
                 return next;
             },
             { replace: true },
         );
+    const setSearchText = (value: string) => {
+        setSearch(value);
+        update({ q: value });
+    };
 
     if (libraries.error) {
         return <Alert color="red">{libraries.error.message}</Alert>;
@@ -137,13 +173,33 @@ export const LibraryPage = () => {
         genre,
         status,
     });
-    const filtered =
-        filter !== 'all' || list !== 'all' || !!genre || status !== 'all';
+    // Filtres du bouton « Filtres », affichés aussi en pastilles.
+    const listLabel =
+        LIST_LABELS[list] ??
+        collections.data?.find((c) => `collection:${c.id}` === list)?.name;
+    const active = [
+        list !== 'all' && {
+            key: 'list',
+            label: listLabel ?? 'Collection',
+            clear: () => update({ list: '' }),
+        },
+        !!genre && {
+            key: 'genre',
+            label: genre,
+            clear: () => update({ genre: '' }),
+        },
+        status !== 'all' && {
+            key: 'status',
+            label: STATUS_FILTERS.find((s) => s.value === status)?.label ?? '',
+            clear: () => update({ status: '' }),
+        },
+    ].filter((item) => !!item);
+    const filtered = filter !== 'all' || active.length > 0;
     // Pendant une recherche : seulement les séries.
     const resume = debouncedSearch ? [] : (inProgress.data ?? []);
     const next = debouncedSearch ? [] : (home.data?.next ?? []);
-    const recent = debouncedSearch ? [] : (home.data?.recent ?? []);
     const genres = allGenres(series.data ?? []);
+    const sortLabel = SERIES_SORTS.find((s) => s.value === sort)?.label;
 
     return (
         <Stack gap="xl">
@@ -151,7 +207,7 @@ export const LibraryPage = () => {
                 {libraries.data && libraries.data.length > 1 ? (
                     <SegmentedControl
                         value={String(libraryId)}
-                        onChange={(value) => update('library', value)}
+                        onChange={(value) => update({ library: value })}
                         data={libraries.data.map((library) => ({
                             value: String(library.id),
                             label: library.name,
@@ -161,14 +217,24 @@ export const LibraryPage = () => {
                     <Title order={2}>{libraries.data?.[0]?.name}</Title>
                 )}
                 <TextInput
-                    w={{ base: '100%', xs: 260 }}
+                    w={{ base: '100%', xs: 320 }}
+                    size="md"
+                    radius="xl"
                     placeholder="Rechercher une série"
-                    leftSection={<IconSearch size={16} />}
+                    aria-label="Rechercher une série"
+                    leftSection={<IconSearch size={18} />}
+                    rightSection={
+                        search && (
+                            <CloseButton
+                                aria-label="Effacer la recherche"
+                                onClick={() => setSearchText('')}
+                            />
+                        )
+                    }
                     value={search}
-                    onChange={(event) => {
-                        setSearch(event.currentTarget.value);
-                        update('q', event.currentTarget.value);
-                    }}
+                    onChange={(event) =>
+                        setSearchText(event.currentTarget.value)
+                    }
                 />
             </Group>
 
@@ -178,7 +244,8 @@ export const LibraryPage = () => {
                         <ShelfCard
                             key={volume.volumeId}
                             volume={volume}
-                            progress={(volume.page + 1) / volume.pageCount}
+                            subtitle={`${volumeLabel(volume)} · ${volume.readCount} / ${volume.volumeCount} lus`}
+                            progress={seriesProgress(volume)}
                         />
                     ))}
                 </Shelf>
@@ -190,94 +257,192 @@ export const LibraryPage = () => {
                     ))}
                 </Shelf>
             )}
-            {recent.length > 0 && (
-                <Shelf title="Nouveautés">
-                    {recent.map((volume) => (
-                        <ShelfCard key={volume.volumeId} volume={volume} />
-                    ))}
-                </Shelf>
-            )}
 
             <Stack gap="sm">
                 <Group justify="space-between" gap="sm">
-                    <Chip.Group
-                        value={filter}
-                        onChange={(value) =>
-                            update('filter', value as string, 'all')
-                        }
-                    >
-                        <Group gap={6}>
-                            {READING_FILTERS.map((option) => (
-                                <Chip
-                                    key={option.value}
-                                    value={option.value}
-                                    size="sm"
-                                    variant="light"
-                                >
-                                    {option.label}
-                                </Chip>
-                            ))}
-                        </Group>
-                    </Chip.Group>
-                    <Group gap="xs">
-                        <Select
-                            size="xs"
-                            w={170}
-                            allowDeselect={false}
-                            aria-label="Liste"
-                            value={list}
-                            onChange={(value) =>
-                                update('list', value ?? 'all', 'all')
-                            }
-                            data={[
-                                { value: 'all', label: 'Toutes les séries' },
-                                { value: 'favorite', label: 'Mes favoris' },
-                                { value: 'toread', label: 'À lire' },
-                                ...(collections.data ?? []).map((c) => ({
-                                    value: `collection:${c.id}`,
-                                    label: c.name,
-                                })),
-                            ]}
-                        />
-                        {genres.length > 0 && (
-                            <Select
-                                size="xs"
-                                w={150}
-                                clearable
-                                searchable
-                                placeholder="Tous les genres"
-                                aria-label="Genre"
-                                value={genre}
-                                onChange={(value) =>
-                                    update('genre', value ?? '')
-                                }
-                                data={genres}
-                            />
+                    <Group gap="xs" align="baseline">
+                        <Title order={4}>Séries</Title>
+                        {series.data && (
+                            <Text size="sm" c="dimmed">
+                                {visible.length}
+                            </Text>
                         )}
-                        <Select
+                    </Group>
+                    <Group gap="xs">
+                        <SegmentedControl
                             size="xs"
-                            w={170}
-                            allowDeselect={false}
-                            aria-label="Statut"
-                            value={status}
+                            radius="xl"
+                            aria-label="État de lecture"
+                            value={filter}
                             onChange={(value) =>
-                                update('status', value ?? 'all', 'all')
+                                update({ filter: value }, 'all')
                             }
-                            data={STATUS_FILTERS}
+                            data={READING_FILTERS}
                         />
-                        <Select
-                            size="xs"
-                            w={150}
-                            allowDeselect={false}
-                            aria-label="Trier les séries"
-                            value={sort}
-                            onChange={(value) =>
-                                update('sort', value ?? 'name', 'name')
-                            }
-                            data={SERIES_SORTS}
-                        />
+                        <Popover position="bottom-end" width={260} shadow="md">
+                            <Popover.Target>
+                                <Indicator
+                                    label={active.length}
+                                    size={16}
+                                    disabled={active.length === 0}
+                                    offset={2}
+                                >
+                                    <Button
+                                        size="xs"
+                                        radius="xl"
+                                        variant={
+                                            active.length ? 'light' : 'default'
+                                        }
+                                        leftSection={
+                                            <IconAdjustmentsHorizontal
+                                                size={14}
+                                            />
+                                        }
+                                    >
+                                        Filtres
+                                    </Button>
+                                </Indicator>
+                            </Popover.Target>
+                            <Popover.Dropdown>
+                                <Stack gap="sm">
+                                    <Select
+                                        label="Liste"
+                                        size="xs"
+                                        allowDeselect={false}
+                                        value={list}
+                                        onChange={(value) =>
+                                            update({ list: value ?? '' }, 'all')
+                                        }
+                                        comboboxProps={{ withinPortal: false }}
+                                        data={[
+                                            {
+                                                value: 'all',
+                                                label: 'Toutes les séries',
+                                            },
+                                            {
+                                                value: 'favorite',
+                                                label: 'Mes favoris',
+                                            },
+                                            {
+                                                value: 'toread',
+                                                label: 'À lire',
+                                            },
+                                            ...(collections.data ?? []).map(
+                                                (c) => ({
+                                                    value: `collection:${c.id}`,
+                                                    label: c.name,
+                                                }),
+                                            ),
+                                        ]}
+                                    />
+                                    <Select
+                                        label="Genre"
+                                        size="xs"
+                                        clearable
+                                        searchable
+                                        disabled={genres.length === 0}
+                                        placeholder="Tous les genres"
+                                        value={genre}
+                                        onChange={(value) =>
+                                            update({ genre: value ?? '' })
+                                        }
+                                        comboboxProps={{ withinPortal: false }}
+                                        data={genres}
+                                    />
+                                    <Select
+                                        label="Statut"
+                                        size="xs"
+                                        allowDeselect={false}
+                                        value={status}
+                                        onChange={(value) =>
+                                            update(
+                                                { status: value ?? '' },
+                                                'all',
+                                            )
+                                        }
+                                        comboboxProps={{ withinPortal: false }}
+                                        data={STATUS_FILTERS}
+                                    />
+                                    <Button
+                                        size="xs"
+                                        variant="subtle"
+                                        disabled={active.length === 0}
+                                        onClick={() =>
+                                            update({
+                                                list: '',
+                                                genre: '',
+                                                status: '',
+                                            })
+                                        }
+                                    >
+                                        Effacer les filtres
+                                    </Button>
+                                </Stack>
+                            </Popover.Dropdown>
+                        </Popover>
+                        <Menu position="bottom-end">
+                            <Menu.Target>
+                                <Button
+                                    size="xs"
+                                    radius="xl"
+                                    variant="default"
+                                    aria-label="Trier les séries"
+                                    leftSection={<IconArrowsSort size={14} />}
+                                >
+                                    {sortLabel}
+                                </Button>
+                            </Menu.Target>
+                            <Menu.Dropdown>
+                                {SERIES_SORTS.map((option) => (
+                                    <Menu.Item
+                                        key={option.value}
+                                        rightSection={
+                                            option.value === sort && (
+                                                <IconCheck size={14} />
+                                            )
+                                        }
+                                        onClick={() =>
+                                            update(
+                                                { sort: option.value },
+                                                'name',
+                                            )
+                                        }
+                                    >
+                                        {option.label}
+                                    </Menu.Item>
+                                ))}
+                            </Menu.Dropdown>
+                        </Menu>
                     </Group>
                 </Group>
+
+                {active.length > 0 && (
+                    <Group gap={6}>
+                        {active.map((item) => (
+                            <Badge
+                                key={item.key}
+                                variant="light"
+                                size="lg"
+                                radius="xl"
+                                tt="none"
+                                fw={500}
+                                rightSection={
+                                    <ActionIcon
+                                        size="xs"
+                                        radius="xl"
+                                        variant="transparent"
+                                        aria-label={`Retirer le filtre ${item.label}`}
+                                        onClick={item.clear}
+                                    >
+                                        <IconX size={12} />
+                                    </ActionIcon>
+                                }
+                            >
+                                {item.label}
+                            </Badge>
+                        ))}
+                    </Group>
+                )}
 
                 {series.error && (
                     <Alert color="red">{series.error.message}</Alert>
@@ -303,7 +468,7 @@ export const LibraryPage = () => {
                             <CoverCard
                                 key={item.id}
                                 to={`/series/${item.id}`}
-                                cover={seriesCoverUrl(item)}
+                                cover={seriesCoverUrl(item, 'small')}
                                 title={item.name}
                                 subtitle={
                                     state === 'started'

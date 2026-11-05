@@ -1,5 +1,5 @@
 import AdmZip from 'adm-zip';
-import { writeFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 
 import { type ComicInfo, readComicInfo } from './comicInfo';
 
@@ -101,8 +101,8 @@ export const writeZipFile = async (zip: AdmZip, fullPath: string) => {
 };
 
 /** Réécrit une archive touchée par la perte des descripteurs. */
-export const repairDescriptorFlags = (fullPath: string) =>
-    writeZipFile(new AdmZip(fullPath), fullPath);
+export const repairDescriptorFlags = async (fullPath: string) =>
+    writeZipFile(new AdmZip(await readFile(fullPath)), fullPath);
 
 /**
  * Modifie le ComicInfo d'une archive : les champs donnés remplacent les
@@ -112,7 +112,8 @@ export const updateComicInfo = async (
     fullPath: string,
     changes: { [K in keyof ComicInfo]?: ComicInfo[K] | null },
 ): Promise<ComicInfo> => {
-    const zip = new AdmZip(fullPath);
+    // Lu sans bloquer : AdmZip lirait le fichier en synchrone.
+    const zip = new AdmZip(await readFile(fullPath));
     const merged: Record<string, unknown> = {
         ...(await readComicInfo(zip.getEntries())),
     };

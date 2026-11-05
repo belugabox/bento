@@ -148,16 +148,12 @@ describe('drafts', () => {
         );
 
         expect(status).toBe(200);
+        // Chaque tome à la racine de _draft forme son propre groupe.
         expect(body).toEqual([
             {
-                folder: '_draft',
+                folder: '_draft/broken.cbz',
                 files: [
                     { path: '_draft/broken.cbz', name: 'broken.cbz', size: 15 },
-                    {
-                        path: '_draft/Spirale.cbr',
-                        name: 'Spirale.cbr',
-                        size: 10,
-                    },
                 ],
                 status: null,
                 readingMode: null,
@@ -169,6 +165,19 @@ describe('drafts', () => {
                     expect.objectContaining({
                         path: '_draft/Gantz (01-18)/Gantz T01.cbz',
                     }),
+                ],
+                status: null,
+                readingMode: null,
+                coverUpdatedAt: null,
+            },
+            {
+                folder: '_draft/Spirale.cbr',
+                files: [
+                    {
+                        path: '_draft/Spirale.cbr',
+                        name: 'Spirale.cbr',
+                        size: 10,
+                    },
                 ],
                 status: null,
                 readingMode: null,
@@ -201,6 +210,17 @@ describe('drafts', () => {
         ).toEqual([
             ['broken.cbz', "Archive illisible : ce n'est pas une archive ZIP"],
             ['Spirale.cbz', null],
+        ]);
+
+        // Un tome seul à la racine (le .cbr est converti au passage).
+        expect(
+            (await folder('_draft/broken.cbz')).body.map(
+                (f: { name: string }) => f.name,
+            ),
+        ).toEqual(['broken.cbz']);
+        await writeFile(ctx.file('_draft/Seul.cbr'), zip.toBuffer());
+        expect((await folder('_draft/Seul.cbr')).body).toEqual([
+            expect.objectContaining({ name: 'Seul.cbz', error: null }),
         ]);
 
         const gantz = (await folder('_draft/Gantz (01-18)')).body;
@@ -354,6 +374,47 @@ describe('publishing', () => {
         expect(await readdir(ctx.file('_draft'))).toEqual([]);
         expect(listSeries(ctx.db, ADMIN_VIEW).map((s) => s.name)).toEqual([
             'Gantz',
+        ]);
+    });
+
+    it('applies the settings of a lone volume at the root of _draft', async () => {
+        await writeCbz(ctx.file('_draft/Spirale.cbz'), {
+            comicInfo: info('Spirale', '1'),
+        });
+        await writeCbz(ctx.file('_draft/Gantz.cbz'), {
+            comicInfo: info('Gantz', '1'),
+        });
+        ctx.files.setDraftSettings(ctx.library.id, '_draft/Spirale.cbz', {
+            status: 'completed',
+        });
+
+        await ctx.files.publish(ctx.library.id, [
+            '_draft/Spirale.cbz',
+            '_draft/Gantz.cbz',
+        ]);
+
+        const statuses = Object.fromEntries(
+            listSeries(ctx.db, ADMIN_VIEW).map((s) => [s.name, s.status]),
+        );
+        expect(statuses).toEqual({ Gantz: null, Spirale: 'completed' });
+    });
+
+    it('adds drafts to a published series whose folder is named otherwise', async () => {
+        await writeCbz(ctx.file('Boxer (The)/T01.cbz'), {
+            comicInfo: info('The Boxer', '1'),
+        });
+        await ctx.scanner.scan(ctx.library.id);
+        await writeCbz(ctx.file('_draft/Boxer/T02.cbz'), {
+            comicInfo: info('the boxer', '2'),
+        });
+
+        const { published } = await ctx.files.publish(ctx.library.id, [
+            '_draft/Boxer/T02.cbz',
+        ]);
+
+        expect(published[0]?.to).toBe('Boxer (The)/the boxer #02.cbz');
+        expect(listSeries(ctx.db, ADMIN_VIEW)).toEqual([
+            expect.objectContaining({ name: 'The Boxer', volumeCount: 2 }),
         ]);
     });
 

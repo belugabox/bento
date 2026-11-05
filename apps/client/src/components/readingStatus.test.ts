@@ -5,6 +5,7 @@ import {
     nextToRead,
     progressRatio,
     volumeLabel,
+    volumeTitleOf,
 } from './readingStatus';
 
 const volume = (
@@ -69,5 +70,24 @@ describe('volumeLabel', () => {
         expect(volumeLabel({ number: '12', title: 'X' })).toBe('Tome 12');
         expect(volumeLabel({ number: null, title: 'Bonus' })).toBe('Bonus');
         expect(volumeLabel({ number: null, title: null })).toBe('Hors-série');
+    });
+});
+
+describe('volumeTitleOf', () => {
+    it('gives the title of a volume, unless it repeats its number', () => {
+        expect(volumeTitleOf({ number: '3', title: 'La Tour' })).toBe(
+            'La Tour',
+        );
+        expect(volumeTitleOf({ number: '3', title: 'Tome 3' })).toBeNull();
+        expect(volumeTitleOf({ number: '3', title: 'Vol. 03' })).toBeNull();
+        expect(
+            volumeTitleOf({ number: '12.5', title: 'Tome 12.5' }),
+        ).toBeNull();
+        expect(volumeTitleOf({ number: '12.5', title: 'Tome 1205' })).toBe(
+            'Tome 1205',
+        );
+        // Sans numéro, le titre sert déjà de libellé.
+        expect(volumeTitleOf({ number: null, title: 'Bonus' })).toBeNull();
+        expect(volumeTitleOf({ number: '1', title: null })).toBeNull();
     });
 });

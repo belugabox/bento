@@ -13,7 +13,7 @@ import {
     Title,
 } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
-import { IconFolder, IconPhoto } from '@tabler/icons-react';
+import { IconFile, IconFolder, IconPhoto } from '@tabler/icons-react';
 import { useState } from 'react';
 
 import { CoverPicker } from '@/components/metadata/CoverPicker';
@@ -30,6 +30,12 @@ import {
     setDraftStatus,
 } from '@/services/api';
 import { useQuery } from '@/services/useQuery';
+
+/**
+ * Un groupe de brouillons est un dossier, ou un tome seul déposé à la
+ * racine de _draft (chacun forme sa propre série).
+ */
+const isLoneFile = (folder: string) => /^_draft\/[^/]+\.cb[zr]$/i.test(folder);
 
 const folderLabel = (folder: string) =>
     folder === '_draft'
@@ -133,7 +139,13 @@ export const DraftsPage = () => {
                                     key={f.folder}
                                     active={f.folder === selected}
                                     onClick={() => setSelected(f.folder)}
-                                    leftSection={<IconFolder size={16} />}
+                                    leftSection={
+                                        isLoneFile(f.folder) ? (
+                                            <IconFile size={16} />
+                                        ) : (
+                                            <IconFolder size={16} />
+                                        )
+                                    }
                                     label={folderLabel(f.folder)}
                                     description={`${f.files.length} tome(s)`}
                                 />
@@ -142,7 +154,9 @@ export const DraftsPage = () => {
                     </Grid.Col>
                     <Grid.Col span={{ base: 12, md: 9 }}>
                         {!selected ? (
-                            <Text c="dimmed">Choisis un dossier.</Text>
+                            <Text c="dimmed">
+                                Choisis un dossier ou un tome.
+                            </Text>
                         ) : folderFiles.error ? (
                             <Alert color="red">
                                 {folderFiles.error.message}
@@ -232,7 +246,11 @@ export const DraftsPage = () => {
                                         onClose={cover.close}
                                         seriesName={
                                             readableFiles[0]?.comicInfo
-                                                .Series || folderLabel(selected)
+                                                .Series ||
+                                            folderLabel(selected).replace(
+                                                /\.cb[zr]$/i,
+                                                '',
+                                            )
                                         }
                                         kind={library.type}
                                         current={currentCover}

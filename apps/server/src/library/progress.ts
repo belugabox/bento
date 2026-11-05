@@ -74,9 +74,12 @@ export const saveProgress = (
     return progress;
 };
 
-/** Tomes commencés et pas finis, du plus récemment lu au plus ancien. */
-export const listInProgress = (db: Db, viewer: Viewer, limit = 12) =>
-    db
+/**
+ * Tomes commencés et pas finis, du plus récemment lu au plus ancien : un
+ * seul par série, avec l'avancement dans la série (tomes lus sur le total).
+ */
+export const listInProgress = (db: Db, viewer: Viewer, limit = 12) => {
+    const rows = db
         .select({
             volumeId: volumes.id,
             seriesId: series.id,
@@ -86,6 +89,9 @@ export const listInProgress = (db: Db, viewer: Viewer, limit = 12) =>
             page: readProgress.page,
             pageCount: volumes.pageCount,
             updatedAt: readProgress.updatedAt,
+            // SQL brut : Drizzle ne préfixerait pas les colonnes par leur table.
+            volumeCount: sql<number>`(select count(*) from volumes v where v.series_id = series.id)`,
+            readCount: sql<number>`(select count(*) from read_progress rp join volumes v on v.id = rp.volume_id where v.series_id = series.id and rp.user_id = ${viewer.id} and rp.completed = 1)`,
         })
         .from(readProgress)
         .innerJoin(volumes, eq(volumes.id, readProgress.volumeId))
@@ -98,8 +104,12 @@ export const listInProgress = (db: Db, viewer: Viewer, limit = 12) =>
             ),
         )
         .orderBy(desc(readProgress.updatedAt))
-        .limit(limit)
         .all();
+    const seen = new Set<number>();
+    return rows
+        .filter((row) => !seen.has(row.seriesId) && seen.add(row.seriesId))
+        .slice(0, limit);
+};
 
 /**
  * Marque tous les tomes d'une série comme lus (`read`) ou non lus

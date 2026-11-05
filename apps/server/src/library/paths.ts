@@ -30,4 +30,13 @@ export const relativeTo = (libraryPath: string, fullPath: string) =>
 export const isDraft = (relative: string) =>
     relative.split('/')[0] === DRAFT_FOLDER;
 
+/**
+ * Groupe d'un brouillon (une future série) : son dossier, ou le fichier
+ * lui-même s'il est à la racine de _draft, où chaque tome est isolé.
+ */
+export const draftGroupOf = (relative: string) => {
+    const folder = path.posix.dirname(relative);
+    return folder === DRAFT_FOLDER ? relative : folder;
+};
+
 export { publicationPathOf, volumeNumberOf } from './publication';

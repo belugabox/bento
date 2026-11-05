@@ -1,10 +1,11 @@
 import AdmZip from 'adm-zip';
-import { open, stat } from 'node:fs/promises';
+import { open, readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
-import sharp from 'sharp';
 
 import { notFound, unprocessable } from '../tools/errors';
+import { readImage } from './image';
 import { isMissingDescriptorError, repairDescriptorFlags } from './write';
+import { descriptorsLost, readZipEntries, readZipEntry } from './zipIndex';
 
 const IMAGE_TYPES: Record<string, string> = {
     '.jpg': 'image/jpeg',
@@ -19,9 +20,12 @@ export const imageType = (entryName: string) =>
     IMAGE_TYPES[path.extname(entryName).toLowerCase()];
 
 /** Pages d'une archive : ses images, dans l'ordre naturel des noms. */
-export const pageEntries = (zip: AdmZip): AdmZip.IZipEntry[] =>
-    zip
-        .getEntries()
+export const pageEntries = <
+    T extends { entryName: string; isDirectory: boolean },
+>(
+    entries: T[],
+): T[] =>
+    entries
         .filter((entry) => !entry.isDirectory && imageType(entry.entryName))
         .sort((a, b) =>
             a.entryName.localeCompare(b.entryName, undefined, {
@@ -98,7 +102,8 @@ const hasLostDescriptors = (zip: AdmZip) => {
 export const openArchive = async (fullPath: string): Promise<AdmZip> => {
     let zip: AdmZip;
     try {
-        zip = new AdmZip(fullPath);
+        // Lu sans bloquer : AdmZip lirait le fichier en synchrone.
+        zip = new AdmZip(await readFile(fullPath));
     } catch (error) {
         throw unprocessable(
             `Archive illisible : ${await describeUnreadableArchive(fullPath, error)}`,
@@ -107,7 +112,7 @@ export const openArchive = async (fullPath: string): Promise<AdmZip> => {
     if (hasLostDescriptors(zip)) {
         try {
             await repairDescriptorFlags(fullPath);
-            zip = new AdmZip(fullPath);
+            zip = new AdmZip(await readFile(fullPath));
         } catch {
             throw unprocessable(
                 'Archive illisible : descripteurs ZIP perdus, réparation impossible (fichier en lecture seule ?)',
@@ -117,16 +122,53 @@ export const openArchive = async (fullPath: string): Promise<AdmZip> => {
     return zip;
 };
 
-type OpenArchive = { mtimeMs: number; pages: AdmZip.IZipEntry[] };
+/** Entrée d'une archive en lecture seule, lue à la demande. */
+export type ArchiveEntry = {
+    entryName: string;
+    isDirectory: boolean;
+    compressedSize: number;
+    getData: () => Promise<Buffer>;
+};
 
 /**
- * Lecture page par page. Les dernières archives ouvertes restent en
- * mémoire : tourner les pages ne relit pas tout le fichier.
+ * Entrées d'une archive, sans la charger : seul son répertoire est lu, puis
+ * chaque entrée à la demande. Une archive inhabituelle ou abîmée passe par
+ * AdmZip (`openArchive`), qui la lit en entier, la répare au besoin ou dit
+ * pourquoi elle est illisible.
+ */
+export const readArchive = async (
+    fullPath: string,
+): Promise<ArchiveEntry[]> => {
+    const entries = await readZipEntries(fullPath).catch(() => undefined);
+    if (
+        entries &&
+        !(await descriptorsLost(fullPath, entries).catch(() => true))
+    ) {
+        return entries.map((entry) => ({
+            entryName: entry.entryName,
+            isDirectory: entry.isDirectory,
+            compressedSize: entry.compressedSize,
+            getData: () => readZipEntry(fullPath, entry),
+        }));
+    }
+    return (await openArchive(fullPath)).getEntries().map((entry) => ({
+        entryName: entry.entryName,
+        isDirectory: entry.isDirectory,
+        compressedSize: entry.header.compressedSize,
+        getData: async () => entry.getData(),
+    }));
+};
+
+type OpenArchive = { mtimeMs: number; pages: ArchiveEntry[] };
+
+/**
+ * Lecture page par page. Le répertoire des dernières archives ouvertes
+ * reste en mémoire : tourner une page ne lit que cette page.
  */
 export class PageReader {
     private archives = new Map<string, OpenArchive>();
 
-    constructor(private readonly maxOpen = 4) {}
+    constructor(private readonly maxOpen = 16) {}
 
     private open = async (fullPath: string): Promise<OpenArchive> => {
         const { mtimeMs } = await stat(fullPath).catch(() => {
@@ -142,7 +184,7 @@ export class PageReader {
         }
         const archive = {
             mtimeMs,
-            pages: pageEntries(await openArchive(fullPath)),
+            pages: pageEntries(await readArchive(fullPath)),
         };
         this.archives.delete(fullPath);
         this.archives.set(fullPath, archive);
@@ -161,7 +203,9 @@ export class PageReader {
         const { pages } = await this.open(fullPath);
         const sizes: [number, number][] = [];
         for (const entry of pages) {
-            const { width = 0, height = 0 } = await sharp(entry.getData())
+            const { width = 0, height = 0 } = await readImage(
+                await entry.getData(),
+            )
                 .metadata()
                 .catch(() => ({ width: 0, height: 0 }));
             sizes.push([width, height]);
@@ -175,6 +219,9 @@ export class PageReader {
     ): Promise<{ data: Buffer; type: string }> => {
         const entry = (await this.open(fullPath)).pages[index];
         if (!entry) throw notFound(`Page ${index + 1} introuvable`);
-        return { data: entry.getData(), type: imageType(entry.entryName)! };
+        return {
+            data: await entry.getData(),
+            type: imageType(entry.entryName)!,
+        };
     };
 }

@@ -1,9 +1,9 @@
 import AdmZip from 'adm-zip';
 import { stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import sharp from 'sharp';
 
-import { openArchive, pageEntries } from './archive';
+import { openArchive, pageEntries, readArchive } from './archive';
+import { readImage } from './image';
 import { clearDescriptorFlags } from './write';
 
 /**
@@ -33,7 +33,7 @@ const recompress = async (
     { quality, maxHeight }: CompressionOptions,
 ) => {
     if (path.extname(entryName).toLowerCase() === '.gif') return null;
-    let image = sharp(data).rotate();
+    let image = readImage(data).rotate();
     if (maxHeight) {
         image = image.resize({
             height: maxHeight,
@@ -70,15 +70,15 @@ export const estimateCompression = async (
     options: CompressionOptions,
 ): Promise<CompressionResult> => {
     const { size: originalSize } = await stat(fullPath);
-    const pages = pageEntries(await openArchive(fullPath));
+    const pages = pageEntries(await readArchive(fullPath));
     const imagesSize = pages.reduce(
-        (total, entry) => total + entry.header.compressedSize,
+        (total, entry) => total + entry.compressedSize,
         0,
     );
     let before = 0;
     let after = 0;
     for (const entry of sampleOf(pages, SAMPLE_PAGES)) {
-        const data = entry.getData();
+        const data = await entry.getData();
         const compressed = await recompress(data, entry.entryName, options);
         before += data.length;
         after += compressed?.length ?? data.length;
@@ -100,7 +100,9 @@ export const compressArchive = async (
 ): Promise<CompressionResult> => {
     const { size: originalSize } = await stat(fullPath);
     const zip = await openArchive(fullPath);
-    const pages = new Set(pageEntries(zip).map((entry) => entry.entryName));
+    const pages = new Set(
+        pageEntries(zip.getEntries()).map((entry) => entry.entryName),
+    );
     const names = new Set(zip.getEntries().map((entry) => entry.entryName));
     const entries = zip.getEntries().filter((entry) => !entry.isDirectory);
     const output = new AdmZip();

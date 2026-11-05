@@ -101,6 +101,34 @@ describe('LibraryScanner', () => {
         expect(height! / width!).toBe(1.5);
     });
 
+    it('makes a cover from a JPEG with harmless corrupt data', async () => {
+        const jpeg = await sharp({
+            create: { width: 20, height: 30, channels: 3, background: '#888' },
+        })
+            .jpeg()
+            .toBuffer();
+        // Un octet en trop avant un marqueur : « Corrupt JPEG data ».
+        const marker = jpeg.indexOf(Buffer.from([0xff, 0xdb]));
+        const zip = new AdmZip();
+        zip.addFile(
+            'p1.jpg',
+            Buffer.concat([
+                jpeg.subarray(0, marker),
+                Buffer.from([0]),
+                jpeg.subarray(marker),
+            ]),
+        );
+        await mkdir(ctx.file('Ikigami'), { recursive: true });
+        await writeFile(ctx.file('Ikigami/Ikigami #07.cbz'), zip.toBuffer());
+
+        await ctx.scanner.scan(ctx.library.id);
+
+        const [series] = listSeries(ctx.db, NO_USER);
+        expect(
+            await exists(coverFile(ctx.coversPath, series!.coverVolumeId)),
+        ).toBe(true);
+    });
+
     it('sorts volumes by number, using the file name without ComicInfo', async () => {
         for (const name of ['T10', 'T2', 'T2.5', 'Bonus']) {
             await writeCbz(ctx.file(`Gantz/Gantz ${name}.cbz`));

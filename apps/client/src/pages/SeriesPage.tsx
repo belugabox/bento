@@ -40,6 +40,7 @@ import {
     nextToRead,
     progressRatio,
     volumeLabel,
+    volumeTitleOf,
 } from '@/components/readingStatus';
 import {
     coverUrl,
@@ -79,6 +80,8 @@ export const SeriesPage = () => {
     const readCount = series.volumes.filter(
         (v) => v.progress?.completed,
     ).length;
+    // Titre de chaque tome sous son numéro, si l'un d'eux en a un.
+    const withTitles = series.volumes.some((v) => volumeTitleOf(v));
     const details = [
         series.year && String(series.year),
         series.writer,
@@ -317,8 +320,13 @@ export const SeriesPage = () => {
                         <CoverCard
                             key={volume.id}
                             to={`/read/${volume.id}`}
-                            cover={coverUrl(volume.id)}
+                            cover={coverUrl(volume.id, 'small')}
                             title={volumeLabel(volume)}
+                            caption={
+                                withTitles
+                                    ? (volumeTitleOf(volume) ?? '')
+                                    : undefined
+                            }
                             subtitle={
                                 volume.progress && !read
                                     ? `Page ${volume.progress.page + 1} / ${volume.pageCount}`

@@ -19,6 +19,8 @@ const user = (overrides: Partial<CurrentUser> = {}): CurrentUser => ({
 
 // Requêtes envoyées : [méthode, adresse, corps].
 let requests: [string, string, unknown][] = [];
+// Tâches de fond renvoyées par le serveur.
+let tasks: unknown[] = [];
 const assign = vi.fn();
 
 const show = (current: CurrentUser) =>
@@ -35,15 +37,19 @@ const show = (current: CurrentUser) =>
 
 beforeEach(() => {
     requests = [];
+    tasks = [];
     vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
         requests.push([
             init?.method ?? 'GET',
             String(input),
             init?.body ? JSON.parse(String(init.body)) : undefined,
         ]);
-        const body = String(input).endsWith('/drafts/pending')
+        const url = String(input);
+        const body = url.endsWith('/drafts/pending')
             ? { series: 3 }
-            : { preview: null };
+            : url.endsWith('/tasks')
+              ? tasks
+              : { preview: null };
         return new Response(JSON.stringify(body), {
             headers: { 'Content-Type': 'application/json' },
         });
@@ -69,6 +75,26 @@ describe('AppHeader', () => {
                 .getByRole('link', { name: 'Brouillons' })
                 .getAttribute('href'),
         ).toBe('/drafts');
+    });
+
+    it('shows admins the background tasks and their progress', async () => {
+        tasks = [
+            {
+                id: 1,
+                label: 'Scan de « Mangas »',
+                done: 30,
+                total: 120,
+                startedAt: 0,
+            },
+        ];
+        show(user());
+
+        fireEvent.click(
+            await screen.findByRole('button', { name: '1 tâche(s) en cours' }),
+        );
+
+        expect(await screen.findByText('Scan de « Mangas »')).toBeTruthy();
+        expect(screen.getByText('30 / 120')).toBeTruthy();
     });
 
     it('hides the drafts from readers', () => {

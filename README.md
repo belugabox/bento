@@ -47,7 +47,9 @@ Toute la configuration passe par des variables d'environnement :
 
 ### Gestion des tomes (admin)
 
-- **Brouillons** : les tomes déposés dans le dossier `_draft` d'une bibliothèque (par la synchro de beluga-box, par exemple) apparaissent dans « Brouillons » : l'icône en haut à droite indique le nombre de séries en attente. Les `.cbr` et les RAR déguisés en `.cbz` sont convertis au passage.
+- **Brouillons** : les tomes déposés dans le dossier `_draft` d'une bibliothèque (par la synchro de beluga-box, par exemple) apparaissent dans « Brouillons » : l'icône en haut à droite indique le nombre de séries en attente. Chaque dossier forme une série ; un tome déposé seul à la racine de `_draft` forme la sienne. Les `.cbr` et les RAR déguisés en `.cbz` sont convertis au passage.
+- **Série existante** : « Ajouter à une série existante » rattache les tomes d'un brouillon à une série publiée : son nom et ses champs de série sont repris, et les tomes rejoignent son dossier à la publication, même si celui-ci porte un autre nom.
+- **Tâches** : l'icône en haut à droite montre les tâches de fond en cours (scan, compression, publication, lecture des brouillons) et leur avancement.
 - **Métadonnées** : on les complète à la main, ou avec « Remplir » : recherche Wikipédia FR pour la série, puis noms de fichiers pour le numéro, le titre (« Tome N ») et l'année de chaque tome (ou les noms de fichiers seuls), avec l'option « Écraser les valeurs existantes ». « Publier » range chaque tome en `Série/Série #NN (Année).cbz` ; un brouillon remplace le tome publié du même numéro.
 - **Statut et mode de lecture** : une série est « en cours de parution » ou « terminée » ; son mode de lecture (BD, manga, webtoon) remplace celui de la bibliothèque. Les deux se règlent dans l'éditeur, dès les brouillons (ils sont appliqués à la série à la publication) ; le statut se remplit aussi depuis Wikipédia.
 - **Séries publiées** : « Modifier les métadonnées » sur la fiche série. Si la série est renommée, « Renommer les fichiers » déplace les tomes, sans perdre la progression de lecture.
@@ -69,8 +71,8 @@ L'admin fixe le mode de chaque série dans « Modifier les métadonnées » (par
 
 ### Accueil, listes et collections
 
-- **Accueil** : « Reprendre la lecture » (tomes commencés), « La suite de tes séries » (le premier tome pas encore ouvert des séries dont on a fini un tome), « Nouveautés » (le dernier tome ajouté de chaque série), puis toutes les séries.
-- **Filtres** : état de lecture, liste (toutes, mes favoris, à lire, une collection), genre, statut de parution ; et le tri par nom ou par ajouts récents. Tout reste dans l'adresse.
+- **Accueil** : « Reprendre la lecture » (le tome commencé de chaque série, avec l'avancement dans la série), « La suite de tes séries » (le premier tome pas encore ouvert des séries dont on a fini un tome), puis toutes les séries. Les vignettes utilisent une version réduite des couvertures, créée à la première demande.
+- **Filtres** : état de lecture ; le bouton « Filtres » pour la liste (toutes, mes favoris, à lire, une collection), le genre et le statut de parution, affichés ensuite en pastilles qu'on retire d'un clic ; et le tri par nom ou par ajouts récents. Tout reste dans l'adresse.
 - **Favoris et « À lire »** : le cœur et le marque-page de la fiche série, propres à chacun.
 - **Collections** : des sélections partagées créées par l'admin (menu de l'avatar, « Collections »), visibles de tous selon leur contrôle parental. Une série s'y ajoute depuis le menu ⋯ de sa fiche. Listes et collections suivent une série renommée à la publication.
 

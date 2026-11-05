@@ -51,6 +51,7 @@ import {
     saveProgress,
 } from './library/progress';
 import { type LibraryScanner, coverFile } from './library/scanner';
+import { readCover } from './library/smallCovers';
 import { getStats } from './library/stats';
 import type { Wikipedia } from './metadata/wikipedia';
 import { SettingsStore, settingsUpdateSchema } from './settings';
@@ -79,6 +80,8 @@ const idParam = z.object({ id: z.coerce.number().int().positive() });
 
 // Fichier d'une bibliothèque, relatif à sa racine.
 const fileQuery = z.object({ path: z.string().min(1) });
+// `?size=small` : version réduite d'une couverture (vignettes des grilles).
+const smallCover = (size?: string) => (size === 'small' ? size : undefined);
 
 const READING_MODES = ['ltr', 'ltr-manga', 'rtl', 'webtoon'] as const;
 
@@ -154,6 +157,7 @@ export const createApi = ({
         files,
         logger,
         () => settings.get().compression,
+        scanner.tasks,
     ),
     auth,
 }: ApiDeps) =>
@@ -309,7 +313,7 @@ export const createApi = ({
                 ? seriesCoverFile(coversPath, id)
                 : firstVolumeId && coverFile(coversPath, firstVolumeId);
             const cover = file
-                ? await readFile(file).catch(() => undefined)
+                ? await readCover(file, smallCover(c.req.query('size')))
                 : undefined;
             if (!cover) throw notFound('Couverture introuvable');
             return c.body(new Uint8Array(cover), 200, {
@@ -473,11 +477,11 @@ export const createApi = ({
         )
         .get('/volumes/:id/cover', zValidator('param', idParam), async (c) => {
             const { id } = getVolume(db, c.var.user, c.req.valid('param').id);
-            const cover = await readFile(coverFile(coversPath, id)).catch(
-                () => {
-                    throw notFound('Couverture introuvable');
-                },
+            const cover = await readCover(
+                coverFile(coversPath, id),
+                smallCover(c.req.query('size')),
             );
+            if (!cover) throw notFound('Couverture introuvable');
             return c.body(new Uint8Array(cover), 200, {
                 'Content-Type': 'image/webp',
                 'Cache-Control': 'private, max-age=3600',
@@ -606,13 +610,17 @@ export const createApi = ({
             requireAdmin,
             zValidator('param', idParam),
             zValidator('query', z.object({ folder: z.string().min(1) })),
-            async (c) =>
-                c.json(
-                    await files.draftFolder(
-                        c.req.valid('param').id,
-                        c.req.valid('query').folder,
+            async (c) => {
+                const { folder } = c.req.valid('query');
+                return c.json(
+                    // Long la première fois : les archives sont ouvertes.
+                    await scanner.tasks.run(
+                        `Lecture des brouillons « ${folder.replace(/^_draft\/?/, '') || '_draft'} »`,
+                        () =>
+                            files.draftFolder(c.req.valid('param').id, folder),
                     ),
-                ),
+                );
+            },
         )
         .get(
             '/libraries/:id/files/info',
@@ -701,6 +709,8 @@ export const createApi = ({
                     ),
                 ),
         )
+        // Tâches de fond en cours (scan, compression…), pour l'icône de l'en-tête.
+        .get('/tasks', requireAdmin, (c) => c.json(scanner.tasks.list()))
         .get('/compression', requireAdmin, (c) => c.json(compression.status()))
         // Réglages de l'admin, avec leurs valeurs par défaut.
         .get('/settings', requireAdmin, (c) =>
@@ -765,13 +775,15 @@ export const createApi = ({
                 'json',
                 z.object({ paths: z.array(z.string().min(1)).min(1) }),
             ),
-            async (c) =>
-                c.json(
-                    await files.publish(
-                        c.req.valid('param').id,
-                        c.req.valid('json').paths,
+            async (c) => {
+                const { paths } = c.req.valid('json');
+                return c.json(
+                    await scanner.tasks.run(
+                        `Publication de ${paths.length} tome(s)`,
+                        () => files.publish(c.req.valid('param').id, paths),
                     ),
-                ),
+                );
+            },
         )
         // Comptes et contrôle parental (admin).
         .get('/users', requireAdmin, (c) => c.json(listUsers(db)))

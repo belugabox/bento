@@ -11,9 +11,8 @@ import {
     unlink,
 } from 'node:fs/promises';
 import path from 'node:path';
-import sharp from 'sharp';
 
-import { type PageReader, openArchive, pageEntries } from '../archive/archive';
+import { type PageReader, pageEntries, readArchive } from '../archive/archive';
 import {
     convertCbrToCbz,
     isCbr,
@@ -26,6 +25,7 @@ import {
     compressArchive,
     estimateCompression,
 } from '../archive/compress';
+import { readImage } from '../archive/image';
 import { updateComicInfo } from '../archive/write';
 import type { Db } from '../db';
 import { libraries, series, volumes } from '../db/schema';
@@ -41,6 +41,7 @@ import {
 import { listsSnapshot, restoreLists } from './lists';
 import {
     DRAFT_FOLDER,
+    draftGroupOf,
     isDraft,
     publicationPathOf,
     relativeTo,
@@ -83,6 +84,12 @@ const COVER_SIZE = {
 const exists = (fullPath: string) =>
     access(fullPath).then(
         () => true,
+        () => false,
+    );
+
+const isFile = (fullPath: string) =>
+    stat(fullPath).then(
+        (stats) => stats.isFile(),
         () => false,
     );
 
@@ -166,18 +173,18 @@ export class LibraryFiles {
 
         let info: Pick<FileInfo, 'pageCount' | 'comicInfo' | 'error'>;
         try {
-            const zip = await openArchive(fullPath);
-            const pages = pageEntries(zip);
+            const entries = await readArchive(fullPath);
+            const pages = pageEntries(entries);
             info = {
                 pageCount: pages.length,
-                comicInfo: await readComicInfo(zip.getEntries()),
+                comicInfo: await readComicInfo(entries),
                 error:
                     pages.length === 0 ? 'aucune image dans l’archive' : null,
             };
             if (pages[0]) {
                 const cover = this.coverPath(fullPath);
                 await mkdir(path.dirname(cover), { recursive: true });
-                await sharp(pages[0].getData())
+                await readImage(await pages[0].getData())
                     .resize(COVER_SIZE)
                     .webp({ quality: 80 })
                     .toFile(cover)
@@ -245,29 +252,30 @@ export class LibraryFiles {
             withFileTypes: true,
             recursive: true,
         }).catch(() => []);
-        for (const entry of entries) {
-            const extension = path.extname(entry.name).toLowerCase();
-            if (
-                !entry.isFile() ||
-                (extension !== '.cbz' && !isCbr(entry.name))
-            ) {
-                continue;
-            }
-            const fullPath = path.join(entry.parentPath, entry.name);
+        await this.convertFiles(
+            entries
+                .filter((entry) => entry.isFile())
+                .map((entry) => path.join(entry.parentPath, entry.name)),
+        );
+    };
+
+    private convertFiles = async (fullPaths: string[]) => {
+        for (const fullPath of fullPaths) {
+            const name = path.basename(fullPath);
+            const extension = path.extname(name).toLowerCase();
+            if (extension !== '.cbz' && !isCbr(name)) continue;
             const stats = await stat(fullPath).catch(() => undefined);
             if (!stats) continue;
             const key = `${stats.size}:${stats.mtimeMs}`;
             if (this.conversionErrors.get(fullPath)?.key === key) continue;
             if (this.cache.get(fullPath)?.key === key) continue;
             try {
-                if (isCbr(entry.name)) {
+                if (isCbr(name)) {
                     await convertCbrToCbz(fullPath);
-                    this.logger.info(`Brouillon ${entry.name} converti en CBZ`);
+                    this.logger.info(`Brouillon ${name} converti en CBZ`);
                 } else if (await isRarArchive(fullPath)) {
                     await repairRarCbz(fullPath);
-                    this.logger.info(
-                        `Brouillon ${entry.name} (RAR) réécrit en ZIP`,
-                    );
+                    this.logger.info(`Brouillon ${name} (RAR) réécrit en ZIP`);
                 }
                 this.conversionErrors.delete(fullPath);
             } catch (error) {
@@ -361,8 +369,9 @@ export class LibraryFiles {
             const { size } = await stat(archive.fullPath).catch(() => ({
                 size: 0,
             }));
-            folders.set(archive.folder, [
-                ...(folders.get(archive.folder) ?? []),
+            const group = draftGroupOf(archive.path);
+            folders.set(group, [
+                ...(folders.get(group) ?? []),
                 { path: archive.path, name: path.basename(archive.path), size },
             ]);
         }
@@ -399,6 +408,18 @@ export class LibraryFiles {
             throw notFound('Dossier de brouillons introuvable');
         }
         const folder = relativeTo(library.path, dir);
+        // Un tome seul à la racine de _draft.
+        if (path.dirname(dir) === draftRoot && (await isFile(dir))) {
+            await this.convertFiles([dir]);
+            // Un .cbr converti est devenu un .cbz.
+            const converted = dir.replace(/\.cbr$/i, '.cbz');
+            return [
+                await this.infoOf(
+                    library.path,
+                    this.conversionErrors.has(dir) ? dir : converted,
+                ),
+            ];
+        }
         await this.convertDrafts(dir);
         const files: FileInfo[] = [];
         for (const archive of await this.archivesUnder(library.path, dir)) {
@@ -513,7 +534,7 @@ export class LibraryFiles {
                 )
                 .get();
             if (!moved) continue;
-            const folder = path.posix.dirname(from);
+            const folder = draftGroupOf(from);
             const draft = drafts.get(folder);
             // Une fois par dossier et par série.
             if (!applied.has(`${folder}\n${moved.seriesId}`)) {
@@ -597,6 +618,46 @@ export class LibraryFiles {
         }
     };
 
+    /**
+     * Emplacement d'un tome : d'après son ComicInfo, mais un brouillon va
+     * dans le dossier de la série publiée du même nom s'il s'écrit
+     * autrement (dossier ancien) : il rejoint la série au lieu d'en créer
+     * une seconde. Un tome publié, lui, suit son ComicInfo (renommage).
+     */
+    private targetOf = (libraryId: number, info: FileInfo) => {
+        const target = info.publicationPath;
+        const name = info.comicInfo.Series?.trim().toLowerCase();
+        if (!target || !name || !info.draft) return target;
+        const wanted = target.split('/')[0]!;
+        const existing = this.db
+            .select({ name: series.name, key: series.key })
+            .from(series)
+            .where(eq(series.libraryId, libraryId))
+            .all()
+            .find((s) => s.name.trim().toLowerCase() === name);
+        // Seulement une série rangée dans un dossier (pas un tome à la racine).
+        const folder = existing && this.seriesFolderOf(libraryId, existing.key);
+        // Même nom à la casse près : le dossier sera renommé (fixFolderCase).
+        if (!folder || folder.toLowerCase() === wanted.toLowerCase()) {
+            return target;
+        }
+        return `${folder}/${path.posix.basename(target)}`;
+    };
+
+    /** Dossier d'une série, si ses tomes sont rangés dans un dossier. */
+    private seriesFolderOf = (libraryId: number, key: string) => {
+        const volume = this.db
+            .select({ file: volumes.file })
+            .from(volumes)
+            .innerJoin(series, eq(series.id, volumes.seriesId))
+            .where(and(eq(series.libraryId, libraryId), eq(series.key, key)))
+            .limit(1)
+            .get();
+        return volume?.file.includes('/')
+            ? volume.file.split('/')[0]
+            : undefined;
+    };
+
     private publishOne = async (
         libraryPath: string,
         libraryId: number,
@@ -605,19 +666,20 @@ export class LibraryFiles {
         const sourcePath = resolveInLibrary(libraryPath, relative);
         const info = await this.infoOf(libraryPath, sourcePath);
         if (info.error) throw new Error(info.error);
-        if (!info.publicationPath) {
+        const publicationPath = this.targetOf(libraryId, info);
+        if (!publicationPath) {
             throw new Error('il faut au moins la série et le numéro du tome');
         }
-        if (info.publicationPath === relative) return undefined;
+        if (publicationPath === relative) return undefined;
 
         // Dérivé du champ `Series` (non fiable) : confiné dans la bibliothèque.
-        const destPath = resolveInLibrary(libraryPath, info.publicationPath);
+        const destPath = resolveInLibrary(libraryPath, publicationPath);
         const destDir = path.dirname(destPath);
         // Changement de casse seulement, sur un disque insensible à la casse.
         const sameFile = await isSameFile(sourcePath, destPath);
 
         // Tomes rangés du même numéro sous un autre nom (« #12 » et « #12 (2024) »).
-        const number = volumeNumberOf(path.basename(info.publicationPath));
+        const number = volumeNumberOf(path.basename(publicationPath));
         const sameNumber: string[] = [];
         if (number) {
             const entries = await readdir(destDir, {
@@ -675,13 +737,13 @@ export class LibraryFiles {
         }
         if (kept) {
             // Un autre tome indexé sous le chemin visé est périmé.
-            if (kept !== info.publicationPath) {
+            if (kept !== publicationPath) {
                 this.db
                     .delete(volumes)
                     .where(
                         and(
                             eq(volumes.libraryId, libraryId),
-                            eq(volumes.file, info.publicationPath),
+                            eq(volumes.file, publicationPath),
                         ),
                     )
                     .run();
@@ -689,7 +751,7 @@ export class LibraryFiles {
             this.db
                 .update(volumes)
                 // Date impossible : le prochain scan relit le tome.
-                .set({ file: info.publicationPath, mtimeMs: -1 })
+                .set({ file: publicationPath, mtimeMs: -1 })
                 .where(
                     and(
                         eq(volumes.libraryId, libraryId),
@@ -699,7 +761,7 @@ export class LibraryFiles {
                 .run();
         }
         this.cache.delete(sourcePath);
-        this.logger.info(`Rangé : ${relative} → ${info.publicationPath}`);
+        this.logger.info(`Rangé : ${relative} → ${publicationPath}`);
 
         // Supprimer l'ancien dossier s'il est vide (jamais la racine ni _draft).
         const sourceDir = path.dirname(sourcePath);
@@ -712,7 +774,7 @@ export class LibraryFiles {
                 await rmdir(sourceDir).catch(() => undefined);
             }
         }
-        return info.publicationPath;
+        return publicationPath;
     };
 
     /**

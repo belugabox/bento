@@ -2,9 +2,9 @@ import { eq } from 'drizzle-orm';
 import { createHash } from 'node:crypto';
 import { copyFile, mkdir, rm } from 'node:fs/promises';
 import path from 'node:path';
-import sharp from 'sharp';
 
 import type { PageReader } from '../archive/archive';
+import { readImage } from '../archive/image';
 import type { Db } from '../db';
 import { libraries, series } from '../db/schema';
 import { badGateway, badRequest, notFound } from '../tools/errors';
@@ -49,7 +49,7 @@ export const draftCoverFile = (
     );
 
 const toCover = (image: Buffer, destination: string, position: CoverPosition) =>
-    sharp(image)
+    readImage(image)
         .resize({
             width: COVER_WIDTH,
             height: COVER_WIDTH * 1.5,

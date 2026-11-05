@@ -1,4 +1,3 @@
-import type AdmZip from 'adm-zip';
 import { promisify } from 'node:util';
 import { parseString } from 'xml2js';
 
@@ -128,14 +127,19 @@ export const normalizeComicInfo = (raw: any): ComicInfo => {
 
 /** Lit le ComicInfo.xml d'une archive ({} s'il est absent ou illisible). */
 export const readComicInfo = async (
-    entries: AdmZip.IZipEntry[],
+    entries: {
+        entryName: string;
+        getData: () => Buffer | Promise<Buffer>;
+    }[],
 ): Promise<ComicInfo> => {
     const entry = entries.find(
         (e) => e.entryName.toLowerCase() === 'comicinfo.xml',
     );
     if (!entry) return {};
     try {
-        const parsed = await parseXml(entry.getData().toString('utf-8'));
+        const parsed = await parseXml(
+            (await entry.getData()).toString('utf-8'),
+        );
         return parsed.ComicInfo ? normalizeComicInfo(parsed.ComicInfo) : {};
     } catch {
         return {};

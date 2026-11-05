@@ -163,7 +163,20 @@ describe('reading progress', () => {
             page: 1,
             pageCount: 3,
         });
+        // Avancement dans la série : un tome de Gantz lu sur trois.
+        expect(body[1]).toMatchObject({ readCount: 1, volumeCount: 3 });
         expect((await call('/continue', bob)).body).toEqual([]);
+    });
+
+    it('keeps only the latest volume of each series to resume', async () => {
+        await save(gantz[0]!, { page: 1 });
+        await save(gantz[1]!, { page: 1 });
+
+        const { body } = await call('/continue', alice);
+
+        expect(body.map((v: { volumeId: number }) => v.volumeId)).toEqual([
+            gantz[1],
+        ]);
     });
 
     it('marks a whole series read or unread, per person', async () => {

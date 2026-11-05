@@ -369,4 +369,50 @@ describe('MetadataEditor', () => {
         expect(screen.queryByAltText('Page 1')).toBeNull();
         expect(save).not.toHaveBeenCalled();
     });
+
+    it('adds the drafts to a published series, with its series fields', async () => {
+        vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+            const url = String(input);
+            const body = url.startsWith('/api/series?')
+                ? [{ id: 5, name: 'Gantz Perfect' }]
+                : {
+                      name: 'Gantz Perfect',
+                      volumes: [
+                          {
+                              number: '1',
+                              title: null,
+                              admin: {
+                                  comicInfo: {
+                                      Series: 'Gantz Perfect',
+                                      Writer: 'Hiroya Oku',
+                                  },
+                              },
+                          },
+                      ],
+                  };
+            return new Response(JSON.stringify(body), {
+                headers: { 'Content-Type': 'application/json' },
+            });
+        });
+        render(<Editor />);
+
+        fireEvent.click(
+            screen.getByRole('textbox', {
+                name: 'Ajouter à une série existante',
+            }),
+        );
+        fireEvent.click(await screen.findByText('Gantz Perfect'));
+
+        await waitFor(() =>
+            expect(
+                (screen.getByLabelText('Nom') as HTMLInputElement).value,
+            ).toBe('Gantz Perfect'),
+        );
+        expect(
+            (screen.getByLabelText('Scénario') as HTMLInputElement).value,
+        ).toBe('Hiroya Oku');
+        expect(
+            await screen.findByText('1 tome(s) publié(s), le dernier : Tome 1'),
+        ).toBeTruthy();
+    });
 });

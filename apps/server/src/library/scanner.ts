@@ -1,15 +1,17 @@
 import { and, asc, eq, inArray, notInArray, sql } from 'drizzle-orm';
 import { mkdir, readdir, rm, stat } from 'node:fs/promises';
 import path from 'node:path';
-import sharp from 'sharp';
 
-import { openArchive, pageEntries } from '../archive/archive';
+import { pageEntries, readArchive } from '../archive/archive';
 import { readComicInfo } from '../archive/comicInfo';
 import { parseVolumeFileName } from '../archive/fileName';
+import { readImage } from '../archive/image';
 import type { Db } from '../db';
 import { libraries, series, volumes } from '../db/schema';
+import { TaskList } from '../tasks';
 import type { Logger } from '../tools/logger';
 import { seriesAge } from './ageRating';
+import { smallCoverFile } from './smallCovers';
 
 export type ScanResult = {
     added: number;
@@ -95,6 +97,8 @@ export class LibraryScanner {
         private readonly db: Db,
         private readonly coversPath: string,
         private readonly logger: Logger,
+        // Tâches de fond, partagées avec l'API (icône des tâches).
+        readonly tasks = new TaskList(),
     ) {}
 
     isScanning = (libraryId: number) => this.running.has(libraryId);
@@ -117,6 +121,19 @@ export class LibraryScanner {
             .get();
         if (!library) throw new Error(`Bibliothèque ${libraryId} inconnue`);
 
+        const task = this.tasks.start(`Scan de « ${library.name} »`);
+        try {
+            return await this.scanLibrary(library, task);
+        } finally {
+            task.finish();
+        }
+    };
+
+    private scanLibrary = async (
+        library: typeof libraries.$inferSelect,
+        task: ReturnType<TaskList['start']>,
+    ): Promise<ScanResult> => {
+        const libraryId = library.id;
         const started = Date.now();
         const result: ScanResult = {
             added: 0,
@@ -142,7 +159,8 @@ export class LibraryScanner {
         );
 
         const kept: string[] = [];
-        for (const archive of found) {
+        for (const [index, archive] of found.entries()) {
+            task.progress(index, found.length);
             const previous = known.get(archive.file);
             if (
                 previous &&
@@ -183,10 +201,10 @@ export class LibraryScanner {
 
     /** Lit une archive et l'enregistre (série comprise), avec sa couverture. */
     private index = async (libraryId: number, archive: FoundArchive) => {
-        const zip = await openArchive(archive.fullPath);
-        const pages = pageEntries(zip);
+        const entries = await readArchive(archive.fullPath);
+        const pages = pageEntries(entries);
         if (pages.length === 0) throw new Error('aucune image dans l’archive');
-        const comicInfo = await readComicInfo(zip.getEntries());
+        const comicInfo = await readComicInfo(entries);
         const fromName = parseVolumeFileName(stem(archive.file));
 
         const key = seriesKeyOf(archive.file, comicInfo.Series);
@@ -227,7 +245,7 @@ export class LibraryScanner {
 
         // Couverture : sans elle, le tome reste lisible.
         try {
-            await sharp(pages[0]!.getData())
+            await readImage(await pages[0]!.getData())
                 .resize(COVER_SIZE)
                 .webp({ quality: 80 })
                 .toFile(coverFile(this.coversPath, volume.id));
@@ -256,9 +274,12 @@ export class LibraryScanner {
         if (gone.length === 0) return 0;
         this.db.delete(volumes).where(inArray(volumes.id, gone)).run();
         await Promise.all(
-            gone.map((id) =>
+            gone.flatMap((id) => [
                 rm(coverFile(this.coversPath, id), { force: true }),
-            ),
+                rm(smallCoverFile(coverFile(this.coversPath, id)), {
+                    force: true,
+                }),
+            ]),
         );
         return gone.length;
     };

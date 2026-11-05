@@ -63,7 +63,9 @@ export type SeriesDetails = Awaited<ReturnType<typeof fetchSeries>>;
 export type Volume = Awaited<ReturnType<typeof fetchVolume>>;
 
 // Images servies telles quelles : utilisables directement dans <img>.
-export const coverUrl = (volumeId: number) => `/api/volumes/${volumeId}/cover`;
+// `small` : version réduite (vignettes des grilles), plus légère.
+export const coverUrl = (volumeId: number, size?: 'small') =>
+    `/api/volumes/${volumeId}/cover${size ? `?size=${size}` : ''}`;
 export const pageUrl = (volumeId: number, index: number) =>
     `/api/volumes/${volumeId}/pages/${index}`;
 
@@ -84,12 +86,10 @@ export type InProgressVolume = Awaited<
     ReturnType<typeof fetchInProgress>
 >[number];
 
-/** Accueil : derniers ajouts et suite des séries entamées. */
+/** Accueil : suite des séries entamées (et derniers ajouts). */
 export const fetchHome = () => json(api.home.$get());
 
-export type HomeVolume = Awaited<
-    ReturnType<typeof fetchHome>
->['recent'][number];
+export type NextVolume = Awaited<ReturnType<typeof fetchHome>>['next'][number];
 
 /** Favoris et liste « à lire » de la personne. */
 export const setSeriesLists = (
@@ -288,15 +288,23 @@ export const draftCoverUrl = (
     `/api/libraries/${library}/drafts/cover?folder=${encodeURIComponent(folder)}&v=${encodeURIComponent(coverUpdatedAt)}`;
 
 /** Couverture d'une série ; l'adresse change avec la couverture choisie. */
-export const seriesCoverUrl = (series: {
-    id: number;
-    coverUpdatedAt: string | null;
-    coverVolumeId?: number | null;
-}) =>
-    `/api/series/${series.id}/cover?v=${encodeURIComponent(series.coverUpdatedAt ?? String(series.coverVolumeId ?? ''))}`;
+export const seriesCoverUrl = (
+    series: {
+        id: number;
+        coverUpdatedAt: string | null;
+        coverVolumeId?: number | null;
+    },
+    size?: 'small',
+) =>
+    `/api/series/${series.id}/cover?v=${encodeURIComponent(series.coverUpdatedAt ?? String(series.coverVolumeId ?? ''))}${size ? `&size=${size}` : ''}`;
 
 /** Séries en attente dans les brouillons (pastille de l'en-tête). */
 export const fetchPendingDrafts = () => json(api.drafts.pending.$get());
+
+/** Tâches de fond en cours : scan, compression… (icône de l'en-tête). */
+export const fetchTasks = () => json(api.tasks.$get());
+
+export type Task = Awaited<ReturnType<typeof fetchTasks>>[number];
 
 /** Vue lecteur d'un admin : âge maximal (null : sans limite). */
 export const startPreview = (maxAge: number | null) =>
