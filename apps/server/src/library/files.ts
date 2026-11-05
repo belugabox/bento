@@ -715,4 +715,8 @@ export class LibraryFiles {
     /** Page d'un fichier (aperçu d'un brouillon). */
     page = (libraryId: number, relative: string, index: number) =>
         this.reader.page(this.fullPath(libraryId, relative), index);
+
+    /** Dimensions des pages (aperçu du lecteur). */
+    pageSizes = (libraryId: number, relative: string) =>
+        this.reader.sizes(this.fullPath(libraryId, relative));
 }

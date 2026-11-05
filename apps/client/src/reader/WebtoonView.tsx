@@ -1,8 +1,5 @@
-import { Box, Button, Center, Loader, Stack, Text } from '@mantine/core';
-import { useEffect, useRef } from 'react';
-import { Link } from 'react-router';
-
-import { pageUrl } from '@/services/api';
+import { Box, Center, Loader, Stack, Text } from '@mantine/core';
+import { type ReactNode, useEffect, useRef } from 'react';
 
 // Largeur maximale des pages : lisible sur un grand écran.
 const MAX_WIDTH = 900;
@@ -12,22 +9,21 @@ const MAX_WIDTH = 900;
  * vertical. La page la plus visible devient la page courante.
  */
 export const WebtoonView = ({
-    volumeId,
+    pageSrc,
     sizes,
     initialPage,
     onPage,
     onTap,
-    seriesId,
-    nextId,
+    end,
 }: {
-    volumeId: number;
+    pageSrc: (index: number) => string;
     /** Largeur et hauteur de chaque page : la place est réservée d'avance. */
     sizes: [number, number][] | undefined;
     initialPage: number;
     onPage: (page: number) => void;
     onTap: () => void;
-    seriesId: number;
-    nextId: number | null;
+    /** Fin du tome : tome suivant, retour… */
+    end: ReactNode;
 }) => {
     const pages = useRef<(HTMLImageElement | null)[]>([]);
     // Page de départ lue une seule fois (reprise de lecture).
@@ -37,7 +33,7 @@ export const WebtoonView = ({
     useEffect(() => {
         if (!sizes) return;
         pages.current[start.current]?.scrollIntoView({ block: 'start' });
-    }, [sizes, volumeId]);
+    }, [sizes]);
 
     // Page courante : celle qui passe la ligne à 40 % de la hauteur.
     useEffect(() => {
@@ -75,7 +71,7 @@ export const WebtoonView = ({
                         pages.current[index] = element;
                     }}
                     data-page={index}
-                    src={pageUrl(volumeId, index)}
+                    src={pageSrc(index)}
                     alt={`Page ${index + 1}`}
                     loading="lazy"
                     draggable={false}
@@ -93,22 +89,7 @@ export const WebtoonView = ({
             ))}
             <Stack align="center" py={80} onClick={(e) => e.stopPropagation()}>
                 <Text c="white">Fin du tome</Text>
-                {nextId ? (
-                    <Button component={Link} to={`/read/${nextId}`}>
-                        Tome suivant
-                    </Button>
-                ) : (
-                    <Text c="dimmed" size="sm">
-                        Dernier tome de la série
-                    </Text>
-                )}
-                <Button
-                    variant="default"
-                    component={Link}
-                    to={`/series/${seriesId}`}
-                >
-                    Retour à la série
-                </Button>
+                {end}
             </Stack>
         </Box>
     );

@@ -1,4 +1,5 @@
 import {
+    ActionIcon,
     Alert,
     Button,
     Checkbox,
@@ -13,20 +14,32 @@ import {
     Text,
     TextInput,
     Textarea,
+    Tooltip,
 } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
-import { IconFileText, IconUpload, IconWand } from '@tabler/icons-react';
+import {
+    IconEye,
+    IconFileText,
+    IconUpload,
+    IconWand,
+} from '@tabler/icons-react';
 import { useEffect, useMemo, useState } from 'react';
 
 import { type ComicInfo, publicationPathOf } from '@server/types';
 
 import { AGE_RATING_OPTIONS, canonicalRating } from '@/components/ageLimits';
+import { ReaderPreview } from '@/reader/ReaderPreview';
 import {
     READING_MODES,
     type ReadingMode,
     readingModeLabel,
 } from '@/reader/navigation';
-import { publishFiles, saveComicInfo } from '@/services/api';
+import {
+    fetchFilePageSizes,
+    filePageUrl,
+    publishFiles,
+    saveComicInfo,
+} from '@/services/api';
 
 import { WikipediaSearch } from './WikipediaSearch';
 import {
@@ -51,6 +64,8 @@ export type EditorVolume = EditableVolume & {
     /** Adresse de la couverture du tome. */
     cover: string | null;
     error?: string | null;
+    /** Nombre de pages (aperçu de lecture). */
+    pageCount?: number;
 };
 
 type Report = { color: string; lines: string[] };
@@ -148,6 +163,17 @@ export const MetadataEditor = ({
     const [busy, setBusy] = useState<'save' | 'publish'>();
     const [report, setReport] = useState<Report>();
     const [wikiOpened, wiki] = useDisclosure(false);
+    // Tome ouvert en aperçu de lecture.
+    const [preview, setPreview] = useState<EditorVolume>();
+    // Mode essayé dans l'aperçu : celui choisi, même pas encore enregistré.
+    const previewMode: ReadingMode =
+        modeValue !== DEFAULT_MODE
+            ? (modeValue as ReadingMode)
+            : (seriesMode?.defaultMode ??
+              (kind === 'manga' ? 'ltr-manga' : 'ltr'));
+    const canPreview = (volume?: EditorVolume) =>
+        !!volume && !volume.error && !!volume.pageCount;
+    const firstPreviewable = volumes.find(canPreview);
 
     // Nouvelles données (après enregistrement) : repartir de celles-ci.
     useEffect(() => setEdits(initialEdits(readable)), [readable]);
@@ -367,6 +393,26 @@ export const MetadataEditor = ({
                                     ...READING_MODES,
                                 ]}
                                 {...changed(modeChanged)}
+                                inputContainer={(children) => (
+                                    <Group gap={4} wrap="nowrap">
+                                        <div style={{ flex: 1 }}>
+                                            {children}
+                                        </div>
+                                        <Tooltip label="Aperçu de lecture">
+                                            <ActionIcon
+                                                variant="default"
+                                                size="lg"
+                                                aria-label="Aperçu de lecture de la série"
+                                                disabled={!firstPreviewable}
+                                                onClick={() =>
+                                                    setPreview(firstPreviewable)
+                                                }
+                                            >
+                                                <IconEye size={16} />
+                                            </ActionIcon>
+                                        </Tooltip>
+                                    </Group>
+                                )}
                             />
                         )}
                         <Select
@@ -425,6 +471,7 @@ export const MetadataEditor = ({
                             <Table.Th w={90}>Numéro</Table.Th>
                             <Table.Th>Titre</Table.Th>
                             <Table.Th w={100}>Année</Table.Th>
+                            <Table.Th w={40} />
                         </Table.Tr>
                     </Table.Thead>
                     <Table.Tbody>
@@ -548,12 +595,47 @@ export const MetadataEditor = ({
                                             }
                                         />
                                     </Table.Td>
+                                    <Table.Td>
+                                        {canPreview(volume) && (
+                                            <Tooltip label="Aperçu de lecture">
+                                                <ActionIcon
+                                                    variant="subtle"
+                                                    color="gray"
+                                                    aria-label={`Aperçu de ${volume.name}`}
+                                                    onClick={() =>
+                                                        setPreview(volume)
+                                                    }
+                                                >
+                                                    <IconEye size={16} />
+                                                </ActionIcon>
+                                            </Tooltip>
+                                        )}
+                                    </Table.Td>
                                 </Table.Tr>
                             );
                         })}
                     </Table.Tbody>
                 </Table>
             </Table.ScrollContainer>
+
+            {preview && (
+                <ReaderPreview
+                    title={preview.name}
+                    pageCount={preview.pageCount ?? 0}
+                    pageSrc={(index) =>
+                        filePageUrl(libraryId, preview.path, index)
+                    }
+                    loadSizes={() =>
+                        fetchFilePageSizes(libraryId, preview.path)
+                    }
+                    sizesKey={preview.path}
+                    mode={previewMode}
+                    onKeepMode={
+                        seriesMode ? (mode) => setModeValue(mode) : undefined
+                    }
+                    onClose={() => setPreview(undefined)}
+                />
+            )}
 
             <WikipediaSearch
                 opened={wikiOpened}

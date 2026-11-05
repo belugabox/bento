@@ -323,4 +323,50 @@ describe('MetadataEditor', () => {
         expect(save).toHaveBeenCalledWith('webtoon');
         expect(screen.getByText('Mode de lecture enregistré.')).toBeTruthy();
     });
+
+    it('previews a volume in the chosen reading mode, then keeps the mode', async () => {
+        const save = vi.fn().mockResolvedValue({});
+        vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+            new Response(JSON.stringify([[20, 30]]), {
+                headers: { 'Content-Type': 'application/json' },
+            }),
+        );
+        render(
+            <MantineProvider>
+                <MetadataEditor
+                    libraryId={1}
+                    kind="manga"
+                    mode="drafts"
+                    volumes={volumes().map((v) => ({ ...v, pageCount: 1 }))}
+                    readingMode={{
+                        value: 'webtoon',
+                        defaultMode: 'ltr-manga',
+                        save,
+                    }}
+                    onChanged={() => {}}
+                />
+            </MantineProvider>,
+        );
+
+        fireEvent.click(
+            screen.getByRole('button', {
+                name: 'Aperçu de Gantz T02 (2017).cbz',
+            }),
+        );
+
+        const page = await screen.findByAltText('Page 1');
+        expect(page.getAttribute('src')).toBe(
+            `/api/libraries/1/files/pages/0?path=${encodeURIComponent('_draft/Gantz/Gantz T02 (2017).cbz')}`,
+        );
+        // Webtoon : la place des pages est demandée au serveur.
+        expect(String(vi.mocked(fetch).mock.calls[0]?.[0])).toMatch(
+            /files\/page-sizes\?path=/,
+        );
+
+        fireEvent.click(
+            screen.getAllByRole('button', { name: 'Fermer l’aperçu' })[0]!,
+        );
+        expect(screen.queryByAltText('Page 1')).toBeNull();
+        expect(save).not.toHaveBeenCalled();
+    });
 });

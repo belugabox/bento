@@ -567,6 +567,19 @@ export const createApi = ({
                 });
             },
         )
+        .get(
+            '/libraries/:id/files/page-sizes',
+            requireAdmin,
+            zValidator('param', idParam),
+            zValidator('query', fileQuery),
+            async (c) =>
+                c.json(
+                    await files.pageSizes(
+                        c.req.valid('param').id,
+                        c.req.valid('query').path,
+                    ),
+                ),
+        )
         .put(
             '/libraries/:id/files/comic-info',
             requireAdmin,

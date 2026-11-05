@@ -1,41 +1,7 @@
-import {
-    ActionIcon,
-    Alert,
-    Box,
-    Button,
-    Center,
-    Group,
-    Loader,
-    Popover,
-    SegmentedControl,
-    Select,
-    Slider,
-    Stack,
-    Text,
-} from '@mantine/core';
-import { useLocalStorage, useMediaQuery } from '@mantine/hooks';
-import {
-    IconArrowLeft,
-    IconSettings,
-    IconZoomIn,
-    IconZoomOut,
-    IconZoomReset,
-} from '@tabler/icons-react';
-import {
-    type CSSProperties,
-    type MouseEvent,
-    type PointerEvent,
-    useCallback,
-    useEffect,
-    useRef,
-    useState,
-} from 'react';
+import { Alert, Button, Center, Loader, Text } from '@mantine/core';
+import { useLocalStorage } from '@mantine/hooks';
+import { useCallback, useEffect, useRef } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
-import {
-    type ReactZoomPanPinchRef,
-    TransformComponent,
-    TransformWrapper,
-} from 'react-zoom-pan-pinch';
 
 import {
     fetchPageSizes,
@@ -45,48 +11,13 @@ import {
 } from '@/services/api';
 import { useQuery } from '@/services/useQuery';
 
-import { WebtoonView } from './WebtoonView';
-import {
-    type Fit,
-    type Move,
-    READING_MODES,
-    type ReadingMode,
-    clampPage,
-    doubleSpreads,
-    moveForKey,
-    moveForSide,
-    moveForSwipe,
-    navigationDirection,
-    pagesToPreload,
-    reversesSpreads,
-    sideOfTap,
-    singleSpreads,
-    spreadIndexOf,
-} from './navigation';
-
-/** Une page ou deux par écran ; `auto` : deux en paysage. */
-type PageMode = 'auto' | 'single' | 'double';
-
-/** Taille de chaque image selon l'ajustement et le nombre de pages affichées. */
-const imageStyle = (fit: Fit, count: number): CSSProperties => {
-    switch (fit) {
-        case 'screen':
-            return {
-                maxWidth: `${100 / count}vw`,
-                maxHeight: '100dvh',
-                objectFit: 'contain',
-            };
-        case 'width':
-            return { width: `${100 / count}vw`, height: 'auto' };
-        case 'height':
-            return { height: '100dvh', width: 'auto' };
-    }
-};
+import { Reader } from './Reader';
+import { type ReadingMode, clampPage } from './navigation';
 
 // `?page=last` : dernière page (en revenant du tome suivant).
 const LAST_PAGE = 'last';
 
-/** Lecteur plein écran d'un tome. */
+/** Lecteur plein écran d'un tome de la bibliothèque. */
 export const ReaderPage = () => {
     const volumeId = Number(useParams().id);
     const navigate = useNavigate();
@@ -95,46 +26,13 @@ export const ReaderPage = () => {
         () => fetchVolume(volumeId),
         [volumeId],
     );
-
-    const [fit, setFit] = useLocalStorage<Fit>({
-        key: 'bento:reader:fit',
-        defaultValue: 'screen',
-    });
-    const [pageMode, setPageMode] = useLocalStorage<PageMode>({
-        key: 'bento:reader:pages',
-        defaultValue: 'auto',
-    });
     // Mode de lecture réglable par série ; par défaut celui de la série.
     const [modes, setModes] = useLocalStorage<Record<string, ReadingMode>>({
         key: 'bento:reader:modes',
         defaultValue: {},
     });
-    const [toolbar, setToolbar] = useState(true);
-    const [ended, setEnded] = useState(false);
-    const [zoomed, setZoomed] = useState(false);
-    const zoom = useRef<ReactZoomPanPinchRef>(null);
-
-    const landscape = useMediaQuery('(orientation: landscape)') ?? false;
-    const mode: ReadingMode =
-        (volume && modes[volume.seriesId]) ?? volume?.readingMode ?? 'ltr';
-    const webtoon = mode === 'webtoon';
-    const direction = navigationDirection(mode);
-    const wantDouble =
-        !webtoon &&
-        (pageMode === 'double' || (pageMode === 'auto' && landscape));
-    // Dimensions des pages : double page, ou place des pages d'un webtoon.
-    const needSizes = wantDouble || webtoon;
-    const { data: sizes } = useQuery(
-        () => (needSizes ? fetchPageSizes(volumeId) : Promise.resolve(null)),
-        [volumeId, needSizes],
-    );
 
     const pageCount = volume?.pageCount ?? 0;
-    const spreads =
-        wantDouble && sizes && sizes.length === pageCount
-            ? doubleSpreads(sizes)
-            : singleSpreads(pageCount);
-
     const rawPage = params.get('page');
     // Sans page dans l'adresse : reprendre là où la personne s'était arrêtée.
     const resumePage =
@@ -147,41 +45,12 @@ export const ReaderPage = () => {
             : rawPage === null
               ? clampPage(resumePage, pageCount)
               : clampPage(Number(rawPage) - 1, pageCount);
-    const spreadIndex = spreadIndexOf(spreads, page);
-    const shown = spreads[spreadIndex] ?? [page];
-    // Dernière page affichée : c'est elle qui compte pour la progression.
-    const lastShown = Math.max(...shown);
 
     const goTo = useCallback(
-        (next: number) => {
-            setEnded(false);
+        (next: number) =>
             // Page affichée en partant de 1 dans l'adresse.
-            setParams(
-                { page: String(clampPage(next, pageCount) + 1) },
-                { replace: true },
-            );
-        },
-        [pageCount, setParams],
-    );
-
-    const onWebtoonPage = useCallback((next: number) => goTo(next), [goTo]);
-
-    const move = useCallback(
-        (to: Move) => {
-            if (!volume) return;
-            if (to === 'next') {
-                const next = spreads[spreadIndex + 1];
-                if (next) goTo(next[0]!);
-                else setEnded(true);
-            } else if (ended) {
-                setEnded(false);
-            } else if (spreadIndex > 0) {
-                goTo(spreads[spreadIndex - 1]![0]!);
-            } else if (volume.previousId) {
-                navigate(`/read/${volume.previousId}?page=${LAST_PAGE}`);
-            }
-        },
-        [volume, spreads, spreadIndex, ended, goTo, navigate],
+            setParams({ page: String(next + 1) }, { replace: true }),
+        [setParams],
     );
 
     // L'adresse garde toujours un numéro de page (reprise après rechargement).
@@ -191,100 +60,31 @@ export const ReaderPage = () => {
 
     // Enregistrer chaque page atteinte (une fois l'adresse fixée).
     const savedPage = useRef<string>(undefined);
-    useEffect(() => {
-        if (!volume || rawPage === null || rawPage === LAST_PAGE) return;
-        const key = `${volume.id}:${lastShown}`;
-        if (savedPage.current === key) return;
-        savedPage.current = key;
-        saveProgress(volume.id, { page: lastShown }).catch(() => {
-            // Sans réseau, la lecture continue ; la page suivante réessaiera.
-            savedPage.current = undefined;
-        });
-    }, [volume, rawPage, lastShown]);
+    const urlReady = !!volume && rawPage !== null && rawPage !== LAST_PAGE;
+    const onShown = useCallback(
+        (lastShown: number) => {
+            if (!volume || !urlReady) return;
+            const key = `${volume.id}:${lastShown}`;
+            if (savedPage.current === key) return;
+            savedPage.current = key;
+            saveProgress(volume.id, { page: lastShown }).catch(() => {
+                // Sans réseau, la lecture continue ; la page suivante réessaiera.
+                savedPage.current = undefined;
+            });
+        },
+        [volume, urlReady],
+    );
 
-    // Nouvelle page : revenir à la taille normale.
-    useEffect(() => {
-        zoom.current?.resetTransform(0);
-        setZoomed(false);
-    }, [page, fit]);
-
-    useEffect(() => {
-        const onKey = (event: KeyboardEvent) => {
-            if (event.key === 'Escape' && volume) {
-                navigate(`/series/${volume.seriesId}`);
-                return;
-            }
-            const to = webtoon ? undefined : moveForKey(event.key, direction);
-            if (to) {
-                event.preventDefault();
-                move(to);
-            }
-        };
-        window.addEventListener('keydown', onKey);
-        return () => window.removeEventListener('keydown', onKey);
-    }, [direction, move, navigate, volume, webtoon]);
-
-    // Précharger les pages voisines (cache du navigateur).
-    useEffect(() => {
-        // Webtoon : les pages se chargent au fil du défilement.
-        if (!volume || webtoon) return;
-        for (const index of pagesToPreload(lastShown, pageCount, {
-            ahead: 4,
-            behind: 2,
-        })) {
-            new Image().src = pageUrl(volume.id, index);
+    const pageSrc = useCallback(
+        (index: number) => pageUrl(volumeId, index),
+        [volumeId],
+    );
+    const loadSizes = useCallback(() => fetchPageSizes(volumeId), [volumeId]);
+    const onBeforeFirst = useCallback(() => {
+        if (volume?.previousId) {
+            navigate(`/read/${volume.previousId}?page=${LAST_PAGE}`);
         }
-    }, [volume, lastShown, pageCount, webtoon]);
-
-    // --- Gestes : balayage et toucher ---------------------------------------
-    const gesture = useRef<{
-        x: number;
-        y: number;
-        // Plusieurs doigts (pincement) : pas un balayage.
-        multi: boolean;
-        swiped: boolean;
-    }>({ x: 0, y: 0, multi: false, swiped: false });
-    const pointers = useRef(new Set<number>());
-
-    const onPointerDown = (event: PointerEvent) => {
-        pointers.current.add(event.pointerId);
-        if (pointers.current.size === 1) {
-            gesture.current = {
-                x: event.clientX,
-                y: event.clientY,
-                multi: false,
-                swiped: false,
-            };
-        } else {
-            gesture.current.multi = true;
-        }
-    };
-
-    const onPointerUp = (event: PointerEvent) => {
-        pointers.current.delete(event.pointerId);
-        const { x, y, multi } = gesture.current;
-        if (multi || zoomed || event.pointerType === 'mouse') return;
-        const to = moveForSwipe(
-            event.clientX - x,
-            event.clientY - y,
-            direction,
-        );
-        if (to) {
-            gesture.current.swiped = true;
-            move(to);
-        }
-    };
-
-    const onClick = (event: MouseEvent) => {
-        // Le clic qui suit un balayage ou un pincement ne compte pas.
-        if (gesture.current.swiped || gesture.current.multi) {
-            gesture.current.swiped = false;
-            return;
-        }
-        const side = sideOfTap(event.clientX, window.innerWidth);
-        if (side === 'middle' || zoomed) setToolbar((visible) => !visible);
-        else move(moveForSide(side, direction));
-    };
+    }, [volume, navigate]);
 
     if (error) {
         return (
@@ -301,321 +101,47 @@ export const ReaderPage = () => {
         );
     }
 
-    const title = `${volume.seriesName} — ${volume.number ? `Tome ${volume.number}` : (volume.title ?? '')}`;
-    // Le curseur suit le sens de lecture : de droite à gauche, la fin est à gauche.
-    const sliderValue = direction === 'rtl' ? pageCount - page : page + 1;
-    // Ordre à l'écran : la première page à droite pour les mangas.
-    const onScreen = reversesSpreads(mode) ? [...shown].reverse() : shown;
-    const pageLabel =
-        shown.length > 1
-            ? `${shown[0]! + 1}-${lastShown + 1}`
-            : String(page + 1);
-
-    const images = (
-        <Box
-            style={{
-                display: 'flex',
-                justifyContent: 'center',
-                alignItems: fit === 'width' ? 'flex-start' : 'center',
-                minHeight: '100dvh',
-                width: fit === 'height' ? 'max-content' : '100vw',
-                margin: '0 auto',
-            }}
-        >
-            {onScreen.map((index) => (
-                <img
-                    key={index}
-                    src={pageUrl(volume.id, index)}
-                    alt={`Page ${index + 1}`}
-                    style={{
-                        display: 'block',
-                        ...imageStyle(fit, shown.length),
-                    }}
-                    draggable={false}
-                />
-            ))}
-        </Box>
-    );
-
+    const seriesUrl = `/series/${volume.seriesId}`;
     return (
-        <Box
-            bg="black"
-            mih="100dvh"
-            pos="relative"
-            style={{ userSelect: 'none' }}
-        >
-            {webtoon ? (
-                <WebtoonView
-                    volumeId={volume.id}
-                    sizes={sizes ?? undefined}
-                    initialPage={page}
-                    onPage={onWebtoonPage}
-                    onTap={() => setToolbar((visible) => !visible)}
-                    seriesId={volume.seriesId}
-                    nextId={volume.nextId}
-                />
-            ) : (
-                <Box
-                    onPointerDown={onPointerDown}
-                    onPointerUp={onPointerUp}
-                    onPointerCancel={(event) =>
-                        pointers.current.delete(event.pointerId)
-                    }
-                    onClick={onClick}
-                    style={{
-                        overflowX: fit === 'height' ? 'auto' : 'hidden',
-                        // Écran : le zoom gère les doigts ; sinon, défilement normal.
-                        touchAction: fit === 'screen' ? 'none' : 'pan-x pan-y',
-                    }}
-                >
-                    {fit === 'screen' ? (
-                        <TransformWrapper
-                            ref={zoom}
-                            minScale={1}
-                            maxScale={5}
-                            limitToBounds
-                            wheel={{ disabled: true }}
-                            doubleClick={{ disabled: true }}
-                            // Sans zoom, le doigt sert à tourner les pages.
-                            panning={{ disabled: !zoomed }}
-                            onTransformed={(_, state) =>
-                                setZoomed(state.scale > 1.01)
-                            }
-                        >
-                            <TransformComponent
-                                wrapperStyle={{
-                                    width: '100vw',
-                                    height: '100dvh',
-                                }}
-                            >
-                                {images}
-                            </TransformComponent>
-                        </TransformWrapper>
-                    ) : (
-                        images
-                    )}
-                </Box>
-            )}
-
-            {ended && (
-                <Center pos="fixed" inset={0} style={{ pointerEvents: 'none' }}>
-                    <Stack
-                        align="center"
-                        p="lg"
-                        bg="rgba(0,0,0,0.85)"
-                        style={{ borderRadius: 8, pointerEvents: 'auto' }}
-                    >
-                        <Text c="white">Fin du tome</Text>
-                        {volume.nextId ? (
-                            <Button
-                                component={Link}
-                                to={`/read/${volume.nextId}`}
-                            >
-                                Tome suivant
-                            </Button>
-                        ) : (
-                            <Text c="dimmed" size="sm">
-                                Dernier tome de la série
-                            </Text>
-                        )}
-                        <Button
-                            variant="default"
-                            component={Link}
-                            to={`/series/${volume.seriesId}`}
-                        >
-                            Retour à la série
-                        </Button>
-                    </Stack>
-                </Center>
-            )}
-
-            {toolbar && (
+        <Reader
+            title={`${volume.seriesName} — ${volume.number ? `Tome ${volume.number}` : (volume.title ?? '')}`}
+            pageCount={pageCount}
+            pageSrc={pageSrc}
+            loadSizes={loadSizes}
+            sizesKey={String(volume.id)}
+            page={page}
+            goTo={goTo}
+            onShown={onShown}
+            onBeforeFirst={onBeforeFirst}
+            mode={modes[volume.seriesId] ?? volume.readingMode ?? 'ltr'}
+            onModeChange={(mode) =>
+                setModes((current) => ({
+                    ...current,
+                    [volume.seriesId]: mode,
+                }))
+            }
+            modeLabel="Mode de lecture (cette série)"
+            exit={{
+                to: seriesUrl,
+                onExit: () => navigate(seriesUrl),
+                label: 'Retour à la série',
+            }}
+            end={
                 <>
-                    <Group
-                        pos="fixed"
-                        top={0}
-                        left={0}
-                        right={0}
-                        p="xs"
-                        justify="space-between"
-                        wrap="nowrap"
-                        bg="rgba(0,0,0,0.75)"
-                    >
-                        <Group gap="xs" wrap="nowrap" style={{ minWidth: 0 }}>
-                            <ActionIcon
-                                component={Link}
-                                to={`/series/${volume.seriesId}`}
-                                variant="subtle"
-                                color="gray"
-                                aria-label="Retour à la série"
-                            >
-                                <IconArrowLeft size={18} />
-                            </ActionIcon>
-                            <Text c="white" size="sm" lineClamp={1}>
-                                {title}
-                            </Text>
-                        </Group>
-                        <Group gap={4} wrap="nowrap">
-                            {fit === 'screen' && !webtoon && (
-                                <>
-                                    <ActionIcon
-                                        variant="subtle"
-                                        color="gray"
-                                        aria-label="Zoom arrière"
-                                        onClick={() => zoom.current?.zoomOut()}
-                                    >
-                                        <IconZoomOut size={18} />
-                                    </ActionIcon>
-                                    {zoomed && (
-                                        <ActionIcon
-                                            variant="subtle"
-                                            color="gray"
-                                            aria-label="Taille normale"
-                                            onClick={() =>
-                                                zoom.current?.resetTransform()
-                                            }
-                                        >
-                                            <IconZoomReset size={18} />
-                                        </ActionIcon>
-                                    )}
-                                    <ActionIcon
-                                        variant="subtle"
-                                        color="gray"
-                                        aria-label="Zoom avant"
-                                        onClick={() => zoom.current?.zoomIn()}
-                                    >
-                                        <IconZoomIn size={18} />
-                                    </ActionIcon>
-                                </>
-                            )}
-                            <Popover position="bottom-end" withinPortal>
-                                <Popover.Target>
-                                    <ActionIcon
-                                        variant="subtle"
-                                        color="gray"
-                                        aria-label="Réglages de lecture"
-                                    >
-                                        <IconSettings size={18} />
-                                    </ActionIcon>
-                                </Popover.Target>
-                                <Popover.Dropdown>
-                                    <Stack gap="xs">
-                                        <Select
-                                            size="xs"
-                                            label="Mode de lecture (cette série)"
-                                            allowDeselect={false}
-                                            value={mode}
-                                            onChange={(value) =>
-                                                value &&
-                                                setModes((current) => ({
-                                                    ...current,
-                                                    [volume.seriesId]:
-                                                        value as ReadingMode,
-                                                }))
-                                            }
-                                            data={READING_MODES}
-                                            comboboxProps={{
-                                                withinPortal: false,
-                                            }}
-                                        />
-                                        {!webtoon && (
-                                            <>
-                                                <Text size="xs" c="dimmed">
-                                                    Pages par écran
-                                                </Text>
-                                                <SegmentedControl
-                                                    size="xs"
-                                                    fullWidth
-                                                    value={pageMode}
-                                                    onChange={(value) =>
-                                                        setPageMode(
-                                                            value as PageMode,
-                                                        )
-                                                    }
-                                                    data={[
-                                                        {
-                                                            value: 'auto',
-                                                            label: 'Auto',
-                                                        },
-                                                        {
-                                                            value: 'single',
-                                                            label: 'Une',
-                                                        },
-                                                        {
-                                                            value: 'double',
-                                                            label: 'Deux',
-                                                        },
-                                                    ]}
-                                                />
-                                                <Text size="xs" c="dimmed">
-                                                    Ajustement
-                                                </Text>
-                                                <SegmentedControl
-                                                    size="xs"
-                                                    fullWidth
-                                                    value={fit}
-                                                    onChange={(value) =>
-                                                        setFit(value as Fit)
-                                                    }
-                                                    data={[
-                                                        {
-                                                            value: 'screen',
-                                                            label: 'Écran',
-                                                        },
-                                                        {
-                                                            value: 'width',
-                                                            label: 'Largeur',
-                                                        },
-                                                        {
-                                                            value: 'height',
-                                                            label: 'Hauteur',
-                                                        },
-                                                    ]}
-                                                />
-                                            </>
-                                        )}
-                                    </Stack>
-                                </Popover.Dropdown>
-                            </Popover>
-                        </Group>
-                    </Group>
-
-                    <Group
-                        pos="fixed"
-                        bottom={0}
-                        left={0}
-                        right={0}
-                        p="sm"
-                        wrap="nowrap"
-                        bg="rgba(0,0,0,0.75)"
-                    >
-                        {!webtoon && (
-                            <Slider
-                                style={{ flex: 1 }}
-                                min={1}
-                                max={Math.max(pageCount, 1)}
-                                value={sliderValue}
-                                onChange={(value) =>
-                                    goTo(
-                                        direction === 'rtl'
-                                            ? pageCount - value
-                                            : value - 1,
-                                    )
-                                }
-                                label={null}
-                                color="gray"
-                            />
-                        )}
-                        <Text
-                            c="white"
-                            size="sm"
-                            style={{ whiteSpace: 'nowrap' }}
-                        >
-                            {pageLabel} / {pageCount}
+                    {volume.nextId ? (
+                        <Button component={Link} to={`/read/${volume.nextId}`}>
+                            Tome suivant
+                        </Button>
+                    ) : (
+                        <Text c="dimmed" size="sm">
+                            Dernier tome de la série
                         </Text>
-                    </Group>
+                    )}
+                    <Button variant="default" component={Link} to={seriesUrl}>
+                        Retour à la série
+                    </Button>
                 </>
-            )}
-        </Box>
+            }
+        />
     );
 };

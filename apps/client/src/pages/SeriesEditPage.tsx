@@ -109,6 +109,7 @@ export const SeriesEditPage = () => {
                                   name: volume.admin.file.split('/').pop()!,
                                   comicInfo: volume.admin.comicInfo,
                                   cover: coverUrl(volume.id),
+                                  pageCount: volume.pageCount,
                               },
                           ]
                         : [],

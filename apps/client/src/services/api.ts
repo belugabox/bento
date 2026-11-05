@@ -141,6 +141,15 @@ export const publishFiles = (library: number, paths: string[]) =>
 export const filePageUrl = (library: number, path: string, index: number) =>
     `/api/libraries/${library}/files/pages/${index}?path=${encodeURIComponent(path)}`;
 
+/** Dimensions des pages d'un fichier (aperçu du lecteur). */
+export const fetchFilePageSizes = (library: number, path: string) =>
+    json(
+        api.libraries[':id'].files['page-sizes'].$get({
+            ...libraryId(library),
+            query: { path },
+        }),
+    );
+
 /** Couverture d'un fichier (brouillon), à recharger quand il change. */
 export const fileCoverUrl = (library: number, path: string, version = '') =>
     `/api/libraries/${library}/files/cover?path=${encodeURIComponent(path)}&v=${encodeURIComponent(version)}`;

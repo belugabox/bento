@@ -216,6 +216,9 @@ describe('drafts', () => {
             headers: { Cookie: admin },
         });
         expect(page.headers.get('content-type')).toBe('image/png');
+        const sizes = await call(`${base}/page-sizes${query}`);
+        expect(sizes.body).toHaveLength(2);
+        expect(sizes.body[0]).toEqual([expect.any(Number), expect.any(Number)]);
     });
 
     it('is for admins, and stays inside the library', async () => {
