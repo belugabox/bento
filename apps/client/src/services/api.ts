@@ -84,6 +84,48 @@ export type InProgressVolume = Awaited<
     ReturnType<typeof fetchInProgress>
 >[number];
 
+/** Accueil : derniers ajouts et suite des séries entamées. */
+export const fetchHome = () => json(api.home.$get());
+
+export type HomeVolume = Awaited<
+    ReturnType<typeof fetchHome>
+>['recent'][number];
+
+/** Favoris et liste « à lire » de la personne. */
+export const setSeriesLists = (
+    seriesId: number,
+    lists: { favorite?: boolean; toRead?: boolean },
+) => json(api.series[':id'].lists.$put({ ...id(seriesId), json: lists }));
+
+// --- Collections partagées ----------------------------------------------------
+
+export const fetchCollections = () => json(api.collections.$get());
+
+export type Collection = Awaited<ReturnType<typeof fetchCollections>>[number];
+
+export const createCollection = (name: string) =>
+    json(api.collections.$post({ json: { name } }));
+
+export const renameCollection = (collectionId: number, name: string) =>
+    json(
+        api.collections[':id'].$patch({ ...id(collectionId), json: { name } }),
+    );
+
+export const deleteCollection = (collectionId: number) =>
+    json(api.collections[':id'].$delete(id(collectionId)));
+
+export const setCollectionMember = (
+    collectionId: number,
+    seriesId: number,
+    member: boolean,
+) =>
+    json(
+        api.collections[':id'].series[':seriesId'].$put({
+            param: { id: String(collectionId), seriesId: String(seriesId) },
+            json: { member },
+        }),
+    );
+
 export const fetchUsers = () => json(api.users.$get());
 
 export type Account = Awaited<ReturnType<typeof fetchUsers>>[number];

@@ -108,8 +108,8 @@ Bento est le serveur de lecture et de gestion des mangas et BD de la maison. Il 
 État au 5 novembre 2026 (branche `feat/reading-foundation`).
 
 1. **Socle de lecture** — fait : dépôt, connexion Pocket ID, bibliothèques, scan (à la demande, toutes les 30 min, après publication), grille et fiche série, lecteur, progression.
-2. **Gestion** — presque fait : brouillons, métadonnées, Wikipédia, publication, réparations, couvertures, statut et mode de lecture dès les brouillons, aperçu de lecture. Reste : la **compression** des images.
-3. **Famille** — en partie : contrôle parental, vue lecteur pour l'admin, thèmes, statistiques, série lue / non lue. Reste : listes « à lire », favoris, collections ; filtres par genre et par statut ; « nouveaux tomes » et « suite des séries entamées » sur l'accueil.
+2. **Gestion** — fait : brouillons, métadonnées, Wikipédia, publication, réparations, couvertures, statut et mode de lecture dès les brouillons, aperçu de lecture, compression des images.
+3. **Famille** — fait : contrôle parental, vue lecteur pour l'admin, thèmes, statistiques, série lue / non lue, favoris et liste « à lire », collections partagées, filtres par liste, genre et statut, « La suite de tes séries » et « Nouveautés » sur l'accueil.
 4. **Lecteur avancé** — fait : double page, modes BD / manga / webtoon, gestes tactiles, zoom. Reste : images redimensionnées selon l'écran (les pages sont servies en taille d'origine).
 5. **Manga-news** : deuxième source de métadonnées pour les mangas (voir F).
 6. **Hors ligne** : appli installable, téléchargements, synchronisation de la progression.

@@ -1,8 +1,9 @@
-import { and, desc, eq } from 'drizzle-orm';
+import { and, desc, eq, sql } from 'drizzle-orm';
 
 import type { Db } from '../db';
 import { readProgress, series, volumes } from '../db/schema';
 import { notFound } from '../tools/errors';
+import { volumeOrder } from './catalog';
 import { type Viewer, visibleTo } from './visibility';
 
 export type Progress = { page: number; completed: boolean };
@@ -123,4 +124,92 @@ export const markSeries = (
         saveProgress(db, viewer.id, id, { completed: read });
     }
     return { volumes: ids.length, read };
+};
+
+/**
+ * Derniers ajouts : le tome le plus récent de chaque série, des séries
+ * enrichies le plus récemment aux plus anciennes.
+ */
+export const listRecentVolumes = (db: Db, viewer: Viewer, limit = 12) => {
+    const rows = db
+        .select({
+            volumeId: volumes.id,
+            seriesId: series.id,
+            seriesName: series.name,
+            number: volumes.number,
+            title: volumes.title,
+            addedAt: volumes.addedAt,
+        })
+        .from(volumes)
+        .innerJoin(series, eq(series.id, volumes.seriesId))
+        .where(visibleTo(viewer))
+        .orderBy(desc(volumes.addedAt), desc(volumes.sortNumber))
+        .all();
+    const seen = new Set<number>();
+    return rows
+        .filter((row) => !seen.has(row.seriesId) && seen.add(row.seriesId))
+        .slice(0, limit);
+};
+
+/**
+ * Suite des séries entamées : le premier tome pas encore ouvert des séries
+ * dont la personne a fini au moins un tome, sans tome en cours (ceux-là
+ * sont dans « Reprendre la lecture »). Séries lues le plus récemment
+ * d'abord.
+ */
+export const listNextVolumes = (db: Db, viewer: Viewer, limit = 12) => {
+    const rows = db
+        .select({
+            volumeId: volumes.id,
+            seriesId: series.id,
+            seriesName: series.name,
+            number: volumes.number,
+            title: volumes.title,
+            completed: readProgress.completed,
+            updatedAt: readProgress.updatedAt,
+        })
+        .from(volumes)
+        .innerJoin(series, eq(series.id, volumes.seriesId))
+        .leftJoin(
+            readProgress,
+            and(
+                eq(readProgress.volumeId, volumes.id),
+                eq(readProgress.userId, viewer.id),
+            ),
+        )
+        .where(
+            and(
+                visibleTo(viewer),
+                sql`${volumes.seriesId} in (select v.series_id from read_progress rp join volumes v on v.id = rp.volume_id where rp.user_id = ${viewer.id} and rp.completed = 1)`,
+            ),
+        )
+        .orderBy(...volumeOrder)
+        .all();
+    const bySeries = new Map<number, typeof rows>();
+    for (const row of rows) {
+        bySeries.set(row.seriesId, [
+            ...(bySeries.get(row.seriesId) ?? []),
+            row,
+        ]);
+    }
+    const next: ((typeof rows)[number] & { lastReadAt: number })[] = [];
+    for (const items of bySeries.values()) {
+        if (items.some((v) => v.updatedAt && !v.completed)) continue;
+        const unread = items.find((v) => !v.updatedAt);
+        if (!unread) continue;
+        const lastReadAt = Math.max(
+            ...items.map((v) => v.updatedAt?.getTime() ?? 0),
+        );
+        next.push({ ...unread, lastReadAt });
+    }
+    return next
+        .sort((a, b) => b.lastReadAt - a.lastReadAt)
+        .slice(0, limit)
+        .map(({ volumeId, seriesId, seriesName, number, title }) => ({
+            volumeId,
+            seriesId,
+            seriesName,
+            number,
+            title,
+        }));
 };

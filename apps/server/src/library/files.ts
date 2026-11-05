@@ -34,6 +34,7 @@ import {
     draftSettingsOf,
     saveDraftSettings,
 } from './draftSettings';
+import { listsSnapshot, restoreLists } from './lists';
 import {
     DRAFT_FOLDER,
     isDraft,
@@ -449,10 +450,16 @@ export class LibraryFiles {
         const folders = new Set<string>();
         // Réglages choisis pour les dossiers de brouillons publiés.
         const drafts = draftSettingsOf(this.db, libraryId);
-        // Statut des séries des tomes publiés déplacés, à reporter ensuite.
-        const statuses = new Map(
+        // Séries des tomes publiés déplacés : statut, mode de lecture, listes
+        // et collections, reportés sur leur nouvelle série.
+        const previous = new Map(
             this.db
-                .select({ file: volumes.file, status: series.status })
+                .select({
+                    file: volumes.file,
+                    seriesId: series.id,
+                    status: series.status,
+                    readingMode: series.readingMode,
+                })
                 .from(volumes)
                 .innerJoin(series, eq(series.id, volumes.seriesId))
                 .where(
@@ -462,8 +469,10 @@ export class LibraryFiles {
                     ),
                 )
                 .all()
-                .filter((row) => row.status)
-                .map((row) => [row.file, row.status]),
+                .map((row) => [
+                    row.file,
+                    { ...row, lists: listsSnapshot(this.db, row.seriesId) },
+                ]),
         );
 
         for (const relative of paths) {
@@ -512,19 +521,27 @@ export class LibraryFiles {
                     moved.seriesId,
                 );
             }
-            // Un tome publié déplacé garde le statut de son ancienne série.
-            const status = statuses.get(from);
-            if (!draft?.status && status) {
-                this.db
-                    .update(series)
-                    .set({ status })
-                    .where(
-                        and(
-                            eq(series.id, moved.seriesId),
-                            isNull(series.status),
-                        ),
-                    )
-                    .run();
+            // Un tome publié déplacé garde les réglages de son ancienne série.
+            const old = previous.get(from);
+            if (old && old.seriesId !== moved.seriesId) {
+                const carried = {
+                    ...(!draft?.status && old.status && { status: old.status }),
+                    ...(!draft?.readingMode &&
+                        old.readingMode && { readingMode: old.readingMode }),
+                };
+                for (const [field, value] of Object.entries(carried)) {
+                    this.db
+                        .update(series)
+                        .set({ [field]: value })
+                        .where(
+                            and(
+                                eq(series.id, moved.seriesId),
+                                isNull(series[field as keyof typeof carried]),
+                            ),
+                        )
+                        .run();
+                }
+                restoreLists(this.db, moved.seriesId, old.lists);
             }
         }
         // Dossiers de brouillons vidés : leurs réglages ne servent plus.

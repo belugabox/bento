@@ -12,11 +12,30 @@ import { compareNames } from './sortName';
 import { type Viewer, visibleTo } from './visibility';
 
 // Tomes sans numéro en dernier, puis par numéro, puis par fichier.
-const volumeOrder = [
+export const volumeOrder = [
     sql`${volumes.sortNumber} is null`,
     asc(volumes.sortNumber),
     asc(volumes.file),
 ];
+
+/**
+ * Listes de la personne et collections d'une série (SQL brut : Drizzle ne
+ * préfixe pas les colonnes des sous-requêtes).
+ */
+const listsOf = (viewer: Viewer) => ({
+    favorite:
+        sql<boolean>`exists(select 1 from series_lists sl where sl.series_id = series.id and sl.user_id = ${viewer.id} and sl.list = 'favorite')`.mapWith(
+            Boolean,
+        ),
+    toRead: sql<boolean>`exists(select 1 from series_lists sl where sl.series_id = series.id and sl.user_id = ${viewer.id} and sl.list = 'toread')`.mapWith(
+        Boolean,
+    ),
+    collectionIds: sql<
+        number[]
+    >`coalesce((select group_concat(cs.collection_id) from collection_series cs where cs.series_id = series.id), '')`.mapWith(
+        (value: string) => (value ? value.split(',').map(Number) : []),
+    ),
+});
 
 /**
  * Aligne les bibliothèques en base sur la configuration (identifiées par
@@ -104,6 +123,7 @@ export const listSeries = (
             readCount: sql<number>`(select count(*) from read_progress rp join volumes v on v.id = rp.volume_id where v.series_id = series.id and rp.user_id = ${viewer.id} and rp.completed = 1)`,
             // Tomes ouverts (lus ou en cours) : série commencée.
             startedCount: sql<number>`(select count(*) from read_progress rp join volumes v on v.id = rp.volume_id where v.series_id = series.id and rp.user_id = ${viewer.id})`,
+            ...listsOf(viewer),
         })
         .from(series)
         .leftJoin(volumes, eq(volumes.seriesId, series.id))
@@ -138,6 +158,7 @@ export const getSeries = (db: Db, viewer: Viewer, id: number) => {
             readingMode: series.readingMode,
             writer: series.writer,
             publisher: series.publisher,
+            ...listsOf(viewer),
             library: {
                 id: libraries.id,
                 name: libraries.name,

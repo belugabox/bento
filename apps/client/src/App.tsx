@@ -3,6 +3,7 @@ import { Navigate, Outlet, Route, Routes } from 'react-router';
 
 import { AppHeader, PreviewBanner } from '@/components/AppHeader';
 import { RequireUser } from '@/components/RequireUser';
+import { CollectionsPage } from '@/pages/CollectionsPage';
 import { DeniedPage } from '@/pages/DeniedPage';
 import { DraftsPage } from '@/pages/DraftsPage';
 import { LibraryPage } from '@/pages/LibraryPage';
@@ -77,6 +78,14 @@ export const App = () => (
                     element={
                         <AdminOnly>
                             <UsersPage />
+                        </AdminOnly>
+                    }
+                />
+                <Route
+                    path="collections"
+                    element={
+                        <AdminOnly>
+                            <CollectionsPage />
                         </AdminOnly>
                     }
                 />

@@ -23,6 +23,9 @@ const SERIES = [
     startedCount: s.readCount,
     coverUpdatedAt: null,
     coverVolumeId: index + 10,
+    favorite: index === 1,
+    toRead: false,
+    collectionIds: index === 0 ? [7] : [],
     ...s,
 }));
 
@@ -62,6 +65,32 @@ beforeEach(() => {
                 },
             ]);
         }
+        if (url === '/api/home') {
+            return respond({
+                next: [
+                    {
+                        volumeId: 51,
+                        seriesId: 1,
+                        seriesName: 'Akira',
+                        number: '4',
+                        title: null,
+                    },
+                ],
+                recent: [
+                    {
+                        volumeId: 60,
+                        seriesId: 2,
+                        seriesName: 'Berserk',
+                        number: '41',
+                        title: null,
+                        addedAt: '2026-03-01T00:00:00.000Z',
+                    },
+                ],
+            });
+        }
+        if (url === '/api/collections') {
+            return respond([{ id: 7, name: 'Classiques', seriesCount: 1 }]);
+        }
         if (url.startsWith('/api/series')) return respond(SERIES);
         throw new Error(`requête inattendue : ${url}`);
     });
@@ -87,8 +116,9 @@ describe('LibraryPage', () => {
 
         expect(await screen.findByText('Reprendre la lecture')).toBeTruthy();
         expect(screen.getByText('Tome 2')).toBeTruthy();
-        expect(await screen.findByText('Akira')).toBeTruthy();
-        expect(titles()).toEqual(['/series/1', '/series/2', '/series/3']);
+        await vi.waitFor(() =>
+            expect(titles()).toEqual(['/series/1', '/series/2', '/series/3']),
+        );
         // Série entièrement lue : marquée ; commencée : « 1 / 3 lus ».
         expect(screen.getByLabelText('Série lue')).toBeTruthy();
         expect(screen.getByText('1 / 3 lus')).toBeTruthy();
@@ -98,7 +128,8 @@ describe('LibraryPage', () => {
 
     it('filters by reading state and sorts by recent additions, in the address', async () => {
         show();
-        await screen.findByText('Akira');
+        await screen.findByTestId('series-grid');
+        await vi.waitFor(() => expect(titles()).toHaveLength(3));
 
         fireEvent.click(screen.getByText('Commencées'));
         expect(titles()).toEqual(['/series/3']);
@@ -111,5 +142,34 @@ describe('LibraryPage', () => {
         fireEvent.click(await screen.findByText('Ajouts récents'));
         expect(titles()).toEqual(['/series/2', '/series/3', '/series/1']);
         expect(location).toBe('?sort=recent');
+    });
+
+    it('suggests what comes next and the newest volumes', async () => {
+        show();
+
+        expect(await screen.findByText('La suite de tes séries')).toBeTruthy();
+        expect(screen.getByText('Nouveautés')).toBeTruthy();
+        expect(screen.getByText('Tome 41')).toBeTruthy();
+        expect(
+            screen
+                .getAllByRole('link')
+                .some((link) => link.getAttribute('href') === '/read/51'),
+        ).toBe(true);
+    });
+
+    it('keeps the favorites or a collection, in the address', async () => {
+        show();
+        await screen.findByTestId('series-grid');
+        await vi.waitFor(() => expect(titles()).toHaveLength(3));
+
+        fireEvent.click(screen.getByRole('textbox', { name: 'Liste' }));
+        fireEvent.click(await screen.findByText('Mes favoris'));
+        expect(titles()).toEqual(['/series/2']);
+        expect(location).toBe('?list=favorite');
+
+        fireEvent.click(screen.getByRole('textbox', { name: 'Liste' }));
+        fireEvent.click(await screen.findByText('Classiques'));
+        expect(titles()).toEqual(['/series/1']);
+        expect(location).toBe('?list=collection%3A7');
     });
 });

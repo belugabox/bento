@@ -175,3 +175,56 @@ export const draftSettings = sqliteTable(
     },
     (t) => [primaryKey({ columns: [t.libraryId, t.folder] })],
 );
+
+/** Listes personnelles : favoris et « à lire », par personne. */
+export const seriesLists = sqliteTable(
+    'series_lists',
+    {
+        userId: integer('user_id')
+            .notNull()
+            .references(() => users.id, { onDelete: 'cascade' }),
+        seriesId: integer('series_id')
+            .notNull()
+            .references(() => series.id, { onDelete: 'cascade' }),
+        list: text('list', { enum: ['favorite', 'toread'] }).notNull(),
+        addedAt: integer('added_at', { mode: 'timestamp' })
+            .notNull()
+            .default(sql`(unixepoch())`),
+    },
+    (t) => [
+        primaryKey({ columns: [t.userId, t.seriesId, t.list] }),
+        index('series_lists_series').on(t.seriesId),
+    ],
+);
+
+/** Collections partagées, créées par l'admin (« Pour les enfants »). */
+export const collections = sqliteTable(
+    'collections',
+    {
+        id: integer('id').primaryKey({ autoIncrement: true }),
+        name: text('name').notNull(),
+        createdAt: integer('created_at', { mode: 'timestamp' })
+            .notNull()
+            .default(sql`(unixepoch())`),
+    },
+    (t) => [uniqueIndex('collections_name').on(t.name)],
+);
+
+export const collectionSeries = sqliteTable(
+    'collection_series',
+    {
+        collectionId: integer('collection_id')
+            .notNull()
+            .references(() => collections.id, { onDelete: 'cascade' }),
+        seriesId: integer('series_id')
+            .notNull()
+            .references(() => series.id, { onDelete: 'cascade' }),
+        addedAt: integer('added_at', { mode: 'timestamp' })
+            .notNull()
+            .default(sql`(unixepoch())`),
+    },
+    (t) => [
+        primaryKey({ columns: [t.collectionId, t.seriesId] }),
+        index('collection_series_series').on(t.seriesId),
+    ],
+);

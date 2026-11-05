@@ -67,6 +67,13 @@ Bento écrit dans les fichiers (ComicInfo, rangement) : le conteneur doit pouvoi
 
 L'admin fixe le mode de chaque série dans « Modifier les métadonnées » (par défaut : manga de gauche à droite pour une bibliothèque de mangas, BD sinon) ; chacun peut le changer pour lui-même dans les réglages du lecteur.
 
+### Accueil, listes et collections
+
+- **Accueil** : « Reprendre la lecture » (tomes commencés), « La suite de tes séries » (le premier tome pas encore ouvert des séries dont on a fini un tome), « Nouveautés » (le dernier tome ajouté de chaque série), puis toutes les séries.
+- **Filtres** : état de lecture, liste (toutes, mes favoris, à lire, une collection), genre, statut de parution ; et le tri par nom ou par ajouts récents. Tout reste dans l'adresse.
+- **Favoris et « À lire »** : le cœur et le marque-page de la fiche série, propres à chacun.
+- **Collections** : des sélections partagées créées par l'admin (menu de l'avatar, « Collections »), visibles de tous selon leur contrôle parental. Une série s'y ajoute depuis le menu ⋯ de sa fiche. Listes et collections suivent une série renommée à la publication.
+
 ### Apparence
 
 Chacun choisit, depuis le menu de l'avatar (« Apparence… »), le mode clair, sombre ou celui du système, et une couleur d'accent parmi douze. Le réglage est gardé sur l'appareil.

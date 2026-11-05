@@ -16,21 +16,28 @@ import {
 } from '@mantine/core';
 import { useDebouncedValue } from '@mantine/hooks';
 import { IconCheck, IconSearch } from '@tabler/icons-react';
-import { useState } from 'react';
+import { type ReactNode, useState } from 'react';
 import { useSearchParams } from 'react-router';
 
 import { CoverCard } from '@/components/CoverCard';
 import { volumeLabel } from '@/components/readingStatus';
 import {
+    type ListFilter,
     READING_FILTERS,
     type ReadingFilter,
     SERIES_SORTS,
+    STATUS_FILTERS,
     type SeriesSort,
+    type StatusFilter,
+    allGenres,
     filterSeries,
     readingStateOf,
 } from '@/components/seriesFilters';
 import {
+    type HomeVolume,
     coverUrl,
+    fetchCollections,
+    fetchHome,
     fetchInProgress,
     fetchLibraries,
     fetchSeriesList,
@@ -38,10 +45,43 @@ import {
 } from '@/services/api';
 import { useQuery } from '@/services/useQuery';
 
-// Largeur des vignettes de « Reprendre la lecture » (défilement horizontal).
-const RESUME_CARD_WIDTH = 132;
+// Largeur des vignettes des rangées (défilement horizontal).
+const SHELF_CARD_WIDTH = 132;
 
-/** Accueil : reprendre la lecture, puis toutes les séries. */
+/** Rangée de tomes, qui défile horizontalement. */
+const Shelf = ({ title, children }: { title: string; children: ReactNode }) => (
+    <Stack gap="xs">
+        <Title order={4}>{title}</Title>
+        <ScrollArea type="hover" offsetScrollbars>
+            <Group gap="sm" wrap="nowrap" align="flex-start">
+                {children}
+            </Group>
+        </ScrollArea>
+    </Stack>
+);
+
+const ShelfCard = ({
+    volume,
+    progress,
+}: {
+    volume: Pick<HomeVolume, 'volumeId' | 'seriesName' | 'number' | 'title'>;
+    progress?: number;
+}) => (
+    <Box w={SHELF_CARD_WIDTH} style={{ flexShrink: 0 }}>
+        <CoverCard
+            to={`/read/${volume.volumeId}`}
+            cover={coverUrl(volume.volumeId)}
+            title={volume.seriesName}
+            subtitle={volumeLabel(volume)}
+            progress={progress}
+        />
+    </Box>
+);
+
+/**
+ * Accueil : reprendre la lecture, suite des séries entamées, nouveautés,
+ * puis toutes les séries.
+ */
 export const LibraryPage = () => {
     // Bibliothèque, recherche, filtre et tri dans l'adresse : le retour
     // arrière les garde.
@@ -50,9 +90,14 @@ export const LibraryPage = () => {
     const [debouncedSearch] = useDebouncedValue(search, 250);
     const filter = (params.get('filter') as ReadingFilter | null) ?? 'all';
     const sort = (params.get('sort') as SeriesSort | null) ?? 'name';
+    const list = (params.get('list') as ListFilter | null) ?? 'all';
+    const genre = params.get('genre');
+    const status = (params.get('status') as StatusFilter | null) ?? 'all';
 
     const libraries = useQuery(fetchLibraries, []);
     const inProgress = useQuery(fetchInProgress, []);
+    const home = useQuery(fetchHome, []);
+    const collections = useQuery(fetchCollections, []);
     const libraryId =
         Number(params.get('library')) || libraries.data?.[0]?.id || undefined;
     const series = useQuery(
@@ -85,8 +130,20 @@ export const LibraryPage = () => {
         );
     }
 
-    const visible = filterSeries(series.data ?? [], { filter, sort });
+    const visible = filterSeries(series.data ?? [], {
+        filter,
+        sort,
+        list,
+        genre,
+        status,
+    });
+    const filtered =
+        filter !== 'all' || list !== 'all' || !!genre || status !== 'all';
+    // Pendant une recherche : seulement les séries.
     const resume = debouncedSearch ? [] : (inProgress.data ?? []);
+    const next = debouncedSearch ? [] : (home.data?.next ?? []);
+    const recent = debouncedSearch ? [] : (home.data?.recent ?? []);
+    const genres = allGenres(series.data ?? []);
 
     return (
         <Stack gap="xl">
@@ -116,30 +173,29 @@ export const LibraryPage = () => {
             </Group>
 
             {resume.length > 0 && (
-                <Stack gap="xs">
-                    <Title order={4}>Reprendre la lecture</Title>
-                    <ScrollArea type="hover" offsetScrollbars>
-                        <Group gap="sm" wrap="nowrap" align="flex-start">
-                            {resume.map((volume) => (
-                                <Box
-                                    key={volume.volumeId}
-                                    w={RESUME_CARD_WIDTH}
-                                    style={{ flexShrink: 0 }}
-                                >
-                                    <CoverCard
-                                        to={`/read/${volume.volumeId}`}
-                                        cover={coverUrl(volume.volumeId)}
-                                        title={volume.seriesName}
-                                        subtitle={volumeLabel(volume)}
-                                        progress={
-                                            (volume.page + 1) / volume.pageCount
-                                        }
-                                    />
-                                </Box>
-                            ))}
-                        </Group>
-                    </ScrollArea>
-                </Stack>
+                <Shelf title="Reprendre la lecture">
+                    {resume.map((volume) => (
+                        <ShelfCard
+                            key={volume.volumeId}
+                            volume={volume}
+                            progress={(volume.page + 1) / volume.pageCount}
+                        />
+                    ))}
+                </Shelf>
+            )}
+            {next.length > 0 && (
+                <Shelf title="La suite de tes séries">
+                    {next.map((volume) => (
+                        <ShelfCard key={volume.volumeId} volume={volume} />
+                    ))}
+                </Shelf>
+            )}
+            {recent.length > 0 && (
+                <Shelf title="Nouveautés">
+                    {recent.map((volume) => (
+                        <ShelfCard key={volume.volumeId} volume={volume} />
+                    ))}
+                </Shelf>
             )}
 
             <Stack gap="sm">
@@ -163,17 +219,64 @@ export const LibraryPage = () => {
                             ))}
                         </Group>
                     </Chip.Group>
-                    <Select
-                        size="xs"
-                        w={150}
-                        allowDeselect={false}
-                        aria-label="Trier les séries"
-                        value={sort}
-                        onChange={(value) =>
-                            update('sort', value ?? 'name', 'name')
-                        }
-                        data={SERIES_SORTS}
-                    />
+                    <Group gap="xs">
+                        <Select
+                            size="xs"
+                            w={170}
+                            allowDeselect={false}
+                            aria-label="Liste"
+                            value={list}
+                            onChange={(value) =>
+                                update('list', value ?? 'all', 'all')
+                            }
+                            data={[
+                                { value: 'all', label: 'Toutes les séries' },
+                                { value: 'favorite', label: 'Mes favoris' },
+                                { value: 'toread', label: 'À lire' },
+                                ...(collections.data ?? []).map((c) => ({
+                                    value: `collection:${c.id}`,
+                                    label: c.name,
+                                })),
+                            ]}
+                        />
+                        {genres.length > 0 && (
+                            <Select
+                                size="xs"
+                                w={150}
+                                clearable
+                                searchable
+                                placeholder="Tous les genres"
+                                aria-label="Genre"
+                                value={genre}
+                                onChange={(value) =>
+                                    update('genre', value ?? '')
+                                }
+                                data={genres}
+                            />
+                        )}
+                        <Select
+                            size="xs"
+                            w={170}
+                            allowDeselect={false}
+                            aria-label="Statut"
+                            value={status}
+                            onChange={(value) =>
+                                update('status', value ?? 'all', 'all')
+                            }
+                            data={STATUS_FILTERS}
+                        />
+                        <Select
+                            size="xs"
+                            w={150}
+                            allowDeselect={false}
+                            aria-label="Trier les séries"
+                            value={sort}
+                            onChange={(value) =>
+                                update('sort', value ?? 'name', 'name')
+                            }
+                            data={SERIES_SORTS}
+                        />
+                    </Group>
                 </Group>
 
                 {series.error && (
@@ -184,7 +287,7 @@ export const LibraryPage = () => {
                     <Text c="dimmed" ta="center" py="xl">
                         {debouncedSearch
                             ? 'Aucune série ne correspond à la recherche.'
-                            : filter !== 'all'
+                            : filtered
                               ? 'Aucune série dans ce filtre.'
                               : 'Bibliothèque vide.'}
                     </Text>

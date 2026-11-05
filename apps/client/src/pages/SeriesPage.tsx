@@ -15,18 +15,25 @@ import {
     Title,
     Tooltip,
 } from '@mantine/core';
+import { useDisclosure } from '@mantine/hooks';
 import {
     IconArrowLeft,
+    IconBookmark,
+    IconBookmarkFilled,
     IconCheck,
     IconChecks,
     IconDots,
+    IconFolders,
+    IconHeart,
+    IconHeartFilled,
     IconPencil,
     IconPlayerPlay,
     IconRestore,
 } from '@tabler/icons-react';
-import type { MouseEvent } from 'react';
+import { type MouseEvent, useState } from 'react';
 import { Link, useParams } from 'react-router';
 
+import { CollectionsModal } from '@/components/CollectionsModal';
 import { CoverCard } from '@/components/CoverCard';
 import { ageRatingLabel } from '@/components/ageLimits';
 import {
@@ -40,6 +47,7 @@ import {
     markSeriesRead,
     saveProgress,
     seriesCoverUrl,
+    setSeriesLists,
 } from '@/services/api';
 import { useCurrentUser } from '@/services/auth';
 import { useQuery } from '@/services/useQuery';
@@ -59,6 +67,9 @@ export const SeriesPage = () => {
         error,
         reload,
     } = useQuery(() => fetchSeries(seriesId), [seriesId]);
+    const [collectionsOpened, collectionsModal] = useDisclosure(false);
+    // Liste en cours d'enregistrement (bouton désactivé).
+    const [savingList, setSavingList] = useState<'favorite' | 'toRead'>();
 
     if (error) return <Alert color="red">{error.message}</Alert>;
     if (!series) return <Loader mx="auto" />;
@@ -86,6 +97,17 @@ export const SeriesPage = () => {
         }
         await markSeriesRead(series.id, read);
         reload();
+    };
+
+    /** Ajoute ou retire la série des favoris ou de la liste « à lire ». */
+    const toggleList = async (list: 'favorite' | 'toRead') => {
+        setSavingList(list);
+        try {
+            await setSeriesLists(series.id, { [list]: !series[list] });
+            reload();
+        } finally {
+            setSavingList(undefined);
+        }
     };
 
     /** Coche « lu » d'un tome (sans ouvrir le lecteur). */
@@ -197,6 +219,50 @@ export const SeriesPage = () => {
                                 {volumeLabel(next.volume).toLowerCase()}
                             </Button>
                         )}
+                        <Tooltip
+                            label={
+                                series.favorite
+                                    ? 'Retirer des favoris'
+                                    : 'Ajouter aux favoris'
+                            }
+                        >
+                            <ActionIcon
+                                variant={series.favorite ? 'light' : 'default'}
+                                size="lg"
+                                aria-label="Favori"
+                                aria-pressed={series.favorite}
+                                loading={savingList === 'favorite'}
+                                onClick={() => void toggleList('favorite')}
+                            >
+                                {series.favorite ? (
+                                    <IconHeartFilled size={18} />
+                                ) : (
+                                    <IconHeart size={18} />
+                                )}
+                            </ActionIcon>
+                        </Tooltip>
+                        <Tooltip
+                            label={
+                                series.toRead
+                                    ? 'Retirer de « À lire »'
+                                    : 'Ajouter à « À lire »'
+                            }
+                        >
+                            <ActionIcon
+                                variant={series.toRead ? 'light' : 'default'}
+                                size="lg"
+                                aria-label="À lire"
+                                aria-pressed={series.toRead}
+                                loading={savingList === 'toRead'}
+                                onClick={() => void toggleList('toRead')}
+                            >
+                                {series.toRead ? (
+                                    <IconBookmarkFilled size={18} />
+                                ) : (
+                                    <IconBookmark size={18} />
+                                )}
+                            </ActionIcon>
+                        </Tooltip>
                         <Menu position="bottom-start">
                             <Menu.Target>
                                 <ActionIcon
@@ -226,11 +292,29 @@ export const SeriesPage = () => {
                                 >
                                     Marquer toute la série comme non lue
                                 </Menu.Item>
+                                {isAdmin && (
+                                    <Menu.Item
+                                        leftSection={<IconFolders size={14} />}
+                                        onClick={collectionsModal.open}
+                                    >
+                                        Collections…
+                                    </Menu.Item>
+                                )}
                             </Menu.Dropdown>
                         </Menu>
                     </Group>
                 </Stack>
             </Flex>
+
+            {isAdmin && (
+                <CollectionsModal
+                    opened={collectionsOpened}
+                    onClose={collectionsModal.close}
+                    seriesId={series.id}
+                    collectionIds={series.collectionIds}
+                    onChanged={reload}
+                />
+            )}
 
             <SimpleGrid cols={{ base: 3, xs: 4, sm: 5, md: 6, lg: 8 }}>
                 {series.volumes.map((volume) => {

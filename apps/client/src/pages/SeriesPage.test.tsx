@@ -39,6 +39,9 @@ const SERIES = {
     writer: null,
     publisher: null,
     coverUpdatedAt: null,
+    favorite: false,
+    toRead: false,
+    collectionIds: [] as number[],
     library: { id: 1, name: 'Mangas', type: 'manga' },
     volumes: [volume(1, true), volume(2, null)],
 };
@@ -111,5 +114,69 @@ describe('SeriesPage', () => {
             '/api/series/3/read',
             { read: false },
         ]);
+    });
+
+    it('adds the series to the favorites', async () => {
+        let favorite = false;
+        const requests: [string, string, unknown][] = [];
+        vi.spyOn(globalThis, 'fetch').mockImplementation(
+            async (input, init) => {
+                const body = init?.body
+                    ? JSON.parse(String(init.body))
+                    : undefined;
+                requests.push([init?.method ?? 'GET', String(input), body]);
+                if (String(input).endsWith('/lists')) {
+                    favorite = body.favorite;
+                }
+                return new Response(
+                    JSON.stringify(
+                        String(input).endsWith('/lists')
+                            ? { favorite, toRead: false }
+                            : { ...SERIES, favorite },
+                    ),
+                    { headers: { 'Content-Type': 'application/json' } },
+                );
+            },
+        );
+
+        render(
+            <MantineProvider>
+                <UserContext.Provider value={READER}>
+                    <MemoryRouter initialEntries={['/series/3']}>
+                        <Routes>
+                            <Route
+                                path="/series/:id"
+                                element={<SeriesPage />}
+                            />
+                        </Routes>
+                    </MemoryRouter>
+                </UserContext.Provider>
+            </MantineProvider>,
+        );
+
+        const button = await screen.findByRole('button', { name: 'Favori' });
+        expect(button.getAttribute('aria-pressed')).toBe('false');
+        await act(async () => {
+            fireEvent.click(button);
+        });
+
+        expect(requests).toContainEqual([
+            'PUT',
+            '/api/series/3/lists',
+            { favorite: true },
+        ]);
+        await vi.waitFor(() =>
+            expect(
+                screen
+                    .getByRole('button', { name: 'Favori' })
+                    .getAttribute('aria-pressed'),
+            ).toBe('true'),
+        );
+        // Les collections sont réservées à l'admin.
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Lecture de la série' }),
+        );
+        expect(await screen.findByText(/comme lue/)).toBeTruthy();
+        expect(screen.queryByText('Collections…')).toBeNull();
     });
 });

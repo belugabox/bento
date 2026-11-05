@@ -35,8 +35,18 @@ import {
 } from './library/covers';
 import type { LibraryFiles } from './library/files';
 import {
+    createCollection,
+    deleteCollection,
+    listCollections,
+    renameCollection,
+    setCollectionMember,
+    setSeriesLists,
+} from './library/lists';
+import {
     getProgress,
     listInProgress,
+    listNextVolumes,
+    listRecentVolumes,
     markSeries,
     saveProgress,
 } from './library/progress';
@@ -68,6 +78,8 @@ const idParam = z.object({ id: z.coerce.number().int().positive() });
 const fileQuery = z.object({ path: z.string().min(1) });
 
 const READING_MODES = ['ltr', 'ltr-manga', 'rtl', 'webtoon'] as const;
+
+const collectionBody = z.object({ name: z.string().trim().min(1).max(80) });
 
 // Couverture choisie, et partie gardée de l'image recadrée en 2:3.
 const position = z.enum(['top', 'center', 'bottom']).optional();
@@ -241,6 +253,27 @@ export const createApi = ({
                     ),
                 ),
         )
+        // Favoris et liste « à lire » de la personne.
+        .put(
+            '/series/:id/lists',
+            zValidator('param', idParam),
+            zValidator(
+                'json',
+                z.object({
+                    favorite: z.boolean().optional(),
+                    toRead: z.boolean().optional(),
+                }),
+            ),
+            (c) =>
+                c.json(
+                    setSeriesLists(
+                        db,
+                        c.var.user,
+                        c.req.valid('param').id,
+                        c.req.valid('json'),
+                    ),
+                ),
+        )
         // Toute la série lue ou non lue, pour la personne.
         .put(
             '/series/:id/read',
@@ -373,6 +406,63 @@ export const createApi = ({
         )
         // Tomes commencés, pour « Reprendre la lecture ».
         .get('/continue', (c) => c.json(listInProgress(db, c.var.user)))
+        // Accueil : derniers ajouts et suite des séries entamées.
+        .get('/home', (c) =>
+            c.json({
+                recent: listRecentVolumes(db, c.var.user),
+                next: listNextVolumes(db, c.var.user),
+            }),
+        )
+        // Collections partagées : lecture pour tous, gestion par l'admin.
+        .get('/collections', (c) => c.json(listCollections(db, c.var.user)))
+        .post(
+            '/collections',
+            requireAdmin,
+            zValidator('json', collectionBody),
+            (c) => c.json(createCollection(db, c.req.valid('json').name)),
+        )
+        .patch(
+            '/collections/:id',
+            requireAdmin,
+            zValidator('param', idParam),
+            zValidator('json', collectionBody),
+            (c) =>
+                c.json(
+                    renameCollection(
+                        db,
+                        c.req.valid('param').id,
+                        c.req.valid('json').name,
+                    ),
+                ),
+        )
+        .delete(
+            '/collections/:id',
+            requireAdmin,
+            zValidator('param', idParam),
+            (c) => c.json(deleteCollection(db, c.req.valid('param').id)),
+        )
+        .put(
+            '/collections/:id/series/:seriesId',
+            requireAdmin,
+            zValidator(
+                'param',
+                idParam.extend({
+                    seriesId: z.coerce.number().int().positive(),
+                }),
+            ),
+            zValidator('json', z.object({ member: z.boolean() })),
+            (c) => {
+                const { id, seriesId } = c.req.valid('param');
+                return c.json(
+                    setCollectionMember(
+                        db,
+                        id,
+                        seriesId,
+                        c.req.valid('json').member,
+                    ),
+                );
+            },
+        )
         .get('/volumes/:id/cover', zValidator('param', idParam), async (c) => {
             const { id } = getVolume(db, c.var.user, c.req.valid('param').id);
             const cover = await readFile(coverFile(coversPath, id)).catch(
