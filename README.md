@@ -49,10 +49,15 @@ Toute la configuration passe par des variables d'environnement :
 
 - **Brouillons** : les tomes déposés dans le dossier `_draft` d'une bibliothèque (par la synchro de beluga-box, par exemple) apparaissent dans « Brouillons » : l'icône en haut à droite indique le nombre de séries en attente. Les `.cbr` et les RAR déguisés en `.cbz` sont convertis au passage.
 - **Métadonnées** : on les complète à la main, depuis Wikipédia FR ou depuis les noms de fichiers. « Publier » range chaque tome en `Série/Série #NN (Année).cbz` ; un brouillon remplace le tome publié du même numéro.
+- **Statut** : une série est « en cours de parution » ou « terminée ». Le statut se règle dans l'éditeur, dès les brouillons (il est appliqué à la série à la publication), ou se remplit depuis Wikipédia.
 - **Séries publiées** : « Modifier les métadonnées » sur la fiche série. Si la série est renommée, « Renommer les fichiers » déplace les tomes, sans perdre la progression de lecture.
 - **Couverture** : celle d'un tome, une page au choix, ou l'image de l'article Wikipédia.
 
 Bento écrit dans les fichiers (ComicInfo, rangement) : le conteneur doit pouvoir écrire dans les dossiers des bibliothèques.
+
+### Apparence
+
+Chacun choisit, depuis le menu de l'avatar (« Apparence… »), le mode clair, sombre ou celui du système, et une couleur d'accent parmi douze. Le réglage est gardé sur l'appareil.
 
 ### Statistiques (admin)
 

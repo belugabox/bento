@@ -21,11 +21,13 @@ import {
     IconEye,
     IconInbox,
     IconLogout,
+    IconPalette,
     IconUsers,
 } from '@tabler/icons-react';
 import { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router';
 
+import { AppearanceModal } from '@/components/AppearanceModal';
 import { AGE_LIMITS, ageLimitLabel } from '@/components/ageLimits';
 import { fetchPendingDrafts, startPreview, stopPreview } from '@/services/api';
 import { logout, useCurrentUser } from '@/services/auth';
@@ -142,9 +144,14 @@ const UserMenu = () => {
     const user = useCurrentUser();
     const isAdmin = user.role === 'admin';
     const [previewOpened, previewModal] = useDisclosure(false);
+    const [appearanceOpened, appearanceModal] = useDisclosure(false);
     return (
         <>
             <PreviewModal opened={previewOpened} onClose={previewModal.close} />
+            <AppearanceModal
+                opened={appearanceOpened}
+                onClose={appearanceModal.close}
+            />
             <Menu position="bottom-end">
                 <Menu.Target>
                     <UnstyledButton aria-label="Mon compte">
@@ -199,6 +206,13 @@ const UserMenu = () => {
                             )}
                         </>
                     )}
+                    <Menu.Divider />
+                    <Menu.Item
+                        leftSection={<IconPalette size={14} />}
+                        onClick={appearanceModal.open}
+                    >
+                        Apparence…
+                    </Menu.Item>
                     <Menu.Divider />
                     <Menu.Item
                         leftSection={<IconLogout size={14} />}

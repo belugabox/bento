@@ -36,7 +36,12 @@ export const CoverCard = ({
                 {cover ? (
                     <Image src={cover} alt={title} loading="lazy" fit="cover" />
                 ) : (
-                    <Center bg="dark.6">
+                    <Center
+                        style={{
+                            backgroundColor:
+                                'light-dark(var(--mantine-color-gray-2), var(--mantine-color-dark-6))',
+                        }}
+                    >
                         <IconBook size={32} />
                     </Center>
                 )}
