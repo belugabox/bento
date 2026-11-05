@@ -20,7 +20,7 @@ Bento est le serveur de lecture et de gestion des mangas et BD de la maison. Il 
 | Contenus | Mangas et BD/comics en CBZ | EPUB, PDF |
 | Appareils | Navigateur, tablette et téléphone (appli installable), lecture hors ligne | Liseuses (OPDS) |
 | Utilisateurs | L'admin (gestion) et la famille (lecture) | Accès public |
-| Métadonnées | Wikipédia FR (mangas et BD), noms de fichiers, saisie | Bedetheque (bloque les robots) |
+| Métadonnées | Wikipédia FR (mangas et BD), manga-news (mangas, prévu), noms de fichiers, saisie | Bedetheque (bloque les robots) |
 
 ## Fonctionnalités
 
@@ -67,6 +67,10 @@ Bento est le serveur de lecture et de gestion des mangas et BD de la maison. Il 
 - **Brouillons** : liste des tomes et fiche de chaque tome avec sa couverture et son ComicInfo modifiable.
 - **Réglages de la future série dès les brouillons** : statut, mode de lecture et couverture, appliqués à la publication.
 - **Métadonnées** : recherche Wikipédia FR, remplissage depuis les noms de fichiers, option « écraser les valeurs existantes ».
+- **Manga-news** (prévu) : deuxième source de « Remplir », par défaut pour les mangas.
+  - Série : auteurs, traducteurs, éditeurs VF et VO, type, genres, origine et année, **âge conseillé** (classification), résumé.
+  - Tomes : année, titre et résumé de chaque tome, d'après leurs pages.
+  - Pas d'API : lecture du HTML, à la demande seulement (jamais d'aspiration en masse), avec des tests sur des pages enregistrées. Si le site affiche un contrôle anti-robot (Cloudflare), Bento ne le contourne pas : Wikipédia reste disponible.
 - **Publication** : rangement en `Série/Série #NN (Année).cbz`, l'année étant facultative.
   - Ajout de tomes à une série existante.
   - Remplacement d'un tome de même numéro.
@@ -101,13 +105,16 @@ Bento est le serveur de lecture et de gestion des mangas et BD de la maison. Il 
 
 ## Feuille de route
 
-1. **Socle de lecture** : dépôt, connexion Pocket ID, bibliothèques, scan et base, grille et fiche série, lecteur de base (sens de lecture, ajustement), progression. À la fin de cette étape, la famille peut lire dans Bento.
-2. **Gestion** : brouillons, métadonnées, Wikipédia, publication, réparations, compression. La logique et les tests sont repris de beluga-box.
-3. **Famille** : contrôle parental, listes, favoris et collections, accueil personnalisé, recherche et filtres complets.
-4. **Lecteur avancé** : double page, défilement vertical, gestes tactiles, zoom.
-5. **Hors ligne** : appli installable, téléchargements, synchronisation de la progression.
-6. **Tomes manquants et sorties.**
-7. **Bascule** : retirer le module manga de beluga-box (la synchro vers `_draft` reste en place) et arrêter Kavita.
+État au 5 novembre 2026 (branche `feat/reading-foundation`).
+
+1. **Socle de lecture** — fait : dépôt, connexion Pocket ID, bibliothèques, scan (à la demande, toutes les 30 min, après publication), grille et fiche série, lecteur, progression.
+2. **Gestion** — presque fait : brouillons, métadonnées, Wikipédia, publication, réparations, couvertures, statut et mode de lecture dès les brouillons, aperçu de lecture. Reste : la **compression** des images.
+3. **Famille** — en partie : contrôle parental, vue lecteur pour l'admin, thèmes, statistiques, série lue / non lue. Reste : listes « à lire », favoris, collections ; filtres par genre et par statut ; « nouveaux tomes » et « suite des séries entamées » sur l'accueil.
+4. **Lecteur avancé** — fait : double page, modes BD / manga / webtoon, gestes tactiles, zoom. Reste : images redimensionnées selon l'écran (les pages sont servies en taille d'origine).
+5. **Manga-news** : deuxième source de métadonnées pour les mangas (voir F).
+6. **Hors ligne** : appli installable, téléchargements, synchronisation de la progression.
+7. **Tomes manquants et sorties** : trous dans la numérotation, tomes parus (Wikipédia, puis manga-news) absents de la bibliothèque.
+8. **Bascule** : déployer Bento (image Docker et publication déjà prêtes), retirer le module manga de beluga-box (la synchro vers `_draft` reste en place), arrêter Kavita.
 
 ## Décisions de déploiement
 
