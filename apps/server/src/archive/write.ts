@@ -75,7 +75,7 @@ const FLAG_DATA_DESCRIPTOR = 0x08;
  * écrit de toute façon le CRC et les tailles dans l'en-tête local : le bit
  * peut être retiré.
  */
-const clearDescriptorFlags = (zip: AdmZip) => {
+export const clearDescriptorFlags = (zip: AdmZip) => {
     for (const entry of zip.getEntries()) {
         entry.header.flags &= ~FLAG_DATA_DESCRIPTOR;
     }

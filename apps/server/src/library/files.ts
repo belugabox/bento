@@ -21,6 +21,7 @@ import {
     repairRarCbz,
 } from '../archive/cbr';
 import { type ComicInfo, readComicInfo } from '../archive/comicInfo';
+import { compressArchive, estimateCompression } from '../archive/compress';
 import { updateComicInfo } from '../archive/write';
 import type { Db } from '../db';
 import { libraries, series, volumes } from '../db/schema';
@@ -715,6 +716,21 @@ export class LibraryFiles {
     /** Page d'un fichier (aperçu d'un brouillon). */
     page = (libraryId: number, relative: string, index: number) =>
         this.reader.page(this.fullPath(libraryId, relative), index);
+
+    /** Gain estimé en compressant les pages d'un fichier. */
+    estimateCompression = (libraryId: number, relative: string) =>
+        estimateCompression(this.fullPath(libraryId, relative));
+
+    /** Compresse les pages d'un fichier ; un tome publié est rescanné. */
+    compress = async (libraryId: number, relative: string) => {
+        const result = await compressArchive(
+            this.fullPath(libraryId, relative),
+        );
+        if (result.compressedSize < result.originalSize && !isDraft(relative)) {
+            await this.scanner.scan(libraryId);
+        }
+        return result;
+    };
 
     /** Dimensions des pages (aperçu du lecteur). */
     pageSizes = (libraryId: number, relative: string) =>

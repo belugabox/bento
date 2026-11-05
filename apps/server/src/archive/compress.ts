@@ -1,0 +1,142 @@
+import AdmZip from 'adm-zip';
+import { stat, writeFile } from 'node:fs/promises';
+import path from 'node:path';
+import sharp from 'sharp';
+
+import { openArchive, pageEntries } from './archive';
+import { clearDescriptorFlags } from './write';
+
+/**
+ * Réglages de la compression : pages ramenées à 2400 px de haut au plus
+ * (bien net sur une tablette), en JPEG qualité 85. Les GIF (animés) et les
+ * images que la compression grossirait restent telles quelles.
+ */
+export const COMPRESSION = { maxHeight: 2400, quality: 85 } as const;
+
+// Pages traitées en même temps.
+const PARALLEL_PAGES = 4;
+// Méthode ZIP « stocké » (sans compression).
+const STORED = 0;
+// Pages compressées pour estimer le gain d'un tome.
+const SAMPLE_PAGES = 8;
+
+export type CompressionResult = {
+    originalSize: number;
+    // Estimée, ou obtenue.
+    compressedSize: number;
+};
+
+/** Page recompressée, ou null si elle n'y gagne pas. */
+const recompress = async (data: Buffer, entryName: string) => {
+    if (path.extname(entryName).toLowerCase() === '.gif') return null;
+    const compressed = await sharp(data)
+        .rotate()
+        .resize({
+            height: COMPRESSION.maxHeight,
+            fit: 'inside',
+            withoutEnlargement: true,
+        })
+        .jpeg({ quality: COMPRESSION.quality, mozjpeg: true })
+        .toBuffer()
+        .catch(() => null);
+    return compressed && compressed.length < data.length ? compressed : null;
+};
+
+/** Nom de la page en JPEG, sans changer sa place dans l'ordre des pages. */
+const jpegName = (entryName: string) => entryName.replace(/\.[^./]+$/, '.jpg');
+
+/** Pages réparties dans tout le tome (couverture, milieu, fin). */
+const sampleOf = <T>(items: T[], count: number) =>
+    items.length <= count
+        ? items
+        : Array.from(
+              { length: count },
+              (_, i) =>
+                  items[Math.floor((i * (items.length - 1)) / (count - 1))]!,
+          );
+
+/**
+ * Gain estimé en compressant quelques pages : le rapport obtenu sur elles
+ * est appliqué à toutes les images.
+ */
+export const estimateCompression = async (
+    fullPath: string,
+): Promise<CompressionResult> => {
+    const { size: originalSize } = await stat(fullPath);
+    const pages = pageEntries(await openArchive(fullPath));
+    const imagesSize = pages.reduce(
+        (total, entry) => total + entry.header.compressedSize,
+        0,
+    );
+    let before = 0;
+    let after = 0;
+    for (const entry of sampleOf(pages, SAMPLE_PAGES)) {
+        const data = entry.getData();
+        const compressed = await recompress(data, entry.entryName);
+        before += data.length;
+        after += compressed?.length ?? data.length;
+    }
+    const ratio = before > 0 ? after / before : 1;
+    return {
+        originalSize,
+        compressedSize: Math.round(originalSize - imagesSize * (1 - ratio)),
+    };
+};
+
+/**
+ * Recompresse les pages d'un tome. Le fichier n'est réécrit que s'il y
+ * gagne ; le ComicInfo et les autres fichiers sont gardés.
+ */
+export const compressArchive = async (
+    fullPath: string,
+): Promise<CompressionResult> => {
+    const { size: originalSize } = await stat(fullPath);
+    const zip = await openArchive(fullPath);
+    const pages = new Set(pageEntries(zip).map((entry) => entry.entryName));
+    const names = new Set(zip.getEntries().map((entry) => entry.entryName));
+    const entries = zip.getEntries().filter((entry) => !entry.isDirectory);
+    const output = new AdmZip();
+    let changed = 0;
+    // Quelques pages à la fois : plus rapide, sans tout garder en mémoire.
+    for (let start = 0; start < entries.length; start += PARALLEL_PAGES) {
+        const batch = entries.slice(start, start + PARALLEL_PAGES);
+        const results = await Promise.all(
+            batch.map(async (entry) => {
+                const data = entry.getData();
+                return {
+                    entry,
+                    data,
+                    compressed: pages.has(entry.entryName)
+                        ? await recompress(data, entry.entryName)
+                        : null,
+                };
+            }),
+        );
+        for (const { entry, data, compressed } of results) {
+            let name = entry.entryName;
+            let content = data;
+            const renamed = jpegName(name);
+            // « 01.png » et « 01.jpg » dans la même archive : ne rien écraser.
+            if (compressed && (renamed === name || !names.has(renamed))) {
+                name = renamed;
+                names.add(renamed);
+                content = compressed;
+                changed++;
+            }
+            output.addFile(name, content);
+            // Images déjà compressées : rangées telles quelles (sans deflate).
+            if (pages.has(entry.entryName)) {
+                output.getEntry(name)!.header.method = STORED;
+            }
+        }
+    }
+    if (changed === 0) return { originalSize, compressedSize: originalSize };
+    clearDescriptorFlags(output);
+    const buffer = output.toBuffer();
+    if (buffer.length >= originalSize) {
+        return { originalSize, compressedSize: originalSize };
+    }
+    // Écrit sur place : le fichier garde son propriétaire (volume Docker).
+    await writeFile(fullPath, buffer);
+    return { originalSize, compressedSize: buffer.length };
+};

@@ -150,6 +150,32 @@ export const fetchFilePageSizes = (library: number, path: string) =>
         }),
     );
 
+/** Gain estimé en compressant les pages d'un fichier. */
+export const estimateCompression = (library: number, path: string) =>
+    json(
+        api.libraries[':id'].files.compression.estimate.$post({
+            ...libraryId(library),
+            json: { path },
+        }),
+    );
+
+/** Compression en arrière-plan : ajout à la file du serveur. */
+export const startCompression = (library: number, paths: string[]) =>
+    json(
+        api.libraries[':id'].files.compress.$post({
+            ...libraryId(library),
+            json: { paths },
+        }),
+    );
+
+export const fetchCompression = () => json(api.compression.$get());
+
+export const clearCompression = () => json(api.compression.$delete());
+
+export type CompressionJob = Awaited<
+    ReturnType<typeof fetchCompression>
+>['jobs'][number];
+
 /** Couverture d'un fichier (brouillon), à recharger quand il change. */
 export const fileCoverUrl = (library: number, path: string, version = '') =>
     `/api/libraries/${library}/files/cover?path=${encodeURIComponent(path)}&v=${encodeURIComponent(version)}`;

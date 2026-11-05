@@ -26,6 +26,7 @@ import {
     setSeriesReadingMode,
     setSeriesStatus,
 } from './library/catalog';
+import { CompressionQueue } from './library/compression';
 import {
     MAX_IMAGE_BYTES,
     type SeriesCovers,
@@ -56,6 +57,8 @@ export type ApiDeps = {
     files: LibraryFiles;
     covers: SeriesCovers;
     wikipedia: Wikipedia;
+    /** File des compressions (créée avec `files` si absente). */
+    compression?: CompressionQueue;
     auth: Omit<AuthDeps, 'db' | 'logger'>;
 };
 
@@ -131,6 +134,7 @@ export const createApi = ({
     files,
     covers,
     wikipedia,
+    compression = new CompressionQueue(files, logger),
     auth,
 }: ApiDeps) =>
     new Hono<AuthEnv>()
@@ -566,6 +570,41 @@ export const createApi = ({
                     'Cache-Control': 'private, no-cache',
                 });
             },
+        )
+        // Compression des pages, un fichier à la fois (le client avance seul).
+        .post(
+            '/libraries/:id/files/compression/estimate',
+            requireAdmin,
+            zValidator('param', idParam),
+            zValidator('json', fileQuery),
+            async (c) =>
+                c.json(
+                    await files.estimateCompression(
+                        c.req.valid('param').id,
+                        c.req.valid('json').path,
+                    ),
+                ),
+        )
+        // Compression en arrière-plan : ajout à la file, puis suivi.
+        .post(
+            '/libraries/:id/files/compress',
+            requireAdmin,
+            zValidator('param', idParam),
+            zValidator(
+                'json',
+                z.object({ paths: z.array(z.string().min(1)).min(1) }),
+            ),
+            (c) =>
+                c.json(
+                    compression.add(
+                        c.req.valid('param').id,
+                        c.req.valid('json').paths,
+                    ),
+                ),
+        )
+        .get('/compression', requireAdmin, (c) => c.json(compression.status()))
+        .delete('/compression', requireAdmin, (c) =>
+            c.json(compression.clear()),
         )
         .get(
             '/libraries/:id/files/page-sizes',

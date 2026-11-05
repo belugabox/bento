@@ -20,6 +20,7 @@ import { useDisclosure } from '@mantine/hooks';
 import {
     IconEye,
     IconFileText,
+    IconFileZip,
     IconUpload,
     IconWand,
 } from '@tabler/icons-react';
@@ -41,6 +42,7 @@ import {
     saveComicInfo,
 } from '@/services/api';
 
+import { CompressionModal } from './CompressionModal';
 import { WikipediaSearch } from './WikipediaSearch';
 import {
     type EditableVolume,
@@ -163,6 +165,7 @@ export const MetadataEditor = ({
     const [busy, setBusy] = useState<'save' | 'publish'>();
     const [report, setReport] = useState<Report>();
     const [wikiOpened, wiki] = useDisclosure(false);
+    const [compressionOpened, compression] = useDisclosure(false);
     // Tome ouvert en aperçu de lecture.
     const [preview, setPreview] = useState<EditorVolume>();
     // Mode essayé dans l'aperçu : celui choisi, même pas encore enregistré.
@@ -282,13 +285,23 @@ export const MetadataEditor = ({
     return (
         <Stack>
             <Group justify="space-between">
-                <Button
-                    variant="default"
-                    leftSection={<IconWand size={16} />}
-                    onClick={wiki.open}
-                >
-                    Remplir
-                </Button>
+                <Group gap="xs">
+                    <Button
+                        variant="default"
+                        leftSection={<IconWand size={16} />}
+                        onClick={wiki.open}
+                    >
+                        Remplir
+                    </Button>
+                    <Button
+                        variant="default"
+                        leftSection={<IconFileZip size={16} />}
+                        disabled={readable.length === 0}
+                        onClick={compression.open}
+                    >
+                        Compresser…
+                    </Button>
+                </Group>
                 <Group gap="xs">
                     <Button
                         variant="default"
@@ -636,6 +649,14 @@ export const MetadataEditor = ({
                     onClose={() => setPreview(undefined)}
                 />
             )}
+
+            <CompressionModal
+                opened={compressionOpened}
+                onClose={compression.close}
+                libraryId={libraryId}
+                files={readable.map((v) => ({ path: v.path, name: v.name }))}
+                onCompressed={() => onChanged()}
+            />
 
             <WikipediaSearch
                 opened={wikiOpened}
