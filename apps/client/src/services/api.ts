@@ -210,6 +210,17 @@ export const startCompression = (library: number, paths: string[]) =>
         }),
     );
 
+/** Réglages de l'admin, avec leurs valeurs par défaut. */
+export const fetchSettings = () => json(api.settings.$get());
+
+export type SettingsResponse = Awaited<ReturnType<typeof fetchSettings>>;
+export type Settings = SettingsResponse['settings'];
+
+export const saveSettings = (changes: {
+    compression?: Partial<Settings['compression']>;
+    scanIntervalMinutes?: number;
+}) => json(api.settings.$put({ json: changes }));
+
 export const fetchCompression = () => json(api.compression.$get());
 
 export const clearCompression = () => json(api.compression.$delete());

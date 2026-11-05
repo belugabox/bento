@@ -7,11 +7,11 @@ import { openArchive, pageEntries } from './archive';
 import { clearDescriptorFlags } from './write';
 
 /**
- * Réglages de la compression : pages ramenées à 2400 px de haut au plus
- * (bien net sur une tablette), en JPEG qualité 85. Les GIF (animés) et les
- * images que la compression grossirait restent telles quelles.
+ * Réglages de la compression (réglables par l'admin) : qualité JPEG et
+ * hauteur maximale des pages (null : taille gardée). Les GIF (animés) et
+ * les images que la compression grossirait restent telles quelles.
  */
-export const COMPRESSION = { maxHeight: 2400, quality: 85 } as const;
+export type CompressionOptions = { quality: number; maxHeight: number | null };
 
 // Pages traitées en même temps.
 const PARALLEL_PAGES = 4;
@@ -27,16 +27,22 @@ export type CompressionResult = {
 };
 
 /** Page recompressée, ou null si elle n'y gagne pas. */
-const recompress = async (data: Buffer, entryName: string) => {
+const recompress = async (
+    data: Buffer,
+    entryName: string,
+    { quality, maxHeight }: CompressionOptions,
+) => {
     if (path.extname(entryName).toLowerCase() === '.gif') return null;
-    const compressed = await sharp(data)
-        .rotate()
-        .resize({
-            height: COMPRESSION.maxHeight,
+    let image = sharp(data).rotate();
+    if (maxHeight) {
+        image = image.resize({
+            height: maxHeight,
             fit: 'inside',
             withoutEnlargement: true,
-        })
-        .jpeg({ quality: COMPRESSION.quality, mozjpeg: true })
+        });
+    }
+    const compressed = await image
+        .jpeg({ quality, mozjpeg: true })
         .toBuffer()
         .catch(() => null);
     return compressed && compressed.length < data.length ? compressed : null;
@@ -61,6 +67,7 @@ const sampleOf = <T>(items: T[], count: number) =>
  */
 export const estimateCompression = async (
     fullPath: string,
+    options: CompressionOptions,
 ): Promise<CompressionResult> => {
     const { size: originalSize } = await stat(fullPath);
     const pages = pageEntries(await openArchive(fullPath));
@@ -72,7 +79,7 @@ export const estimateCompression = async (
     let after = 0;
     for (const entry of sampleOf(pages, SAMPLE_PAGES)) {
         const data = entry.getData();
-        const compressed = await recompress(data, entry.entryName);
+        const compressed = await recompress(data, entry.entryName, options);
         before += data.length;
         after += compressed?.length ?? data.length;
     }
@@ -89,6 +96,7 @@ export const estimateCompression = async (
  */
 export const compressArchive = async (
     fullPath: string,
+    options: CompressionOptions,
 ): Promise<CompressionResult> => {
     const { size: originalSize } = await stat(fullPath);
     const zip = await openArchive(fullPath);
@@ -107,7 +115,7 @@ export const compressArchive = async (
                     entry,
                     data,
                     compressed: pages.has(entry.entryName)
-                        ? await recompress(data, entry.entryName)
+                        ? await recompress(data, entry.entryName, options)
                         : null,
                 };
             }),

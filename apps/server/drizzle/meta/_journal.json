@@ -92,6 +92,13 @@
       "when": 1793887859908,
       "tag": "0012_lists_and_collections",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "6",
+      "when": 1793891291910,
+      "tag": "0013_settings",
+      "breakpoints": true
     }
   ]
 }

@@ -51,7 +51,7 @@ Toute la configuration passe par des variables d'environnement :
 - **Métadonnées** : on les complète à la main, ou avec « Remplir » : recherche Wikipédia FR pour la série, puis noms de fichiers pour le numéro, le titre (« Tome N ») et l'année de chaque tome (ou les noms de fichiers seuls), avec l'option « Écraser les valeurs existantes ». « Publier » range chaque tome en `Série/Série #NN (Année).cbz` ; un brouillon remplace le tome publié du même numéro.
 - **Statut et mode de lecture** : une série est « en cours de parution » ou « terminée » ; son mode de lecture (BD, manga, webtoon) remplace celui de la bibliothèque. Les deux se règlent dans l'éditeur, dès les brouillons (ils sont appliqués à la série à la publication) ; le statut se remplit aussi depuis Wikipédia.
 - **Séries publiées** : « Modifier les métadonnées » sur la fiche série. Si la série est renommée, « Renommer les fichiers » déplace les tomes, sans perdre la progression de lecture.
-- **Compression** : « Compresser… » estime le gain (sur quelques pages), puis recompresse les pages en arrière-plan sur le serveur : 2400 px de haut au plus, JPEG qualité 85. Un fichier n'est réécrit que s'il y gagne ; le ComicInfo est gardé. Sur un vrai tome de 258 Mo : −52 % en une trentaine de secondes.
+- **Compression** : « Compresser… » estime le gain (sur quelques pages), puis recompresse les pages en arrière-plan sur le serveur : par défaut 2400 px de haut au plus, JPEG qualité 85 (modifiable dans les réglages). Un fichier n'est réécrit que s'il y gagne ; le ComicInfo est gardé. Sur un vrai tome de 258 Mo : −52 % en une trentaine de secondes.
 - **Aperçu de lecture** : l'œil à côté du mode de lecture (ou de chaque tome) ouvre le tome dans le lecteur, dans le mode choisi, sans quitter l'éditeur. On y essaie les autres modes ; « Garder » reprend celui essayé dans l'éditeur (à enregistrer).
 - **Couverture** : celle d'un tome, une page au choix, une image de l'appareil (choisie, déposée ou collée) ou l'image de l'article Wikipédia, avec un aperçu et un cadrage (haut, centre ou bas). Elle se choisit aussi dès les brouillons.
 - **Articles** : le tri des séries ignore l'article en tête (« Le », « La », « Les », « L' », « Un », « Une », « Des », « The », « A », « An ») : « L'Attaque des Titans » est rangée à A. Le nom affiché ne change pas. Un nom de fichier « Boxer (The) T01 » donne la série « The Boxer ».
@@ -73,6 +73,10 @@ L'admin fixe le mode de chaque série dans « Modifier les métadonnées » (par
 - **Filtres** : état de lecture, liste (toutes, mes favoris, à lire, une collection), genre, statut de parution ; et le tri par nom ou par ajouts récents. Tout reste dans l'adresse.
 - **Favoris et « À lire »** : le cœur et le marque-page de la fiche série, propres à chacun.
 - **Collections** : des sélections partagées créées par l'admin (menu de l'avatar, « Collections »), visibles de tous selon leur contrôle parental. Une série s'y ajoute depuis le menu ⋯ de sa fiche. Listes et collections suivent une série renommée à la publication.
+
+### Réglages (admin)
+
+Depuis le menu de l'avatar, « Réglages » : qualité JPEG et hauteur maximale des pages pour la compression, et intervalle du scan automatique (la variable `SCAN_INTERVAL_MINUTES` n'en donne plus que la valeur par défaut). Les réglages sont gardés en base et s'appliquent tout de suite.
 
 ### Apparence
 

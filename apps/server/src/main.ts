@@ -15,6 +15,7 @@ import { SeriesCovers } from './library/covers';
 import { LibraryFiles } from './library/files';
 import { LibraryScanner } from './library/scanner';
 import { Wikipedia } from './metadata/wikipedia';
+import { SettingsStore, defaultSettings } from './settings';
 import { createLogger } from './tools/logger';
 
 // Depuis `src` (dev) comme depuis `dist` (build).
@@ -36,6 +37,12 @@ logger.info(`Base de données : ${config.DB_FILE}`);
 
 const scanner = new LibraryScanner(database.db, config.COVERS_PATH, logger);
 const pages = new PageReader();
+// Réglages de l'admin ; la variable SCAN_INTERVAL_MINUTES donne la valeur
+// par défaut de l'intervalle des scans.
+const settings = new SettingsStore(
+    database.db,
+    defaultSettings(config.SCAN_INTERVAL_MINUTES),
+);
 
 /** Scanne les bibliothèques l'une après l'autre. */
 const scanAll = async (libraryIds: number[]) => {
@@ -64,6 +71,7 @@ const app = new Hono()
                 logger,
             ),
             covers: new SeriesCovers(database.db, pages, config.COVERS_PATH),
+            settings,
             wikipedia: new Wikipedia(),
             auth: {
                 oidc: new OidcClient({
@@ -101,12 +109,22 @@ void (async () => {
     }
     const ids = synced.map((library) => library.id);
     await scanAll(ids);
-    if (config.SCAN_INTERVAL_MINUTES > 0) {
-        setInterval(
-            () => void scanAll(ids),
-            config.SCAN_INTERVAL_MINUTES * 60_000,
-        ).unref();
-    }
+    // Scan périodique, relancé quand l'admin change l'intervalle.
+    let timer: NodeJS.Timeout | undefined;
+    const schedule = (minutes: number) => {
+        clearInterval(timer);
+        timer =
+            minutes > 0
+                ? setInterval(() => void scanAll(ids), minutes * 60_000).unref()
+                : undefined;
+    };
+    schedule(settings.get().scanIntervalMinutes);
+    let interval = settings.get().scanIntervalMinutes;
+    settings.onChange(({ scanIntervalMinutes }) => {
+        if (scanIntervalMinutes === interval) return;
+        interval = scanIntervalMinutes;
+        schedule(scanIntervalMinutes);
+    });
 })().catch((err) => logger.error(err, 'Initialisation des bibliothèques'));
 
 let shuttingDown = false;

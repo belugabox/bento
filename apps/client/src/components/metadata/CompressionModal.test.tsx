@@ -1,5 +1,6 @@
 import { MantineProvider } from '@mantine/core';
 import { act, fireEvent, render, screen } from '@testing-library/react';
+import { MemoryRouter } from 'react-router';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { CompressionModal } from './CompressionModal';
@@ -31,7 +32,14 @@ describe('CompressionModal', () => {
                 const method = init?.method ?? 'GET';
                 requests.push(`${method} ${url}`);
                 let body: unknown;
-                if (url.endsWith('/compression/estimate')) {
+                if (url === '/api/settings') {
+                    body = {
+                        settings: {
+                            compression: { quality: 70, maxHeight: null },
+                            scanIntervalMinutes: 30,
+                        },
+                    };
+                } else if (url.endsWith('/compression/estimate')) {
                     body = { originalSize: 1000, compressedSize: 600 };
                 } else if (url.endsWith('/compress')) {
                     queue = files.map((f) => job(f.path, 'pending'));
@@ -56,16 +64,24 @@ describe('CompressionModal', () => {
         const onCompressed = vi.fn();
         render(
             <MantineProvider>
-                <CompressionModal
-                    opened
-                    onClose={() => {}}
-                    libraryId={1}
-                    files={files}
-                    onCompressed={onCompressed}
-                />
+                <MemoryRouter>
+                    <CompressionModal
+                        opened
+                        onClose={() => {}}
+                        libraryId={1}
+                        files={files}
+                        onCompressed={onCompressed}
+                    />
+                </MemoryRouter>
             </MantineProvider>,
         );
 
+        // Réglages actuels rappelés.
+        expect(
+            await screen.findByText(
+                /gardées à leur taille, en JPEG qualité 70/,
+            ),
+        ).toBeTruthy();
         await act(async () => {
             fireEvent.click(await screen.findByText('Estimer le gain'));
         });

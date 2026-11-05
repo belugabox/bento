@@ -23,6 +23,7 @@ import {
     IconInbox,
     IconLogout,
     IconPalette,
+    IconSettings,
     IconUsers,
 } from '@tabler/icons-react';
 import { useEffect, useState } from 'react';
@@ -195,6 +196,15 @@ const UserMenu = () => {
                             leftSection={<IconFolders size={14} />}
                         >
                             Collections
+                        </Menu.Item>
+                    )}
+                    {isAdmin && (
+                        <Menu.Item
+                            component={Link}
+                            to="/settings"
+                            leftSection={<IconSettings size={14} />}
+                        >
+                            Réglages
                         </Menu.Item>
                     )}
                     {(isAdmin || user.preview) && (

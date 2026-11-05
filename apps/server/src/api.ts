@@ -53,6 +53,7 @@ import {
 import { type LibraryScanner, coverFile } from './library/scanner';
 import { getStats } from './library/stats';
 import type { Wikipedia } from './metadata/wikipedia';
+import { SettingsStore, settingsUpdateSchema } from './settings';
 import { AppError, notFound } from './tools/errors';
 import type { Logger } from './tools/logger';
 import { zValidator } from './tools/validator';
@@ -67,6 +68,8 @@ export type ApiDeps = {
     files: LibraryFiles;
     covers: SeriesCovers;
     wikipedia: Wikipedia;
+    /** Réglages de l'admin (valeurs par défaut si absents). */
+    settings?: SettingsStore;
     /** File des compressions (créée avec `files` si absente). */
     compression?: CompressionQueue;
     auth: Omit<AuthDeps, 'db' | 'logger'>;
@@ -146,7 +149,12 @@ export const createApi = ({
     files,
     covers,
     wikipedia,
-    compression = new CompressionQueue(files, logger),
+    settings = new SettingsStore(db),
+    compression = new CompressionQueue(
+        files,
+        logger,
+        () => settings.get().compression,
+    ),
     auth,
 }: ApiDeps) =>
     new Hono<AuthEnv>()
@@ -672,6 +680,7 @@ export const createApi = ({
                     await files.estimateCompression(
                         c.req.valid('param').id,
                         c.req.valid('json').path,
+                        settings.get().compression,
                     ),
                 ),
         )
@@ -693,6 +702,20 @@ export const createApi = ({
                 ),
         )
         .get('/compression', requireAdmin, (c) => c.json(compression.status()))
+        // Réglages de l'admin, avec leurs valeurs par défaut.
+        .get('/settings', requireAdmin, (c) =>
+            c.json({ settings: settings.get(), defaults: settings.defaults }),
+        )
+        .put(
+            '/settings',
+            requireAdmin,
+            zValidator('json', settingsUpdateSchema),
+            (c) =>
+                c.json({
+                    settings: settings.update(c.req.valid('json')),
+                    defaults: settings.defaults,
+                }),
+        )
         .delete('/compression', requireAdmin, (c) =>
             c.json(compression.clear()),
         )

@@ -1,5 +1,6 @@
 import {
     Alert,
+    Anchor,
     Button,
     Group,
     Loader,
@@ -11,14 +12,17 @@ import {
 } from '@mantine/core';
 import { IconCheck } from '@tabler/icons-react';
 import { useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router';
 
 import { formatSize } from '@/components/format';
 import {
     type CompressionJob,
     estimateCompression,
     fetchCompression,
+    fetchSettings,
     startCompression,
 } from '@/services/api';
+import { useQuery } from '@/services/useQuery';
 
 type Estimate =
     { originalSize: number; compressedSize: number } | { error: string };
@@ -57,6 +61,12 @@ export const CompressionModal = ({
     const [estimating, setEstimating] = useState<number>();
     const [jobs, setJobs] = useState<CompressionJob[]>([]);
     const [error, setError] = useState<string>();
+    // Réglages actuels, rappelés en tête.
+    const { data: saved } = useQuery(
+        () => (opened ? fetchSettings() : Promise.resolve(undefined)),
+        [opened],
+    );
+    const settings = saved?.settings;
     const paths = files.map((f) => f.path);
     const jobOf = (path: string) =>
         jobs.find((job) => job.libraryId === libraryId && job.path === path);
@@ -139,10 +149,19 @@ export const CompressionModal = ({
         >
             <Stack>
                 <Text size="sm" c="dimmed">
-                    Les pages sont ramenées à 2400 px de haut au plus et
-                    enregistrées en JPEG (qualité 85). Un fichier n’est réécrit
-                    que s’il y gagne. La compression continue sur le serveur si
-                    tu fermes cette fenêtre.
+                    {settings
+                        ? `Pages ${
+                              settings.compression.maxHeight
+                                  ? `ramenées à ${settings.compression.maxHeight} px de haut au plus`
+                                  : 'gardées à leur taille'
+                          }, en JPEG qualité ${settings.compression.quality}`
+                        : 'Pages recompressées en JPEG'}{' '}
+                    (
+                    <Anchor component={Link} to="/settings" size="sm">
+                        réglages
+                    </Anchor>
+                    ). Un fichier n’est réécrit que s’il y gagne. La compression
+                    continue sur le serveur si tu fermes cette fenêtre.
                 </Text>
                 {error && <Alert color="red">{error}</Alert>}
                 {estimating !== undefined && (

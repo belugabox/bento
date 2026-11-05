@@ -228,3 +228,9 @@ export const collectionSeries = sqliteTable(
         index('collection_series_series').on(t.seriesId),
     ],
 );
+
+/** Réglages de l'admin (clé → valeur JSON). */
+export const settings = sqliteTable('settings', {
+    key: text('key').primaryKey(),
+    value: text('value', { mode: 'json' }).notNull(),
+});

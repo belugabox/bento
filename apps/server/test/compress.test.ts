@@ -8,12 +8,14 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createApi } from '../src/api';
 import { listSeries } from '../src/library/catalog';
 import { CompressionQueue } from '../src/library/compression';
+import { SettingsStore } from '../src/settings';
 import { authDeps, sessionCookie, setup, silent, writeCbz } from './helpers';
 
 let ctx: Awaited<ReturnType<typeof setup>>;
 let api: ReturnType<typeof createApi>;
 let admin: string;
 let queue: CompressionQueue;
+let settings: SettingsStore;
 
 const ADMIN_VIEW = { id: 0, role: 'admin' as const, maxAge: null };
 
@@ -61,7 +63,12 @@ const post = (route: string, json: unknown, cookie = admin) =>
 
 beforeEach(async () => {
     ctx = await setup();
-    queue = new CompressionQueue(ctx.files, silent);
+    settings = new SettingsStore(ctx.db);
+    queue = new CompressionQueue(
+        ctx.files,
+        silent,
+        () => settings.get().compression,
+    );
     api = createApi({
         db: ctx.db,
         logger: silent,
@@ -73,6 +80,7 @@ beforeEach(async () => {
         covers: ctx.covers,
         wikipedia: ctx.wikipedia,
         auth: authDeps(),
+        settings,
         compression: queue,
     });
     admin = sessionCookie(ctx.db, 'admin');
@@ -183,5 +191,76 @@ describe('compression', () => {
             headers: { Cookie: admin },
         });
         expect((await cleared.json()).jobs).toEqual([]);
+    });
+
+    it('follows the settings chosen by the admin', async () => {
+        const fullPath = await writeHeavyCbz('_draft/Gantz T01.cbz');
+        const put = (json: unknown, cookie = admin) =>
+            api.request('/settings', {
+                method: 'PUT',
+                headers: { Cookie: cookie, 'Content-Type': 'application/json' },
+                body: JSON.stringify(json),
+            });
+
+        const saved = await put({ compression: { maxHeight: null } });
+        expect((await saved.json()).settings.compression).toEqual({
+            quality: 85,
+            maxHeight: null,
+        });
+        await compress('_draft/Gantz T01.cbz');
+
+        // Taille gardée : la page de 3000 px n'est pas réduite.
+        const first = await sharp(
+            new AdmZip(fullPath).getEntry('01.jpg')!.getData(),
+        ).metadata();
+        expect(first.height).toBe(3000);
+    });
+});
+
+describe('settings', () => {
+    it('are read and changed by the admin, with their defaults', async () => {
+        const read = await api.request('/settings', {
+            headers: { Cookie: admin },
+        });
+        expect(await read.json()).toEqual({
+            settings: {
+                compression: { quality: 85, maxHeight: 2400 },
+                scanIntervalMinutes: 30,
+            },
+            defaults: {
+                compression: { quality: 85, maxHeight: 2400 },
+                scanIntervalMinutes: 30,
+            },
+        });
+
+        const put = (json: unknown, cookie = admin) =>
+            api.request('/settings', {
+                method: 'PUT',
+                headers: { Cookie: cookie, 'Content-Type': 'application/json' },
+                body: JSON.stringify(json),
+            });
+        const changed = await put({
+            compression: { quality: 70 },
+            scanIntervalMinutes: 0,
+        });
+        expect((await changed.json()).settings).toEqual({
+            compression: { quality: 70, maxHeight: 2400 },
+            scanIntervalMinutes: 0,
+        });
+        // Gardés en base.
+        expect(new SettingsStore(ctx.db).get().compression.quality).toBe(70);
+
+        expect((await put({ compression: { quality: 10 } })).status).toBe(400);
+        const reader = sessionCookie(ctx.db, 'reader');
+        expect((await put({ scanIntervalMinutes: 5 }, reader)).status).toBe(
+            403,
+        );
+    });
+
+    it('tell who listens that they changed', () => {
+        const seen: number[] = [];
+        settings.onChange((next) => seen.push(next.scanIntervalMinutes));
+        settings.update({ scanIntervalMinutes: 60 });
+        expect(seen).toEqual([60]);
     });
 });

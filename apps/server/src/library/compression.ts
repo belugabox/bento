@@ -1,3 +1,4 @@
+import type { CompressionOptions } from '../archive/compress';
 import type { Logger } from '../tools/logger';
 import type { LibraryFiles } from './files';
 
@@ -25,6 +26,8 @@ export class CompressionQueue {
     constructor(
         private readonly files: LibraryFiles,
         private readonly logger: Logger,
+        // Réglages lus au début de chaque tome.
+        private readonly options: () => CompressionOptions,
     ) {}
 
     /** Ajoute des fichiers (chemins vérifiés tout de suite). */
@@ -75,7 +78,11 @@ export class CompressionQueue {
                 try {
                     Object.assign(
                         job,
-                        await this.files.compress(job.libraryId, job.path),
+                        await this.files.compress(
+                            job.libraryId,
+                            job.path,
+                            this.options(),
+                        ),
                     );
                     job.state = 'done';
                 } catch (error) {
