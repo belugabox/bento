@@ -287,7 +287,6 @@ export const MetadataEditor = ({
                         {changes.length ? ` (${changes.length})` : ''}
                     </Button>
                     <Button
-                        color="teal"
                         leftSection={<IconUpload size={16} />}
                         disabled={!!publishReason || busy === 'save'}
                         title={publishReason}

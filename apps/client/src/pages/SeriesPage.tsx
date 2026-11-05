@@ -152,7 +152,7 @@ export const SeriesPage = () => {
                             </Badge>
                         )}
                         {readCount > 0 && (
-                            <Badge variant="light" color="teal">
+                            <Badge variant="light">
                                 {readCount} lu{readCount > 1 ? 's' : ''}
                             </Badge>
                         )}
@@ -259,7 +259,6 @@ export const SeriesPage = () => {
                                         radius="xl"
                                         size="sm"
                                         variant={read ? 'filled' : 'default'}
-                                        color="teal"
                                         style={{ opacity: read ? 1 : 0.8 }}
                                         aria-label={
                                             read

@@ -217,7 +217,6 @@ export const LibraryPage = () => {
                                         <ThemeIcon
                                             size="sm"
                                             radius="xl"
-                                            color="teal"
                                             aria-label="Série lue"
                                         >
                                             <IconCheck size={12} />

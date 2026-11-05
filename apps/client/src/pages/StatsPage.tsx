@@ -289,7 +289,10 @@ export const StatsPage = () => {
                                         size="lg"
                                         radius="sm"
                                         value={(row.series / maxRating) * 100}
-                                        color={row.unrated ? 'orange' : 'teal'}
+                                        // Couleur d'accent du thème, orange pour l'alerte.
+                                        color={
+                                            row.unrated ? 'orange' : undefined
+                                        }
                                         aria-label={`${row.label} : ${row.series} séries`}
                                     />
                                 </Tooltip>
