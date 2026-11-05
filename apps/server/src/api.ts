@@ -349,6 +349,28 @@ export const createApi = ({
             zValidator('param', idParam),
             async (c) => c.json(await files.drafts(c.req.valid('param').id)),
         )
+        .put(
+            '/libraries/:id/drafts/status',
+            requireAdmin,
+            zValidator('param', idParam),
+            zValidator(
+                'json',
+                z.object({
+                    folder: z.string().min(1),
+                    status: z.enum(['ongoing', 'completed']).nullable(),
+                }),
+            ),
+            (c) => {
+                const { folder, status } = c.req.valid('json');
+                return c.json(
+                    files.setDraftStatus(
+                        c.req.valid('param').id,
+                        folder,
+                        status,
+                    ),
+                );
+            },
+        )
         .get(
             '/libraries/:id/drafts/files',
             requireAdmin,

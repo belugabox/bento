@@ -20,6 +20,7 @@ import {
     fetchSeries,
     fetchVolume,
     seriesCoverUrl,
+    setSeriesStatus,
 } from '@/services/api';
 import { useQuery } from '@/services/useQuery';
 
@@ -86,7 +87,10 @@ export const SeriesEditPage = () => {
                 libraryId={series.library.id}
                 kind={series.library.type}
                 mode="series"
-                series={{ id: series.id, status: series.status }}
+                status={{
+                    value: series.status,
+                    save: (status) => setSeriesStatus(series.id, status),
+                }}
                 volumes={series.volumes.flatMap((volume) =>
                     volume.admin
                         ? [

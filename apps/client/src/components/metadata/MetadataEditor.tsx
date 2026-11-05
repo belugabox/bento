@@ -28,7 +28,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { type ComicInfo, publicationPathOf } from '@server/types';
 
 import { AGE_RATING_OPTIONS, canonicalRating } from '@/components/ageLimits';
-import { publishFiles, saveComicInfo, setSeriesStatus } from '@/services/api';
+import { publishFiles, saveComicInfo } from '@/services/api';
 
 import { WikipediaSearch } from './WikipediaSearch';
 import {
@@ -96,7 +96,7 @@ export const MetadataEditor = ({
     volumes,
     mode,
     onChanged,
-    series: publishedSeries,
+    status: seriesStatus,
 }: {
     libraryId: number;
     kind: 'manga' | 'comics';
@@ -105,8 +105,14 @@ export const MetadataEditor = ({
     mode: 'drafts' | 'series';
     /** Après un enregistrement ou un rangement (recharger les données). */
     onChanged: (moved?: { from: string; to: string }[]) => void;
-    /** Série publiée : son statut, enregistré avec le reste. */
-    series?: { id: number; status: SeriesStatus | null };
+    /**
+     * Statut de la série (publiée, ou future série d'un dossier de
+     * brouillons), enregistré avec le reste par `save`.
+     */
+    status?: {
+        value: SeriesStatus | null;
+        save: (status: SeriesStatus | null) => Promise<unknown>;
+    };
 }) => {
     // Contenu des données reçues : le parent peut recréer la liste à chaque
     // rendu, seule une vraie nouveauté (enregistrement) doit tout reprendre.
@@ -119,10 +125,10 @@ export const MetadataEditor = ({
     const [edits, setEdits] = useState<Edits>(() => initialEdits(readable));
     const [overwrite, setOverwrite] = useState(false);
     // Statut de la série (publiée) : « unknown » pour « inconnu ».
-    const savedStatus = publishedSeries?.status ?? UNKNOWN;
+    const savedStatus = seriesStatus?.value ?? UNKNOWN;
     const [status, setStatus] = useState<string>(savedStatus);
     useEffect(() => setStatus(savedStatus), [savedStatus]);
-    const statusChanged = !!publishedSeries && status !== savedStatus;
+    const statusChanged = !!seriesStatus && status !== savedStatus;
     // Action en cours : roue de chargement sur son seul bouton.
     const [busy, setBusy] = useState<'save' | 'publish'>();
     const [report, setReport] = useState<Report>();
@@ -164,33 +170,26 @@ export const MetadataEditor = ({
         setBusy('save');
         setReport(undefined);
         try {
-            if (publishedSeries && statusChanged) {
-                await setSeriesStatus(
-                    publishedSeries.id,
+            const lines: string[] = [];
+            let color = 'green';
+            if (changes.length) {
+                const result = await saveComicInfo(libraryId, changes);
+                lines.push(
+                    `${result.updated.length} tome(s) enregistré(s)` +
+                        (result.failures.length
+                            ? `, ${result.failures.length} en échec :`
+                            : '.'),
+                    ...result.failures.map((f) => `${f.path} : ${f.reason}`),
+                );
+                if (result.failures.length) color = 'orange';
+            }
+            if (seriesStatus && statusChanged) {
+                await seriesStatus.save(
                     status === UNKNOWN ? null : (status as SeriesStatus),
                 );
+                lines.push('Statut de la série enregistré.');
             }
-            const result = changes.length
-                ? await saveComicInfo(libraryId, changes)
-                : { updated: [], failures: [] };
-            setReport(
-                result.failures.length
-                    ? {
-                          color: 'orange',
-                          lines: [
-                              `${result.updated.length} tome(s) enregistré(s), ${result.failures.length} en échec :`,
-                              ...result.failures.map(
-                                  (f) => `${f.path} : ${f.reason}`,
-                              ),
-                          ],
-                      }
-                    : {
-                          color: 'green',
-                          lines: [
-                              `${result.updated.length} tome(s) enregistré(s).`,
-                          ],
-                      },
-            );
+            setReport({ color, lines });
             onChanged();
         } catch (e) {
             setReport({ color: 'red', lines: [(e as Error).message] });
@@ -362,7 +361,7 @@ export const MetadataEditor = ({
                                 setSeries('Series', e.currentTarget.value)
                             }
                         />
-                        {publishedSeries && (
+                        {seriesStatus && (
                             <Select
                                 label="Statut"
                                 allowDeselect={false}

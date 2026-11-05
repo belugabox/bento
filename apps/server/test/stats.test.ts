@@ -111,11 +111,15 @@ describe('GET /stats', () => {
             inProgress: 1,
             lastReadAt: expect.any(String),
         });
-        expect(stats.recent).toHaveLength(3);
-        expect(stats.recent[0]).toMatchObject({
-            seriesName: 'Kids',
-            completed: false,
-        });
+        // Enregistrées dans la même milliseconde : ordre non garanti.
+        expect(
+            stats.recent
+                .map(
+                    (r: { seriesName: string; completed: boolean }) =>
+                        `${r.seriesName} ${r.completed ? 'lu' : 'en cours'}`,
+                )
+                .sort(),
+        ).toEqual(['Gantz en cours', 'Gantz lu', 'Kids en cours']);
         expect(stats.topSeries[0]).toMatchObject({
             name: 'Gantz',
             readers: 1,

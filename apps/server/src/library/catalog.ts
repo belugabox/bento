@@ -97,6 +97,8 @@ export const listSeries = (
             coverVolumeId: sql<number>`(select v.id from volumes v where v.series_id = series.id order by v.sort_number is null, v.sort_number, v.file limit 1)`,
             // Tomes lus par la personne.
             readCount: sql<number>`(select count(*) from read_progress rp join volumes v on v.id = rp.volume_id where v.series_id = series.id and rp.user_id = ${viewer.id} and rp.completed = 1)`,
+            // Tomes ouverts (lus ou en cours) : série commencée.
+            startedCount: sql<number>`(select count(*) from read_progress rp join volumes v on v.id = rp.volume_id where v.series_id = series.id and rp.user_id = ${viewer.id})`,
         })
         .from(series)
         .leftJoin(volumes, eq(volumes.seriesId, series.id))

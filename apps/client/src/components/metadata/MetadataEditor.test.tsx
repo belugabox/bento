@@ -94,10 +94,16 @@ describe('MetadataEditor', () => {
         expect(numberOf(2).value).toBe('2');
         // Champs remplis : surlignés jusqu'à l'enregistrement.
         expect(numberOf(1).getAttribute('data-changed')).toBe('true');
+        // Titre rempli (« Tome 1 ») ; le genre, lui, n'a pas changé.
         expect(
-            screen
-                .getByLabelText('Titre de Gantz T01 (2017).cbz')
-                .getAttribute('data-changed'),
+            (
+                screen.getByLabelText(
+                    'Titre de Gantz T01 (2017).cbz',
+                ) as HTMLInputElement
+            ).value,
+        ).toBe('Tome 1');
+        expect(
+            screen.getByLabelText('Genre').getAttribute('data-changed'),
         ).toBeNull();
 
         await act(async () => {
@@ -114,13 +120,18 @@ describe('MetadataEditor', () => {
                     updates: [
                         {
                             path: '_draft/Gantz/Gantz T01 (2017).cbz',
-                            changes: { Number: '1', Year: 2017 },
+                            changes: {
+                                Number: '1',
+                                Title: 'Tome 1',
+                                Year: 2017,
+                            },
                         },
                         {
                             path: '_draft/Gantz/Gantz T02 (2017).cbz',
                             changes: {
                                 Series: 'Gantz',
                                 Number: '2',
+                                Title: 'Tome 2',
                                 Year: 2017,
                             },
                         },
@@ -181,5 +192,33 @@ describe('MetadataEditor', () => {
             'Enregistre d’abord les modifications',
         );
         expect((publish as HTMLButtonElement).disabled).toBe(true);
+    });
+
+    it('saves the series status alone, with its own message', async () => {
+        const save = vi.fn().mockResolvedValue({});
+        render(
+            <MantineProvider>
+                <MetadataEditor
+                    libraryId={1}
+                    kind="manga"
+                    mode="drafts"
+                    volumes={volumes()}
+                    status={{ value: null, save }}
+                    onChanged={() => {}}
+                />
+            </MantineProvider>,
+        );
+
+        fireEvent.click(screen.getByRole('textbox', { name: 'Statut' }));
+        fireEvent.click(await screen.findByText('Terminée'));
+        await act(async () => {
+            fireEvent.click(
+                screen.getByRole('button', { name: /Enregistrer/ }),
+            );
+        });
+
+        expect(save).toHaveBeenCalledWith('completed');
+        expect(screen.getByText('Statut de la série enregistré.')).toBeTruthy();
+        expect(screen.queryByText(/tome\(s\) enregistré/)).toBeNull();
     });
 });

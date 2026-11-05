@@ -62,11 +62,13 @@ describe('fillFromFileNames', () => {
         expect(edits[first]).toEqual({
             Series: 'Spy x Family',
             Number: '1',
+            Title: 'Tome 1',
             Year: 2020,
         });
         expect(edits[second]).toEqual({
             Series: 'Spy x Family',
             Number: '2',
+            Title: 'Tome 2',
             Year: 2020,
         });
     });
@@ -83,6 +85,7 @@ describe('fillFromFileNames', () => {
         expect(edits[first]).toEqual({
             Series: 'Mine',
             Number: '1',
+            Title: 'Tome 1',
             Year: 2020,
         });
     });

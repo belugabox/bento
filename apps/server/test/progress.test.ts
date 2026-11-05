@@ -130,7 +130,7 @@ describe('reading progress', () => {
         const list = (await call('/series', alice)).body;
         expect(
             list.find((s: { name: string }) => s.name === 'Gantz'),
-        ).toMatchObject({ volumeCount: 3, readCount: 1 });
+        ).toMatchObject({ volumeCount: 3, readCount: 1, startedCount: 2 });
         expect(
             (await call('/series', bob)).body.find(
                 (s: { name: string }) => s.name === 'Gantz',

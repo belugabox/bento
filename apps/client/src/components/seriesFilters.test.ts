@@ -10,7 +10,14 @@ const series = (
     name: string,
     readCount: number,
     lastAddedAt: string | null,
-): ListedSeries => ({ name, volumeCount: 3, readCount, lastAddedAt });
+    startedCount = readCount,
+): ListedSeries => ({
+    name,
+    volumeCount: 3,
+    readCount,
+    startedCount,
+    lastAddedAt,
+});
 
 const list = [
     series('Akira', 0, '2026-01-01T00:00:00.000Z'),
@@ -46,5 +53,13 @@ describe('filterSeries', () => {
         const copy = [...list];
         filterSeries(list, { filter: 'all', sort: 'recent' });
         expect(list).toEqual(copy);
+    });
+});
+
+describe('started series', () => {
+    it('counts a series as started as soon as a volume is opened', () => {
+        expect(readingStateOf(series('Dune', 0, null, 1))).toBe('started');
+        expect(readingStateOf(series('Dune', 0, null, 0))).toBe('unread');
+        expect(readingStateOf(series('Dune', 3, null, 3))).toBe('read');
     });
 });

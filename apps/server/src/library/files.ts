@@ -23,7 +23,7 @@ import {
 import { type ComicInfo, readComicInfo } from '../archive/comicInfo';
 import { updateComicInfo } from '../archive/write';
 import type { Db } from '../db';
-import { libraries, series, volumes } from '../db/schema';
+import { draftStatuses, libraries, series, volumes } from '../db/schema';
 import { conflict, notFound } from '../tools/errors';
 import type { Logger } from '../tools/logger';
 import {
@@ -346,7 +346,51 @@ export class LibraryFiles {
                 { path: archive.path, name: path.basename(archive.path), size },
             ]);
         }
-        return [...folders].map(([folder, files]) => ({ folder, files }));
+        const statuses = new Map(
+            this.db
+                .select({
+                    folder: draftStatuses.folder,
+                    status: draftStatuses.status,
+                })
+                .from(draftStatuses)
+                .where(eq(draftStatuses.libraryId, libraryId))
+                .all()
+                .map((row) => [row.folder, row.status]),
+        );
+        return [...folders].map(([folder, files]) => ({
+            folder,
+            files,
+            status: statuses.get(folder) ?? null,
+        }));
+    };
+
+    /** Statut de la future série d'un dossier de brouillons (null : aucun). */
+    setDraftStatus = (
+        libraryId: number,
+        folder: string,
+        status: 'ongoing' | 'completed' | null,
+    ) => {
+        this.library(libraryId);
+        if (!isDraft(folder) || folder.split('/').includes('..')) {
+            throw notFound('Dossier de brouillons introuvable');
+        }
+        const where = and(
+            eq(draftStatuses.libraryId, libraryId),
+            eq(draftStatuses.folder, folder),
+        );
+        if (status === null) {
+            this.db.delete(draftStatuses).where(where).run();
+        } else {
+            this.db
+                .insert(draftStatuses)
+                .values({ libraryId, folder, status })
+                .onConflictDoUpdate({
+                    target: [draftStatuses.libraryId, draftStatuses.folder],
+                    set: { status },
+                })
+                .run();
+        }
+        return { status };
     };
 
     /**
@@ -415,6 +459,18 @@ export class LibraryFiles {
         const published: { from: string; to: string }[] = [];
         const failures: Failure[] = [];
         const folders = new Set<string>();
+        // Statut choisi pour les dossiers de brouillons publiés.
+        const draftStatusOf = new Map(
+            this.db
+                .select({
+                    folder: draftStatuses.folder,
+                    status: draftStatuses.status,
+                })
+                .from(draftStatuses)
+                .where(eq(draftStatuses.libraryId, libraryId))
+                .all()
+                .map((row) => [row.folder, row.status]),
+        );
         // Statut des séries des tomes publiés déplacés, à reporter ensuite.
         const statuses = new Map(
             this.db
@@ -457,7 +513,8 @@ export class LibraryFiles {
         }
         if (published.length > 0) await this.scanner.scan(libraryId);
         for (const { from, to } of published) {
-            const status = statuses.get(from);
+            const fromDraft = draftStatusOf.get(path.posix.dirname(from));
+            const status = fromDraft ?? statuses.get(from);
             if (!status) continue;
             const moved = this.db
                 .select({ seriesId: volumes.seriesId })
@@ -473,7 +530,23 @@ export class LibraryFiles {
                     .where(
                         and(
                             eq(series.id, moved.seriesId),
-                            isNull(series.status),
+                            // Un choix fait sur le brouillon l'emporte.
+                            fromDraft ? undefined : isNull(series.status),
+                        ),
+                    )
+                    .run();
+            }
+        }
+        // Dossiers de brouillons vidés : leur statut ne sert plus.
+        for (const folder of draftStatusOf.keys()) {
+            const dir = path.join(library.path, ...folder.split('/'));
+            if (!(await exists(dir))) {
+                this.db
+                    .delete(draftStatuses)
+                    .where(
+                        and(
+                            eq(draftStatuses.libraryId, libraryId),
+                            eq(draftStatuses.folder, folder),
                         ),
                     )
                     .run();

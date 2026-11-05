@@ -3,6 +3,8 @@ export type ListedSeries = {
     name: string;
     volumeCount: number;
     readCount: number;
+    // Tomes ouverts (lus ou en cours).
+    startedCount: number;
     lastAddedAt: string | null;
 };
 
@@ -25,11 +27,11 @@ export const SERIES_SORTS: { value: SeriesSort; label: string }[] = [
 export const readingStateOf = (
     s: ListedSeries,
 ): Exclude<ReadingFilter, 'all'> =>
-    s.readCount === 0
-        ? 'unread'
-        : s.readCount >= s.volumeCount
-          ? 'read'
-          : 'started';
+    s.readCount >= s.volumeCount
+        ? 'read'
+        : s.startedCount > 0
+          ? 'started'
+          : 'unread';
 
 /** Séries à afficher, filtrées par état de lecture puis triées. */
 export const filterSeries = <T extends ListedSeries>(

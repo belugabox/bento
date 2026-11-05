@@ -19,6 +19,7 @@ import {
     fetchDrafts,
     fetchLibraries,
     fileCoverUrl,
+    setDraftStatus,
 } from '@/services/api';
 import { useQuery } from '@/services/useQuery';
 
@@ -142,6 +143,18 @@ export const DraftsPage = () => {
                                     libraryId={libraryId}
                                     kind={library.type}
                                     mode="drafts"
+                                    status={{
+                                        value:
+                                            drafts.data?.find(
+                                                (f) => f.folder === selected,
+                                            )?.status ?? null,
+                                        save: (status) =>
+                                            setDraftStatus(
+                                                libraryId,
+                                                selected,
+                                                status,
+                                            ),
+                                    }}
                                     volumes={files.map((file) => ({
                                         path: file.path,
                                         name: file.name,

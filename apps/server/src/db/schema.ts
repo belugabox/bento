@@ -148,3 +148,20 @@ export const readProgress = sqliteTable(
         index('read_progress_recent').on(t.userId, t.updatedAt),
     ],
 );
+
+/**
+ * Statut choisi pour la série d'un dossier de brouillons : appliqué à la
+ * série à la publication (la série n'existe pas encore en base).
+ */
+export const draftStatuses = sqliteTable(
+    'draft_statuses',
+    {
+        libraryId: integer('library_id')
+            .notNull()
+            .references(() => libraries.id, { onDelete: 'cascade' }),
+        // Dossier relatif à la bibliothèque (« _draft/Gantz »).
+        folder: text('folder').notNull(),
+        status: text('status', { enum: ['ongoing', 'completed'] }).notNull(),
+    },
+    (t) => [primaryKey({ columns: [t.libraryId, t.folder] })],
+);

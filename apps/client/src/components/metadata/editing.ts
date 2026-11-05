@@ -94,6 +94,11 @@ export const fillFromFileNames = (
         if (parsed.number && fillable(info.Number, overwrite)) {
             next = setVolumeField(next, volume.path, 'Number', parsed.number);
         }
+        // Titre par défaut : « Tome N ».
+        const number = parsed.number ?? info.Number;
+        if (number && fillable(info.Title, overwrite)) {
+            next = setVolumeField(next, volume.path, 'Title', `Tome ${number}`);
+        }
         if (parsed.year && fillable(info.Year, overwrite)) {
             next = setVolumeField(next, volume.path, 'Year', parsed.year);
         }

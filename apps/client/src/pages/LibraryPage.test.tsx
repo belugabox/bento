@@ -20,6 +20,7 @@ const SERIES = [
     genre: null,
     status: null,
     volumeCount: 3,
+    startedCount: s.readCount,
     coverUpdatedAt: null,
     coverVolumeId: index + 10,
     ...s,

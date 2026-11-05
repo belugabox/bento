@@ -188,3 +188,16 @@ export const setSeriesStatus = (
 export const fetchStats = () => json(api.stats.$get());
 
 export type Stats = Awaited<ReturnType<typeof fetchStats>>;
+
+/** Statut de la future série d'un dossier de brouillons. */
+export const setDraftStatus = (
+    library: number,
+    folder: string,
+    status: 'ongoing' | 'completed' | null,
+) =>
+    json(
+        api.libraries[':id'].drafts.status.$put({
+            ...libraryId(library),
+            json: { folder, status },
+        }),
+    );

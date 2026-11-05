@@ -142,6 +142,7 @@ describe('drafts', () => {
                         size: 10,
                     },
                 ],
+                status: null,
             },
             {
                 folder: '_draft/Gantz (01-18)',
@@ -150,6 +151,7 @@ describe('drafts', () => {
                         path: '_draft/Gantz (01-18)/Gantz T01.cbz',
                     }),
                 ],
+                status: null,
             },
         ]);
     });
@@ -329,6 +331,54 @@ describe('publishing', () => {
         expect(listSeries(ctx.db, ADMIN_VIEW).map((s) => s.name)).toEqual([
             'Gantz',
         ]);
+    });
+
+    it('applies the status chosen on the draft folder to the series', async () => {
+        await writeCbz(ctx.file('_draft/Gantz/T01.cbz'), {
+            comicInfo: info('Gantz', '1'),
+        });
+        const set = await call(`/libraries/${ctx.library.id}/drafts/status`, {
+            method: 'PUT',
+            json: { folder: '_draft/Gantz', status: 'completed' },
+        });
+        expect(set.body).toEqual({ status: 'completed' });
+        const drafts = await call(`/libraries/${ctx.library.id}/drafts`);
+        expect(drafts.body[0].status).toBe('completed');
+
+        await ctx.files.publish(ctx.library.id, ['_draft/Gantz/T01.cbz']);
+
+        expect(listSeries(ctx.db, ADMIN_VIEW)[0]?.status).toBe('completed');
+        // Dossier vidé : son statut est oublié.
+        expect(
+            (await call(`/libraries/${ctx.library.id}/drafts`)).body,
+        ).toEqual([]);
+        expect(
+            ctx.files.setDraftStatus(ctx.library.id, '_draft/Gantz', null),
+        ).toEqual({ status: null });
+    });
+
+    it('keeps draft statuses for admins and draft folders', async () => {
+        const reader = sessionCookie(ctx.db, 'reader');
+        const put = (json: unknown, cookie = admin) =>
+            call(
+                `/libraries/${ctx.library.id}/drafts/status`,
+                { method: 'PUT', json },
+                cookie,
+            );
+        expect(
+            (await put({ folder: '_draft/X', status: 'ongoing' }, reader))
+                .status,
+        ).toBe(403);
+        expect((await put({ folder: 'Gantz', status: 'ongoing' })).status).toBe(
+            404,
+        );
+        expect(
+            (await put({ folder: '_draft/../Gantz', status: 'ongoing' }))
+                .status,
+        ).toBe(404);
+        expect((await put({ folder: '_draft/X', status: 'done' })).status).toBe(
+            400,
+        );
     });
 
     it('needs a series and a number', async () => {

@@ -64,6 +64,13 @@
       "when": 1793870872840,
       "tag": "0008_series_status",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1793872090444,
+      "tag": "0009_draft_statuses",
+      "breakpoints": true
     }
   ]
 }
