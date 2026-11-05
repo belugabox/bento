@@ -26,7 +26,12 @@ import {
     setSeriesReadingMode,
     setSeriesStatus,
 } from './library/catalog';
-import { type SeriesCovers, seriesCoverFile } from './library/covers';
+import {
+    MAX_IMAGE_BYTES,
+    type SeriesCovers,
+    draftCoverFile,
+    seriesCoverFile,
+} from './library/covers';
 import type { LibraryFiles } from './library/files';
 import {
     getProgress,
@@ -58,6 +63,37 @@ const idParam = z.object({ id: z.coerce.number().int().positive() });
 
 // Fichier d'une bibliothèque, relatif à sa racine.
 const fileQuery = z.object({ path: z.string().min(1) });
+
+const READING_MODES = ['ltr', 'ltr-manga', 'rtl', 'webtoon'] as const;
+
+// Couverture choisie, et partie gardée de l'image recadrée en 2:3.
+const position = z.enum(['top', 'center', 'bottom']).optional();
+const page = z.number().int().min(0).optional();
+const coverSource = z.discriminatedUnion('type', [
+    z.object({
+        type: z.literal('volume'),
+        volumeId: z.number().int().positive(),
+        page,
+        position,
+    }),
+    z.object({
+        type: z.literal('file'),
+        path: z.string().min(1),
+        page,
+        position,
+    }),
+    z.object({ type: z.literal('url'), url: z.string(), position }),
+    z.object({
+        type: z.literal('image'),
+        // Base64 : un tiers plus long que l'image.
+        data: z.string().max(Math.ceil((MAX_IMAGE_BYTES * 4) / 3) + 4),
+        position,
+    }),
+    z.object({ type: z.literal('default') }),
+]);
+
+const positionOf = (source: z.infer<typeof coverSource>) =>
+    'position' in source ? source.position : undefined;
 
 const NUMERIC = new Set<string>(NUMBER_FIELDS);
 
@@ -189,9 +225,7 @@ export const createApi = ({
             zValidator(
                 'json',
                 z.object({
-                    readingMode: z
-                        .enum(['ltr', 'ltr-manga', 'rtl', 'webtoon'])
-                        .nullable(),
+                    readingMode: z.enum(READING_MODES).nullable(),
                 }),
             ),
             (c) =>
@@ -243,25 +277,17 @@ export const createApi = ({
             '/series/:id/cover',
             requireAdmin,
             zValidator('param', idParam),
-            zValidator(
-                'json',
-                z.discriminatedUnion('type', [
-                    z.object({
-                        type: z.literal('volume'),
-                        volumeId: z.number().int().positive(),
-                        page: z.number().int().min(0).optional(),
-                    }),
-                    z.object({ type: z.literal('url'), url: z.string() }),
-                    z.object({ type: z.literal('default') }),
-                ]),
-            ),
-            async (c) =>
-                c.json(
+            zValidator('json', coverSource),
+            async (c) => {
+                const source = c.req.valid('json');
+                return c.json(
                     await covers.set(
                         c.req.valid('param').id,
-                        c.req.valid('json'),
+                        source,
+                        positionOf(source),
                     ),
-                ),
+                );
+            },
         )
         // --- Métadonnées Wikipédia (admin).
         .get(
@@ -391,6 +417,7 @@ export const createApi = ({
             zValidator('param', idParam),
             async (c) => c.json(await files.drafts(c.req.valid('param').id)),
         )
+        // Réglages de la future série d'un dossier de brouillons.
         .put(
             '/libraries/:id/drafts/status',
             requireAdmin,
@@ -404,13 +431,72 @@ export const createApi = ({
             ),
             (c) => {
                 const { folder, status } = c.req.valid('json');
-                return c.json(
-                    files.setDraftStatus(
-                        c.req.valid('param').id,
-                        folder,
-                        status,
-                    ),
+                const saved = files.setDraftSettings(
+                    c.req.valid('param').id,
+                    folder,
+                    { status },
                 );
+                return c.json({ status: saved.status });
+            },
+        )
+        .put(
+            '/libraries/:id/drafts/reading-mode',
+            requireAdmin,
+            zValidator('param', idParam),
+            zValidator(
+                'json',
+                z.object({
+                    folder: z.string().min(1),
+                    readingMode: z.enum(READING_MODES).nullable(),
+                }),
+            ),
+            (c) => {
+                const { folder, readingMode } = c.req.valid('json');
+                const saved = files.setDraftSettings(
+                    c.req.valid('param').id,
+                    folder,
+                    { readingMode },
+                );
+                return c.json({ readingMode: saved.readingMode });
+            },
+        )
+        .get(
+            '/libraries/:id/drafts/cover',
+            requireAdmin,
+            zValidator('param', idParam),
+            zValidator('query', z.object({ folder: z.string().min(1) })),
+            async (c) => {
+                const cover = await readFile(
+                    draftCoverFile(
+                        coversPath,
+                        c.req.valid('param').id,
+                        c.req.valid('query').folder,
+                    ),
+                ).catch(() => {
+                    throw notFound('Couverture introuvable');
+                });
+                return c.body(new Uint8Array(cover), 200, {
+                    'Content-Type': 'image/webp',
+                    // L'adresse du client change avec la couverture (?v=).
+                    'Cache-Control': 'private, max-age=3600',
+                });
+            },
+        )
+        .put(
+            '/libraries/:id/drafts/cover',
+            requireAdmin,
+            zValidator('param', idParam),
+            zValidator('query', z.object({ folder: z.string().min(1) })),
+            zValidator('json', coverSource),
+            async (c) => {
+                const source = c.req.valid('json');
+                const saved = await covers.setDraft(
+                    c.req.valid('param').id,
+                    c.req.valid('query').folder,
+                    source,
+                    positionOf(source),
+                );
+                return c.json({ coverUpdatedAt: saved.coverUpdatedAt });
             },
         )
         .get(

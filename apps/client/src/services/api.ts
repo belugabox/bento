@@ -137,6 +137,10 @@ export const publishFiles = (library: number, paths: string[]) =>
         }),
     );
 
+/** Page d'un fichier de la bibliothèque (brouillon compris). */
+export const filePageUrl = (library: number, path: string, index: number) =>
+    `/api/libraries/${library}/files/pages/${index}?path=${encodeURIComponent(path)}`;
+
 /** Couverture d'un fichier (brouillon), à recharger quand il change. */
 export const fileCoverUrl = (library: number, path: string, version = '') =>
     `/api/libraries/${library}/files/cover?path=${encodeURIComponent(path)}&v=${encodeURIComponent(version)}`;
@@ -154,13 +158,46 @@ export type WikipediaResult = Awaited<
 >[number];
 export type WikipediaDetails = Awaited<ReturnType<typeof fetchWikipediaSeries>>;
 
-export type CoverSource =
+/** Partie gardée de l'image, recadrée en 2:3. */
+export type CoverPosition = 'top' | 'center' | 'bottom';
+
+export type CoverSource = (
     | { type: 'volume'; volumeId: number; page?: number }
+    | { type: 'file'; path: string; page?: number }
     | { type: 'url'; url: string }
-    | { type: 'default' };
+    // Image envoyée depuis l'appareil, en base64.
+    | { type: 'image'; data: string }
+    | { type: 'default' }
+) & { position?: CoverPosition };
 
 export const setSeriesCover = (seriesId: number, source: CoverSource) =>
-    json(api.series[':id'].cover.$put({ ...id(seriesId), json: source }));
+    json(
+        api.series[':id'].cover.$put({
+            ...id(seriesId),
+            json: source,
+        }),
+    );
+
+/** Couverture de la future série d'un dossier de brouillons. */
+export const setDraftCover = (
+    library: number,
+    folder: string,
+    source: CoverSource,
+) =>
+    json(
+        api.libraries[':id'].drafts.cover.$put({
+            ...libraryId(library),
+            query: { folder },
+            json: source,
+        }),
+    );
+
+export const draftCoverUrl = (
+    library: number,
+    folder: string,
+    coverUpdatedAt: string,
+) =>
+    `/api/libraries/${library}/drafts/cover?folder=${encodeURIComponent(folder)}&v=${encodeURIComponent(coverUpdatedAt)}`;
 
 /** Couverture d'une série ; l'adresse change avec la couverture choisie. */
 export const seriesCoverUrl = (series: {
@@ -199,6 +236,19 @@ export const setDraftStatus = (
         api.libraries[':id'].drafts.status.$put({
             ...libraryId(library),
             json: { folder, status },
+        }),
+    );
+
+/** Mode de lecture de la future série d'un dossier de brouillons. */
+export const setDraftReadingMode = (
+    library: number,
+    folder: string,
+    readingMode: 'ltr' | 'ltr-manga' | 'rtl' | 'webtoon' | null,
+) =>
+    json(
+        api.libraries[':id'].drafts['reading-mode'].$put({
+            ...libraryId(library),
+            json: { folder, readingMode },
         }),
     );
 

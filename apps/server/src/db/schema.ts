@@ -154,10 +154,11 @@ export const readProgress = sqliteTable(
 );
 
 /**
- * Statut choisi pour la série d'un dossier de brouillons : appliqué à la
- * série à la publication (la série n'existe pas encore en base).
+ * Réglages choisis pour la série d'un dossier de brouillons (statut, mode
+ * de lecture, couverture) : appliqués à la série à la publication (elle
+ * n'existe pas encore en base). La table garde son nom d'origine.
  */
-export const draftStatuses = sqliteTable(
+export const draftSettings = sqliteTable(
     'draft_statuses',
     {
         libraryId: integer('library_id')
@@ -165,7 +166,12 @@ export const draftStatuses = sqliteTable(
             .references(() => libraries.id, { onDelete: 'cascade' }),
         // Dossier relatif à la bibliothèque (« _draft/Gantz »).
         folder: text('folder').notNull(),
-        status: text('status', { enum: ['ongoing', 'completed'] }).notNull(),
+        status: text('status', { enum: ['ongoing', 'completed'] }),
+        readingMode: text('reading_mode', {
+            enum: ['ltr', 'ltr-manga', 'rtl', 'webtoon'],
+        }),
+        // Couverture choisie (fichier covers/drafts/…) ; null = aucune.
+        coverUpdatedAt: integer('cover_updated_at', { mode: 'timestamp_ms' }),
     },
     (t) => [primaryKey({ columns: [t.libraryId, t.folder] })],
 );

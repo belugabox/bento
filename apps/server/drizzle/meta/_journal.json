@@ -78,6 +78,13 @@
       "when": 1793873668467,
       "tag": "0010_series_reading_mode",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1793880193752,
+      "tag": "0011_draft_settings",
+      "breakpoints": true
     }
   ]
 }

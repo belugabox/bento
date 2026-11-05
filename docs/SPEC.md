@@ -65,6 +65,7 @@ Bento est le serveur de lecture et de gestion des mangas et BD de la maison. Il 
 
 ### F. Gestion (admin)
 - **Brouillons** : liste des tomes et fiche de chaque tome avec sa couverture et son ComicInfo modifiable.
+- **Réglages de la future série dès les brouillons** : statut, mode de lecture et couverture, appliqués à la publication.
 - **Métadonnées** : recherche Wikipédia FR, remplissage depuis les noms de fichiers, option « écraser les valeurs existantes ».
 - **Publication** : rangement en `Série/Série #NN (Année).cbz`, l'année étant facultative.
   - Ajout de tomes à une série existante.

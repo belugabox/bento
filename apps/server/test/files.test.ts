@@ -143,6 +143,8 @@ describe('drafts', () => {
                     },
                 ],
                 status: null,
+                readingMode: null,
+                coverUpdatedAt: null,
             },
             {
                 folder: '_draft/Gantz (01-18)',
@@ -152,6 +154,8 @@ describe('drafts', () => {
                     }),
                 ],
                 status: null,
+                readingMode: null,
+                coverUpdatedAt: null,
             },
         ]);
     });
@@ -353,8 +357,101 @@ describe('publishing', () => {
             (await call(`/libraries/${ctx.library.id}/drafts`)).body,
         ).toEqual([]);
         expect(
-            ctx.files.setDraftStatus(ctx.library.id, '_draft/Gantz', null),
-        ).toEqual({ status: null });
+            ctx.files.setDraftSettings(ctx.library.id, '_draft/Gantz', {
+                status: null,
+            }),
+        ).toEqual({ status: null, readingMode: null, coverUpdatedAt: null });
+    });
+
+    it('applies the reading mode and cover chosen on the draft folder', async () => {
+        await writeCbz(ctx.file('_draft/Boxer/T01.cbz'), {
+            pages: 2,
+            comicInfo: info('Boxer', '1'),
+        });
+        await writeCbz(ctx.file('_draft/Boxer/T02.cbz'), {
+            comicInfo: info('Boxer', '2'),
+        });
+        const drafts = `/libraries/${ctx.library.id}/drafts`;
+        const mode = await call(`${drafts}/reading-mode`, {
+            method: 'PUT',
+            json: { folder: '_draft/Boxer', readingMode: 'webtoon' },
+        });
+        expect(mode.body).toEqual({ readingMode: 'webtoon' });
+        const folder = encodeURIComponent('_draft/Boxer');
+        const cover = await call(`${drafts}/cover?folder=${folder}`, {
+            method: 'PUT',
+            json: {
+                type: 'file',
+                path: '_draft/Boxer/T01.cbz',
+                page: 1,
+                position: 'center',
+            },
+        });
+        expect(cover.status).toBe(200);
+        const listed = (await call(drafts)).body[0];
+        expect(listed.readingMode).toBe('webtoon');
+        expect(listed.coverUpdatedAt).toEqual(expect.any(String));
+        const draftCover = await api.request(
+            `${drafts}/cover?folder=${folder}`,
+            { headers: { Cookie: admin } },
+        );
+        expect(draftCover.status).toBe(200);
+        const draftBytes = Buffer.from(await draftCover.arrayBuffer());
+
+        await ctx.files.publish(ctx.library.id, [
+            '_draft/Boxer/T01.cbz',
+            '_draft/Boxer/T02.cbz',
+        ]);
+
+        const [published] = listSeries(ctx.db, ADMIN_VIEW);
+        expect(published?.coverUpdatedAt).not.toBeNull();
+        expect((await call(`/series/${published!.id}`)).body.readingMode).toBe(
+            'webtoon',
+        );
+        const seriesCover = await api.request(
+            `/series/${published!.id}/cover`,
+            { headers: { Cookie: admin } },
+        );
+        expect(Buffer.from(await seriesCover.arrayBuffer())).toEqual(
+            draftBytes,
+        );
+        // Dossier vidé : sa couverture est oubliée.
+        expect(
+            (
+                await api.request(`${drafts}/cover?folder=${folder}`, {
+                    headers: { Cookie: admin },
+                })
+            ).status,
+        ).toBe(404);
+    });
+
+    it('takes a draft cover only from a file of the folder', async () => {
+        await writeCbz(ctx.file('_draft/Boxer/T01.cbz'));
+        await writeCbz(ctx.file('_draft/Gantz/T01.cbz'));
+        const put = (folder: string, json: unknown) =>
+            call(
+                `/libraries/${ctx.library.id}/drafts/cover?folder=${encodeURIComponent(folder)}`,
+                { method: 'PUT', json },
+            );
+        expect(
+            (
+                await put('_draft/Boxer', {
+                    type: 'file',
+                    path: '_draft/Gantz/T01.cbz',
+                })
+            ).status,
+        ).toBe(400);
+        expect(
+            (
+                await put('_draft/../Gantz', {
+                    type: 'file',
+                    path: '_draft/../Gantz/x.cbz',
+                })
+            ).status,
+        ).toBe(404);
+        expect((await put('_draft/Boxer', { type: 'default' })).status).toBe(
+            200,
+        );
     });
 
     it('keeps draft statuses for admins and draft folders', async () => {

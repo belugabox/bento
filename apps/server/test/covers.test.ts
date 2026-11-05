@@ -161,6 +161,38 @@ describe('series cover', () => {
         expect(requested).toHaveLength(1);
     });
 
+    it('takes an uploaded image, framed at the chosen position', async () => {
+        // Image très haute : rouge en haut, bleu en bas.
+        const raw = Buffer.alloc(100 * 400 * 3);
+        for (let pixel = 0; pixel < 100 * 400; pixel++) {
+            raw[pixel * 3 + (pixel < 100 * 200 ? 0 : 2)] = 255;
+        }
+        const data = (
+            await sharp(raw, { raw: { width: 100, height: 400, channels: 3 } })
+                .png()
+                .toBuffer()
+        ).toString('base64');
+        const colorOfCover = async () => {
+            const { data: pixels } = await sharp(await coverBytes())
+                .raw()
+                .toBuffer({ resolveWithObject: true });
+            return pixels[0]! > pixels[2]! ? 'red' : 'blue';
+        };
+
+        await setCover({ type: 'image', data });
+        expect(await colorOfCover()).toBe('red');
+        await setCover({ type: 'image', data, position: 'bottom' });
+        expect(await colorOfCover()).toBe('blue');
+
+        expect(
+            (await setCover({ type: 'image', data: 'cGFzIHVuZSBpbWFnZQ==' }))
+                .status,
+        ).toBe(400);
+        expect(
+            (await setCover({ type: 'image', data, position: 'left' })).status,
+        ).toBe(400);
+    });
+
     it('refuses a volume of another series, and non-admins', async () => {
         const spirale = (await (await call(`/series/${otherSeriesId}`)).json())
             .volumes[0].id;

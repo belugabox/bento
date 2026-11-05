@@ -1,3 +1,5 @@
+import { articleFirst } from '../library/sortName';
+
 /**
  * Numéro de tome et année lus dans un nom de fichier, par ex.
  * « Spy X Family T05 (Endo) (2021) [Digital-1920] » ou « One Piece #12 (2014) ».
@@ -27,7 +29,8 @@ export const parseVolumeFileName = (name: string): VolumeFileName => {
               .trim()
         : undefined;
     return {
-        series: series || undefined,
+        // « Boxer (The) » devient « The Boxer ».
+        series: series ? articleFirst(series) : undefined,
         number: digits ? String(Number(digits)) : undefined,
         year: year ? Number(year[1]) : undefined,
     };

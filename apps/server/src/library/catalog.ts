@@ -8,6 +8,7 @@ import { libraries, readProgress, series, volumes } from '../db/schema';
 import { notFound } from '../tools/errors';
 import { publicationPathOf } from './paths';
 import { coverFile } from './scanner';
+import { compareNames } from './sortName';
 import { type Viewer, visibleTo } from './visibility';
 
 // Tomes sans numéro en dernier, puis par numéro, puis par fichier.
@@ -69,7 +70,11 @@ export const listLibraries = (db: Db) =>
         })
         .from(libraries)
         .orderBy(asc(libraries.name))
-        .all();
+        .all()
+        .map((library) => ({
+            ...library,
+            defaultReadingMode: defaultReadingMode(library.type),
+        }));
 
 /** Séries, filtrées par bibliothèque et par nom (sans tenir compte de la casse). */
 export const listSeries = (
@@ -114,8 +119,8 @@ export const listSeries = (
             ),
         )
         .groupBy(series.id)
-        .orderBy(sql`${series.name} collate nocase`)
-        .all();
+        .all()
+        .sort((a, b) => compareNames(a.name, b.name));
 };
 
 export const getSeries = (db: Db, viewer: Viewer, id: number) => {

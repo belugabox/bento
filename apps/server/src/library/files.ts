@@ -23,9 +23,16 @@ import {
 import { type ComicInfo, readComicInfo } from '../archive/comicInfo';
 import { updateComicInfo } from '../archive/write';
 import type { Db } from '../db';
-import { draftStatuses, libraries, series, volumes } from '../db/schema';
+import { libraries, series, volumes } from '../db/schema';
 import { conflict, notFound } from '../tools/errors';
 import type { Logger } from '../tools/logger';
+import { draftCoverFile, seriesCoverFile } from './covers';
+import {
+    type DraftSettings,
+    deleteDraftSettings,
+    draftSettingsOf,
+    saveDraftSettings,
+} from './draftSettings';
 import {
     DRAFT_FOLDER,
     isDraft,
@@ -353,51 +360,24 @@ export class LibraryFiles {
                 { path: archive.path, name: path.basename(archive.path), size },
             ]);
         }
-        const statuses = new Map(
-            this.db
-                .select({
-                    folder: draftStatuses.folder,
-                    status: draftStatuses.status,
-                })
-                .from(draftStatuses)
-                .where(eq(draftStatuses.libraryId, libraryId))
-                .all()
-                .map((row) => [row.folder, row.status]),
-        );
+        const settings = draftSettingsOf(this.db, libraryId);
         return [...folders].map(([folder, files]) => ({
             folder,
             files,
-            status: statuses.get(folder) ?? null,
+            status: settings.get(folder)?.status ?? null,
+            readingMode: settings.get(folder)?.readingMode ?? null,
+            coverUpdatedAt: settings.get(folder)?.coverUpdatedAt ?? null,
         }));
     };
 
-    /** Statut de la future série d'un dossier de brouillons (null : aucun). */
-    setDraftStatus = (
+    /** Statut ou mode de lecture de la future série d'un dossier de brouillons. */
+    setDraftSettings = (
         libraryId: number,
         folder: string,
-        status: 'ongoing' | 'completed' | null,
+        changes: Partial<Pick<DraftSettings, 'status' | 'readingMode'>>,
     ) => {
         this.library(libraryId);
-        if (!isDraft(folder) || folder.split('/').includes('..')) {
-            throw notFound('Dossier de brouillons introuvable');
-        }
-        const where = and(
-            eq(draftStatuses.libraryId, libraryId),
-            eq(draftStatuses.folder, folder),
-        );
-        if (status === null) {
-            this.db.delete(draftStatuses).where(where).run();
-        } else {
-            this.db
-                .insert(draftStatuses)
-                .values({ libraryId, folder, status })
-                .onConflictDoUpdate({
-                    target: [draftStatuses.libraryId, draftStatuses.folder],
-                    set: { status },
-                })
-                .run();
-        }
-        return { status };
+        return saveDraftSettings(this.db, libraryId, folder, changes);
     };
 
     /**
@@ -466,18 +446,8 @@ export class LibraryFiles {
         const published: { from: string; to: string }[] = [];
         const failures: Failure[] = [];
         const folders = new Set<string>();
-        // Statut choisi pour les dossiers de brouillons publiés.
-        const draftStatusOf = new Map(
-            this.db
-                .select({
-                    folder: draftStatuses.folder,
-                    status: draftStatuses.status,
-                })
-                .from(draftStatuses)
-                .where(eq(draftStatuses.libraryId, libraryId))
-                .all()
-                .map((row) => [row.folder, row.status]),
-        );
+        // Réglages choisis pour les dossiers de brouillons publiés.
+        const drafts = draftSettingsOf(this.db, libraryId);
         // Statut des séries des tomes publiés déplacés, à reporter ensuite.
         const statuses = new Map(
             this.db
@@ -519,10 +489,8 @@ export class LibraryFiles {
             );
         }
         if (published.length > 0) await this.scanner.scan(libraryId);
+        const applied = new Set<string>();
         for (const { from, to } of published) {
-            const fromDraft = draftStatusOf.get(path.posix.dirname(from));
-            const status = fromDraft ?? statuses.get(from);
-            if (!status) continue;
             const moved = this.db
                 .select({ seriesId: volumes.seriesId })
                 .from(volumes)
@@ -530,36 +498,81 @@ export class LibraryFiles {
                     and(eq(volumes.libraryId, libraryId), eq(volumes.file, to)),
                 )
                 .get();
-            if (moved) {
+            if (!moved) continue;
+            const folder = path.posix.dirname(from);
+            const draft = drafts.get(folder);
+            // Une fois par dossier et par série.
+            if (!applied.has(`${folder}\n${moved.seriesId}`)) {
+                applied.add(`${folder}\n${moved.seriesId}`);
+                await this.applyDraftSettings(
+                    libraryId,
+                    folder,
+                    draft,
+                    moved.seriesId,
+                );
+            }
+            // Un tome publié déplacé garde le statut de son ancienne série.
+            const status = statuses.get(from);
+            if (!draft?.status && status) {
                 this.db
                     .update(series)
                     .set({ status })
                     .where(
                         and(
                             eq(series.id, moved.seriesId),
-                            // Un choix fait sur le brouillon l'emporte.
-                            fromDraft ? undefined : isNull(series.status),
+                            isNull(series.status),
                         ),
                     )
                     .run();
             }
         }
-        // Dossiers de brouillons vidés : leur statut ne sert plus.
-        for (const folder of draftStatusOf.keys()) {
+        // Dossiers de brouillons vidés : leurs réglages ne servent plus.
+        for (const folder of drafts.keys()) {
             const dir = path.join(library.path, ...folder.split('/'));
             if (!(await exists(dir))) {
-                this.db
-                    .delete(draftStatuses)
-                    .where(
-                        and(
-                            eq(draftStatuses.libraryId, libraryId),
-                            eq(draftStatuses.folder, folder),
-                        ),
-                    )
-                    .run();
+                deleteDraftSettings(this.db, libraryId, folder);
+                await unlink(
+                    draftCoverFile(this.coversPath, libraryId, folder),
+                ).catch(() => {});
             }
         }
         return { published, failures };
+    };
+
+    /** Réglages d'un dossier de brouillons reportés sur sa série publiée. */
+    private applyDraftSettings = async (
+        libraryId: number,
+        folder: string,
+        draft: DraftSettings | undefined,
+        seriesId: number,
+    ) => {
+        if (!draft) return;
+        const changes: Partial<typeof series.$inferInsert> = {};
+        // Un choix fait sur le brouillon l'emporte.
+        if (draft.status) changes.status = draft.status;
+        if (draft.readingMode) changes.readingMode = draft.readingMode;
+        if (draft.coverUpdatedAt) {
+            const copied = await copyFile(
+                draftCoverFile(this.coversPath, libraryId, folder),
+                seriesCoverFile(this.coversPath, seriesId),
+            ).then(
+                () => true,
+                (error) => {
+                    this.logger.warn(
+                        `Couverture du brouillon ${folder} : ${reasonOf(error)}`,
+                    );
+                    return false;
+                },
+            );
+            if (copied) changes.coverUpdatedAt = new Date();
+        }
+        if (Object.keys(changes).length > 0) {
+            this.db
+                .update(series)
+                .set(changes)
+                .where(eq(series.id, seriesId))
+                .run();
+        }
     };
 
     private publishOne = async (

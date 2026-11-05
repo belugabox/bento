@@ -19,7 +19,9 @@ import {
     coverUrl,
     fetchSeries,
     fetchVolume,
+    pageUrl,
     seriesCoverUrl,
+    setSeriesCover,
     setSeriesReadingMode,
     setSeriesStatus,
 } from '@/services/api';
@@ -40,6 +42,9 @@ export const SeriesEditPage = () => {
     if (!series) return <Loader mx="auto" />;
 
     const first = series.volumes[0];
+    const currentCover = first
+        ? seriesCoverUrl({ ...series, coverVolumeId: first.id })
+        : undefined;
 
     /** Fichiers renommés : la série peut avoir changé (nouveau dossier). */
     const afterChange = async (moved?: { from: string; to: string }[]) => {
@@ -63,12 +68,9 @@ export const SeriesEditPage = () => {
             <Group justify="space-between" align="flex-start">
                 <Title order={2}>Modifier la série</Title>
                 <Group align="flex-end">
-                    {first && (
+                    {currentCover && (
                         <Image
-                            src={seriesCoverUrl({
-                                ...series,
-                                coverVolumeId: first.id,
-                            })}
+                            src={currentCover}
                             w={64}
                             h={96}
                             fit="cover"
@@ -117,14 +119,22 @@ export const SeriesEditPage = () => {
             <CoverPicker
                 opened={coverOpened}
                 onClose={cover.close}
-                seriesId={series.id}
                 seriesName={series.name}
                 kind={series.library.type}
+                current={currentCover}
                 volumes={series.volumes.map((v) => ({
-                    id: v.id,
+                    key: String(v.id),
                     label: volumeLabel(v),
                     pageCount: v.pageCount,
+                    cover: coverUrl(v.id),
+                    page: (index) => pageUrl(v.id, index),
+                    source: (page) => ({
+                        type: 'volume',
+                        volumeId: v.id,
+                        page,
+                    }),
                 }))}
+                save={(source) => setSeriesCover(series.id, source)}
                 onChanged={reload}
             />
         </Stack>

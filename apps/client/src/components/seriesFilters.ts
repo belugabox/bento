@@ -1,3 +1,5 @@
+import { compareNames } from '@server/types';
+
 /** Ce dont les filtres ont besoin pour une série de la liste. */
 export type ListedSeries = {
     name: string;
@@ -46,7 +48,7 @@ export const filterSeries = <T extends ListedSeries>(
         ? kept.sort(
               (a, b) =>
                   (b.lastAddedAt ?? '').localeCompare(a.lastAddedAt ?? '') ||
-                  a.name.localeCompare(b.name, 'fr'),
+                  compareNames(a.name, b.name),
           )
         : kept;
 };

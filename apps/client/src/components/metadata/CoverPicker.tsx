@@ -1,11 +1,14 @@
 import {
     Alert,
     AspectRatio,
+    Box,
     Button,
+    FileButton,
     Group,
     Image,
     Modal,
-    NumberInput,
+    Paper,
+    SegmentedControl,
     Select,
     SimpleGrid,
     Stack,
@@ -14,52 +17,136 @@ import {
     UnstyledButton,
 } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
-import { useState } from 'react';
+import { IconPhotoUp } from '@tabler/icons-react';
+import { useEffect, useState } from 'react';
 
-import {
-    type CoverSource,
-    coverUrl,
-    pageUrl,
-    setSeriesCover,
-} from '@/services/api';
+import type { CoverPosition, CoverSource } from '@/services/api';
 
 import { WikipediaSearch } from './WikipediaSearch';
 
-type Volume = { id: number; label: string; pageCount: number };
+/** Tome (série publiée) ou fichier (brouillon) où prendre une couverture. */
+export type CoverVolume = {
+    key: string;
+    label: string;
+    pageCount: number;
+    /** Vignette du tome. */
+    cover: string;
+    page: (index: number) => string;
+    /** Source envoyée au serveur : le tome, ou une de ses pages. */
+    source: (page?: number) => CoverSource;
+};
 
-/** Choix de la couverture d'une série : tome, page, Wikipédia ou défaut. */
+/** Image choisie, en attente de confirmation (avec son cadrage). */
+type Candidate = {
+    id: string;
+    src: string;
+    source: CoverSource;
+    label: string;
+};
+
+const POSITIONS: { value: CoverPosition; label: string }[] = [
+    { value: 'top', label: 'Haut' },
+    { value: 'center', label: 'Centre' },
+    { value: 'bottom', label: 'Bas' },
+];
+
+// Pages affichées à la fois (des images en taille réelle).
+const PAGE_BATCH = 24;
+const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+
+const objectPosition = (position: CoverPosition) =>
+    position === 'center' ? 'center' : `center ${position}`;
+
+const readAsBase64 = (file: File) =>
+    new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () =>
+            resolve(String(reader.result).replace(/^data:[^,]*,/, ''));
+        reader.onerror = () => reject(new Error('Image illisible'));
+        reader.readAsDataURL(file);
+    });
+
+/** Vignette cliquable, entourée quand elle est choisie. */
+const Thumb = ({
+    src,
+    label,
+    selected,
+    onClick,
+}: {
+    src: string;
+    label: string;
+    selected: boolean;
+    onClick: () => void;
+}) => (
+    <UnstyledButton onClick={onClick} aria-pressed={selected}>
+        <AspectRatio ratio={2 / 3}>
+            <Image
+                src={src}
+                radius="sm"
+                fit="cover"
+                alt=""
+                loading="lazy"
+                style={{
+                    outline: selected
+                        ? '3px solid var(--mantine-primary-color-filled)'
+                        : undefined,
+                }}
+            />
+        </AspectRatio>
+        <Text size="xs" ta="center" lineClamp={1}>
+            {label}
+        </Text>
+    </UnstyledButton>
+);
+
+/**
+ * Choix de la couverture d'une série (ou de la future série d'un dossier de
+ * brouillons) : un tome, une page, une image de l'appareil ou de Wikipédia,
+ * recadrée en 2:3 en gardant le haut, le centre ou le bas.
+ */
 export const CoverPicker = ({
     opened,
     onClose,
-    seriesId,
     seriesName,
     kind,
     volumes,
+    current,
+    save,
     onChanged,
 }: {
     opened: boolean;
     onClose: () => void;
-    seriesId: number;
     seriesName: string;
     kind: 'manga' | 'comics';
-    volumes: Volume[];
+    volumes: CoverVolume[];
+    /** Couverture actuelle. */
+    current?: string;
+    save: (source: CoverSource) => Promise<unknown>;
     onChanged: () => void;
 }) => {
-    const [volumeId, setVolumeId] = useState<number | undefined>(
-        volumes[0]?.id,
-    );
-    const [page, setPage] = useState(1);
+    const [volumeKey, setVolumeKey] = useState(volumes[0]?.key);
+    const [shownPages, setShownPages] = useState(PAGE_BATCH);
+    const [candidate, setCandidate] = useState<Candidate>();
+    const [position, setPosition] = useState<CoverPosition>('top');
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string>();
     const [wikiOpened, wiki] = useDisclosure(false);
-    const volume = volumes.find((v) => v.id === volumeId);
+    const volume = volumes.find((v) => v.key === volumeKey) ?? volumes[0];
+
+    // Image de l'appareil : son adresse locale est libérée ensuite.
+    useEffect(() => {
+        if (!candidate?.src.startsWith('blob:')) return;
+        const src = candidate.src;
+        return () => URL.revokeObjectURL(src);
+    }, [candidate?.src]);
 
     const apply = async (source: CoverSource) => {
         setBusy(true);
         setError(undefined);
         try {
-            await setSeriesCover(seriesId, source);
+            await save(source);
             onChanged();
+            setCandidate(undefined);
             onClose();
         } catch (e) {
             setError((e as Error).message);
@@ -68,103 +155,195 @@ export const CoverPicker = ({
         }
     };
 
+    const takeFile = async (file: File | null) => {
+        if (!file) return;
+        setError(undefined);
+        if (!file.type.startsWith('image/')) {
+            setError('Ce fichier n’est pas une image.');
+            return;
+        }
+        if (file.size > MAX_IMAGE_BYTES) {
+            setError('Image trop lourde (10 Mo au plus).');
+            return;
+        }
+        const data = await readAsBase64(file);
+        setCandidate({
+            id: 'image',
+            src: URL.createObjectURL(file),
+            source: { type: 'image', data },
+            label: file.name || 'Image collée',
+        });
+    };
+
+    const pageCount = volume?.pageCount ?? 0;
+
     return (
         <>
             <Modal
                 opened={opened && !wikiOpened}
                 onClose={onClose}
                 title="Couverture de la série"
-                size="lg"
+                size="xl"
             >
-                <Stack>
+                <Stack
+                    // Une image copiée peut être collée n'importe où.
+                    onPaste={(event) => {
+                        const file = [...event.clipboardData.files].find((f) =>
+                            f.type.startsWith('image/'),
+                        );
+                        if (file) void takeFile(file);
+                    }}
+                >
                     {error && <Alert color="red">{error}</Alert>}
-                    <Tabs defaultValue="volume">
+                    <Tabs defaultValue="volume" keepMounted={false}>
                         <Tabs.List>
                             <Tabs.Tab value="volume">Un tome</Tabs.Tab>
                             <Tabs.Tab value="page">Une page</Tabs.Tab>
+                            <Tabs.Tab value="image">Une image</Tabs.Tab>
                             <Tabs.Tab value="wikipedia">Wikipédia</Tabs.Tab>
                         </Tabs.List>
 
                         <Tabs.Panel value="volume" pt="sm">
-                            <SimpleGrid cols={{ base: 3, sm: 5 }}>
+                            <SimpleGrid
+                                cols={{ base: 4, sm: 6 }}
+                                mah={320}
+                                style={{ overflowY: 'auto' }}
+                            >
                                 {volumes.map((v) => (
-                                    <UnstyledButton
-                                        key={v.id}
-                                        disabled={busy}
+                                    <Thumb
+                                        key={v.key}
+                                        src={v.cover}
+                                        label={v.label}
+                                        selected={
+                                            candidate?.id === `volume:${v.key}`
+                                        }
                                         onClick={() =>
-                                            void apply({
-                                                type: 'volume',
-                                                volumeId: v.id,
+                                            setCandidate({
+                                                id: `volume:${v.key}`,
+                                                src: v.page(0),
+                                                source: v.source(),
+                                                label: v.label,
                                             })
                                         }
-                                    >
-                                        <AspectRatio ratio={2 / 3}>
-                                            <Image
-                                                src={coverUrl(v.id)}
-                                                radius="sm"
-                                                fit="cover"
-                                                alt=""
-                                            />
-                                        </AspectRatio>
-                                        <Text size="xs" ta="center">
-                                            {v.label}
-                                        </Text>
-                                    </UnstyledButton>
+                                    />
                                 ))}
                             </SimpleGrid>
                         </Tabs.Panel>
 
                         <Tabs.Panel value="page" pt="sm">
-                            <Group align="flex-start" wrap="nowrap">
-                                <Stack style={{ flex: 1 }}>
-                                    <Select
-                                        label="Tome"
-                                        allowDeselect={false}
-                                        value={String(volumeId)}
-                                        onChange={(value) => {
-                                            setVolumeId(Number(value));
-                                            setPage(1);
-                                        }}
-                                        data={volumes.map((v) => ({
-                                            value: String(v.id),
-                                            label: v.label,
-                                        }))}
-                                    />
-                                    <NumberInput
-                                        label="Page"
-                                        min={1}
-                                        max={volume?.pageCount ?? 1}
-                                        value={page}
-                                        onChange={(value) =>
-                                            setPage(Number(value) || 1)
-                                        }
-                                    />
-                                    <Button
-                                        loading={busy}
-                                        disabled={!volume}
-                                        onClick={() =>
-                                            volume &&
-                                            void apply({
-                                                type: 'volume',
-                                                volumeId: volume.id,
-                                                page: page - 1,
-                                            })
-                                        }
-                                    >
-                                        Utiliser cette page
-                                    </Button>
-                                </Stack>
+                            <Stack gap="xs">
+                                <Select
+                                    label="Tome"
+                                    allowDeselect={false}
+                                    value={volume?.key ?? null}
+                                    onChange={(value) => {
+                                        if (!value) return;
+                                        setVolumeKey(value);
+                                        setShownPages(PAGE_BATCH);
+                                    }}
+                                    data={volumes.map((v) => ({
+                                        value: v.key,
+                                        label: v.label,
+                                    }))}
+                                />
                                 {volume && (
-                                    <Image
-                                        src={pageUrl(volume.id, page - 1)}
-                                        w={160}
+                                    <Box
                                         mah={320}
-                                        fit="contain"
-                                        radius="sm"
-                                        alt={`Page ${page}`}
-                                    />
+                                        style={{ overflowY: 'auto' }}
+                                    >
+                                        <SimpleGrid cols={{ base: 4, sm: 6 }}>
+                                            {Array.from(
+                                                {
+                                                    length: Math.min(
+                                                        shownPages,
+                                                        pageCount,
+                                                    ),
+                                                },
+                                                (_, index) => (
+                                                    <Thumb
+                                                        key={index}
+                                                        src={volume.page(index)}
+                                                        label={`Page ${index + 1}`}
+                                                        selected={
+                                                            candidate?.id ===
+                                                            `page:${volume.key}:${index}`
+                                                        }
+                                                        onClick={() =>
+                                                            setCandidate({
+                                                                id: `page:${volume.key}:${index}`,
+                                                                src: volume.page(
+                                                                    index,
+                                                                ),
+                                                                source: volume.source(
+                                                                    index,
+                                                                ),
+                                                                label: `${volume.label}, page ${index + 1}`,
+                                                            })
+                                                        }
+                                                    />
+                                                ),
+                                            )}
+                                        </SimpleGrid>
+                                        {shownPages < pageCount && (
+                                            <Group justify="center" mt="xs">
+                                                <Button
+                                                    variant="subtle"
+                                                    size="xs"
+                                                    onClick={() =>
+                                                        setShownPages(
+                                                            (n) =>
+                                                                n + PAGE_BATCH,
+                                                        )
+                                                    }
+                                                >
+                                                    Pages suivantes (
+                                                    {pageCount - shownPages})
+                                                </Button>
+                                            </Group>
+                                        )}
+                                    </Box>
                                 )}
-                            </Group>
+                            </Stack>
+                        </Tabs.Panel>
+
+                        <Tabs.Panel value="image" pt="sm">
+                            <Paper
+                                withBorder
+                                p="lg"
+                                radius="md"
+                                style={{ borderStyle: 'dashed' }}
+                                onDragOver={(event) => event.preventDefault()}
+                                onDrop={(event) => {
+                                    event.preventDefault();
+                                    void takeFile(
+                                        event.dataTransfer.files[0] ?? null,
+                                    );
+                                }}
+                            >
+                                <Stack align="center" gap="xs">
+                                    <IconPhotoUp size={32} stroke={1.5} />
+                                    <Text size="sm" ta="center">
+                                        Dépose une image ici, colle-la (Ctrl+V),
+                                        ou
+                                    </Text>
+                                    <FileButton
+                                        accept="image/*"
+                                        onChange={(file) => void takeFile(file)}
+                                    >
+                                        {(props) => (
+                                            <Button
+                                                variant="default"
+                                                {...props}
+                                            >
+                                                Choisir une image…
+                                            </Button>
+                                        )}
+                                    </FileButton>
+                                    <Text size="xs" c="dimmed">
+                                        JPEG, PNG ou WebP, 10 Mo au plus.
+                                    </Text>
+                                </Stack>
+                            </Paper>
                         </Tabs.Panel>
 
                         <Tabs.Panel value="wikipedia" pt="sm">
@@ -174,16 +353,111 @@ export const CoverPicker = ({
                                     (souvent un logo ou la couverture du premier
                                     tome).
                                 </Text>
-                                <Button onClick={wiki.open}>
+                                <Button variant="default" onClick={wiki.open}>
                                     Chercher sur Wikipédia…
                                 </Button>
                             </Stack>
                         </Tabs.Panel>
                     </Tabs>
+
+                    <Paper withBorder p="sm" radius="md">
+                        <Group align="flex-start" wrap="nowrap">
+                            <Stack gap={4} align="center" w={120}>
+                                <Box w={120}>
+                                    <AspectRatio ratio={2 / 3}>
+                                        {candidate ? (
+                                            <img
+                                                src={candidate.src}
+                                                alt="Aperçu"
+                                                style={{
+                                                    width: '100%',
+                                                    height: '100%',
+                                                    objectFit: 'cover',
+                                                    objectPosition:
+                                                        objectPosition(
+                                                            position,
+                                                        ),
+                                                    borderRadius: 4,
+                                                }}
+                                            />
+                                        ) : current ? (
+                                            <Image
+                                                src={current}
+                                                radius="sm"
+                                                fit="cover"
+                                                alt="Couverture actuelle"
+                                            />
+                                        ) : (
+                                            <Box bg="var(--mantine-color-default-hover)" />
+                                        )}
+                                    </AspectRatio>
+                                </Box>
+                                <Text size="xs" c="dimmed">
+                                    {candidate ? 'Aperçu' : 'Actuelle'}
+                                </Text>
+                            </Stack>
+                            <Stack style={{ flex: 1 }} gap="sm">
+                                {candidate ? (
+                                    <>
+                                        <Text size="sm" lineClamp={2}>
+                                            {candidate.label}
+                                        </Text>
+                                        <Stack gap={4}>
+                                            <Text size="sm" fw={500}>
+                                                Cadrage
+                                            </Text>
+                                            <SegmentedControl
+                                                value={position}
+                                                onChange={(value) =>
+                                                    setPosition(
+                                                        value as CoverPosition,
+                                                    )
+                                                }
+                                                data={POSITIONS}
+                                            />
+                                            <Text size="xs" c="dimmed">
+                                                Partie de l’image gardée pour
+                                                une couverture au format 2:3.
+                                            </Text>
+                                        </Stack>
+                                        <Group>
+                                            <Button
+                                                loading={busy}
+                                                onClick={() =>
+                                                    void apply({
+                                                        ...candidate.source,
+                                                        position,
+                                                    })
+                                                }
+                                            >
+                                                Utiliser cette couverture
+                                            </Button>
+                                            <Button
+                                                variant="subtle"
+                                                color="gray"
+                                                onClick={() =>
+                                                    setCandidate(undefined)
+                                                }
+                                            >
+                                                Annuler
+                                            </Button>
+                                        </Group>
+                                    </>
+                                ) : (
+                                    <Text size="sm" c="dimmed">
+                                        Choisis un tome, une page ou une image
+                                        pour voir l’aperçu et régler le cadrage.
+                                    </Text>
+                                )}
+                            </Stack>
+                        </Group>
+                    </Paper>
+
                     <Group justify="flex-end">
                         <Button
                             variant="default"
-                            loading={busy}
+                            loading={busy && !candidate}
+                            disabled={busy}
                             onClick={() => void apply({ type: 'default' })}
                         >
                             Revenir à la couverture du premier tome
@@ -197,11 +471,19 @@ export const CoverPicker = ({
                 kind={kind}
                 initialQuery={seriesName}
                 actionLabel="Utiliser son image"
-                onPick={(details) =>
-                    details.coverUrl
-                        ? void apply({ type: 'url', url: details.coverUrl })
-                        : setError('Cet article n’a pas d’image.')
-                }
+                onPick={(details) => {
+                    if (!details.coverUrl) {
+                        setError('Cet article n’a pas d’image.');
+                        return;
+                    }
+                    setError(undefined);
+                    setCandidate({
+                        id: 'wikipedia',
+                        src: details.coverUrl,
+                        source: { type: 'url', url: details.coverUrl },
+                        label: `Wikipédia : ${details.title}`,
+                    });
+                }}
             />
         </>
     );

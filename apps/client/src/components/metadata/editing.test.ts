@@ -73,6 +73,18 @@ describe('fillFromFileNames', () => {
         });
     });
 
+    it('puts back an article written after the series name', () => {
+        const boxer: EditableVolume[] = [
+            {
+                path: '_draft/Boxer (The)/Boxer (The) #01 (2022).cbz',
+                name: 'Boxer (The) #01 (2022).cbz',
+                comicInfo: {},
+            },
+        ];
+        const edits = fillFromFileNames(initialEdits(boxer), boxer, false);
+        expect(edits[boxer[0]!.path]?.Series).toBe('The Boxer');
+    });
+
     it('replaces numbers and years when asked, never the series', () => {
         const edits = fillFromFileNames(
             {
