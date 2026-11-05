@@ -29,7 +29,7 @@ export const settingsUpdateSchema = z.object({
 export type SettingsUpdate = z.infer<typeof settingsUpdateSchema>;
 
 export const defaultSettings = (scanIntervalMinutes = 30): Settings => ({
-    compression: { quality: 85, maxHeight: 2400 },
+    compression: { quality: 90, maxHeight: 2400 },
     scanIntervalMinutes,
 });
 

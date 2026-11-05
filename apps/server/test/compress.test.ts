@@ -204,7 +204,7 @@ describe('compression', () => {
 
         const saved = await put({ compression: { maxHeight: null } });
         expect((await saved.json()).settings.compression).toEqual({
-            quality: 85,
+            quality: 90,
             maxHeight: null,
         });
         await compress('_draft/Gantz T01.cbz');
@@ -224,11 +224,11 @@ describe('settings', () => {
         });
         expect(await read.json()).toEqual({
             settings: {
-                compression: { quality: 85, maxHeight: 2400 },
+                compression: { quality: 90, maxHeight: 2400 },
                 scanIntervalMinutes: 30,
             },
             defaults: {
-                compression: { quality: 85, maxHeight: 2400 },
+                compression: { quality: 90, maxHeight: 2400 },
                 scanIntervalMinutes: 30,
             },
         });

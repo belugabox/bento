@@ -39,7 +39,7 @@ const heightOptions = (current: number | null) => [
 const QUALITY_MARKS = [
     { value: 60, label: '60' },
     { value: 75, label: '75' },
-    { value: 85, label: '85' },
+    { value: 90, label: '90' },
     { value: 95, label: '95' },
 ];
 

@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { SettingsPage } from './SettingsPage';
 
 const DEFAULTS = {
-    compression: { quality: 85, maxHeight: 2400 },
+    compression: { quality: 90, maxHeight: 2400 },
     scanIntervalMinutes: 30,
 };
 
@@ -36,7 +36,7 @@ describe('SettingsPage', () => {
             </MantineProvider>,
         );
 
-        expect(await screen.findByText('Qualité JPEG : 85')).toBeTruthy();
+        expect(await screen.findByText('Qualité JPEG : 90')).toBeTruthy();
         const save = screen.getByRole('button', { name: 'Enregistrer' });
         expect(save.hasAttribute('disabled')).toBe(true);
 
@@ -58,7 +58,7 @@ describe('SettingsPage', () => {
 
         expect(puts).toEqual([
             {
-                compression: { quality: 85, maxHeight: null },
+                compression: { quality: 90, maxHeight: null },
                 scanIntervalMinutes: 0,
             },
         ]);
