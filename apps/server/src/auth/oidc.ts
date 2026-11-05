@@ -29,6 +29,19 @@ const SCOPES = 'openid profile email groups';
 // Délai d'une requête vers Pocket ID, pour ne pas bloquer la connexion.
 const TIMEOUT_MS = 10_000;
 
+/**
+ * Raison d'un échec, pour les logs : erreur réseau, ou code HTTP et erreur
+ * OAuth renvoyée par Pocket ID (`invalid_client`…, jamais de secret).
+ */
+const failureOf = async (response: Response | Error) => {
+    if (response instanceof Error) {
+        const cause = (response.cause as Error | undefined)?.message;
+        return cause ? `${response.message} : ${cause}` : response.message;
+    }
+    const body = await response.text().catch(() => '');
+    return `HTTP ${response.status} ${body.slice(0, 200)}`.trim();
+};
+
 /** Chaîne aléatoire URL-safe (state, code_verifier, jetons de session). */
 export const randomToken = (bytes = 32) =>
     randomBytes(bytes).toString('base64url');
@@ -120,9 +133,11 @@ export class OidcClient {
                 code_verifier: verifier,
             }),
             signal: AbortSignal.timeout(TIMEOUT_MS),
-        }).catch(() => undefined);
-        if (!tokenResponse?.ok) {
-            throw badGateway('Pocket ID a refusé la connexion');
+        }).catch((error: Error) => error);
+        if (tokenResponse instanceof Error || !tokenResponse.ok) {
+            throw badGateway(
+                `Pocket ID a refusé la connexion (${await failureOf(tokenResponse)})`,
+            );
         }
         const { access_token } = (await tokenResponse.json()) as {
             access_token?: string;
@@ -132,9 +147,11 @@ export class OidcClient {
         const infoResponse = await this.fetchFn(userinfo_endpoint, {
             headers: { Authorization: `Bearer ${access_token}` },
             signal: AbortSignal.timeout(TIMEOUT_MS),
-        }).catch(() => undefined);
-        if (!infoResponse?.ok) {
-            throw badGateway('Pocket ID : identité illisible');
+        }).catch((error: Error) => error);
+        if (infoResponse instanceof Error || !infoResponse.ok) {
+            throw badGateway(
+                `Pocket ID : identité illisible (${await failureOf(infoResponse)})`,
+            );
         }
         const info = (await infoResponse.json()) as Record<string, unknown>;
         if (typeof info.sub !== 'string' || !info.sub) {
