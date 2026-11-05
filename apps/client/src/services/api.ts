@@ -183,3 +183,8 @@ export const setSeriesStatus = (
     seriesId: number,
     status: 'ongoing' | 'completed' | null,
 ) => json(api.series[':id'].status.$put({ ...id(seriesId), json: { status } }));
+
+/** Statistiques de la bibliothèque et de la lecture (admin). */
+export const fetchStats = () => json(api.stats.$get());
+
+export type Stats = Awaited<ReturnType<typeof fetchStats>>;

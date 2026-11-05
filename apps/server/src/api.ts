@@ -29,6 +29,7 @@ import { type SeriesCovers, seriesCoverFile } from './library/covers';
 import type { LibraryFiles } from './library/files';
 import { getProgress, listInProgress, saveProgress } from './library/progress';
 import { type LibraryScanner, coverFile } from './library/scanner';
+import { getStats } from './library/stats';
 import type { Wikipedia } from './metadata/wikipedia';
 import { AppError, notFound } from './tools/errors';
 import type { Logger } from './tools/logger';
@@ -331,6 +332,13 @@ export const createApi = ({
             },
         )
         // --- Gestion des fichiers (admin) : brouillons, ComicInfo, rangement.
+        // Statistiques de la bibliothèque et de la lecture (admin).
+        .get('/stats', requireAdmin, async (c) =>
+            c.json({
+                ...getStats(db),
+                pendingDrafts: await files.pendingSeries(),
+            }),
+        )
         // Nombre de séries en attente (pastille de l'en-tête).
         .get('/drafts/pending', requireAdmin, async (c) =>
             c.json({ series: await files.pendingSeries() }),

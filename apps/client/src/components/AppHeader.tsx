@@ -16,7 +16,13 @@ import {
     UnstyledButton,
 } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
-import { IconEye, IconInbox, IconLogout, IconUsers } from '@tabler/icons-react';
+import {
+    IconChartBar,
+    IconEye,
+    IconInbox,
+    IconLogout,
+    IconUsers,
+} from '@tabler/icons-react';
 import { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router';
 
@@ -156,6 +162,15 @@ const UserMenu = () => {
                               ? 'Administrateur'
                               : 'Lecteur'}
                     </Menu.Label>
+                    {isAdmin && (
+                        <Menu.Item
+                            component={Link}
+                            to="/stats"
+                            leftSection={<IconChartBar size={14} />}
+                        >
+                            Statistiques
+                        </Menu.Item>
+                    )}
                     {isAdmin && (
                         <Menu.Item
                             component={Link}

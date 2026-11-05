@@ -8,6 +8,7 @@ import { DraftsPage } from '@/pages/DraftsPage';
 import { LibraryPage } from '@/pages/LibraryPage';
 import { SeriesEditPage } from '@/pages/SeriesEditPage';
 import { SeriesPage } from '@/pages/SeriesPage';
+import { StatsPage } from '@/pages/StatsPage';
 import { UsersPage } from '@/pages/UsersPage';
 import { ReaderPage } from '@/reader/ReaderPage';
 import { useCurrentUser } from '@/services/auth';
@@ -60,6 +61,14 @@ export const App = () => (
                     element={
                         <AdminOnly>
                             <SeriesEditPage />
+                        </AdminOnly>
+                    }
+                />
+                <Route
+                    path="stats"
+                    element={
+                        <AdminOnly>
+                            <StatsPage />
                         </AdminOnly>
                     }
                 />
