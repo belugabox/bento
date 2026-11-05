@@ -100,9 +100,15 @@ export class SeriesCovers {
                 throw badRequest('Ce tome n’appartient pas à la série');
             }
             if (source.page === undefined) {
-                await copyFile(coverFile(this.coversPath, volume.id), destination);
+                await copyFile(
+                    coverFile(this.coversPath, volume.id),
+                    destination,
+                );
             } else {
-                const { data } = await this.pages.page(volume.fullPath, source.page);
+                const { data } = await this.pages.page(
+                    volume.fullPath,
+                    source.page,
+                );
                 await toCover(data, destination);
             }
         }

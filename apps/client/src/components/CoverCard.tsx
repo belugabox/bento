@@ -11,19 +11,18 @@ import { IconBook } from '@tabler/icons-react';
 import type { ReactNode } from 'react';
 import { Link } from 'react-router';
 
-import { coverUrl } from '@/services/api';
-
 /** Vignette cliquable : couverture et légende (série ou tome). */
 export const CoverCard = ({
     to,
-    coverId,
+    cover,
     title,
     subtitle,
     progress,
     corner,
 }: {
     to: string;
-    coverId: number | null;
+    /** Adresse de l'image de couverture. */
+    cover: string | null;
     title: string;
     subtitle?: string;
     /** Avancement de lecture (0 à 1), en barre sous la couverture. */
@@ -34,13 +33,8 @@ export const CoverCard = ({
     <Card component={Link} to={to} padding={0} radius="md" withBorder>
         <Box pos="relative">
             <AspectRatio ratio={2 / 3}>
-                {coverId ? (
-                    <Image
-                        src={coverUrl(coverId)}
-                        alt={title}
-                        loading="lazy"
-                        fit="cover"
-                    />
+                {cover ? (
+                    <Image src={cover} alt={title} loading="lazy" fit="cover" />
                 ) : (
                     <Center bg="dark.6">
                         <IconBook size={32} />

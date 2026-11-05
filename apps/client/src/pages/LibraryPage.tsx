@@ -19,10 +19,12 @@ import { useSearchParams } from 'react-router';
 import { CoverCard } from '@/components/CoverCard';
 import { volumeLabel } from '@/components/readingStatus';
 import {
+    coverUrl,
     fetchInProgress,
     fetchLibraries,
     fetchSeriesList,
     scanLibrary,
+    seriesCoverUrl,
 } from '@/services/api';
 import { useCurrentUser } from '@/services/auth';
 import { useQuery } from '@/services/useQuery';
@@ -146,7 +148,7 @@ export const LibraryPage = () => {
                             <CoverCard
                                 key={volume.volumeId}
                                 to={`/read/${volume.volumeId}`}
-                                coverId={volume.volumeId}
+                                cover={coverUrl(volume.volumeId)}
                                 title={volume.seriesName}
                                 subtitle={`${volumeLabel(volume)} · p. ${volume.page + 1}/${volume.pageCount}`}
                                 progress={(volume.page + 1) / volume.pageCount}
@@ -170,7 +172,7 @@ export const LibraryPage = () => {
                     <CoverCard
                         key={item.id}
                         to={`/series/${item.id}`}
-                        coverId={item.coverVolumeId}
+                        cover={seriesCoverUrl(item)}
                         title={item.name}
                         subtitle={
                             item.readCount > 0

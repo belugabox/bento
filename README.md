@@ -45,6 +45,15 @@ Toute la configuration passe par des variables d'environnement :
 | `OIDC_ADMIN_GROUP` | `bento-admins` | Groupe Pocket ID des administrateurs |
 | `OIDC_READER_GROUP` | `bento-readers` | Groupe Pocket ID des lecteurs (sans l'un des deux groupes, l'accès est refusé) |
 
+### Gestion des tomes (admin)
+
+- **Brouillons** : les tomes déposés dans le dossier `_draft` d'une bibliothèque (par la synchro de beluga-box, par exemple) apparaissent dans « Brouillons », depuis le menu de l'avatar. Les `.cbr` et les RAR déguisés en `.cbz` sont convertis au passage.
+- **Métadonnées** : on les complète à la main, depuis Wikipédia FR ou depuis les noms de fichiers. « Publier » range chaque tome en `Série/Série #NN (Année).cbz` ; un brouillon remplace le tome publié du même numéro.
+- **Séries publiées** : « Modifier les métadonnées » sur la fiche série. Si la série est renommée, « Renommer les fichiers » déplace les tomes, sans perdre la progression de lecture.
+- **Couverture** : celle d'un tome, une page au choix, ou l'image de l'article Wikipédia.
+
+Bento écrit dans les fichiers (ComicInfo, rangement) : le conteneur doit pouvoir écrire dans les dossiers des bibliothèques.
+
 ### Contrôle parental
 
 - **Âge maximal** : l'admin le règle pour chaque personne dans « Comptes et contrôle parental », depuis le menu de l'avatar.
@@ -84,4 +93,4 @@ services:
       - /BLK/Books/Manga:/manga
 ```
 
-Le conteneur tourne avec l'utilisateur `node` : il doit pouvoir écrire dans `/config`. Pour la lecture, un accès en lecture seule aux bibliothèques suffit.
+Le conteneur tourne avec l'utilisateur `node` : il doit pouvoir écrire dans `/config` et dans les dossiers des bibliothèques (gestion des tomes).

@@ -9,12 +9,14 @@ import {
     Title,
     UnstyledButton,
 } from '@mantine/core';
-import { IconLogout, IconUsers } from '@tabler/icons-react';
+import { IconInbox, IconLogout, IconUsers } from '@tabler/icons-react';
 import { Link, Navigate, Outlet, Route, Routes } from 'react-router';
 
 import { RequireUser } from '@/components/RequireUser';
 import { DeniedPage } from '@/pages/DeniedPage';
+import { DraftsPage } from '@/pages/DraftsPage';
 import { LibraryPage } from '@/pages/LibraryPage';
+import { SeriesEditPage } from '@/pages/SeriesEditPage';
 import { SeriesPage } from '@/pages/SeriesPage';
 import { UsersPage } from '@/pages/UsersPage';
 import { ReaderPage } from '@/reader/ReaderPage';
@@ -36,6 +38,15 @@ const UserMenu = () => {
                     </Text>
                     {user.role === 'admin' ? 'Administrateur' : 'Lecteur'}
                 </Menu.Label>
+                {user.role === 'admin' && (
+                    <Menu.Item
+                        component={Link}
+                        to="/drafts"
+                        leftSection={<IconInbox size={14} />}
+                    >
+                        Brouillons
+                    </Menu.Item>
+                )}
                 {user.role === 'admin' && (
                     <Menu.Item
                         component={Link}
@@ -100,6 +111,22 @@ export const App = () => (
             <Route element={<Layout />}>
                 <Route index element={<LibraryPage />} />
                 <Route path="series/:id" element={<SeriesPage />} />
+                <Route
+                    path="drafts"
+                    element={
+                        <AdminOnly>
+                            <DraftsPage />
+                        </AdminOnly>
+                    }
+                />
+                <Route
+                    path="series/:id/edit"
+                    element={
+                        <AdminOnly>
+                            <SeriesEditPage />
+                        </AdminOnly>
+                    }
+                />
                 <Route
                     path="users"
                     element={

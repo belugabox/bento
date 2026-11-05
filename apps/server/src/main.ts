@@ -13,8 +13,8 @@ import { openDatabase } from './db';
 import { syncLibraries } from './library/catalog';
 import { SeriesCovers } from './library/covers';
 import { LibraryFiles } from './library/files';
-import { Wikipedia } from './metadata/wikipedia';
 import { LibraryScanner } from './library/scanner';
+import { Wikipedia } from './metadata/wikipedia';
 import { createLogger } from './tools/logger';
 
 // Depuis `src` (dev) comme depuis `dist` (build).

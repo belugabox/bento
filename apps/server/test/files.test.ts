@@ -253,7 +253,14 @@ describe('ComicInfo editing', () => {
         const details = await call(`/series/${series[0]!.id}`);
         expect(details.body.summary).toBe('Des aliens.');
         // L'admin reçoit le chemin de chaque tome.
-        expect(details.body.volumes[0].file).toBe('Gantz/Gantz #01.cbz');
+        expect(details.body.volumes[0].admin).toEqual({
+            file: 'Gantz/Gantz #01.cbz',
+            comicInfo: { Series: 'Gantz', Number: '1', Summary: 'Des aliens.' },
+            publicationPath: 'Gantz/Gantz #01.cbz',
+        });
+        const reader = sessionCookie(ctx.db, 'reader');
+        const forReader = await call(`/series/${series[0]!.id}`, {}, reader);
+        expect(forReader.body.volumes[0].admin).toBeNull();
     });
 });
 

@@ -7,6 +7,7 @@ import type { Db } from '../db';
 import { libraries, readProgress, series, volumes } from '../db/schema';
 import { notFound } from '../tools/errors';
 import { seriesAge } from './ageRating';
+import { publicationPathOf } from './paths';
 import { coverFile } from './scanner';
 import { type Viewer, visibleTo } from './visibility';
 
@@ -146,8 +147,8 @@ export const getSeries = (db: Db, viewer: Viewer, id: number) => {
             pageCount: volumes.pageCount,
             size: volumes.size,
             addedAt: volumes.addedAt,
-            // Chemin dans la bibliothèque : seulement pour un admin.
-            file: viewer.role === 'admin' ? volumes.file : sql<null>`null`,
+            file: volumes.file,
+            comicInfo: volumes.comicInfo,
             // Progression de la personne ; null = pas commencé.
             progress: {
                 page: readProgress.page,
@@ -165,7 +166,21 @@ export const getSeries = (db: Db, viewer: Viewer, id: number) => {
         .where(eq(volumes.seriesId, id))
         .orderBy(...volumeOrder)
         .all();
-    return { ...row, volumes: items };
+    return {
+        ...row,
+        volumes: items.map(({ file, comicInfo, ...volume }) => ({
+            ...volume,
+            // Gestion des métadonnées : seulement pour un admin.
+            admin:
+                viewer.role === 'admin'
+                    ? {
+                          file,
+                          comicInfo,
+                          publicationPath: publicationPathOf(comicInfo) ?? null,
+                      }
+                    : null,
+        })),
+    };
 };
 
 /**

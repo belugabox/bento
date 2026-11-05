@@ -105,3 +105,68 @@ export const setSeriesAgeRating = (
 /** Largeur et hauteur de chaque page (double page). */
 export const fetchPageSizes = (volumeId: number) =>
     json(api.volumes[':id']['page-sizes'].$get(id(volumeId)));
+
+// --- Gestion des fichiers (admin) -------------------------------------------
+
+const libraryId = (value: number) => ({ param: { id: String(value) } });
+
+export const fetchDrafts = (library: number) =>
+    json(api.libraries[':id'].drafts.$get(libraryId(library)));
+
+export type DraftFolder = Awaited<ReturnType<typeof fetchDrafts>>[number];
+export type LibraryFile = DraftFolder['files'][number];
+
+export const saveComicInfo = (
+    library: number,
+    updates: {
+        path: string;
+        changes: Record<string, string | number | null>;
+    }[],
+) =>
+    json(
+        api.libraries[':id'].files['comic-info'].$put({
+            ...libraryId(library),
+            json: { updates },
+        }),
+    );
+
+export const publishFiles = (library: number, paths: string[]) =>
+    json(
+        api.libraries[':id'].files.publish.$post({
+            ...libraryId(library),
+            json: { paths },
+        }),
+    );
+
+/** Couverture d'un fichier (brouillon), à recharger quand il change. */
+export const fileCoverUrl = (library: number, path: string, version = '') =>
+    `/api/libraries/${library}/files/cover?path=${encodeURIComponent(path)}&v=${encodeURIComponent(version)}`;
+
+// --- Métadonnées et couvertures (admin) ----------------------------------------
+
+export const searchWikipedia = (q: string, kind: 'manga' | 'comics') =>
+    json(api.metadata.wikipedia.search.$get({ query: { q, kind } }));
+
+export const fetchWikipediaSeries = (wikiId: number) =>
+    json(api.metadata.wikipedia[':id'].$get(id(wikiId)));
+
+export type WikipediaResult = Awaited<
+    ReturnType<typeof searchWikipedia>
+>[number];
+export type WikipediaDetails = Awaited<ReturnType<typeof fetchWikipediaSeries>>;
+
+export type CoverSource =
+    | { type: 'volume'; volumeId: number; page?: number }
+    | { type: 'url'; url: string }
+    | { type: 'default' };
+
+export const setSeriesCover = (seriesId: number, source: CoverSource) =>
+    json(api.series[':id'].cover.$put({ ...id(seriesId), json: source }));
+
+/** Couverture d'une série ; l'adresse change avec la couverture choisie. */
+export const seriesCoverUrl = (series: {
+    id: number;
+    coverUpdatedAt: string | null;
+    coverVolumeId?: number | null;
+}) =>
+    `/api/series/${series.id}/cover?v=${encodeURIComponent(series.coverUpdatedAt ?? String(series.coverVolumeId ?? ''))}`;

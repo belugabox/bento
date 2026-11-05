@@ -15,7 +15,12 @@ import {
     Title,
     Tooltip,
 } from '@mantine/core';
-import { IconArrowLeft, IconCheck, IconPlayerPlay } from '@tabler/icons-react';
+import {
+    IconArrowLeft,
+    IconCheck,
+    IconPencil,
+    IconPlayerPlay,
+} from '@tabler/icons-react';
 import type { MouseEvent } from 'react';
 import { Link, useParams } from 'react-router';
 
@@ -30,6 +35,7 @@ import {
     coverUrl,
     fetchSeries,
     saveProgress,
+    seriesCoverUrl,
     setSeriesAgeRating,
 } from '@/services/api';
 import { useCurrentUser } from '@/services/auth';
@@ -93,7 +99,10 @@ export const SeriesPage = () => {
             <Flex gap="lg" direction={{ base: 'column', xs: 'row' }}>
                 {first && (
                     <Image
-                        src={coverUrl(first.id)}
+                        src={seriesCoverUrl({
+                            ...series,
+                            coverVolumeId: first.id,
+                        })}
                         alt={series.name}
                         w={{ base: 160, sm: 200 }}
                         radius="md"
@@ -129,6 +138,18 @@ export const SeriesPage = () => {
                             </Badge>
                         )}
                     </Group>
+                    {isAdmin && (
+                        <Button
+                            component={Link}
+                            to={`/series/${series.id}/edit`}
+                            variant="default"
+                            size="xs"
+                            w="fit-content"
+                            leftSection={<IconPencil size={14} />}
+                        >
+                            Modifier les métadonnées
+                        </Button>
+                    )}
                     {isAdmin && (
                         <Select
                             size="xs"
@@ -184,7 +205,7 @@ export const SeriesPage = () => {
                         <CoverCard
                             key={volume.id}
                             to={`/read/${volume.id}`}
-                            coverId={volume.id}
+                            cover={coverUrl(volume.id)}
                             title={volumeLabel(volume)}
                             subtitle={
                                 volume.progress && !read

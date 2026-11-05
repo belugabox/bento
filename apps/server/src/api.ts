@@ -27,9 +27,9 @@ import {
 } from './library/catalog';
 import { type SeriesCovers, seriesCoverFile } from './library/covers';
 import type { LibraryFiles } from './library/files';
-import type { Wikipedia } from './metadata/wikipedia';
 import { getProgress, listInProgress, saveProgress } from './library/progress';
 import { type LibraryScanner, coverFile } from './library/scanner';
+import type { Wikipedia } from './metadata/wikipedia';
 import { AppError, notFound } from './tools/errors';
 import type { Logger } from './tools/logger';
 import { zValidator } from './tools/validator';
@@ -216,7 +216,8 @@ export const createApi = ({
             '/metadata/wikipedia/:id',
             requireAdmin,
             zValidator('param', idParam),
-            async (c) => c.json(await wikipedia.series(c.req.valid('param').id)),
+            async (c) =>
+                c.json(await wikipedia.series(c.req.valid('param').id)),
         )
         // Classification choisie dans Bento (null : celle des tomes).
         .put(
