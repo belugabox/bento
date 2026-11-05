@@ -1,9 +1,9 @@
 import AdmZip from 'adm-zip';
 import { open, stat } from 'node:fs/promises';
 import path from 'node:path';
-import sharp from 'sharp';
 
 import { notFound, unprocessable } from '../tools/errors';
+import { readImage } from './image';
 import { isMissingDescriptorError, repairDescriptorFlags } from './write';
 
 const IMAGE_TYPES: Record<string, string> = {
@@ -161,7 +161,7 @@ export class PageReader {
         const { pages } = await this.open(fullPath);
         const sizes: [number, number][] = [];
         for (const entry of pages) {
-            const { width = 0, height = 0 } = await sharp(entry.getData())
+            const { width = 0, height = 0 } = await readImage(entry.getData())
                 .metadata()
                 .catch(() => ({ width: 0, height: 0 }));
             sizes.push([width, height]);

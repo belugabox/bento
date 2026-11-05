@@ -1,11 +1,11 @@
 import { and, asc, eq, inArray, notInArray, sql } from 'drizzle-orm';
 import { mkdir, readdir, rm, stat } from 'node:fs/promises';
 import path from 'node:path';
-import sharp from 'sharp';
 
 import { openArchive, pageEntries } from '../archive/archive';
 import { readComicInfo } from '../archive/comicInfo';
 import { parseVolumeFileName } from '../archive/fileName';
+import { readImage } from '../archive/image';
 import type { Db } from '../db';
 import { libraries, series, volumes } from '../db/schema';
 import type { Logger } from '../tools/logger';
@@ -227,7 +227,7 @@ export class LibraryScanner {
 
         // Couverture : sans elle, le tome reste lisible.
         try {
-            await sharp(pages[0]!.getData())
+            await readImage(pages[0]!.getData())
                 .resize(COVER_SIZE)
                 .webp({ quality: 80 })
                 .toFile(coverFile(this.coversPath, volume.id));

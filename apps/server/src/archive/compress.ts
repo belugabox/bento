@@ -1,9 +1,9 @@
 import AdmZip from 'adm-zip';
 import { stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import sharp from 'sharp';
 
 import { openArchive, pageEntries } from './archive';
+import { readImage } from './image';
 import { clearDescriptorFlags } from './write';
 
 /**
@@ -33,7 +33,7 @@ const recompress = async (
     { quality, maxHeight }: CompressionOptions,
 ) => {
     if (path.extname(entryName).toLowerCase() === '.gif') return null;
-    let image = sharp(data).rotate();
+    let image = readImage(data).rotate();
     if (maxHeight) {
         image = image.resize({
             height: maxHeight,

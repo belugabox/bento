@@ -11,7 +11,6 @@ import {
     unlink,
 } from 'node:fs/promises';
 import path from 'node:path';
-import sharp from 'sharp';
 
 import { type PageReader, openArchive, pageEntries } from '../archive/archive';
 import {
@@ -26,6 +25,7 @@ import {
     compressArchive,
     estimateCompression,
 } from '../archive/compress';
+import { readImage } from '../archive/image';
 import { updateComicInfo } from '../archive/write';
 import type { Db } from '../db';
 import { libraries, series, volumes } from '../db/schema';
@@ -177,7 +177,7 @@ export class LibraryFiles {
             if (pages[0]) {
                 const cover = this.coverPath(fullPath);
                 await mkdir(path.dirname(cover), { recursive: true });
-                await sharp(pages[0].getData())
+                await readImage(pages[0].getData())
                     .resize(COVER_SIZE)
                     .webp({ quality: 80 })
                     .toFile(cover)
