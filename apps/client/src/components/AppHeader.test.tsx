@@ -82,8 +82,11 @@ describe('AppHeader', () => {
         show(user());
 
         fireEvent.click(screen.getByRole('button', { name: 'Mon compte' }));
+        fireEvent.click(await screen.findByText('Voir comme un lecteur…'));
+        // Âge proposé par défaut : 10 ans.
+        expect(await screen.findByDisplayValue('Jusqu’à 10 ans')).toBeTruthy();
         await act(async () => {
-            fireEvent.click(await screen.findByText('Jusqu’à 10 ans'));
+            fireEvent.click(screen.getByRole('button', { name: 'Voir' }));
         });
 
         expect(requests).toContainEqual([

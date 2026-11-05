@@ -57,9 +57,9 @@ Bento écrit dans les fichiers (ComicInfo, rangement) : le conteneur doit pouvoi
 ### Contrôle parental
 
 - **Âge maximal** : l'admin le règle pour chaque personne dans « Comptes et contrôle parental », depuis le menu de l'avatar.
-- **Classification d'une série** : la plus restrictive de ses tomes (`AgeRating` du ComicInfo), ou celle choisie par l'admin sur la fiche série.
+- **Classification d'une série** : toujours la plus restrictive de ses tomes (`AgeRating` du ComicInfo). Pour la changer, on modifie la classification des tomes dans l'éditeur de métadonnées.
 - **Comptes limités** : ils ne voient que les séries classées sous leur limite. Une série sans classification leur est masquée, partout : liste, fiche, tomes, pages, couvertures, « Reprendre la lecture ».
-- **Admins** : ils voient tout. Le menu de l'avatar leur permet de **voir l'appli comme un lecteur** d'un âge donné, pour vérifier ce qu'un enfant verra ; un bandeau permet de revenir à la vue admin.
+- **Admins** : ils voient tout. « Voir comme un lecteur… », dans le menu de l'avatar, leur permet de **voir l'appli comme un lecteur** d'un âge donné, pour vérifier ce qu'un enfant verra ; un bandeau permet de revenir à la vue admin.
 - **Classifications** : les variantes du ComicInfo sont regroupées par âge (« 10 ans et + » regroupe « Everyone 10+ » et « PG », par exemple).
 
 ### Connexion

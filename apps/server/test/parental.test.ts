@@ -114,18 +114,14 @@ describe('age ratings', () => {
         expect(minAgeOf(undefined)).toBeNull();
     });
 
-    it('rates a series by its strictest volume, unless overridden', () => {
-        expect(seriesAge(null, ['Everyone', 'Teen', undefined])).toEqual({
+    it('rates a series by its strictest volume', () => {
+        expect(seriesAge(['Everyone', 'Teen', undefined])).toEqual({
             ageRating: 'Teen',
             minAge: 13,
         });
-        expect(seriesAge(null, ['Unknown', undefined])).toEqual({
+        expect(seriesAge(['Unknown', undefined])).toEqual({
             ageRating: 'Unknown',
             minAge: null,
-        });
-        expect(seriesAge('Everyone', ['Mature 17+'])).toEqual({
-            ageRating: 'Everyone',
-            minAge: 0,
         });
     });
 });
@@ -184,41 +180,15 @@ describe('parental control', () => {
         expect((await call('/continue', child)).body).toEqual([]);
     });
 
-    it('lets an admin rate a series, and keeps it across scans', async () => {
-        const path = `/series/${ids.Unrated!.series}/age-rating`;
-
-        const set = await call(path, admin, {
-            method: 'PUT',
-            json: { ageRating: 'Everyone' },
-        });
-        expect(set.body).toMatchObject({ ageRating: 'Everyone', minAge: 0 });
-        expect(await visibleNames(child)).toContain('Unrated');
-
-        await ctx.scanner.scan(ctx.library.id);
-        expect(await visibleNames(child)).toContain('Unrated');
-
-        await call(path, admin, { method: 'PUT', json: { ageRating: null } });
-        expect(await visibleNames(child)).not.toContain('Unrated');
+    it('lists accounts with their limit, and tells each person theirs', async () => {
+        const list = (await call('/users', admin)).body;
+        expect(list).toContainEqual(
+            expect.objectContaining({ id: childId, maxAge: 13 }),
+        );
+        expect((await call('/me', child)).body).toMatchObject({ maxAge: 13 });
     });
 
-    it('keeps ratings and limits for admins, with checked values', async () => {
-        const path = `/series/${ids.Unrated!.series}/age-rating`;
-        expect(
-            (
-                await call(path, reader, {
-                    method: 'PUT',
-                    json: { ageRating: 'Teen' },
-                })
-            ).status,
-        ).toBe(403);
-        expect(
-            (
-                await call(path, admin, {
-                    method: 'PUT',
-                    json: { ageRating: 'PG-13' },
-                })
-            ).status,
-        ).toBe(400);
+    it('keeps account limits for admins, with checked values', async () => {
         expect((await call('/users', reader)).status).toBe(403);
         expect(
             (
@@ -236,13 +206,5 @@ describe('parental control', () => {
                 })
             ).status,
         ).toBe(404);
-    });
-
-    it('lists accounts with their limit, and tells each person theirs', async () => {
-        const list = (await call('/users', admin)).body;
-        expect(list).toContainEqual(
-            expect.objectContaining({ id: childId, maxAge: 13 }),
-        );
-        expect((await call('/me', child)).body).toMatchObject({ maxAge: 13 });
     });
 });

@@ -16,7 +16,6 @@ import {
 } from './auth/routes';
 import { listUsers, setUserMaxAge } from './auth/users';
 import type { Db } from './db';
-import { isAgeRating } from './library/ageRating';
 import {
     getSeries,
     getVolume,
@@ -24,7 +23,6 @@ import {
     listSeries,
     savePageSizes,
     seriesCoverOf,
-    setSeriesAgeRating,
 } from './library/catalog';
 import { type SeriesCovers, seriesCoverFile } from './library/covers';
 import type { LibraryFiles } from './library/files';
@@ -225,29 +223,6 @@ export const createApi = ({
             async (c) =>
                 c.json(await wikipedia.series(c.req.valid('param').id)),
         )
-        // Classification choisie dans Bento (null : celle des tomes).
-        .put(
-            '/series/:id/age-rating',
-            requireAdmin,
-            zValidator('param', idParam),
-            zValidator(
-                'json',
-                z.object({
-                    ageRating: z
-                        .string()
-                        .refine(isAgeRating, 'classification inconnue')
-                        .nullable(),
-                }),
-            ),
-            (c) =>
-                c.json(
-                    setSeriesAgeRating(
-                        db,
-                        c.req.valid('param').id,
-                        c.req.valid('json').ageRating,
-                    ),
-                ),
-        )
         .get('/volumes/:id', zValidator('param', idParam), (c) => {
             // Le chemin sur disque reste côté serveur.
             const {
@@ -345,6 +320,19 @@ export const createApi = ({
             requireAdmin,
             zValidator('param', idParam),
             async (c) => c.json(await files.drafts(c.req.valid('param').id)),
+        )
+        .get(
+            '/libraries/:id/drafts/files',
+            requireAdmin,
+            zValidator('param', idParam),
+            zValidator('query', z.object({ folder: z.string().min(1) })),
+            async (c) =>
+                c.json(
+                    await files.draftFolder(
+                        c.req.valid('param').id,
+                        c.req.valid('query').folder,
+                    ),
+                ),
         )
         .get(
             '/libraries/:id/files/info',

@@ -7,11 +7,15 @@ import {
     Group,
     Indicator,
     Menu,
+    Modal,
+    Select,
+    Stack,
     Text,
     Title,
     Tooltip,
     UnstyledButton,
 } from '@mantine/core';
+import { useDisclosure } from '@mantine/hooks';
 import { IconEye, IconInbox, IconLogout, IconUsers } from '@tabler/icons-react';
 import { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router';
@@ -21,6 +25,8 @@ import { fetchPendingDrafts, startPreview, stopPreview } from '@/services/api';
 import { logout, useCurrentUser } from '@/services/auth';
 
 const REFRESH_MS = 60_000;
+// Valeur du choix « Sans limite » (Select n'accepte pas de valeur vide).
+const NO_LIMIT = 'none';
 
 /** Change de vue (lecteur ou admin) : tout l'écran se recharge. */
 const switchView = async (action: () => Promise<unknown>) => {
@@ -74,76 +80,120 @@ const DraftsIndicator = () => {
     );
 };
 
+/** Choix de l'âge pour voir l'appli comme un lecteur (admin). */
+const PreviewModal = ({
+    opened,
+    onClose,
+}: {
+    opened: boolean;
+    onClose: () => void;
+}) => {
+    const { preview } = useCurrentUser();
+    // Âge proposé : celui de la vue en cours, sinon un enfant de 10 ans.
+    const [maxAge, setMaxAge] = useState<string>(
+        preview ? String(preview.maxAge ?? NO_LIMIT) : '10',
+    );
+    return (
+        <Modal opened={opened} onClose={onClose} title="Voir comme un lecteur">
+            <Stack>
+                <Text size="sm" c="dimmed">
+                    L’appli s’affiche comme pour un lecteur de cet âge : séries
+                    filtrées, écrans d’administration masqués.
+                </Text>
+                <Select
+                    label="Séries visibles"
+                    allowDeselect={false}
+                    value={maxAge}
+                    onChange={(value) => value && setMaxAge(value)}
+                    data={AGE_LIMITS.map((limit) => ({
+                        value: String(limit.value ?? NO_LIMIT),
+                        label: limit.label,
+                    }))}
+                    comboboxProps={{ withinPortal: false }}
+                />
+                <Group justify="flex-end">
+                    <Button variant="default" onClick={onClose}>
+                        Annuler
+                    </Button>
+                    <Button
+                        onClick={() =>
+                            void switchView(() =>
+                                startPreview(
+                                    maxAge === NO_LIMIT ? null : Number(maxAge),
+                                ),
+                            )
+                        }
+                    >
+                        Voir
+                    </Button>
+                </Group>
+            </Stack>
+        </Modal>
+    );
+};
+
 const UserMenu = () => {
     const user = useCurrentUser();
     const isAdmin = user.role === 'admin';
+    const [previewOpened, previewModal] = useDisclosure(false);
     return (
-        <Menu position="bottom-end">
-            <Menu.Target>
-                <UnstyledButton aria-label="Mon compte">
-                    <Avatar name={user.name} color="initials" size="md" />
-                </UnstyledButton>
-            </Menu.Target>
-            <Menu.Dropdown>
-                <Menu.Label>
-                    <Text size="sm" fw={500} c="bright">
-                        {user.name}
-                    </Text>
-                    {user.preview
-                        ? `Vue lecteur · ${ageLimitLabel(user.preview.maxAge)}`
-                        : isAdmin
-                          ? 'Administrateur'
-                          : 'Lecteur'}
-                </Menu.Label>
-                {isAdmin && (
-                    <Menu.Item
-                        component={Link}
-                        to="/users"
-                        leftSection={<IconUsers size={14} />}
-                    >
-                        Comptes et contrôle parental
-                    </Menu.Item>
-                )}
-                {(isAdmin || user.preview) && (
-                    <>
-                        <Menu.Divider />
-                        <Menu.Label>Voir comme un lecteur</Menu.Label>
-                        {AGE_LIMITS.map((limit) => (
+        <>
+            <PreviewModal opened={previewOpened} onClose={previewModal.close} />
+            <Menu position="bottom-end">
+                <Menu.Target>
+                    <UnstyledButton aria-label="Mon compte">
+                        <Avatar name={user.name} color="initials" size="md" />
+                    </UnstyledButton>
+                </Menu.Target>
+                <Menu.Dropdown>
+                    <Menu.Label>
+                        <Text size="sm" fw={500} c="bright">
+                            {user.name}
+                        </Text>
+                        {user.preview
+                            ? `Vue lecteur · ${ageLimitLabel(user.preview.maxAge)}`
+                            : isAdmin
+                              ? 'Administrateur'
+                              : 'Lecteur'}
+                    </Menu.Label>
+                    {isAdmin && (
+                        <Menu.Item
+                            component={Link}
+                            to="/users"
+                            leftSection={<IconUsers size={14} />}
+                        >
+                            Comptes et contrôle parental
+                        </Menu.Item>
+                    )}
+                    {(isAdmin || user.preview) && (
+                        <>
+                            <Menu.Divider />
                             <Menu.Item
-                                key={String(limit.value)}
                                 leftSection={<IconEye size={14} />}
-                                disabled={
-                                    !!user.preview &&
-                                    user.preview.maxAge === limit.value
-                                }
-                                onClick={() =>
-                                    void switchView(() =>
-                                        startPreview(limit.value),
-                                    )
-                                }
+                                onClick={previewModal.open}
                             >
-                                {limit.label}
+                                Voir comme un lecteur…
                             </Menu.Item>
-                        ))}
-                        {user.preview && (
-                            <Menu.Item
-                                color="orange"
-                                onClick={() => void switchView(stopPreview)}
-                            >
-                                Revenir à la vue admin
-                            </Menu.Item>
-                        )}
-                    </>
-                )}
-                <Menu.Divider />
-                <Menu.Item
-                    leftSection={<IconLogout size={14} />}
-                    onClick={() => void logout()}
-                >
-                    Se déconnecter
-                </Menu.Item>
-            </Menu.Dropdown>
-        </Menu>
+                            {user.preview && (
+                                <Menu.Item
+                                    color="orange"
+                                    onClick={() => void switchView(stopPreview)}
+                                >
+                                    Revenir à la vue admin
+                                </Menu.Item>
+                            )}
+                        </>
+                    )}
+                    <Menu.Divider />
+                    <Menu.Item
+                        leftSection={<IconLogout size={14} />}
+                        onClick={() => void logout()}
+                    >
+                        Se déconnecter
+                    </Menu.Item>
+                </Menu.Dropdown>
+            </Menu>
+        </>
     );
 };
 

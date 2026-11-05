@@ -259,7 +259,7 @@ export class LibraryScanner {
     /**
      * Supprime les séries vides et recopie dans chaque série les
      * métadonnées de son premier tome ; la classification est la plus
-     * restrictive de ses tomes (ou celle choisie dans Bento).
+     * restrictive de ses tomes.
      */
     private refreshSeries = (libraryId: number) => {
         this.db
@@ -277,7 +277,6 @@ export class LibraryScanner {
             .select({
                 id: series.id,
                 key: series.key,
-                ageRatingOverride: series.ageRatingOverride,
             })
             .from(series)
             .where(eq(series.libraryId, libraryId))
@@ -301,10 +300,7 @@ export class LibraryScanner {
                     name: info.Series ?? row.key,
                     summary: info.Summary ?? null,
                     genre: info.Genre ?? null,
-                    ...seriesAge(
-                        row.ageRatingOverride,
-                        infos.map((i) => i.AgeRating),
-                    ),
+                    ...seriesAge(infos.map((i) => i.AgeRating)),
                     year: info.Year ?? null,
                     count: info.Count ?? null,
                     writer: info.Writer ?? null,

@@ -29,15 +29,12 @@ export const minAgeOf = (rating: string | null | undefined): number | null =>
     isAgeRating(rating) ? AGE_RATINGS[rating] : null;
 
 /**
- * Classification d'une série et âge minimal correspondant : celle choisie
- * dans Bento, sinon la plus restrictive de ses tomes (un seul tome pour
- * adultes suffit).
+ * Classification d'une série et âge minimal correspondant : la plus
+ * restrictive de ses tomes (un seul tome pour adultes suffit).
  */
 export const seriesAge = (
-    override: string | null,
     volumeRatings: (string | null | undefined)[],
 ): { ageRating: string | null; minAge: number | null } => {
-    if (override) return { ageRating: override, minAge: minAgeOf(override) };
     let strictest: { ageRating: string; minAge: number } | undefined;
     for (const rating of volumeRatings) {
         const age = minAgeOf(rating);

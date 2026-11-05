@@ -294,40 +294,88 @@ export class LibraryFiles {
         return count;
     };
 
-    /** Brouillons de la bibliothèque, par dossier. */
-    drafts = async (libraryId: number) => {
-        const library = this.library(libraryId);
-        const draftRoot = path.join(library.path, DRAFT_FOLDER);
-        await this.convertDrafts(draftRoot);
-
-        const entries = await readdir(draftRoot, {
+    /** Archives (.cbz, .cbr) sous un dossier, triées par chemin. */
+    private archivesUnder = async (libraryPath: string, dir: string) => {
+        const entries = await readdir(dir, {
             withFileTypes: true,
             recursive: true,
         }).catch(() => []);
-        const files: FileInfo[] = [];
+        const archives: { fullPath: string; path: string; folder: string }[] =
+            [];
         for (const entry of entries) {
-            if (!entry.isFile()) continue;
-            const fullPath = path.join(entry.parentPath, entry.name);
             const extension = path.extname(entry.name).toLowerCase();
-            // Un .cbr reste listé tant que sa conversion échoue.
-            if (extension !== '.cbz' && !this.conversionErrors.has(fullPath)) {
+            if (
+                !entry.isFile() ||
+                (extension !== '.cbz' && !isCbr(entry.name))
+            ) {
                 continue;
             }
-            files.push(await this.infoOf(library.path, fullPath));
+            const fullPath = path.join(entry.parentPath, entry.name);
+            const relative = relativeTo(libraryPath, fullPath);
+            archives.push({
+                fullPath,
+                path: relative,
+                folder: path.posix.dirname(relative),
+            });
         }
-        const folders = new Map<string, FileInfo[]>();
-        for (const file of files.sort((a, b) =>
+        return archives.sort((a, b) =>
             a.path.localeCompare(b.path, undefined, { numeric: true }),
-        )) {
-            folders.set(file.folder, [
-                ...(folders.get(file.folder) ?? []),
-                file,
+        );
+    };
+
+    /**
+     * Dossiers de brouillons et leurs fichiers (nom, taille), sans ouvrir
+     * les archives : rapide, même avec des centaines de tomes.
+     */
+    drafts = async (libraryId: number) => {
+        const library = this.library(libraryId);
+        const archives = await this.archivesUnder(
+            library.path,
+            path.join(library.path, DRAFT_FOLDER),
+        );
+        const folders = new Map<
+            string,
+            { path: string; name: string; size: number }[]
+        >();
+        for (const archive of archives) {
+            const { size } = await stat(archive.fullPath).catch(() => ({
+                size: 0,
+            }));
+            folders.set(archive.folder, [
+                ...(folders.get(archive.folder) ?? []),
+                { path: archive.path, name: path.basename(archive.path), size },
             ]);
         }
-        return [...folders].map(([folder, folderFiles]) => ({
-            folder,
-            files: folderFiles,
-        }));
+        return [...folders].map(([folder, files]) => ({ folder, files }));
+    };
+
+    /**
+     * Fichiers d'un dossier de brouillons, avec leur ComicInfo : les
+     * archives de ce seul dossier sont lues (et les .cbr convertis).
+     */
+    draftFolder = async (libraryId: number, requested: string) => {
+        const library = this.library(libraryId);
+        // Chemin résolu dans _draft (« _draft/../Gantz » n'en est pas un).
+        const draftRoot = path.resolve(library.path, DRAFT_FOLDER);
+        const dir = path.resolve(library.path, ...requested.split('/'));
+        if (dir !== draftRoot && !dir.startsWith(draftRoot + path.sep)) {
+            throw notFound('Dossier de brouillons introuvable');
+        }
+        const folder = relativeTo(library.path, dir);
+        await this.convertDrafts(dir);
+        const files: FileInfo[] = [];
+        for (const archive of await this.archivesUnder(library.path, dir)) {
+            // Un .cbr reste listé tant que sa conversion échoue.
+            if (archive.folder !== folder) continue;
+            if (
+                isCbr(archive.path) &&
+                !this.conversionErrors.has(archive.fullPath)
+            ) {
+                continue;
+            }
+            files.push(await this.infoOf(library.path, archive.fullPath));
+        }
+        return files;
     };
 
     /**

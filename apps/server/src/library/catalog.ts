@@ -6,7 +6,6 @@ import type { LibraryConfig } from '../config';
 import type { Db } from '../db';
 import { libraries, readProgress, series, volumes } from '../db/schema';
 import { notFound } from '../tools/errors';
-import { seriesAge } from './ageRating';
 import { publicationPathOf } from './paths';
 import { coverFile } from './scanner';
 import { type Viewer, visibleTo } from './visibility';
@@ -121,7 +120,6 @@ export const getSeries = (db: Db, viewer: Viewer, id: number) => {
             summary: series.summary,
             genre: series.genre,
             ageRating: series.ageRating,
-            ageRatingOverride: series.ageRatingOverride,
             minAge: series.minAge,
             coverUpdatedAt: series.coverUpdatedAt,
             year: series.year,
@@ -224,31 +222,6 @@ export const getVolume = (db: Db, viewer: Viewer, id: number) => {
         nextId: siblings[index + 1] ?? null,
         fullPath: path.join(libraryPath, ...file.split('/')),
     };
-};
-
-/**
- * Classification d'une série choisie dans Bento (`null` : revenir à celle
- * des tomes). Recalcule aussitôt son âge minimal.
- */
-export const setSeriesAgeRating = (
-    db: Db,
-    id: number,
-    override: string | null,
-) => {
-    const ratings = db
-        .select({ comicInfo: volumes.comicInfo })
-        .from(volumes)
-        .where(eq(volumes.seriesId, id))
-        .all()
-        .map((v) => v.comicInfo.AgeRating);
-    const updated = db
-        .update(series)
-        .set({ ageRatingOverride: override, ...seriesAge(override, ratings) })
-        .where(eq(series.id, id))
-        .returning({ ageRating: series.ageRating, minAge: series.minAge })
-        .get();
-    if (!updated) throw notFound('Série introuvable');
-    return { ...updated, ageRatingOverride: override };
 };
 
 export const savePageSizes = (

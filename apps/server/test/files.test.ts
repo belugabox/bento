@@ -120,7 +120,41 @@ describe('publicationPathOf', () => {
 });
 
 describe('drafts', () => {
-    it('lists drafts by folder, with their ComicInfo and problems', async () => {
+    it('lists draft folders quickly, without reading the archives', async () => {
+        await writeCbz(ctx.file('_draft/Gantz (01-18)/Gantz T01.cbz'));
+        await writeFile(ctx.file('_draft/broken.cbz'), 'pas une archive');
+        await writeFile(ctx.file('_draft/Spirale.cbr'), 'pas lu ici');
+        await writeFile(ctx.file('_draft/notes.txt'), 'ignoré');
+
+        const { status, body } = await call(
+            `/libraries/${ctx.library.id}/drafts`,
+        );
+
+        expect(status).toBe(200);
+        expect(body).toEqual([
+            {
+                folder: '_draft',
+                files: [
+                    { path: '_draft/broken.cbz', name: 'broken.cbz', size: 15 },
+                    {
+                        path: '_draft/Spirale.cbr',
+                        name: 'Spirale.cbr',
+                        size: 10,
+                    },
+                ],
+            },
+            {
+                folder: '_draft/Gantz (01-18)',
+                files: [
+                    expect.objectContaining({
+                        path: '_draft/Gantz (01-18)/Gantz T01.cbz',
+                    }),
+                ],
+            },
+        ]);
+    });
+
+    it('reads one folder with its ComicInfo and problems', async () => {
         await writeCbz(ctx.file('_draft/Gantz (01-18)/Gantz T01.cbz'), {
             comicInfo: info('Gantz', '1'),
         });
@@ -130,19 +164,14 @@ describe('drafts', () => {
         const zip = new AdmZip();
         zip.addFile('p1.png', await png('#ff0000'));
         await writeFile(ctx.file('_draft/Spirale.cbr'), zip.toBuffer());
+        const folder = (name: string) =>
+            call(
+                `/libraries/${ctx.library.id}/drafts/files?folder=${encodeURIComponent(name)}`,
+            );
 
-        const { status, body } = await call(
-            `/libraries/${ctx.library.id}/drafts`,
-        );
-
-        expect(status).toBe(200);
-        expect(body.map((f: { folder: string }) => f.folder)).toEqual([
-            '_draft',
-            '_draft/Gantz (01-18)',
-        ]);
-        const [root, gantz] = body;
+        const root = (await folder('_draft')).body;
         expect(
-            root.files.map((f: { name: string; error: string | null }) => [
+            root.map((f: { name: string; error: string | null }) => [
                 f.name,
                 f.error,
             ]),
@@ -150,14 +179,21 @@ describe('drafts', () => {
             ['broken.cbz', "Archive illisible : ce n'est pas une archive ZIP"],
             ['Spirale.cbz', null],
         ]);
-        expect(gantz.files[0]).toMatchObject({
+
+        const gantz = (await folder('_draft/Gantz (01-18)')).body;
+        expect(gantz[0]).toMatchObject({
             name: 'Gantz T01.cbz',
             draft: true,
             pageCount: 2,
             comicInfo: { Series: 'Gantz', Number: '1' },
             publicationPath: 'Gantz/Gantz #01.cbz',
         });
-        expect(gantz.files[1].publicationPath).toBeNull();
+        expect(gantz[1].publicationPath).toBeNull();
+
+        // Seulement des dossiers de brouillons.
+        expect((await folder('Gantz')).status).toBe(404);
+        expect((await folder('_draft/../Gantz')).status).toBe(404);
+        expect((await folder('_draft/../..')).status).toBe(404);
     });
 
     it('serves the cover and pages of a draft', async () => {

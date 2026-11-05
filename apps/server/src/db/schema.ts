@@ -51,8 +51,6 @@ export const series = sqliteTable(
         summary: text('summary'),
         genre: text('genre'),
         ageRating: text('age_rating'),
-        // Classification choisie dans Bento ; prime sur celle des tomes.
-        ageRatingOverride: text('age_rating_override'),
         // Âge minimal pour la lire, déduit de la classification ; null = inconnu.
         minAge: integer('min_age'),
         // Couverture choisie (fichier covers/series-<id>.webp) : date de mise

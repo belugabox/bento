@@ -8,7 +8,6 @@ import {
     Group,
     Image,
     Loader,
-    Select,
     SimpleGrid,
     Stack,
     Text,
@@ -25,11 +24,7 @@ import type { MouseEvent } from 'react';
 import { Link, useParams } from 'react-router';
 
 import { CoverCard } from '@/components/CoverCard';
-import {
-    AGE_RATING_OPTIONS,
-    ageRatingLabel,
-    canonicalRating,
-} from '@/components/ageLimits';
+import { ageRatingLabel } from '@/components/ageLimits';
 import {
     nextToRead,
     progressRatio,
@@ -40,13 +35,9 @@ import {
     fetchSeries,
     saveProgress,
     seriesCoverUrl,
-    setSeriesAgeRating,
 } from '@/services/api';
 import { useCurrentUser } from '@/services/auth';
 import { useQuery } from '@/services/useQuery';
-
-// Valeur du choix « classification des tomes » (pas de classification forcée).
-const FROM_VOLUMES = 'auto';
 
 const ACTION_LABELS = {
     start: 'Lire',
@@ -153,37 +144,6 @@ export const SeriesPage = () => {
                         >
                             Modifier les métadonnées
                         </Button>
-                    )}
-                    {isAdmin && (
-                        <Select
-                            size="xs"
-                            w={260}
-                            label="Classification (contrôle parental)"
-                            description={
-                                series.minAge === null
-                                    ? 'Inconnue : série masquée aux comptes limités'
-                                    : undefined
-                            }
-                            allowDeselect={false}
-                            value={
-                                canonicalRating(series.ageRatingOverride) ??
-                                FROM_VOLUMES
-                            }
-                            onChange={async (value) => {
-                                await setSeriesAgeRating(
-                                    series.id,
-                                    value === FROM_VOLUMES ? null : value,
-                                );
-                                reload();
-                            }}
-                            data={[
-                                {
-                                    value: FROM_VOLUMES,
-                                    label: 'Celle des tomes',
-                                },
-                                ...AGE_RATING_OPTIONS,
-                            ]}
-                        />
                     )}
                     {series.summary && (
                         <Text size="sm" style={{ whiteSpace: 'pre-line' }}>

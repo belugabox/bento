@@ -91,17 +91,6 @@ export type Account = Awaited<ReturnType<typeof fetchUsers>>[number];
 export const setUserMaxAge = (userId: number, maxAge: number | null) =>
     json(api.users[':id'].$patch({ ...id(userId), json: { maxAge } }));
 
-export const setSeriesAgeRating = (
-    seriesId: number,
-    ageRating: string | null,
-) =>
-    json(
-        api.series[':id']['age-rating'].$put({
-            ...id(seriesId),
-            json: { ageRating },
-        }),
-    );
-
 /** Largeur et hauteur de chaque page (double page). */
 export const fetchPageSizes = (volumeId: number) =>
     json(api.volumes[':id']['page-sizes'].$get(id(volumeId)));
@@ -114,7 +103,17 @@ export const fetchDrafts = (library: number) =>
     json(api.libraries[':id'].drafts.$get(libraryId(library)));
 
 export type DraftFolder = Awaited<ReturnType<typeof fetchDrafts>>[number];
-export type LibraryFile = DraftFolder['files'][number];
+
+/** Fichiers d'un dossier de brouillons, avec leur ComicInfo (archives lues). */
+export const fetchDraftFolder = (library: number, folder: string) =>
+    json(
+        api.libraries[':id'].drafts.files.$get({
+            ...libraryId(library),
+            query: { folder },
+        }),
+    );
+
+export type LibraryFile = Awaited<ReturnType<typeof fetchDraftFolder>>[number];
 
 export const saveComicInfo = (
     library: number,
