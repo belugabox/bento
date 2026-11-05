@@ -144,6 +144,8 @@ export const getSeries = (db: Db, viewer: Viewer, id: number) => {
             pageCount: volumes.pageCount,
             size: volumes.size,
             addedAt: volumes.addedAt,
+            // Chemin dans la bibliothèque : seulement pour un admin.
+            file: viewer.role === 'admin' ? volumes.file : sql<null>`null`,
             // Progression de la personne ; null = pas commencé.
             progress: {
                 page: readProgress.page,

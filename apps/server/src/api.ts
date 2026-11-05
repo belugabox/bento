@@ -4,6 +4,8 @@ import { readFile } from 'node:fs/promises';
 import { z } from 'zod';
 
 import type { PageReader } from './archive/archive';
+import { NUMBER_FIELDS } from './archive/comicInfo';
+import { COMIC_INFO_FIELDS } from './archive/write';
 import {
     type AuthDeps,
     type AuthEnv,
@@ -22,6 +24,7 @@ import {
     savePageSizes,
     setSeriesAgeRating,
 } from './library/catalog';
+import type { LibraryFiles } from './library/files';
 import { getProgress, listInProgress, saveProgress } from './library/progress';
 import { type LibraryScanner, coverFile } from './library/scanner';
 import { AppError, notFound } from './tools/errors';
@@ -35,10 +38,39 @@ export type ApiDeps = {
     scanner: LibraryScanner;
     pages: PageReader;
     coversPath: string;
+    files: LibraryFiles;
     auth: Omit<AuthDeps, 'db' | 'logger'>;
 };
 
 const idParam = z.object({ id: z.coerce.number().int().positive() });
+
+// Fichier d'une bibliothèque, relatif à sa racine.
+const fileQuery = z.object({ path: z.string().min(1) });
+
+const NUMERIC = new Set<string>(NUMBER_FIELDS);
+
+// Modifications d'un ComicInfo : champs connus, null ou vide pour retirer.
+const comicInfoChanges = z
+    .record(z.string(), z.union([z.string(), z.number(), z.null()]))
+    .superRefine((changes, ctx) => {
+        for (const [field, value] of Object.entries(changes)) {
+            if (!(COMIC_INFO_FIELDS as string[]).includes(field)) {
+                ctx.addIssue({
+                    code: 'custom',
+                    message: `champ inconnu ${field}`,
+                });
+            } else if (
+                value !== null &&
+                value !== '' &&
+                NUMERIC.has(field) !== (typeof value === 'number')
+            ) {
+                ctx.addIssue({
+                    code: 'custom',
+                    message: `${field} : type invalide`,
+                });
+            }
+        }
+    });
 
 /** Routes de l'API, montées sous `/api`. */
 export const createApi = ({
@@ -48,6 +80,7 @@ export const createApi = ({
     scanner,
     pages,
     coversPath,
+    files,
     auth,
 }: ApiDeps) =>
     new Hono<AuthEnv>()
@@ -220,6 +253,109 @@ export const createApi = ({
                     'Cache-Control': 'private, max-age=3600',
                 });
             },
+        )
+        // --- Gestion des fichiers (admin) : brouillons, ComicInfo, rangement.
+        .get(
+            '/libraries/:id/drafts',
+            requireAdmin,
+            zValidator('param', idParam),
+            async (c) => c.json(await files.drafts(c.req.valid('param').id)),
+        )
+        .get(
+            '/libraries/:id/files/info',
+            requireAdmin,
+            zValidator('param', idParam),
+            zValidator('query', fileQuery),
+            async (c) =>
+                c.json(
+                    await files.info(
+                        c.req.valid('param').id,
+                        c.req.valid('query').path,
+                    ),
+                ),
+        )
+        .get(
+            '/libraries/:id/files/cover',
+            requireAdmin,
+            zValidator('param', idParam),
+            zValidator('query', fileQuery),
+            async (c) => {
+                const { id } = c.req.valid('param');
+                const { path } = c.req.valid('query');
+                // Lire le fichier génère sa couverture au besoin.
+                await files.info(id, path);
+                const cover = await readFile(
+                    files.coverPath(files.fullPath(id, path)),
+                ).catch(() => {
+                    throw notFound('Couverture introuvable');
+                });
+                return c.body(new Uint8Array(cover), 200, {
+                    'Content-Type': 'image/webp',
+                    'Cache-Control': 'private, no-cache',
+                });
+            },
+        )
+        .get(
+            '/libraries/:id/files/pages/:index',
+            requireAdmin,
+            zValidator(
+                'param',
+                idParam.extend({ index: z.coerce.number().int().min(0) }),
+            ),
+            zValidator('query', fileQuery),
+            async (c) => {
+                const { id, index } = c.req.valid('param');
+                const { data, type } = await files.page(
+                    id,
+                    c.req.valid('query').path,
+                    index,
+                );
+                return c.body(new Uint8Array(data), 200, {
+                    'Content-Type': type,
+                    'Cache-Control': 'private, no-cache',
+                });
+            },
+        )
+        .put(
+            '/libraries/:id/files/comic-info',
+            requireAdmin,
+            zValidator('param', idParam),
+            zValidator(
+                'json',
+                z.object({
+                    updates: z
+                        .array(
+                            z.object({
+                                path: z.string().min(1),
+                                changes: comicInfoChanges,
+                            }),
+                        )
+                        .min(1),
+                }),
+            ),
+            async (c) =>
+                c.json(
+                    await files.updateComicInfo(
+                        c.req.valid('param').id,
+                        c.req.valid('json').updates,
+                    ),
+                ),
+        )
+        .post(
+            '/libraries/:id/files/publish',
+            requireAdmin,
+            zValidator('param', idParam),
+            zValidator(
+                'json',
+                z.object({ paths: z.array(z.string().min(1)).min(1) }),
+            ),
+            async (c) =>
+                c.json(
+                    await files.publish(
+                        c.req.valid('param').id,
+                        c.req.valid('json').paths,
+                    ),
+                ),
         )
         // Comptes et contrôle parental (admin).
         .get('/users', requireAdmin, (c) => c.json(listUsers(db)))

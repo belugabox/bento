@@ -98,7 +98,7 @@ const STRING_FIELDS = [
     'Review',
 ] as const;
 
-const NUMBER_FIELDS = [
+export const NUMBER_FIELDS = [
     'Count',
     'Volume',
     'AlternateCount',

@@ -23,6 +23,7 @@ const build = (publicUrl?: string) =>
         scanner: ctx.scanner,
         pages: ctx.pages,
         coversPath: ctx.coversPath,
+        files: ctx.files,
         auth: { ...authDeps(oidc.client), ...(publicUrl && { publicUrl }) },
     });
 

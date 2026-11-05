@@ -11,6 +11,7 @@ import { type Role, createSession, upsertUser } from '../src/auth/sessions';
 import type { Db } from '../src/db';
 import { openDatabase } from '../src/db';
 import { syncLibraries } from '../src/library/catalog';
+import { LibraryFiles } from '../src/library/files';
 import { LibraryScanner } from '../src/library/scanner';
 
 export const silent = pino({ level: 'silent' });
@@ -57,13 +58,21 @@ export const setup = async (type: 'manga' | 'comics' = 'manga') => {
         coversPath,
     );
     const scanner = new LibraryScanner(database.db, coversPath, silent);
+    const pages = new PageReader();
     return {
         db: database.db,
         root,
         coversPath,
         library: library!,
         scanner,
-        pages: new PageReader(),
+        pages,
+        files: new LibraryFiles(
+            database.db,
+            scanner,
+            pages,
+            coversPath,
+            silent,
+        ),
         file: (relative: string) => path.join(root, ...relative.split('/')),
         cleanup: async () => {
             database.close();

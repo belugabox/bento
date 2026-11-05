@@ -4,7 +4,7 @@ import { writeFile } from 'node:fs/promises';
 import { type ComicInfo, readComicInfo } from './comicInfo';
 
 // Ordre des champs dans ComicInfo.xml (schéma Anansi).
-const FIELDS: (keyof ComicInfo)[] = [
+export const COMIC_INFO_FIELDS: (keyof ComicInfo)[] = [
     'Title',
     'Series',
     'Number',
@@ -56,7 +56,7 @@ export const escapeXml = (str: string): string =>
 
 export const buildComicInfoXml = (comicInfo: ComicInfo): Buffer => {
     let xml = '<?xml version="1.0" encoding="utf-8"?>\n<ComicInfo>\n';
-    for (const field of FIELDS) {
+    for (const field of COMIC_INFO_FIELDS) {
         const value = comicInfo[field];
         if (value === undefined || value === '') continue;
         xml += `  <${field}>${escapeXml(String(value))}</${field}>\n`;

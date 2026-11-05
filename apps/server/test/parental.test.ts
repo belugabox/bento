@@ -54,6 +54,7 @@ beforeEach(async () => {
         scanner: ctx.scanner,
         pages: ctx.pages,
         coversPath: ctx.coversPath,
+        files: ctx.files,
         auth: authDeps(),
     });
     admin = sessionCookie(ctx.db, 'admin');

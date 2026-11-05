@@ -11,6 +11,7 @@ import { OidcClient } from './auth/oidc';
 import { loadConfig } from './config';
 import { openDatabase } from './db';
 import { syncLibraries } from './library/catalog';
+import { LibraryFiles } from './library/files';
 import { LibraryScanner } from './library/scanner';
 import { createLogger } from './tools/logger';
 
@@ -32,6 +33,7 @@ const database = openDatabase(config.DB_FILE);
 logger.info(`Base de données : ${config.DB_FILE}`);
 
 const scanner = new LibraryScanner(database.db, config.COVERS_PATH, logger);
+const pages = new PageReader();
 
 /** Scanne les bibliothèques l'une après l'autre. */
 const scanAll = async (libraryIds: number[]) => {
@@ -50,8 +52,15 @@ const app = new Hono()
             logger,
             version,
             scanner,
-            pages: new PageReader(),
+            pages,
             coversPath: config.COVERS_PATH,
+            files: new LibraryFiles(
+                database.db,
+                scanner,
+                pages,
+                config.COVERS_PATH,
+                logger,
+            ),
             auth: {
                 oidc: new OidcClient({
                     issuer: config.OIDC_ISSUER,
