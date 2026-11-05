@@ -9,6 +9,7 @@ import {
     isFieldChanged,
     isMixed,
     isSeriesFieldChanged,
+    joinSeries,
     seriesValue,
     setSeriesField,
     statusFromWikipedia,
@@ -53,6 +54,25 @@ describe('series fields', () => {
 
         edits = setSeriesField(edits, 'Genre', '');
         expect(edits[first]).toEqual({ Series: 'Spy x Family', Number: '1' });
+    });
+});
+
+describe('joinSeries', () => {
+    it('takes the name and series fields of a published series', () => {
+        const edits = joinSeries(
+            setSeriesField(initialEdits(volumes), 'Genre', 'Comédie'),
+            'SPY×FAMILY',
+            { Series: 'Spy', Writer: 'Tatsuya Endō', Genre: '', Number: '3' },
+        );
+
+        expect(edits[second]).toEqual({
+            Series: 'SPY×FAMILY',
+            Writer: 'Tatsuya Endō',
+            // Champ vide dans la série : la saisie est gardée.
+            Genre: 'Comédie',
+        });
+        // Le numéro de chaque tome ne change pas.
+        expect(edits[first]?.Number).toBe('1');
     });
 });
 

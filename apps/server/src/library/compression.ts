@@ -1,4 +1,7 @@
+import path from 'node:path';
+
 import type { CompressionOptions } from '../archive/compress';
+import type { TaskList } from '../tasks';
 import type { Logger } from '../tools/logger';
 import type { LibraryFiles } from './files';
 
@@ -28,6 +31,7 @@ export class CompressionQueue {
         private readonly logger: Logger,
         // Réglages lus au début de chaque tome.
         private readonly options: () => CompressionOptions,
+        private readonly tasks?: TaskList,
     ) {}
 
     /** Ajoute des fichiers (chemins vérifiés tout de suite). */
@@ -71,10 +75,19 @@ export class CompressionQueue {
     private run = async () => {
         if (this.running) return;
         this.running = true;
+        const task = this.tasks?.start('Compression');
+        let done = 0;
         try {
             let job: CompressionJob | undefined;
             while ((job = this.jobs.find((j) => j.state === 'pending'))) {
                 job.state = 'running';
+                const pending = this.jobs.filter(
+                    (j) => j.state === 'pending',
+                ).length;
+                task?.rename(
+                    `Compression de « ${path.posix.basename(job.path)} »`,
+                );
+                task?.progress(done, done + pending + 1);
                 try {
                     Object.assign(
                         job,
@@ -93,6 +106,7 @@ export class CompressionQueue {
                         `Compression de ${job.path} : ${job.error}`,
                     );
                 }
+                done++;
             }
             const finished = this.jobs.filter(
                 (j) => j.state === 'done' || j.state === 'failed',
@@ -104,6 +118,7 @@ export class CompressionQueue {
                 this.jobs = this.jobs.filter((j) => !dropped.has(j));
             }
         } finally {
+            task?.finish();
             this.running = false;
         }
     };

@@ -15,6 +15,21 @@ export const volumeLabel = (volume: {
 }) =>
     volume.number ? `Tome ${volume.number}` : (volume.title ?? 'Hors-série');
 
+/**
+ * Titre propre d'un tome, à afficher sous son libellé ; null s'il n'en a
+ * pas, ou s'il répète le libellé (« Tome 3 », rempli d'après le numéro).
+ */
+export const volumeTitleOf = (volume: {
+    number: string | null;
+    title: string | null;
+}) => {
+    const title = volume.title?.trim();
+    if (!title || !volume.number) return null;
+    const number = volume.number.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const repeated = new RegExp(`^(tome|vol(ume)?\\.?)\\s*0*${number}$`, 'i');
+    return repeated.test(title) ? null : title;
+};
+
 /** Avancement d'un tome (0 à 1) ; un tome lu est à 1. */
 export const progressRatio = (volume: {
     pageCount: number;

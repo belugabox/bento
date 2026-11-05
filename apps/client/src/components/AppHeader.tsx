@@ -6,8 +6,11 @@ import {
     Button,
     Group,
     Indicator,
+    Loader,
     Menu,
     Modal,
+    Popover,
+    Progress,
     Select,
     Stack,
     Text,
@@ -17,6 +20,7 @@ import {
 } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import {
+    IconActivity,
     IconChartBar,
     IconEye,
     IconFolders,
@@ -31,10 +35,19 @@ import { Link, useLocation } from 'react-router';
 
 import { AppearanceModal } from '@/components/AppearanceModal';
 import { AGE_LIMITS, ageLimitLabel } from '@/components/ageLimits';
-import { fetchPendingDrafts, startPreview, stopPreview } from '@/services/api';
+import {
+    type Task,
+    fetchPendingDrafts,
+    fetchTasks,
+    startPreview,
+    stopPreview,
+} from '@/services/api';
 import { logout, useCurrentUser } from '@/services/auth';
 
 const REFRESH_MS = 60_000;
+// Tâches : suivies de près pendant qu'il y en a, sinon de temps en temps.
+const TASKS_ACTIVE_MS = 2_000;
+const TASKS_IDLE_MS = 15_000;
 // Valeur du choix « Sans limite » (Select n'accepte pas de valeur vide).
 const NO_LIMIT = 'none';
 
@@ -87,6 +100,107 @@ const DraftsIndicator = () => {
                 </ActionIcon>
             </Indicator>
         </Tooltip>
+    );
+};
+
+/** Icône des tâches de fond en cours (scan, compression…), pour l'admin. */
+const TasksIndicator = () => {
+    const location = useLocation();
+    const [tasks, setTasks] = useState<Task[]>([]);
+
+    // Au changement de page (une action a pu en lancer une) et régulièrement.
+    useEffect(() => {
+        let timer: ReturnType<typeof setTimeout>;
+        let stopped = false;
+        const load = async () => {
+            const current = await fetchTasks().catch(() => undefined);
+            if (stopped) return;
+            if (current) setTasks(current);
+            timer = setTimeout(
+                () => void load(),
+                current?.length ? TASKS_ACTIVE_MS : TASKS_IDLE_MS,
+            );
+        };
+        void load();
+        return () => {
+            stopped = true;
+            clearTimeout(timer);
+        };
+    }, [location.pathname]);
+
+    const running = tasks.length > 0;
+    return (
+        <Popover position="bottom-end" width={300} shadow="md">
+            <Popover.Target>
+                <Indicator
+                    label={tasks.length}
+                    size={18}
+                    disabled={!running}
+                    offset={4}
+                >
+                    <ActionIcon
+                        variant="subtle"
+                        color="gray"
+                        size="lg"
+                        aria-label={
+                            running
+                                ? `${tasks.length} tâche(s) en cours`
+                                : 'Tâches'
+                        }
+                    >
+                        {running ? (
+                            <Loader size={18} />
+                        ) : (
+                            <IconActivity size={20} />
+                        )}
+                    </ActionIcon>
+                </Indicator>
+            </Popover.Target>
+            <Popover.Dropdown>
+                {running ? (
+                    <Stack gap="sm">
+                        {tasks.map((task) => (
+                            <Stack key={task.id} gap={4}>
+                                <Group
+                                    justify="space-between"
+                                    gap="xs"
+                                    wrap="nowrap"
+                                >
+                                    <Text size="sm" lineClamp={1}>
+                                        {task.label}
+                                    </Text>
+                                    {task.total !== undefined && (
+                                        <Text
+                                            size="xs"
+                                            c="dimmed"
+                                            style={{ flexShrink: 0 }}
+                                        >
+                                            {task.done} / {task.total}
+                                        </Text>
+                                    )}
+                                </Group>
+                                <Progress
+                                    size="sm"
+                                    value={
+                                        task.total
+                                            ? ((task.done ?? 0) / task.total) *
+                                              100
+                                            : 100
+                                    }
+                                    animated={!task.total}
+                                    striped={!task.total}
+                                    aria-label={task.label}
+                                />
+                            </Stack>
+                        ))}
+                    </Stack>
+                ) : (
+                    <Text size="sm" c="dimmed">
+                        Aucune tâche en cours.
+                    </Text>
+                )}
+            </Popover.Dropdown>
+        </Popover>
     );
 };
 
@@ -246,7 +360,7 @@ const UserMenu = () => {
     );
 };
 
-/** En-tête : logo, brouillons (admin) et menu du compte. */
+/** En-tête : logo, tâches et brouillons (admin), menu du compte. */
 export const AppHeader = () => {
     const user = useCurrentUser();
     return (
@@ -255,6 +369,7 @@ export const AppHeader = () => {
                 <Title order={3}>🍱 Bento</Title>
             </Anchor>
             <Group gap="sm">
+                {user.role === 'admin' && <TasksIndicator />}
                 {user.role === 'admin' && <DraftsIndicator />}
                 <UserMenu />
             </Group>

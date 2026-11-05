@@ -62,6 +62,8 @@ beforeEach(() => {
                     page: 9,
                     pageCount: 20,
                     updatedAt: '2026-03-02T00:00:00.000Z',
+                    readCount: 1,
+                    volumeCount: 3,
                 },
             ]);
         }
@@ -115,7 +117,14 @@ describe('LibraryPage', () => {
         show();
 
         expect(await screen.findByText('Reprendre la lecture')).toBeTruthy();
-        expect(screen.getByText('Tome 2')).toBeTruthy();
+        // Le tome en cours, et l'avancement dans la série.
+        expect(screen.getByText('Tome 2 · 1 / 3 lus')).toBeTruthy();
+        // Un tome lu sur trois, plus la moitié du deuxième.
+        expect(
+            screen
+                .getAllByLabelText('Avancement')[0]!
+                .getAttribute('aria-valuenow'),
+        ).toBe('50');
         await vi.waitFor(() =>
             expect(titles()).toEqual(['/series/1', '/series/2', '/series/3']),
         );
@@ -137,19 +146,19 @@ describe('LibraryPage', () => {
 
         fireEvent.click(screen.getByText('Toutes'));
         fireEvent.click(
-            screen.getByRole('textbox', { name: 'Trier les séries' }),
+            screen.getByRole('button', { name: 'Trier les séries' }),
         );
         fireEvent.click(await screen.findByText('Ajouts récents'));
         expect(titles()).toEqual(['/series/2', '/series/3', '/series/1']);
         expect(location).toBe('?sort=recent');
     });
 
-    it('suggests what comes next and the newest volumes', async () => {
+    it('suggests what comes next, without the newest volumes', async () => {
         show();
 
         expect(await screen.findByText('La suite de tes séries')).toBeTruthy();
-        expect(screen.getByText('Nouveautés')).toBeTruthy();
-        expect(screen.getByText('Tome 41')).toBeTruthy();
+        expect(screen.queryByText('Nouveautés')).toBeNull();
+        expect(screen.queryByText('Tome 41')).toBeNull();
         expect(
             screen
                 .getAllByRole('link')
@@ -162,14 +171,25 @@ describe('LibraryPage', () => {
         await screen.findByTestId('series-grid');
         await vi.waitFor(() => expect(titles()).toHaveLength(3));
 
-        fireEvent.click(screen.getByRole('textbox', { name: 'Liste' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Filtres' }));
+        fireEvent.click(await screen.findByRole('textbox', { name: 'Liste' }));
         fireEvent.click(await screen.findByText('Mes favoris'));
         expect(titles()).toEqual(['/series/2']);
         expect(location).toBe('?list=favorite');
+        // Filtre actif : en pastille, qu'on peut retirer.
+        expect(screen.getAllByText('Mes favoris').length).toBeGreaterThan(0);
 
         fireEvent.click(screen.getByRole('textbox', { name: 'Liste' }));
         fireEvent.click(await screen.findByText('Classiques'));
         expect(titles()).toEqual(['/series/1']);
         expect(location).toBe('?list=collection%3A7');
+
+        fireEvent.click(
+            screen.getByRole('button', {
+                name: 'Retirer le filtre Classiques',
+            }),
+        );
+        expect(titles()).toHaveLength(3);
+        expect(location).toBe('');
     });
 });

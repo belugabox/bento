@@ -16,6 +16,7 @@ export const CoverCard = ({
     to,
     cover,
     title,
+    caption,
     subtitle,
     progress,
     corner,
@@ -24,6 +25,11 @@ export const CoverCard = ({
     /** Adresse de l'image de couverture. */
     cover: string | null;
     title: string;
+    /**
+     * Ligne sous le titre (titre d'un tome), coupée par « … ». Une chaîne
+     * vide garde la place : les vignettes d'une grille restent alignées.
+     */
+    caption?: string;
     subtitle?: string;
     /** Avancement de lecture (0 à 1), en barre sous la couverture. */
     progress?: number;
@@ -69,8 +75,18 @@ export const CoverCard = ({
             <Text size="sm" fw={500} lineClamp={1} px="xs" pt={6} title={title}>
                 {title}
             </Text>
+            {caption !== undefined && (
+                <Text
+                    size="xs"
+                    lineClamp={1}
+                    px="xs"
+                    title={caption || undefined}
+                >
+                    {caption || ' '}
+                </Text>
+            )}
             {subtitle && (
-                <Text size="xs" c="dimmed" px="xs" pb={6}>
+                <Text size="xs" c="dimmed" lineClamp={1} px="xs" pb={6}>
                     {subtitle}
                 </Text>
             )}

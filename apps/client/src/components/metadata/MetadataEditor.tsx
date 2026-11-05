@@ -43,6 +43,7 @@ import {
 } from '@/services/api';
 
 import { CompressionModal } from './CompressionModal';
+import { ExistingSeriesPicker } from './ExistingSeriesPicker';
 import { WikipediaSearch } from './WikipediaSearch';
 import {
     type EditableVolume,
@@ -56,6 +57,7 @@ import {
     isFieldChanged,
     isMixed,
     isSeriesFieldChanged,
+    joinSeries,
     seriesValue,
     setSeriesField,
     setVolumeField,
@@ -366,6 +368,18 @@ export const MetadataEditor = ({
             <Paper withBorder p="md" radius="md">
                 <Stack gap="sm">
                     <Text fw={600}>Série</Text>
+                    {mode === 'drafts' && (
+                        <SimpleGrid cols={{ base: 1, sm: 3 }}>
+                            <ExistingSeriesPicker
+                                libraryId={libraryId}
+                                onJoin={(name, source) =>
+                                    setEdits((current) =>
+                                        joinSeries(current, name, source),
+                                    )
+                                }
+                            />
+                        </SimpleGrid>
+                    )}
                     <SimpleGrid cols={{ base: 1, sm: 3 }}>
                         <TextInput
                             label="Nom"

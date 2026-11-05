@@ -8,8 +8,10 @@ import { parseVolumeFileName } from '../archive/fileName';
 import { readImage } from '../archive/image';
 import type { Db } from '../db';
 import { libraries, series, volumes } from '../db/schema';
+import { TaskList } from '../tasks';
 import type { Logger } from '../tools/logger';
 import { seriesAge } from './ageRating';
+import { smallCoverFile } from './smallCovers';
 
 export type ScanResult = {
     added: number;
@@ -95,6 +97,8 @@ export class LibraryScanner {
         private readonly db: Db,
         private readonly coversPath: string,
         private readonly logger: Logger,
+        // Tâches de fond, partagées avec l'API (icône des tâches).
+        readonly tasks = new TaskList(),
     ) {}
 
     isScanning = (libraryId: number) => this.running.has(libraryId);
@@ -117,6 +121,19 @@ export class LibraryScanner {
             .get();
         if (!library) throw new Error(`Bibliothèque ${libraryId} inconnue`);
 
+        const task = this.tasks.start(`Scan de « ${library.name} »`);
+        try {
+            return await this.scanLibrary(library, task);
+        } finally {
+            task.finish();
+        }
+    };
+
+    private scanLibrary = async (
+        library: typeof libraries.$inferSelect,
+        task: ReturnType<TaskList['start']>,
+    ): Promise<ScanResult> => {
+        const libraryId = library.id;
         const started = Date.now();
         const result: ScanResult = {
             added: 0,
@@ -142,7 +159,8 @@ export class LibraryScanner {
         );
 
         const kept: string[] = [];
-        for (const archive of found) {
+        for (const [index, archive] of found.entries()) {
+            task.progress(index, found.length);
             const previous = known.get(archive.file);
             if (
                 previous &&
@@ -256,9 +274,12 @@ export class LibraryScanner {
         if (gone.length === 0) return 0;
         this.db.delete(volumes).where(inArray(volumes.id, gone)).run();
         await Promise.all(
-            gone.map((id) =>
+            gone.flatMap((id) => [
                 rm(coverFile(this.coversPath, id), { force: true }),
-            ),
+                rm(smallCoverFile(coverFile(this.coversPath, id)), {
+                    force: true,
+                }),
+            ]),
         );
         return gone.length;
     };
