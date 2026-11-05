@@ -86,6 +86,8 @@ export class SeriesCovers {
         }
         const response = await this.fetchFn(parsed, {
             headers: { 'User-Agent': USER_AGENT },
+            // Une redirection pourrait mener hors de Wikimedia.
+            redirect: 'error',
             signal: AbortSignal.timeout(15_000),
         }).catch(() => undefined);
         if (!response?.ok) throw badGateway('Image introuvable sur Wikimedia');

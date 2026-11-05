@@ -26,6 +26,8 @@ export type OidcUser = {
 };
 
 const SCOPES = 'openid profile email groups';
+// Délai d'une requête vers Pocket ID, pour ne pas bloquer la connexion.
+const TIMEOUT_MS = 10_000;
 
 /** Chaîne aléatoire URL-safe (state, code_verifier, jetons de session). */
 export const randomToken = (bytes = 32) =>
@@ -52,7 +54,9 @@ export class OidcClient {
     private discover = (): Promise<Discovery> => {
         this.discovery ??= (async () => {
             const url = `${this.config.issuer.replace(/\/+$/, '')}/.well-known/openid-configuration`;
-            const response = await this.fetchFn(url).catch(() => undefined);
+            const response = await this.fetchFn(url, {
+                signal: AbortSignal.timeout(TIMEOUT_MS),
+            }).catch(() => undefined);
             if (!response?.ok) {
                 throw badGateway('Pocket ID est injoignable');
             }
@@ -115,6 +119,7 @@ export class OidcClient {
                 redirect_uri: this.config.redirectUri,
                 code_verifier: verifier,
             }),
+            signal: AbortSignal.timeout(TIMEOUT_MS),
         }).catch(() => undefined);
         if (!tokenResponse?.ok) {
             throw badGateway('Pocket ID a refusé la connexion');
@@ -126,6 +131,7 @@ export class OidcClient {
 
         const infoResponse = await this.fetchFn(userinfo_endpoint, {
             headers: { Authorization: `Bearer ${access_token}` },
+            signal: AbortSignal.timeout(TIMEOUT_MS),
         }).catch(() => undefined);
         if (!infoResponse?.ok) {
             throw badGateway('Pocket ID : identité illisible');

@@ -117,6 +117,23 @@ describe('publicationPathOf', () => {
             '..-AC-DC/..-AC-DC #01.cbz',
         );
     });
+
+    it('avoids characters Windows refuses in a folder name', () => {
+        expect(
+            publicationPathOf({
+                Series: 'Fullmetal Alchemist: Brotherhood',
+                Number: '1',
+            }),
+        ).toBe(
+            'Fullmetal Alchemist - Brotherhood/Fullmetal Alchemist - Brotherhood #01.cbz',
+        );
+        expect(publicationPathOf({ Series: 'Re:Zero', Number: '1' })).toBe(
+            'Re-Zero/Re-Zero #01.cbz',
+        );
+        expect(
+            publicationPathOf({ Series: 'Who? "Me" <a|b>*', Number: '1' }),
+        ).toBe("Who 'Me' -a-b-/Who 'Me' -a-b- #01.cbz");
+    });
 });
 
 describe('drafts', () => {

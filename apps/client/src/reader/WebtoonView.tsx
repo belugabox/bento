@@ -35,7 +35,8 @@ export const WebtoonView = ({
         pages.current[start.current]?.scrollIntoView({ block: 'start' });
     }, [sizes]);
 
-    // Page courante : celle qui passe la ligne à 40 % de la hauteur.
+    // Page courante : celle qui passe la ligne à 40 % de la hauteur (une
+    // bande de 1 % : une zone vide n'est pas fiable dans tous les navigateurs).
     useEffect(() => {
         if (!sizes || typeof IntersectionObserver === 'undefined') return;
         const observer = new IntersectionObserver(
@@ -48,7 +49,7 @@ export const WebtoonView = ({
                     }
                 }
             },
-            { rootMargin: '-40% 0px -60% 0px' },
+            { rootMargin: '-40% 0px -59% 0px' },
         );
         for (const page of pages.current) if (page) observer.observe(page);
         return () => observer.disconnect();

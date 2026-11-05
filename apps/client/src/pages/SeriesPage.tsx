@@ -30,7 +30,7 @@ import {
     IconPlayerPlay,
     IconRestore,
 } from '@tabler/icons-react';
-import { type MouseEvent, useState } from 'react';
+import { useState } from 'react';
 import { Link, useParams } from 'react-router';
 
 import { CollectionsModal } from '@/components/CollectionsModal';
@@ -111,13 +111,7 @@ export const SeriesPage = () => {
     };
 
     /** Coche « lu » d'un tome (sans ouvrir le lecteur). */
-    const toggleRead = async (
-        event: MouseEvent,
-        volume: (typeof series.volumes)[number],
-    ) => {
-        // La vignette est un lien : ne pas le suivre.
-        event.preventDefault();
-        event.stopPropagation();
+    const toggleRead = async (volume: (typeof series.volumes)[number]) => {
         await saveProgress(volume.id, {
             completed: !volume.progress?.completed,
         });
@@ -349,9 +343,7 @@ export const SeriesPage = () => {
                                                 ? `${volumeLabel(volume)} lu`
                                                 : `Marquer ${volumeLabel(volume)} comme lu`
                                         }
-                                        onClick={(event) =>
-                                            void toggleRead(event, volume)
-                                        }
+                                        onClick={() => void toggleRead(volume)}
                                     >
                                         <IconCheck size={14} />
                                     </ActionIcon>

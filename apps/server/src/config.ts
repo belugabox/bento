@@ -29,8 +29,14 @@ const schema = z.object({
     // Base SQLite, cache des images… (volume `/config` dans Docker).
     DATA_PATH: z.string().default('./data'),
     LIBRARIES: librariesSchema,
-    // Intervalle entre deux scans automatiques (0 = jamais).
-    SCAN_INTERVAL_MINUTES: z.coerce.number().int().min(0).default(30),
+    // Intervalle entre deux scans automatiques (0 = jamais), une semaine au
+    // plus comme dans les réglages.
+    SCAN_INTERVAL_MINUTES: z.coerce
+        .number()
+        .int()
+        .min(0)
+        .max(7 * 24 * 60)
+        .default(30),
     // Connexion OIDC (Pocket ID).
     OIDC_ISSUER: z.string().url(),
     OIDC_CLIENT_ID: z.string().min(1),

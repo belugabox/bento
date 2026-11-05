@@ -1,10 +1,17 @@
 // Sans dépendance à Node : partagé avec le client (via `@server/types`).
 import type { ComicInfo } from '../archive/comicInfo';
 
-/** Nom de série utilisable comme nom de dossier (pas de séparateur). */
+/**
+ * Nom de série utilisable comme nom de dossier : pas de séparateur, ni de
+ * caractère refusé par Windows (la bibliothèque peut être partagée en SMB).
+ */
 const folderName = (series: string) =>
     series
-        .replace(/[\\/]/g, '-')
+        .replace(/\s*:\s+/g, ' - ')
+        .replace(/"/g, "'")
+        .replace(/[?*]/g, '')
+        // eslint-disable-next-line no-control-regex
+        .replace(/[\\/:<>|\x00-\x1f]/g, '-')
         .trim()
         // Windows refuse les noms finissant par un point ou une espace.
         .replace(/[. ]+$/, '');
