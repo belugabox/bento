@@ -4,6 +4,7 @@ import path from 'node:path';
 import sharp from 'sharp';
 
 import { notFound, unprocessable } from '../tools/errors';
+import { isMissingDescriptorError, repairDescriptorFlags } from './write';
 
 const IMAGE_TYPES: Record<string, string> = {
     '.jpg': 'image/jpeg',
@@ -68,15 +69,52 @@ export const describeUnreadableArchive = async (
     })().catch(() => message);
 };
 
-/** Ouvre une archive, ou lève une erreur 422 avec une raison lisible. */
-export const openArchive = async (fullPath: string): Promise<AdmZip> => {
+/** Bit 3 des flags : CRC et tailles dans un descripteur après les données. */
+const FLAG_DATA_DESCRIPTOR = 0x08;
+
+/**
+ * Archive abîmée par une ancienne réécriture (bit 3 gardé, descripteurs
+ * perdus) : elle s'ouvre, mais ses entrées sont illisibles. Il suffit
+ * d'essayer la première entrée marquée.
+ */
+const hasLostDescriptors = (zip: AdmZip) => {
+    const marked = zip
+        .getEntries()
+        .find((e) => !e.isDirectory && e.header.flags & FLAG_DATA_DESCRIPTOR);
+    if (!marked) return false;
     try {
-        return new AdmZip(fullPath);
+        marked.getData();
+        return false;
+    } catch (error) {
+        return isMissingDescriptorError(error);
+    }
+};
+
+/**
+ * Ouvre une archive, ou lève une erreur 422 avec une raison lisible. Une
+ * archive aux descripteurs perdus est réparée au passage (si le fichier est
+ * modifiable).
+ */
+export const openArchive = async (fullPath: string): Promise<AdmZip> => {
+    let zip: AdmZip;
+    try {
+        zip = new AdmZip(fullPath);
     } catch (error) {
         throw unprocessable(
             `Archive illisible : ${await describeUnreadableArchive(fullPath, error)}`,
         );
     }
+    if (hasLostDescriptors(zip)) {
+        try {
+            await repairDescriptorFlags(fullPath);
+            zip = new AdmZip(fullPath);
+        } catch {
+            throw unprocessable(
+                'Archive illisible : descripteurs ZIP perdus, réparation impossible (fichier en lecture seule ?)',
+            );
+        }
+    }
+    return zip;
 };
 
 type OpenArchive = { mtimeMs: number; pages: AdmZip.IZipEntry[] };

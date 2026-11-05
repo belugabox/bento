@@ -123,6 +123,9 @@ importers:
       hono:
         specifier: ^4.10.8
         version: 4.13.16
+      node-unrar-js:
+        specifier: 2.0.2
+        version: 2.0.2
       pino:
         specifier: ^9.14.0
         version: 9.14.0
@@ -2004,6 +2007,10 @@ packages:
   node-releases@2.0.63:
     resolution: {integrity: sha512-6li2QanLsAXpIH2R6j77MzRyvOyrvdTqlKtO4CgBdHGNvN99ZZfyxszHc5o5+IZBWD5u6Hzwg83JoGXmqZNG9Q==}
     engines: {node: '>=18'}
+
+  node-unrar-js@2.0.2:
+    resolution: {integrity: sha512-hLNmoJzqaKJnod8yiTVGe9hnlNRHotUi0CreSv/8HtfRi/3JnRC8DvsmKfeGGguRjTEulhZK6zXX5PXoVuDZ2w==}
+    engines: {node: '>=10.0.0'}
 
   obug@2.2.1:
     resolution: {integrity: sha512-XrsrhT5sybtKI6wakr2SPOlGZWWYbUXZ7a0jT8/QOeAPau+1X/bSegNe5YR75oJmEZQbKningirmGOEJCIk61Q==}
@@ -4171,6 +4178,8 @@ snapshots:
       semver: 7.8.6
 
   node-releases@2.0.63: {}
+
+  node-unrar-js@2.0.2: {}
 
   obug@2.2.1: {}
 
