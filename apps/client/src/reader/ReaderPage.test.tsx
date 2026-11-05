@@ -286,4 +286,54 @@ describe('ReaderPage', () => {
         press('ArrowRight');
         expect(location).toBe('/read/7?page=1');
     });
+
+    it('starts the next webtoon volume at its top', async () => {
+        vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+            const url = String(input);
+            const id = Number(/volumes\/(\d+)/.exec(url)![1]);
+            const body = url.endsWith('/page-sizes')
+                ? PAGE_SIZES
+                : url.endsWith('/progress')
+                  ? { progress: null }
+                  : {
+                        // Tome 7 repris en cours de lecture.
+                        ...volume(
+                            'webtoon',
+                            id === 7 ? { page: 2, completed: false } : null,
+                        ),
+                        id,
+                        previousId: id === 8 ? 7 : null,
+                        nextId: id === 7 ? 8 : null,
+                    };
+            return new Response(JSON.stringify(body), {
+                headers: { 'Content-Type': 'application/json' },
+            });
+        });
+        const scrolled: (string | null)[] = [];
+        vi.spyOn(Element.prototype, 'scrollIntoView').mockImplementation(
+            function (this: Element) {
+                scrolled.push(this.getAttribute('src'));
+            },
+        );
+        render(
+            <MantineProvider>
+                <MemoryRouter initialEntries={['/read/7']}>
+                    <Routes>
+                        <Route path="/read/:id" element={<ReaderPage />} />
+                    </Routes>
+                    <Location />
+                </MemoryRouter>
+            </MantineProvider>,
+        );
+        await vi.waitFor(() =>
+            expect(scrolled).toContain('/api/volumes/7/pages/2'),
+        );
+
+        fireEvent.click(await screen.findByText('Tome suivant'));
+
+        await vi.waitFor(() =>
+            expect(scrolled.at(-1)).toBe('/api/volumes/8/pages/0'),
+        );
+        await vi.waitFor(() => expect(location).toBe('/read/8?page=1'));
+    });
 });

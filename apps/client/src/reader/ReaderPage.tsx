@@ -22,10 +22,10 @@ export const ReaderPage = () => {
     const volumeId = Number(useParams().id);
     const navigate = useNavigate();
     const [params, setParams] = useSearchParams();
-    const { data: volume, error } = useQuery(
-        () => fetchVolume(volumeId),
-        [volumeId],
-    );
+    const { data, error } = useQuery(() => fetchVolume(volumeId), [volumeId]);
+    // Tome précédent encore en mémoire pendant le chargement du suivant :
+    // l'ignorer, sinon sa page (et son défilement) passent au nouveau tome.
+    const volume = data?.id === volumeId ? data : undefined;
     // Mode de lecture réglable par série ; par défaut celui de la série.
     const [modes, setModes] = useLocalStorage<Record<string, ReadingMode>>({
         key: 'bento:reader:modes',
