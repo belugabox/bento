@@ -14,8 +14,8 @@ Serveur de lecture et de gestion de mangas et BD, qui remplace Kavita pour la fa
 
 - **Secret OIDC** : il est dans `apps/server/.env` (ignoré par Git). Ne jamais l'afficher, le copier ou le committer.
 - **Migrations Drizzle** : ne jamais modifier ni régénérer une migration qu'une base a pu appliquer ; en générer une nouvelle (`pnpm --filter server db:generate --name <nom>`). Avant de committer une migration, la vérifier sur une **copie** de `apps/server/data/bento.db*`, fichiers `-wal` et `-shm` compris : le serveur de dev de l'utilisateur tourne souvent et applique les migrations dès qu'elles apparaissent.
-  - drizzle-kit ne sait pas répondre à ses questions interactives : un renommage se fait en deux migrations.
-  - Quand drizzle-kit recrée une table pour changer une colonne, il copie aussi les colonnes nouvelles depuis l'ancienne table : corriger l'`INSERT … SELECT` avant tout lancement (cas de 0011).
+    - drizzle-kit ne sait pas répondre à ses questions interactives : un renommage se fait en deux migrations.
+    - Quand drizzle-kit recrée une table pour changer une colonne, il copie aussi les colonnes nouvelles depuis l'ancienne table : corriger l'`INSERT … SELECT` avant tout lancement (cas de 0011).
 - **Fichiers de l'utilisateur** : ne pas toucher à sa bibliothèque de dev (`O:/PERSO/beluga-box/apps/server/RED/Books/Manga`, voir `LIBRARIES` dans `.env`). Faire les essais sur des copies, dans le dossier temporaire de la session.
 - **Processus** : ne jamais tuer de processus en masse. Arrêter seulement un PID identifié et vérifié.
 - **Sites web** : ne jamais contourner une protection anti-robot (Cloudflare…).
@@ -25,17 +25,17 @@ Serveur de lecture et de gestion de mangas et BD, qui remplace Kavita pour la fa
 - Shell : Git Bash. Les longs heredocs échouent, et les accents passent mal dans `python -c` ou les heredocs. Pour une modification de plusieurs lignes, écrire un script Python dans le dossier temporaire avec l'outil Write, puis le lancer avec `python -I`.
 - prettier reformate à l'enregistrement. Relire le fichier avant une modification exacte après un `prettier --write`.
 - Vérifications avant chaque commit :
-  - serveur : `cd apps/server && pnpm test` (tsc des tests, puis vitest) ;
-  - client : `cd apps/client && npx tsc -b && npx eslint . && npx vitest run` ;
-  - le tout : `pnpm build` à la racine.
+    - serveur : `cd apps/server && pnpm test` (tsc des tests, puis vitest) ;
+    - client : `cd apps/client && npx tsc -b && npx eslint . && npx vitest run` ;
+    - le tout : `pnpm build` à la racine.
 - Pour essayer du code serveur sur des données réelles : un petit script `.ts` lancé avec `npx tsx` depuis `apps/server`, à supprimer ensuite.
 - better-sqlite3 reste en 12.x (la 13 n'a pas de binaires pour Node 22).
 
 ## Repères techniques
 
 - Monorepo pnpm :
-  - `apps/server` : Hono, zod, Drizzle et SQLite, AdmZip, sharp ;
-  - `apps/client` : React 19, Mantine 7, react-router 7, client typé `hc` de Hono.
+    - `apps/server` : Hono, zod, Drizzle et SQLite, AdmZip, sharp ;
+    - `apps/client` : React 19, Mantine 7, react-router 7, client typé `hc` de Hono.
 - Modules sans Node partagés avec le client par `@server/types` (`apps/server/src/types.ts`).
 - **Sous-requêtes Drizzle** : les écrire en SQL brut avec des colonnes préfixées (`series.id`) ; Drizzle ne préfixe pas les colonnes des sous-requêtes corrélées.
 - **Tests serveur** : `test/helpers.ts` (`setup`, `writeCbz`, `sessionCookie`). `createApi` accepte `settings` et `compression` en option.
