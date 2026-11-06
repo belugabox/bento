@@ -1,4 +1,9 @@
-import { type ComicInfo, parseVolumeFileName } from '@server/types';
+import {
+    type ComicInfo,
+    type GenreEntry,
+    classify,
+    parseVolumeFileName,
+} from '@server/types';
 
 /** Champs communs à toute la série, appliqués à chaque tome. */
 export const SERIES_FIELDS = [
@@ -216,19 +221,55 @@ export const sheetFromMangaNews = (series: MangaNewsSeries): SeriesSheet => ({
 });
 
 /**
+ * Genres et thèmes après remplissage, rangés d'après la liste : « vide » se
+ * juge sur ce que montre l'éditeur, pas sur le texte brut (un Genre
+ * « Shonen » est un thème, un « Teen » disparaît : les genres sont vides).
+ */
+const fillGenres = (
+    current: { genre?: string; tags?: string },
+    sheet: SeriesSheet,
+    catalog: GenreEntry[],
+    overwrite: boolean,
+) => {
+    const now = classify(current.genre, current.tags, catalog);
+    const found = classify(sheet.genre, sheet.tags, catalog);
+    const takeGenres = (overwrite || !now.genres.length) && found.genres.length;
+    const takeThemes = (overwrite || !now.themes.length) && found.themes.length;
+    // Rien de la fiche : les champs restent tels quels.
+    if (!takeGenres && !takeThemes) return undefined;
+    return {
+        genre: (takeGenres ? found.genres : now.genres).join(', '),
+        tags: (takeThemes ? found.themes : now.themes).join(', '),
+    };
+};
+
+/**
  * Champs de série depuis une fiche en ligne. Le résumé ne va que sur le
- * premier tome. Sans `overwrite`, seuls les champs vides sont remplis.
+ * premier tome. Sans `overwrite`, seuls les champs vides sont remplis. Avec
+ * la liste des genres (`catalog`), genres et thèmes sont rangés et remplis
+ * d'après ce que l'éditeur en montre.
  */
 export const fillFromSheet = (
     edits: Edits,
     paths: string[],
     sheet: SeriesSheet,
     overwrite: boolean,
+    catalog?: GenreEntry[],
 ): Edits => {
+    const genres = catalog
+        ? fillGenres(
+              {
+                  genre: seriesValue(edits, paths, 'Genre'),
+                  tags: seriesValue(edits, paths, 'Tags'),
+              },
+              sheet,
+              catalog,
+              overwrite,
+          )
+        : undefined;
     const values: Partial<Record<SeriesField, string | number | undefined>> = {
         Series: sheet.title,
-        Genre: sheet.genre,
-        Tags: sheet.tags,
+        ...(!catalog && { Genre: sheet.genre, Tags: sheet.tags }),
         Writer: sheet.writer,
         Penciller: sheet.penciller,
         Publisher: sheet.publisher,
@@ -244,6 +285,14 @@ export const fillFromSheet = (
             if (fillable(next[path]?.[field], overwrite)) {
                 next = setVolumeField(next, path, field, value as never);
             }
+        }
+    }
+    // Genres et thèmes sur tous les tomes, rangés : un tome n'en garde pas
+    // d'autres que ceux affichés.
+    if (genres) {
+        for (const path of paths) {
+            next = setVolumeField(next, path, 'Genre', genres.genre);
+            next = setVolumeField(next, path, 'Tags', genres.tags);
         }
     }
     const first = paths[0];

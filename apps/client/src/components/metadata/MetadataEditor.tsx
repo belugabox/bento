@@ -1054,20 +1054,15 @@ export const MetadataEditor = ({
                 autoSearch={autoFill}
                 initialQuery={String(series('Series'))}
                 onPick={({ sheet }) => {
-                    // Genres et thèmes rangés d'après la liste des genres
-                    // (« Suspense » devient « Thriller »).
-                    const sorted = classify(sheet.genre, sheet.tags, catalog);
-                    const tidy = {
-                        ...sheet,
-                        genre: sorted.genres.join(', '),
-                        tags: sorted.themes.join(', '),
-                    };
                     setEdits((current) => {
+                        // Genres et thèmes rangés d'après la liste des genres
+                        // (« Suspense » devient « Thriller »).
                         const filled = fillFromSheet(
                             current,
                             paths,
-                            tidy,
+                            sheet,
                             overwrite,
+                            catalog,
                         );
                         return alsoFileNames
                             ? fillFromFileNames(filled, readable, overwrite)

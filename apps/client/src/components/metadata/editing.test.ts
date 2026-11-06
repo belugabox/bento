@@ -4,6 +4,7 @@ import {
     type EditableVolume,
     changesOf,
     fillFromFileNames,
+    fillFromSheet,
     fillFromWikipedia,
     initialEdits,
     isFieldChanged,
@@ -152,6 +153,58 @@ describe('fillFromWikipedia', () => {
             true,
         );
         expect(edits[first]?.Series).toBe('Spy × Family');
+    });
+});
+
+describe('fillFromSheet with the genre list', () => {
+    const catalog = [
+        { id: 1, name: 'Aventure', aliases: [] },
+        { id: 2, name: 'Fantastique', aliases: [] },
+    ];
+    const sheet = {
+        title: 'Dr. Stone',
+        genre: 'Aventure, Fantastique',
+        tags: 'survie',
+    };
+    const withGenre = (genre: string, tags?: string) =>
+        Object.fromEntries(
+            paths.map((path) => [path, { Genre: genre, Tags: tags }]),
+        );
+
+    it('fills genres hidden by a raw word that is a theme or an age', () => {
+        const edits = fillFromSheet(
+            withGenre('Shonen, Teen'),
+            paths,
+            sheet,
+            false,
+            catalog,
+        );
+        // « Shonen » est un thème déjà là, gardé ; « Teen » disparaît.
+        expect(edits[second]).toMatchObject({
+            Genre: 'Aventure, Fantastique',
+            Tags: 'Shonen',
+        });
+    });
+
+    it('keeps genres already chosen, and leaves the fields untouched', () => {
+        const before = withGenre('Fantastique', 'robots');
+        const edits = fillFromSheet(before, paths, sheet, false, catalog);
+        expect(edits[first]?.Genre).toBe('Fantastique');
+        expect(edits[first]?.Tags).toBe('robots');
+    });
+
+    it('replaces genres and themes when asked', () => {
+        const edits = fillFromSheet(
+            withGenre('Fantastique', 'robots'),
+            paths,
+            sheet,
+            true,
+            catalog,
+        );
+        expect(edits[first]).toMatchObject({
+            Genre: 'Aventure, Fantastique',
+            Tags: 'survie',
+        });
     });
 });
 
