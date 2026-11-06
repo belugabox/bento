@@ -11,6 +11,8 @@ import {
     parseVolumeFileName,
 } from '@server/types';
 
+import { type KnownNames, cleanNames } from './credits';
+
 /** Champs communs à toute la série, appliqués à chaque tome. */
 export const SERIES_FIELDS = [
     'Series',
@@ -238,11 +240,15 @@ const withoutEmpty = (values: Record<string, string | undefined>) =>
         Object.entries(values).filter(([, value]) => !!value?.trim()),
     ) as SheetValues;
 
-/** Valeurs d'une fiche en ligne (le format parmi ceux des réglages). */
+/**
+ * Valeurs d'une fiche en ligne : le format parmi ceux des réglages, les
+ * noms nettoyés (`cleanNames`) d'après ceux déjà connus.
+ */
 export const sheetValues = (
     sheet: SeriesSheet,
     catalog: GenreEntry[],
     formats: { id: number; name: string }[],
+    known: KnownNames = { people: [], publishers: [] },
 ): SheetValues => {
     const { genres, themes } = classify(sheet.genre, sheet.tags, catalog);
     const wanted = sheet.format ? genreKey(sheet.format) : undefined;
@@ -254,9 +260,9 @@ export const sheetValues = (
         Status: sheet.status,
         Genre: genres.join(', '),
         Tags: themes.join(', '),
-        Writer: sheet.writer,
-        Penciller: sheet.penciller,
-        Publisher: sheet.publisher,
+        Writer: cleanNames(sheet.writer, known.people),
+        Penciller: cleanNames(sheet.penciller, known.people),
+        Publisher: cleanNames(sheet.publisher, known.publishers),
         Summary: sheet.summary,
     });
 };

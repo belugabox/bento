@@ -371,6 +371,15 @@ export const MetadataEditor = ({
             ? known.publishers
             : [...new Set([...known.writers, ...known.pencillers])];
     };
+    // Les noms des fiches en ligne reprennent l'écriture de ceux-ci.
+    const knownNames = useMemo(
+        () => ({
+            people: creditNames('Writer'),
+            publishers: creditNames('Publisher'),
+        }),
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        [credits.data],
+    );
     // Action en cours : roue de chargement sur son seul bouton.
     const [busy, setBusy] = useState<'save' | 'publish'>();
     const [report, setReport] = useState<Report>();
@@ -1314,6 +1323,7 @@ export const MetadataEditor = ({
                 current={currentSheet}
                 catalog={catalog}
                 formats={formats.data ?? []}
+                known={knownNames}
                 order={sitesFor(kind)}
                 priority={priority}
                 display={display}

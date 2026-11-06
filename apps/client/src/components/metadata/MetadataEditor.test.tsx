@@ -560,7 +560,8 @@ describe('MetadataEditor', () => {
             Genre: 'Thriller, Science-fiction',
             Tags: 'aliens',
             AgeRating: 'Mature 17+',
-            Writer: 'Hiroya OKU',
+            // « Hiroya OKU » sur Manga-news : le nom déjà connu.
+            Writer: 'Hiroya Oku',
         });
         expect(saveStatus).toHaveBeenCalledWith('completed');
         // Format retrouvé parmi ceux des réglages, âge exact gardé dans Bento.

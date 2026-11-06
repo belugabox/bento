@@ -19,6 +19,7 @@ import {
     type SourcePriority,
 } from '@server/types';
 
+import type { KnownNames } from './credits';
 import {
     type SheetChoice,
     type SheetValues,
@@ -52,6 +53,7 @@ export const SheetComparison = ({
     current,
     catalog,
     formats,
+    known,
     order,
     priority,
     display,
@@ -64,6 +66,8 @@ export const SheetComparison = ({
     current: SheetValues;
     catalog: GenreEntry[];
     formats: { id: number; name: string }[];
+    /** Noms déjà connus : ceux des fiches en reprennent l'écriture. */
+    known: KnownNames;
     /** Ordre des colonnes, le site le plus utile d'abord. */
     order: MetadataSource[];
     /** Site préféré pour chaque champ (choix de départ d'un champ vide). */
@@ -82,9 +86,9 @@ export const SheetComparison = ({
                 .map((f) => ({
                     found: f,
                     site: f.source,
-                    values: sheetValues(f.sheet, catalog, formats),
+                    values: sheetValues(f.sheet, catalog, formats, known),
                 })),
-        [found, catalog, formats, order],
+        [found, catalog, formats, known, order],
     );
     // Lignes calculées à l'ouverture : la saisie derrière ne bouge pas.
     const [rows, setRows] = useState<ReturnType<typeof comparisonRows>>([]);
