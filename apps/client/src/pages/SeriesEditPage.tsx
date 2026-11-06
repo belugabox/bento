@@ -104,7 +104,6 @@ export const SeriesEditPage = () => {
                 classification={{
                     format: series.format,
                     defaultFormat: series.defaultFormat,
-                    audience: series.audience,
                     save: (changes) =>
                         setSeriesClassification(series.id, changes),
                 }}

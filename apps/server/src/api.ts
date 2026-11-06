@@ -15,7 +15,7 @@ import {
     requireUser,
 } from './auth/routes';
 import { listUsers, setUserMaxAge } from './auth/users';
-import { AUDIENCES, FORMATS } from './classification';
+import { FORMATS } from './classification';
 import type { Db } from './db';
 import {
     getSeries,
@@ -107,7 +107,6 @@ const collectionBody = z.object({ name: z.string().trim().min(1).max(80) });
 // Format et public d'une série : null pour revenir à « par défaut ».
 const classificationBody = z.object({
     format: z.enum(FORMATS).nullable().optional(),
-    audience: z.enum(AUDIENCES).nullable().optional(),
 });
 
 const genreBody = z.object({
@@ -666,12 +665,12 @@ export const createApi = ({
             ),
             (c) => {
                 const { folder, ...changes } = c.req.valid('json');
-                const { format, audience } = files.setDraftSettings(
+                const { format } = files.setDraftSettings(
                     c.req.valid('param').id,
                     folder,
                     changes,
                 );
-                return c.json({ format, audience });
+                return c.json({ format });
             },
         )
         .get(

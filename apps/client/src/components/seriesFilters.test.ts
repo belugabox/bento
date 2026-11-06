@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 
 import {
     type ListedSeries,
-    allAudiences,
     allFormats,
     allGenres,
     filterSeries,
@@ -67,13 +66,12 @@ describe('started series', () => {
     });
 });
 
-describe('list, format, audience, genre and status filters', () => {
+describe('list, format, genre and status filters', () => {
     const items: ListedSeries[] = [
         {
             ...series('Akira', 0, null),
             genres: ['Science-fiction', 'Action'],
             format: 'manga',
-            audience: 'seinen',
             status: 'completed',
             collectionIds: [4],
         },
@@ -81,7 +79,6 @@ describe('list, format, audience, genre and status filters', () => {
             ...series('Berserk', 0, null),
             genres: ['Fantasy', 'Action'],
             format: 'manga',
-            audience: null,
             status: 'ongoing',
             toRead: true,
         },
@@ -89,7 +86,6 @@ describe('list, format, audience, genre and status filters', () => {
             ...series('Solo Leveling', 0, null),
             genres: [],
             format: 'manhwa',
-            audience: 'shonen',
             status: null,
         },
     ];
@@ -107,11 +103,9 @@ describe('list, format, audience, genre and status filters', () => {
         expect(kept({ genre: 'Fantasy' })).toEqual(['Berserk']);
     });
 
-    it('keeps a format or an audience', () => {
+    it('keeps a format', () => {
         expect(kept({ format: 'manhwa' })).toEqual(['Solo Leveling']);
-        expect(kept({ audience: 'seinen' })).toEqual(['Akira']);
         expect(allFormats(items)).toEqual(['manga', 'manhwa']);
-        expect(allAudiences(items)).toEqual(['seinen', 'shonen']);
     });
 
     it('keeps a status', () => {

@@ -18,6 +18,7 @@ import {
 } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import {
+    IconArrowBackUp,
     IconEye,
     IconFileText,
     IconFileZip,
@@ -27,9 +28,6 @@ import {
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import {
-    AUDIENCES,
-    AUDIENCE_LABELS,
-    type Audience,
     type ComicInfo,
     FORMATS,
     FORMAT_LABELS,
@@ -72,6 +70,7 @@ import {
     isMixed,
     isSeriesFieldChanged,
     joinSeries,
+    revertSeriesField,
     seriesValue,
     setSeriesField,
     setVolumeField,
@@ -87,8 +86,43 @@ export type EditorVolume = EditableVolume & {
 
 type Report = { color: string; lines: string[] };
 
-/** Champ modifié, pas encore enregistré : bordure et fond orange. */
-const changed = (isChanged: boolean) =>
+/** Valeur d'origine d'un champ modifié, et comment y revenir. */
+type Revert = { original: string; onRevert: () => void };
+
+// Un long résumé n'est montré qu'en partie dans la bulle.
+const ORIGINAL_PREVIEW = 300;
+
+/** Bouton dans un champ modifié : montre sa valeur d'origine, et y revient. */
+const RevertButton = ({ original, onRevert }: Revert) => {
+    const shown =
+        original.length > ORIGINAL_PREVIEW
+            ? `${original.slice(0, ORIGINAL_PREVIEW)}…`
+            : original || '(vide)';
+    return (
+        <Tooltip
+            label={`Valeur d’origine : ${shown}`}
+            multiline
+            maw={320}
+            withinPortal
+        >
+            <ActionIcon
+                variant="subtle"
+                color="orange"
+                size="sm"
+                aria-label={`Revenir à la valeur d’origine : ${shown}`}
+                onClick={onRevert}
+            >
+                <IconArrowBackUp size={14} />
+            </ActionIcon>
+        </Tooltip>
+    );
+};
+
+/**
+ * Champ modifié, pas encore enregistré : bordure et fond orange, et un
+ * bouton pour voir la valeur d'origine et y revenir.
+ */
+const changed = (isChanged: boolean, revert?: Revert) =>
     isChanged
         ? {
               'data-changed': true,
@@ -98,8 +132,16 @@ const changed = (isChanged: boolean) =>
                       backgroundColor: 'var(--mantine-color-orange-light)',
                   },
               },
+              ...(revert && {
+                  rightSection: <RevertButton {...revert} />,
+                  rightSectionPointerEvents: 'all' as const,
+              }),
           }
         : {};
+
+/** Libellé d'une valeur parmi des options (statut, format…). */
+const labelOf = (options: { value: string; label: string }[], value: string) =>
+    options.find((option) => option.value === value)?.label ?? value;
 
 // Valeur du statut « inconnu » (Select n'accepte pas de valeur vide).
 const UNKNOWN = 'unknown';
@@ -151,14 +193,10 @@ export const MetadataEditor = ({
         defaultMode: ReadingMode;
         save: (mode: ReadingMode | null) => Promise<unknown>;
     };
-    /**
-     * Format et public de la série, réglés dans Bento (null : format de la
-     * bibliothèque, public inconnu ou trouvé parmi les genres).
-     */
+    /** Format de la série, réglé dans Bento (null : celui de la bibliothèque). */
     classification?: {
         format: Format | null;
         defaultFormat: Format;
-        audience: Audience | null;
         save: (changes: ClassificationChanges) => Promise<unknown>;
     };
 }) => {
@@ -187,18 +225,13 @@ export const MetadataEditor = ({
     const [modeValue, setModeValue] = useState<string>(savedMode);
     useEffect(() => setModeValue(savedMode), [savedMode]);
     const modeChanged = !!seriesMode && modeValue !== savedMode;
-    // Format (« default » : celui de la bibliothèque) et public (« unknown »).
+    // Format : « default » pour celui de la bibliothèque.
     const savedFormat = classification?.format ?? DEFAULT_MODE;
     const [formatValue, setFormatValue] = useState<string>(savedFormat);
     useEffect(() => setFormatValue(savedFormat), [savedFormat]);
     const formatChanged = !!classification && formatValue !== savedFormat;
-    const savedAudience = classification?.audience ?? UNKNOWN;
-    const [audienceValue, setAudienceValue] = useState<string>(savedAudience);
-    useEffect(() => setAudienceValue(savedAudience), [savedAudience]);
-    const audienceChanged = !!classification && audienceValue !== savedAudience;
     // Réglages de la série modifiés (enregistrés avec les tomes).
-    const settingsChanged =
-        statusChanged || modeChanged || formatChanged || audienceChanged;
+    const settingsChanged = statusChanged || modeChanged || formatChanged;
     const genres = useQuery(fetchGenres, []);
     const catalog = genres.data ?? [];
     // Action en cours : roue de chargement sur son seul bouton.
@@ -217,6 +250,20 @@ export const MetadataEditor = ({
     const canPreview = (volume?: EditorVolume) =>
         !!volume && !volume.error && !!volume.pageCount;
     const firstPreviewable = volumes.find(canPreview);
+    const modeOptions = [
+        {
+            value: DEFAULT_MODE,
+            label: `Par défaut : ${readingModeLabel(seriesMode?.defaultMode ?? previewMode)}`,
+        },
+        ...READING_MODES,
+    ];
+    const formatOptions = [
+        {
+            value: DEFAULT_MODE,
+            label: `Par défaut : ${FORMAT_LABELS[classification?.defaultFormat ?? (kind === 'manga' ? 'manga' : 'bd')]}`,
+        },
+        ...FORMATS.map((value) => ({ value, label: FORMAT_LABELS[value] })),
+    ];
 
     // Nouvelles données (après enregistrement) : repartir de celles-ci. Le
     // choix d'une série existante est alors acquis : plus rien à annuler.
@@ -225,16 +272,38 @@ export const MetadataEditor = ({
         beforeJoin.current = undefined;
     }, [readable]);
     const original = useMemo(() => initialEdits(readable), [readable]);
-    // Public écrit parmi les genres d'un ancien fichier : proposé par défaut.
-    const foundAudience = classify(
-        String(seriesValue(original, paths, 'Genre') ?? ''),
-        null,
-        catalog,
-    ).audience;
     const seriesChanged = (field: SeriesField) =>
         isSeriesFieldChanged(original, edits, paths, field);
     const volumeChanged = (path: string, field: keyof ComicInfo) =>
         isFieldChanged(original, edits, path, field);
+    /** Champ de série : orange s'il a changé, avec sa valeur d'origine. */
+    const seriesField = (
+        field: SeriesField,
+        shown?: (value: string) => string,
+    ) => {
+        const value = String(seriesValue(original, paths, field) ?? '');
+        return changed(seriesChanged(field), {
+            original: shown ? shown(value) : value,
+            onRevert: () =>
+                setEdits((current) =>
+                    revertSeriesField(current, original, paths, field),
+                ),
+        });
+    };
+    /** Champ d'un tome : orange s'il a changé, avec sa valeur d'origine. */
+    const volumeField = (path: string, field: keyof ComicInfo) =>
+        changed(volumeChanged(path, field), {
+            original: String(original[path]?.[field] ?? ''),
+            onRevert: () =>
+                setEdits((current) =>
+                    setVolumeField(
+                        current,
+                        path,
+                        field,
+                        original[path]?.[field],
+                    ),
+                ),
+        });
 
     const changes = readable
         .map((v) => ({
@@ -283,22 +352,14 @@ export const MetadataEditor = ({
                 );
                 lines.push('Statut de la série enregistré.');
             }
-            if (classification && (formatChanged || audienceChanged)) {
+            if (classification && formatChanged) {
                 await classification.save({
-                    ...(formatChanged && {
-                        format:
-                            formatValue === DEFAULT_MODE
-                                ? null
-                                : (formatValue as Format),
-                    }),
-                    ...(audienceChanged && {
-                        audience:
-                            audienceValue === UNKNOWN
-                                ? null
-                                : (audienceValue as Audience),
-                    }),
+                    format:
+                        formatValue === DEFAULT_MODE
+                            ? null
+                            : (formatValue as Format),
                 });
-                lines.push('Format et public enregistrés.');
+                lines.push('Format enregistré.');
             }
             if (seriesMode && modeChanged) {
                 await seriesMode.save(
@@ -381,7 +442,6 @@ export const MetadataEditor = ({
                             setStatus(savedStatus);
                             setModeValue(savedMode);
                             setFormatValue(savedFormat);
-                            setAudienceValue(savedAudience);
                         }}
                     >
                         Annuler
@@ -468,7 +528,7 @@ export const MetadataEditor = ({
                     <SimpleGrid cols={{ base: 1, sm: 3 }}>
                         <TextInput
                             label="Nom"
-                            {...changed(seriesChanged('Series'))}
+                            {...seriesField('Series')}
                             value={String(series('Series'))}
                             description={
                                 isMixed(edits, paths, 'Series')
@@ -486,7 +546,13 @@ export const MetadataEditor = ({
                                 value={status}
                                 onChange={(value) => value && setStatus(value)}
                                 data={STATUS_OPTIONS}
-                                {...changed(statusChanged)}
+                                {...changed(statusChanged, {
+                                    original: labelOf(
+                                        STATUS_OPTIONS,
+                                        savedStatus,
+                                    ),
+                                    onRevert: () => setStatus(savedStatus),
+                                })}
                             />
                         )}
                         {seriesMode && (
@@ -497,14 +563,11 @@ export const MetadataEditor = ({
                                 onChange={(value) =>
                                     value && setModeValue(value)
                                 }
-                                data={[
-                                    {
-                                        value: DEFAULT_MODE,
-                                        label: `Par défaut : ${readingModeLabel(seriesMode.defaultMode)}`,
-                                    },
-                                    ...READING_MODES,
-                                ]}
-                                {...changed(modeChanged)}
+                                data={modeOptions}
+                                {...changed(modeChanged, {
+                                    original: labelOf(modeOptions, savedMode),
+                                    onRevert: () => setModeValue(savedMode),
+                                })}
                                 inputContainer={(children) => (
                                     <Group gap={4} wrap="nowrap">
                                         <div style={{ flex: 1 }}>
@@ -529,7 +592,12 @@ export const MetadataEditor = ({
                         )}
                         <Select
                             label="Classification"
-                            {...changed(seriesChanged('AgeRating'))}
+                            {...seriesField('AgeRating', (value) =>
+                                labelOf(
+                                    AGE_RATING_OPTIONS,
+                                    canonicalRating(value) ?? value,
+                                ),
+                            )}
                             clearable
                             placeholder="Aucune"
                             value={canonicalRating(String(series('AgeRating')))}
@@ -546,57 +614,27 @@ export const MetadataEditor = ({
                                 onChange={(value) =>
                                     value && setFormatValue(value)
                                 }
-                                data={[
-                                    {
-                                        value: DEFAULT_MODE,
-                                        label: `Par défaut : ${FORMAT_LABELS[classification.defaultFormat]}`,
-                                    },
-                                    ...FORMATS.map((value) => ({
-                                        value,
-                                        label: FORMAT_LABELS[value],
-                                    })),
-                                ]}
-                                {...changed(formatChanged)}
-                            />
-                        )}
-                        {classification && (
-                            <Select
-                                label="Public"
-                                allowDeselect={false}
-                                value={audienceValue}
-                                onChange={(value) =>
-                                    value && setAudienceValue(value)
-                                }
-                                data={[
-                                    ...AUDIENCES.map((value) => ({
-                                        value,
-                                        label: AUDIENCE_LABELS[value],
-                                    })),
-                                    {
-                                        value: UNKNOWN,
-                                        label: foundAudience
-                                            ? `Par défaut : ${AUDIENCE_LABELS[foundAudience]} (genres du fichier)`
-                                            : 'Inconnu',
-                                    },
-                                ]}
-                                {...changed(audienceChanged)}
+                                data={formatOptions}
+                                {...changed(formatChanged, {
+                                    original: labelOf(
+                                        formatOptions,
+                                        savedFormat,
+                                    ),
+                                    onRevert: () => setFormatValue(savedFormat),
+                                })}
                             />
                         )}
                         <GenreFields
                             genre={String(series('Genre'))}
                             tags={String(series('Tags'))}
                             catalog={catalog}
-                            genreProps={changed(seriesChanged('Genre'))}
-                            tagsProps={changed(seriesChanged('Tags'))}
+                            genreProps={seriesField('Genre', (value) =>
+                                classify(value, null, catalog).genres.join(
+                                    ', ',
+                                ),
+                            )}
+                            tagsProps={seriesField('Tags')}
                             onChange={(genre, tags) => {
-                                // Un public parmi les anciens genres disparaît
-                                // du fichier : le garder dans Bento.
-                                if (
-                                    foundAudience &&
-                                    audienceValue === UNKNOWN
-                                ) {
-                                    setAudienceValue(foundAudience);
-                                }
                                 setEdits((current) =>
                                     setSeriesField(
                                         setSeriesField(current, 'Genre', genre),
@@ -609,7 +647,7 @@ export const MetadataEditor = ({
                         {SERIES_TEXT_FIELDS.map(({ field, label }) => (
                             <TextInput
                                 key={field}
-                                {...changed(seriesChanged(field))}
+                                {...seriesField(field)}
                                 label={label}
                                 value={String(series(field))}
                                 onChange={(e) =>
@@ -621,7 +659,7 @@ export const MetadataEditor = ({
                     {first && (
                         <Textarea
                             label="Résumé (enregistré sur le premier tome)"
-                            {...changed(volumeChanged(first, 'Summary'))}
+                            {...volumeField(first, 'Summary')}
                             autosize
                             minRows={3}
                             maxRows={10}
@@ -717,11 +755,9 @@ export const MetadataEditor = ({
                                             size="xs"
                                             disabled={!!volume.error}
                                             aria-label={`Numéro de ${volume.name}`}
-                                            {...changed(
-                                                volumeChanged(
-                                                    volume.path,
-                                                    'Number',
-                                                ),
+                                            {...volumeField(
+                                                volume.path,
+                                                'Number',
                                             )}
                                             value={info.Number ?? ''}
                                             onChange={(e) =>
@@ -737,11 +773,9 @@ export const MetadataEditor = ({
                                             size="xs"
                                             disabled={!!volume.error}
                                             aria-label={`Titre de ${volume.name}`}
-                                            {...changed(
-                                                volumeChanged(
-                                                    volume.path,
-                                                    'Title',
-                                                ),
+                                            {...volumeField(
+                                                volume.path,
+                                                'Title',
                                             )}
                                             value={info.Title ?? ''}
                                             onChange={(e) =>
@@ -757,11 +791,9 @@ export const MetadataEditor = ({
                                             size="xs"
                                             disabled={!!volume.error}
                                             aria-label={`Année de ${volume.name}`}
-                                            {...changed(
-                                                volumeChanged(
-                                                    volume.path,
-                                                    'Year',
-                                                ),
+                                            {...volumeField(
+                                                volume.path,
+                                                'Year',
                                             )}
                                             hideControls
                                             value={info.Year ?? ''}
@@ -861,10 +893,6 @@ export const MetadataEditor = ({
                         (overwrite || formatValue === DEFAULT_MODE)
                     ) {
                         setFormatValue(sheet.format);
-                    }
-                    const audience = sheet.audience ?? sorted.audience;
-                    if (audience && (overwrite || audienceValue === UNKNOWN)) {
-                        setAudienceValue(audience);
                     }
                 }}
                 footer={

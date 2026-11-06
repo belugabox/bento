@@ -31,7 +31,7 @@ import {
 import { useState } from 'react';
 import { Link, useParams } from 'react-router';
 
-import { AUDIENCE_LABELS, FORMAT_LABELS } from '@server/types';
+import { FORMAT_LABELS } from '@server/types';
 
 import { CollectionsModal } from '@/components/CollectionsModal';
 import { CoverCard } from '@/components/CoverCard';
@@ -82,11 +82,8 @@ export const SeriesPage = () => {
     ).length;
     // Titre de chaque tome sous son numéro, si l'un d'eux en a un.
     const withTitles = series.volumes.some((v) => volumeTitleOf(v));
-    const audience = series.audience ?? series.defaultAudience;
     const details = [
-        // « Manga · Shonen » : format et public d'abord.
         FORMAT_LABELS[series.format ?? series.defaultFormat],
-        audience && AUDIENCE_LABELS[audience],
         series.year && String(series.year),
         series.writer,
         series.publisher,

@@ -15,7 +15,7 @@ import {
 import { IconSearch } from '@tabler/icons-react';
 import { type FormEvent, type ReactNode, useEffect, useState } from 'react';
 
-import { AUDIENCE_LABELS, FORMAT_LABELS } from '@server/types';
+import { FORMAT_LABELS } from '@server/types';
 
 import { ageRatingLabel } from '@/components/ageLimits';
 import {
@@ -81,11 +81,7 @@ const fromMangaNews = (details: MangaNewsDetails): Preview => ({
     sheet: sheetFromMangaNews(details),
     themes: details.themes,
     lines: [
-        [
-            details.format && FORMAT_LABELS[details.format],
-            details.audience && AUDIENCE_LABELS[details.audience],
-            details.year,
-        ]
+        [details.format && FORMAT_LABELS[details.format], details.year]
             .filter(Boolean)
             .join(' · '),
         details.genres.join(', '),

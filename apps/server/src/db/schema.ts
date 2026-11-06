@@ -10,7 +10,7 @@ import {
 } from 'drizzle-orm/sqlite-core';
 
 import type { ComicInfo } from '../archive/comicInfo';
-import { AUDIENCES, FORMATS } from '../classification';
+import { FORMATS } from '../classification';
 
 /** Compte Bento, créé à la première connexion via Pocket ID. */
 export const users = sqliteTable('users', {
@@ -69,10 +69,8 @@ export const series = sqliteTable(
         readingMode: text('reading_mode', {
             enum: ['ltr', 'ltr-manga', 'rtl', 'webtoon'],
         }),
-        // Format et public, réglés dans Bento ; null = format de la
-        // bibliothèque, public inconnu (ou trouvé parmi les genres).
+        // Format, réglé dans Bento ; null = celui de la bibliothèque.
         format: text('format', { enum: FORMATS }),
-        audience: text('audience', { enum: AUDIENCES }),
         writer: text('writer'),
         publisher: text('publisher'),
         createdAt: integer('created_at', { mode: 'timestamp' })
@@ -179,7 +177,6 @@ export const draftSettings = sqliteTable(
             enum: ['ltr', 'ltr-manga', 'rtl', 'webtoon'],
         }),
         format: text('format', { enum: FORMATS }),
-        audience: text('audience', { enum: AUDIENCES }),
         // Couverture choisie (fichier covers/drafts/…) ; null = aucune.
         coverUpdatedAt: integer('cover_updated_at', { mode: 'timestamp_ms' }),
     },

@@ -3,7 +3,6 @@ import { rm } from 'node:fs/promises';
 import path from 'node:path';
 
 import {
-    type Audience,
     type Format,
     type GenreEntry,
     classify,
@@ -106,30 +105,18 @@ export const listLibraries = (db: Db) =>
         }));
 
 /**
- * Format, public, genres et thèmes d'une série, d'après ses réglages et
- * les genres bruts de ses fichiers rangés par la liste des genres.
+ * Format, genres et thèmes d'une série, d'après son réglage et les genres
+ * bruts de ses fichiers rangés par la liste des genres.
  */
 const classified = (
-    row: {
-        genre: string | null;
-        tags: string | null;
-        format: Format | null;
-        audience: Audience | null;
-    },
+    row: { genre: string | null; tags: string | null; format: Format | null },
     libraryType: 'manga' | 'comics',
     catalog: GenreEntry[],
-) => {
-    const { genres, themes, audience } = classify(row.genre, row.tags, catalog);
-    return {
-        format: row.format,
-        defaultFormat: defaultFormat(libraryType),
-        audience: row.audience,
-        // Public trouvé parmi les genres d'un ancien fichier.
-        defaultAudience: audience,
-        genres,
-        themes,
-    };
-};
+) => ({
+    format: row.format,
+    defaultFormat: defaultFormat(libraryType),
+    ...classify(row.genre, row.tags, catalog),
+});
 
 /**
  * Séries, filtrées par bibliothèque et par texte (nom, genres et thèmes,
@@ -152,7 +139,6 @@ export const listSeries = (
             genre: series.genre,
             tags: series.tags,
             format: series.format,
-            audience: series.audience,
             status: series.status,
             volumeCount: count(volumes.id),
             // Dernier tome ajouté (tri « ajouts récents »).
@@ -188,9 +174,9 @@ export const listSeries = (
         .groupBy(series.id)
         .all()
         .sort((a, b) => compareNames(a.name, b.name))
-        .map(({ genre, tags, format, audience, libraryType, ...row }) => {
+        .map(({ genre, tags, format, libraryType, ...row }) => {
             const found = classified(
-                { genre, tags, format, audience },
+                { genre, tags, format },
                 libraryType,
                 catalog,
             );
@@ -198,7 +184,6 @@ export const listSeries = (
                 ...row,
                 // Réglages de la série, sinon ses valeurs par défaut.
                 format: found.format ?? found.defaultFormat,
-                audience: found.audience ?? found.defaultAudience,
                 genres: found.genres,
                 themes: found.themes,
             };
@@ -214,7 +199,6 @@ export const getSeries = (db: Db, viewer: Viewer, id: number) => {
             genre: series.genre,
             tags: series.tags,
             format: series.format,
-            audience: series.audience,
             ageRating: series.ageRating,
             minAge: series.minAge,
             coverUpdatedAt: series.coverUpdatedAt,
@@ -404,17 +388,17 @@ export const defaultReadingMode = (
     return effective === 'manga' ? 'ltr-manga' : 'ltr';
 };
 
-/** Format et public d'une série (null : par défaut, inconnu). */
+/** Format d'une série (null : celui de la bibliothèque). */
 export const setSeriesClassification = (
     db: Db,
     id: number,
-    changes: { format?: Format | null; audience?: Audience | null },
+    changes: { format?: Format | null },
 ) => {
     const updated = db
         .update(series)
         .set(changes)
         .where(eq(series.id, id))
-        .returning({ format: series.format, audience: series.audience })
+        .returning({ format: series.format })
         .get();
     if (!updated) throw notFound('Série introuvable');
     return updated;

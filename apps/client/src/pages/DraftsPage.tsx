@@ -221,7 +221,6 @@ export const DraftsPage = () => {
                                             defaultFormat: defaultFormat(
                                                 library.type,
                                             ),
-                                            audience: draft?.audience ?? null,
                                             save: (changes) =>
                                                 setDraftClassification(
                                                     libraryId,

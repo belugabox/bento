@@ -33,8 +33,6 @@ const SERIES = {
     summary: null,
     format: null,
     defaultFormat: 'manga',
-    audience: null,
-    defaultAudience: 'shonen',
     genres: ['Action', 'Sport'],
     themes: ['boxe'],
     ageRating: null,
@@ -90,8 +88,8 @@ describe('SeriesPage', () => {
         );
 
         expect(await screen.findByText('Série terminée')).toBeTruthy();
-        // Format, public (trouvé parmi les genres), genres et thèmes.
-        expect(screen.getByText('Manga · Shonen')).toBeTruthy();
+        // Format, genres et thèmes.
+        expect(screen.getByText('Manga')).toBeTruthy();
         expect(screen.getByText('Sport')).toBeTruthy();
         expect(screen.getByText('Thèmes : boxe')).toBeTruthy();
         fireEvent.click(

@@ -1,6 +1,6 @@
 import { hc } from 'hono/client';
 
-import type { ApiType, Audience, Format } from '@server/types';
+import type { ApiType, Format } from '@server/types';
 
 /** Client typé de l'API (`/api`, servie par le même domaine). */
 export const api = hc<ApiType>('/api');
@@ -377,10 +377,9 @@ export const setSeriesReadingMode = (
         }),
     );
 
-/** Format et public d'une série ou d'un dossier de brouillons (null : par défaut). */
+/** Format d'une série ou d'un dossier de brouillons (null : par défaut). */
 export type ClassificationChanges = {
     format?: Format | null;
-    audience?: Audience | null;
 };
 
 export const setSeriesClassification = (

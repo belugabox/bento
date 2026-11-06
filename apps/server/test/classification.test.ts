@@ -11,11 +11,10 @@ describe('classify', () => {
         ).toEqual({
             genres: ['Action', 'Comédie', 'Science-fiction'],
             themes: [],
-            audience: null,
         });
     });
 
-    it('puts the audience aside, drops ages, keeps the rest as themes', () => {
+    it('drops ages, keeps the rest as themes', () => {
         expect(
             classify(
                 'Shōnen, Action, Mature 17+, 12+, Espionnage',
@@ -24,8 +23,7 @@ describe('classify', () => {
             ),
         ).toEqual({
             genres: ['Action', 'Sport'],
-            themes: ['Espionnage', 'famille'],
-            audience: 'shonen',
+            themes: ['Shōnen', 'Espionnage', 'famille'],
         });
     });
 });
@@ -78,7 +76,7 @@ beforeEach(async () => {
     reader = sessionCookie(ctx.db, 'reader');
     await writeCbz(ctx.file('Spy/Spy #01.cbz'), {
         comicInfo:
-            '<Series>Spy</Series><Number>1</Number><Genre>Seinen, Humour, Suspense</Genre><Tags>Espions</Tags>',
+            '<Series>Spy</Series><Number>1</Number><Genre>Humour, Suspense</Genre><Tags>Espions</Tags>',
     });
     await ctx.scanner.scan(ctx.library.id);
 });
@@ -102,7 +100,6 @@ describe('genres', () => {
     it('classifies series with the list, and finds them by theme', async () => {
         expect(await series()).toMatchObject({
             format: 'manga',
-            audience: 'seinen',
             genres: ['Comédie', 'Thriller'],
             themes: ['Espions'],
         });
@@ -158,10 +155,10 @@ describe('genres', () => {
     });
 });
 
-describe('format and audience', () => {
-    it('are set by the admin, and a webtoon scrolls by default', async () => {
+describe('format', () => {
+    it('is set by the admin, and a webtoon scrolls by default', async () => {
         const { id } = await series();
-        const json = { format: 'webtoon', audience: 'shonen' };
+        const json = { format: 'webtoon' };
         expect(
             (
                 await call(`/series/${id}/classification`, reader, {
@@ -181,9 +178,6 @@ describe('format and audience', () => {
         expect(details).toMatchObject({
             format: 'webtoon',
             defaultFormat: 'manga',
-            audience: 'shonen',
-            // Trouvé parmi les genres du fichier.
-            defaultAudience: 'seinen',
             defaultReadingMode: 'webtoon',
         });
         const volume = (await call(`/volumes/${details.volumes[0].id}`, reader))
@@ -195,13 +189,10 @@ describe('format and audience', () => {
             method: 'PUT',
             json: { format: null },
         });
-        expect(await series()).toMatchObject({
-            format: 'manga',
-            audience: 'shonen',
-        });
+        expect(await series()).toMatchObject({ format: 'manga' });
     });
 
-    it('chosen on a draft folder, are applied when it is published', async () => {
+    it('chosen on a draft folder, is applied when it is published', async () => {
         await writeCbz(ctx.file('_draft/Solo/Solo T01.cbz'), {
             comicInfo: '<Series>Solo</Series><Number>1</Number>',
         });
@@ -213,23 +204,19 @@ describe('format and audience', () => {
                 json: {
                     folder: '_draft/Solo',
                     format: 'manhwa',
-                    audience: 'shonen',
                 },
             },
         );
         const drafts = (
             await call(`/libraries/${ctx.library.id}/drafts`, admin)
         ).body;
-        expect(drafts[0]).toMatchObject({
-            format: 'manhwa',
-            audience: 'shonen',
-        });
+        expect(drafts[0]).toMatchObject({ format: 'manhwa' });
 
         await ctx.files.publish(ctx.library.id, ['_draft/Solo/Solo T01.cbz']);
 
         const solo = (await call('/series', reader)).body.find(
             (s: { name: string }) => s.name === 'Solo',
         );
-        expect(solo).toMatchObject({ format: 'manhwa', audience: 'shonen' });
+        expect(solo).toMatchObject({ format: 'manhwa' });
     });
 });

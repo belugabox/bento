@@ -6,7 +6,7 @@ import { type GenreEntry, classify } from '@server/types';
  * Genres (pris dans la liste gérée par l'admin) et thèmes libres d'une
  * série, enregistrés dans `Genre` et `Tags` du ComicInfo. Les genres bruts
  * des fichiers sont rangés comme sur la fiche : un mot inconnu y devient
- * un thème, un mot de public ou un âge disparaît à l'enregistrement.
+ * un thème, un âge disparaît à l'enregistrement.
  */
 export const GenreFields = ({
     genre,
@@ -41,7 +41,6 @@ export const GenreFields = ({
             />
             <TagsInput
                 label="Thèmes"
-                description="Mots libres : espion, famille…"
                 placeholder={themes.length ? undefined : 'Aucun'}
                 value={themes}
                 onChange={(value) =>

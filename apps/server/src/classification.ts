@@ -22,25 +22,6 @@ export const FORMAT_LABELS: Record<Format, string> = {
     comics: 'Comics',
 };
 
-/** Public visé, au sens japonais (shonen : jeunes garçons…). */
-export const AUDIENCES = [
-    'kodomo',
-    'shonen',
-    'shojo',
-    'seinen',
-    'josei',
-] as const;
-
-export type Audience = (typeof AUDIENCES)[number];
-
-export const AUDIENCE_LABELS: Record<Audience, string> = {
-    kodomo: 'Jeunesse',
-    shonen: 'Shonen',
-    shojo: 'Shojo',
-    seinen: 'Seinen',
-    josei: 'Josei',
-};
-
 /** Format d'une série sans format choisi : celui de sa bibliothèque. */
 export const defaultFormat = (libraryType: 'manga' | 'comics'): Format =>
     libraryType === 'manga' ? 'manga' : 'bd';
@@ -101,17 +82,6 @@ export const splitList = (value: string | null | undefined) =>
         .map((item) => item.trim())
         .filter(Boolean);
 
-// Mots de public dans les genres d'anciens fichiers.
-const AUDIENCE_WORDS: Record<string, Audience> = {
-    kodomo: 'kodomo',
-    shonen: 'shonen',
-    shounen: 'shonen',
-    shojo: 'shojo',
-    shoujo: 'shojo',
-    seinen: 'seinen',
-    josei: 'josei',
-};
-
 // Classifications d'âge rangées parmi les genres : la classification
 // (`AgeRating`) en tient lieu.
 const AGE_WORDS = [
@@ -130,17 +100,12 @@ const isAge = (key: string) =>
     /^\d+ ?\+$/.test(key) ||
     AGE_WORDS.some((word) => key === word || key.startsWith(`${word} `));
 
-export type Classification = {
-    genres: string[];
-    themes: string[];
-    /** Public trouvé parmi les genres d'un ancien fichier. */
-    audience: Audience | null;
-};
+export type Classification = { genres: string[]; themes: string[] };
 
 /**
  * Range les genres et les thèmes (`Genre` et `Tags` du ComicInfo) d'après
- * la liste gérée : un genre reconnu prend son nom de la liste, un mot de
- * public est mis à part, un âge est retiré, le reste devient un thème.
+ * la liste gérée : un genre reconnu prend son nom de la liste, un âge est
+ * retiré, le reste devient un thème.
  */
 export const classify = (
     genre: string | null | undefined,
@@ -158,15 +123,12 @@ export const classify = (
     const genres: string[] = [];
     const themes: string[] = [];
     const seenThemes = new Set<string>();
-    let audience: Audience | null = null;
     const place = (value: string, isTag: boolean) => {
         const key = genreKey(value);
         if (!key) return;
         const name = names.get(key);
         if (name) {
             if (!genres.includes(name)) genres.push(name);
-        } else if (!isTag && AUDIENCE_WORDS[key]) {
-            audience ??= AUDIENCE_WORDS[key];
         } else if (!isTag && isAge(key)) {
             // Retiré : la classification en tient lieu.
         } else if (!seenThemes.has(key)) {
@@ -176,5 +138,5 @@ export const classify = (
     };
     for (const value of splitList(genre)) place(value, false);
     for (const value of splitList(tags)) place(value, true);
-    return { genres, themes, audience };
+    return { genres, themes };
 };

@@ -158,7 +158,6 @@ describe('drafts', () => {
                 status: null,
                 readingMode: null,
                 format: null,
-                audience: null,
                 coverUpdatedAt: null,
             },
             {
@@ -171,7 +170,6 @@ describe('drafts', () => {
                 status: null,
                 readingMode: null,
                 format: null,
-                audience: null,
                 coverUpdatedAt: null,
             },
             {
@@ -187,7 +185,6 @@ describe('drafts', () => {
                 status: null,
                 readingMode: null,
                 format: null,
-                audience: null,
                 coverUpdatedAt: null,
             },
         ]);
@@ -490,7 +487,6 @@ describe('publishing', () => {
             status: null,
             readingMode: null,
             format: null,
-            audience: null,
             coverUpdatedAt: null,
         });
     });

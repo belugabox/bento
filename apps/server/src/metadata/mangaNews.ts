@@ -1,11 +1,6 @@
 import { type CheerioAPI, load as cheerioLoad } from 'cheerio';
 
-import {
-    AUDIENCES,
-    type Audience,
-    type Format,
-    genreKey,
-} from '../classification';
+import { type Format, genreKey } from '../classification';
 import { type AgeRating } from '../library/ageRating';
 import { badGateway, badRequest, notFound } from '../tools/errors';
 
@@ -35,7 +30,6 @@ export type MangaNewsSeries = {
     penciller: string;
     publisher: string;
     format: Format | null;
-    audience: Audience | null;
     /** Genres tels que les nomme Manga-news (rangés ensuite par la liste). */
     genres: string[];
     themes: string[];
@@ -79,8 +73,8 @@ const clean = (text: string) => text.replace(/\s+/g, ' ').trim();
 const absolute = (src: string | undefined) =>
     src ? new URL(src, 'https://www.manga-news.com/').toString() : undefined;
 
-// Type de Manga-news : un public, ou un format pour les séries coréennes,
-// chinoises et les webtoons.
+// Type de Manga-news : un format pour les séries coréennes, chinoises et
+// les webtoons (sinon un public, shonen…, qui n'est pas gardé).
 const TYPE_FORMATS: Record<string, Format> = {
     manhwa: 'manhwa',
     manhua: 'manhua',
@@ -177,9 +171,6 @@ export const parseSeriesPage = (
             .filter(Boolean)
             .join(', '),
         format: TYPE_FORMATS[type] ?? COUNTRY_FORMATS[country] ?? null,
-        audience: (AUDIENCES as readonly string[]).includes(type)
-            ? (type as Audience)
-            : null,
         genres: $('li.book-genre a')
             .map((_, a) => clean($(a).text()))
             .get()

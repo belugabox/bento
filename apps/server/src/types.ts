@@ -9,9 +9,6 @@ export {
     type ColorScheme,
 } from './appearance';
 export {
-    AUDIENCE_LABELS,
-    AUDIENCES,
-    type Audience,
     classify,
     type Classification,
     DEFAULT_GENRES,

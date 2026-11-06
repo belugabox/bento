@@ -9,7 +9,7 @@ Serveur de lecture et de gestion de mangas et BD, qui remplace Kavita pour la fa
 - **Branche de travail : `feat/reading-foundation`** (poussée, pas encore de PR). Commit et push sur cette branche à la fin de chaque demande terminée et testée : c'est acquis. Ne pas fusionner dans `main`, ne pas ouvrir de PR sans qu'il le demande.
 - Le déploiement est reporté (« on déploiera plus tard »).
 - Il a refusé un nom de tri modifiable par série (« oublie »).
-- Classement décidé le 6 novembre 2026 : format, public, genres, thèmes. La liste des genres est gérée par l'admin (Réglages) ; format et public restent dans Bento (pas dans le ComicInfo, pas même dans `Genre` pour Kavita).
+- Classement décidé le 6 novembre 2026 : format, genres, thèmes. La liste des genres est gérée par l'admin (Réglages) ; le format reste dans Bento (pas dans le ComicInfo). Le « public » (shonen, seinen…) a été retiré : « je ne l'utiliserai pas » (migration 0015).
 - Favoris retirés le 6 novembre 2026 (« À lire » seul, en filtre de la barre « Séries »). Les collections restent telles quelles, mises de côté. Changer de fournisseur de connexion (TinyAuth, Authelia) : « oublie pour le moment ».
 
 ## Règles impératives

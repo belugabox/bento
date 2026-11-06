@@ -1,4 +1,4 @@
-import { type Audience, type Format, compareNames } from '@server/types';
+import { type Format, compareNames } from '@server/types';
 
 /** Ce dont les filtres ont besoin pour une série de la liste. */
 export type ListedSeries = {
@@ -11,8 +11,7 @@ export type ListedSeries = {
     // Genres rangés par la liste des genres.
     genres?: string[];
     format?: Format;
-    audience?: Audience | null;
-    status?: 'ongoing' | 'completed' | null;
+        status?: 'ongoing' | 'completed' | null;
     toRead?: boolean;
     collectionIds?: number[];
 };
@@ -66,10 +65,6 @@ export const allGenres = (series: Pick<ListedSeries, 'genres'>[]) =>
 export const allFormats = (series: Pick<ListedSeries, 'format'>[]) =>
     present(series.flatMap((s) => (s.format ? [s.format] : [])));
 
-/** Publics présents dans la liste. */
-export const allAudiences = (series: Pick<ListedSeries, 'audience'>[]) =>
-    present(series.flatMap((s) => (s.audience ? [s.audience] : [])));
-
 const inList = (s: ListedSeries, list: ListFilter) =>
     list === 'all' ||
     (s.collectionIds ?? []).includes(Number(list.split(':')[1]));
@@ -79,7 +74,7 @@ const matchesReading = (s: ListedSeries, filter: ReadingFilter) =>
     (filter === 'toread' ? !!s.toRead : readingStateOf(s) === filter);
 
 /**
- * Séries à afficher, filtrées (lecture, liste, format, public, genre,
+ * Séries à afficher, filtrées (lecture, liste, format, genre,
  * statut) puis triées.
  */
 export const filterSeries = <T extends ListedSeries>(
@@ -90,7 +85,6 @@ export const filterSeries = <T extends ListedSeries>(
         list = 'all',
         genre = null,
         format = null,
-        audience = null,
         status = 'all',
     }: {
         filter: ReadingFilter;
@@ -98,8 +92,7 @@ export const filterSeries = <T extends ListedSeries>(
         list?: ListFilter;
         genre?: string | null;
         format?: Format | null;
-        audience?: Audience | null;
-        status?: StatusFilter;
+                status?: StatusFilter;
     },
 ): T[] => {
     const kept = series.filter(
@@ -108,7 +101,6 @@ export const filterSeries = <T extends ListedSeries>(
             inList(s, list) &&
             (!genre || (s.genres ?? []).includes(genre)) &&
             (!format || s.format === format) &&
-            (!audience || s.audience === audience) &&
             (status === 'all' || s.status === status),
     );
     return sort === 'recent'

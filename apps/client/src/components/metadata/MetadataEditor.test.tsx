@@ -218,7 +218,7 @@ describe('MetadataEditor', () => {
         expect((publish as HTMLButtonElement).disabled).toBe(true);
     });
 
-    it('sorts the genres of old files, and keeps their audience in Bento', async () => {
+    it('sorts the genres of old files, and saves the format', async () => {
         mockServer();
         const save = vi.fn().mockResolvedValue({});
         render(
@@ -237,7 +237,6 @@ describe('MetadataEditor', () => {
                     classification={{
                         format: null,
                         defaultFormat: 'manga',
-                        audience: null,
                         save,
                     }}
                     onChanged={() => {}}
@@ -246,14 +245,7 @@ describe('MetadataEditor', () => {
         );
 
         await waitFor(() => expect(pillsOf('Genres')).toEqual(['Comédie']));
-        expect(pillsOf('Thèmes')).toEqual(['Espions']);
-        expect(
-            (
-                screen.getByRole('textbox', {
-                    name: 'Public',
-                }) as HTMLInputElement
-            ).value,
-        ).toBe('Par défaut : Shonen (genres du fichier)');
+        expect(pillsOf('Thèmes')).toEqual(['Shonen', 'Espions']);
 
         const themes = screen.getByRole('textbox', { name: 'Thèmes' });
         fireEvent.change(themes, { target: { value: 'famille' } });
@@ -266,18 +258,49 @@ describe('MetadataEditor', () => {
             );
         });
 
-        // Le public et l'âge quittent les genres du fichier.
+        // L'âge quitte les genres du fichier, les mots inconnus vont aux thèmes.
         expect(requests[0]?.[2]).toEqual({
             updates: volumes().map((volume) => ({
                 path: volume.path,
-                changes: { Genre: 'Comédie', Tags: 'Espions, famille' },
+                changes: {
+                    Genre: 'Comédie',
+                    Tags: 'Shonen, Espions, famille',
+                },
             })),
         });
-        expect(save).toHaveBeenCalledWith({
-            format: 'manhwa',
-            audience: 'shonen',
-        });
-        expect(screen.getByText('Format et public enregistrés.')).toBeTruthy();
+        expect(save).toHaveBeenCalledWith({ format: 'manhwa' });
+        expect(screen.getByText('Format enregistré.')).toBeTruthy();
+    });
+
+    it('shows the original value of a changed field, and goes back to it', async () => {
+        mockServer();
+        render(<Editor />);
+        const name = screen.getByRole('textbox', {
+            name: 'Nom',
+        }) as HTMLInputElement;
+
+        fireEvent.change(name, { target: { value: 'Gantz:G' } });
+        expect(name.getAttribute('data-changed')).toBe('true');
+        fireEvent.click(
+            screen.getByRole('button', {
+                name: 'Revenir à la valeur d’origine : Gantz',
+            }),
+        );
+
+        expect(name.value).toBe('Gantz');
+        expect(name.getAttribute('data-changed')).toBeNull();
+        expect(
+            screen.queryByRole('button', { name: /valeur d’origine/ }),
+        ).toBeNull();
+
+        // Un champ vide à l'origine.
+        fireEvent.change(numberOf(1), { target: { value: '7' } });
+        fireEvent.click(
+            screen.getByRole('button', {
+                name: 'Revenir à la valeur d’origine : (vide)',
+            }),
+        );
+        expect(numberOf(1).value).toBe('');
     });
 
     it('saves the series status alone, with its own message', async () => {
@@ -368,7 +391,7 @@ describe('MetadataEditor', () => {
         ).toBe('Tome 2');
     });
 
-    it('fills from Manga-news: sorted genres, themes, age, format and audience', async () => {
+    it('fills from Manga-news: sorted genres, themes, age and format', async () => {
         mockServer();
         const fetchMock = vi.mocked(fetch);
         const answer = fetchMock.getMockImplementation()!;
@@ -389,7 +412,6 @@ describe('MetadataEditor', () => {
                         penciller: 'Hiroya OKU',
                         publisher: 'Tonkam',
                         format: 'manga',
-                        audience: 'seinen',
                         age: 16,
                         ageRating: 'Mature 17+',
                         volumeCount: 37,
@@ -414,7 +436,6 @@ describe('MetadataEditor', () => {
                     classification={{
                         format: null,
                         defaultFormat: 'manga',
-                        audience: null,
                         save,
                     }}
                     onChanged={() => {}}
@@ -454,7 +475,7 @@ describe('MetadataEditor', () => {
         });
         expect(saveStatus).toHaveBeenCalledWith('completed');
         // Format de la bibliothèque : gardé « par défaut ».
-        expect(save).toHaveBeenCalledWith({ audience: 'seinen' });
+        expect(save).not.toHaveBeenCalled();
     });
 
     it('saves the reading mode of a published series', async () => {

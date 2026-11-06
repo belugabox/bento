@@ -35,7 +35,6 @@ describe('parseSeriesPage', () => {
             penciller: 'Tatsuya ENDÔ',
             publisher: 'Kurokawa',
             format: 'manga',
-            audience: 'shonen',
             genres: ['Suspense', 'Fantastique'],
             themes: [
                 'espion',
@@ -64,7 +63,6 @@ describe('parseSeriesPage', () => {
             originalTitle: '나 혼자만 레벨업',
             publisher: 'Kbooks, Verytoon, Piccoma',
             format: 'manhwa',
-            audience: null,
             volumeCount: 19,
             ongoing: false,
         });
@@ -194,7 +192,7 @@ describe('GET /metadata/manga-news', () => {
             '/metadata/manga-news/series?id=Spy-X-Family',
             'admin',
         );
-        expect((await sheet.json()).audience).toBe('shonen');
+        expect((await sheet.json()).format).toBe('manga');
         expect(
             (await get('/metadata/manga-news/search?q=spy', 'reader')).status,
         ).toBe(403);

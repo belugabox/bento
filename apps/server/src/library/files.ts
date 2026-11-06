@@ -355,7 +355,6 @@ export class LibraryFiles {
             status: settings.get(folder)?.status ?? null,
             readingMode: settings.get(folder)?.readingMode ?? null,
             format: settings.get(folder)?.format ?? null,
-            audience: settings.get(folder)?.audience ?? null,
             coverUpdatedAt: settings.get(folder)?.coverUpdatedAt ?? null,
         }));
     };
@@ -365,10 +364,7 @@ export class LibraryFiles {
         libraryId: number,
         folder: string,
         changes: Partial<
-            Pick<
-                DraftSettings,
-                'status' | 'readingMode' | 'format' | 'audience'
-            >
+            Pick<DraftSettings, 'status' | 'readingMode' | 'format'>
         >,
     ) => {
         this.library(libraryId);
@@ -474,7 +470,6 @@ export class LibraryFiles {
                     status: series.status,
                     readingMode: series.readingMode,
                     format: series.format,
-                    audience: series.audience,
                 })
                 .from(volumes)
                 .innerJoin(series, eq(series.id, volumes.seriesId))
@@ -545,8 +540,6 @@ export class LibraryFiles {
                     ...(!draft?.readingMode &&
                         old.readingMode && { readingMode: old.readingMode }),
                     ...(!draft?.format && old.format && { format: old.format }),
-                    ...(!draft?.audience &&
-                        old.audience && { audience: old.audience }),
                 };
                 for (const [field, value] of Object.entries(carried)) {
                     this.db
@@ -589,7 +582,6 @@ export class LibraryFiles {
         if (draft.status) changes.status = draft.status;
         if (draft.readingMode) changes.readingMode = draft.readingMode;
         if (draft.format) changes.format = draft.format;
-        if (draft.audience) changes.audience = draft.audience;
         if (draft.coverUpdatedAt) {
             const copied = await copyFile(
                 draftCoverFile(this.coversPath, libraryId, folder),

@@ -1,5 +1,4 @@
 import {
-    type Audience,
     type ComicInfo,
     type Format,
     parseVolumeFileName,
@@ -165,7 +164,6 @@ export type MangaNewsSeries = {
     penciller: string;
     publisher: string;
     format: Format | null;
-    audience: Audience | null;
     ageRating?: string;
     ongoing?: boolean;
 };
@@ -185,7 +183,6 @@ export type SeriesSheet = {
     ageRating?: string;
     status?: SeriesStatus;
     format?: Format;
-    audience?: Audience;
 };
 
 export const sheetFromWikipedia = (wiki: WikipediaSeries): SeriesSheet => ({
@@ -214,7 +211,6 @@ export const sheetFromMangaNews = (series: MangaNewsSeries): SeriesSheet => ({
               ? 'ongoing'
               : 'completed',
     format: series.format ?? undefined,
-    audience: series.audience ?? undefined,
 });
 
 /**
@@ -280,6 +276,19 @@ export const isSeriesFieldChanged = (
     paths: string[],
     field: SeriesField,
 ) => paths.some((path) => isFieldChanged(original, edits, path, field));
+
+/** Le champ de série revient, tome par tome, à sa valeur enregistrée. */
+export const revertSeriesField = (
+    edits: Edits,
+    original: Edits,
+    paths: string[],
+    field: SeriesField,
+): Edits =>
+    paths.reduce(
+        (next, path) =>
+            setVolumeField(next, path, field, original[path]?.[field]),
+        edits,
+    );
 
 /** Champs modifiés d'un tome (null : champ retiré). */
 export const changesOf = (
