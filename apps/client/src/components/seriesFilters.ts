@@ -8,8 +8,10 @@ export type ListedSeries = {
     // Tomes ouverts (lus ou en cours).
     startedCount: number;
     lastAddedAt: string | null;
-    // « Action, Aventure ».
-    genre?: string | null;
+    // Genres rangés par la liste des genres.
+    genres?: string[];
+    // Nom du format ; null = pas encore choisi.
+    format?: string | null;
     status?: 'ongoing' | 'completed' | null;
     toRead?: boolean;
     collectionIds?: number[];
@@ -51,22 +53,18 @@ export const readingStateOf = (
           ? 'started'
           : 'unread';
 
-/** Genres d'une série (« Action, Aventure » : deux genres). */
-export const genresOf = (s: Pick<ListedSeries, 'genre'>) =>
-    (s.genre ?? '')
-        .split(/[,;/]/)
-        .map((genre) => genre.trim())
-        .filter(Boolean);
+/** Valeurs présentes dans la liste (genres, formats…), une seule fois. */
+const present = <V>(values: V[]) => [...new Set(values)];
 
 /** Genres présents dans la liste, par ordre alphabétique. */
-export const allGenres = (series: Pick<ListedSeries, 'genre'>[]) => {
-    const byKey = new Map<string, string>();
-    for (const genre of series.flatMap(genresOf)) {
-        const key = genre.toLocaleLowerCase('fr');
-        if (!byKey.has(key)) byKey.set(key, genre);
-    }
-    return [...byKey.values()].sort((a, b) => a.localeCompare(b, 'fr'));
-};
+export const allGenres = (series: Pick<ListedSeries, 'genres'>[]) =>
+    present(series.flatMap((s) => s.genres ?? [])).sort((a, b) =>
+        a.localeCompare(b, 'fr'),
+    );
+
+/** Formats présents dans la liste. */
+export const allFormats = (series: Pick<ListedSeries, 'format'>[]) =>
+    present(series.flatMap((s) => (s.format ? [s.format] : [])));
 
 const inList = (s: ListedSeries, list: ListFilter) =>
     list === 'all' ||
@@ -76,7 +74,10 @@ const matchesReading = (s: ListedSeries, filter: ReadingFilter) =>
     filter === 'all' ||
     (filter === 'toread' ? !!s.toRead : readingStateOf(s) === filter);
 
-/** Séries à afficher, filtrées (lecture, liste, genre, statut) puis triées. */
+/**
+ * Séries à afficher, filtrées (lecture, liste, format, genre,
+ * statut) puis triées.
+ */
 export const filterSeries = <T extends ListedSeries>(
     series: T[],
     {
@@ -84,24 +85,23 @@ export const filterSeries = <T extends ListedSeries>(
         sort,
         list = 'all',
         genre = null,
+        format = null,
         status = 'all',
     }: {
         filter: ReadingFilter;
         sort: SeriesSort;
         list?: ListFilter;
         genre?: string | null;
+        format?: string | null;
         status?: StatusFilter;
     },
 ): T[] => {
-    const genreKey = genre?.toLocaleLowerCase('fr');
     const kept = series.filter(
         (s) =>
             matchesReading(s, filter) &&
             inList(s, list) &&
-            (!genreKey ||
-                genresOf(s).some(
-                    (g) => g.toLocaleLowerCase('fr') === genreKey,
-                )) &&
+            (!genre || (s.genres ?? []).includes(genre)) &&
+            (!format || s.format === format) &&
             (status === 'all' || s.status === status),
     );
     return sort === 'recent'

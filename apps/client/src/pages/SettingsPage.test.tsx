@@ -1,5 +1,6 @@
 import { MantineProvider } from '@mantine/core';
 import { act, fireEvent, render, screen } from '@testing-library/react';
+import { MemoryRouter } from 'react-router';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { SettingsPage } from './SettingsPage';
@@ -19,7 +20,13 @@ describe('SettingsPage', () => {
         let saved = DEFAULTS;
         const puts: unknown[] = [];
         vi.spyOn(globalThis, 'fetch').mockImplementation(
-            async (_input, init) => {
+            async (input, init) => {
+                // Liste des genres : vide, testée à part.
+                if (String(input) === '/api/genres') {
+                    return new Response('[]', {
+                        headers: { 'Content-Type': 'application/json' },
+                    });
+                }
                 if (init?.method === 'PUT') {
                     const body = JSON.parse(String(init.body));
                     puts.push(body);
@@ -33,7 +40,9 @@ describe('SettingsPage', () => {
         );
         render(
             <MantineProvider>
-                <SettingsPage />
+                <MemoryRouter>
+                    <SettingsPage />
+                </MemoryRouter>
             </MantineProvider>,
         );
 

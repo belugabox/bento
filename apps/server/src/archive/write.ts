@@ -28,6 +28,7 @@ export const COMIC_INFO_FIELDS: (keyof ComicInfo)[] = [
     'Publisher',
     'Imprint',
     'Genre',
+    'Tags',
     'Web',
     'PageCount',
     'LanguageISO',

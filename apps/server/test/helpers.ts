@@ -87,6 +87,18 @@ export const setup = async (type: 'manga' | 'comics' = 'manga') => {
 };
 
 /** Cookie d'une session ouverte pour une personne de ce rôle. */
+/**
+ * Un format pour chaque dossier de brouillons : obligatoire pour publier
+ * (sauf vers une série qui en a déjà un).
+ */
+export const formatDrafts = async (ctx: Awaited<ReturnType<typeof setup>>) => {
+    for (const draft of await ctx.files.drafts(ctx.library.id)) {
+        ctx.files.setDraftSettings(ctx.library.id, draft.folder, {
+            formatId: 1,
+        });
+    }
+};
+
 export const sessionCookie = (db: Db, role: Role, sub = `${role}-sub`) => {
     const { id } = upsertUser(db, { sub, name: role, groups: [] }, role);
     return `bento_session=${createSession(db, id)}`;

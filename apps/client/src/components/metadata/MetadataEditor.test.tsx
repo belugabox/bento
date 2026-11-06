@@ -8,7 +8,37 @@ import {
 } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import {
+    DEFAULT_AGE_STEPS,
+    DEFAULT_FORMATS,
+    DEFAULT_GENRES,
+} from '@server/types';
+
 import { type EditorVolume, MetadataEditor } from './MetadataEditor';
+
+// Genres, formats et grille d'âges : ceux de départ, sans passer par le
+// serveur. Formats numérotés à partir de 1 (Manga : 1, Manhwa : 2…).
+vi.mock('@/services/api', async (original) => ({
+    ...(await original<typeof import('@/services/api')>()),
+    fetchGenres: async () =>
+        DEFAULT_GENRES.map((genre, id) => ({ id, ...genre, seriesCount: 0 })),
+    fetchFormats: async () =>
+        DEFAULT_FORMATS.map((format, index) => ({
+            id: index + 1,
+            ...format,
+            seriesCount: 0,
+        })),
+    fetchSettings: async () => ({ settings: { ages: DEFAULT_AGE_STEPS } }),
+}));
+
+/** Pastilles d'un champ à valeurs multiples (genres, thèmes). */
+const pillsOf = (label: string) =>
+    [
+        ...(screen
+            .getByRole('textbox', { name: label })
+            .closest('.mantine-InputWrapper-root')
+            ?.querySelectorAll('.mantine-Pill-label') ?? []),
+    ].map((pill) => pill.textContent);
 
 const volumes = (): EditorVolume[] => [
     {
@@ -107,7 +137,9 @@ describe('MetadataEditor', () => {
             ).value,
         ).toBe('Tome 1');
         expect(
-            screen.getByLabelText('Genre').getAttribute('data-changed'),
+            screen
+                .getByRole('textbox', { name: 'Genres' })
+                .getAttribute('data-changed'),
         ).toBeNull();
 
         await act(async () => {
@@ -198,6 +230,128 @@ describe('MetadataEditor', () => {
         expect((publish as HTMLButtonElement).disabled).toBe(true);
     });
 
+    it('sorts the genres of old files, and saves the format', async () => {
+        mockServer();
+        const save = vi.fn().mockResolvedValue({});
+        render(
+            <MantineProvider>
+                <MetadataEditor
+                    libraryId={1}
+                    kind="manga"
+                    mode="drafts"
+                    volumes={volumes().map((volume) => ({
+                        ...volume,
+                        comicInfo: {
+                            ...volume.comicInfo,
+                            Genre: 'Shonen, Humour, Mature, Espions',
+                        },
+                    }))}
+                    classification={{
+                        formatId: null,
+                        age: null,
+                        save,
+                    }}
+                    onChanged={() => {}}
+                />
+            </MantineProvider>,
+        );
+
+        await waitFor(() => expect(pillsOf('Genres')).toEqual(['Comédie']));
+        expect(pillsOf('Thèmes')).toEqual(['Shonen', 'Espions']);
+
+        const themes = screen.getByRole('textbox', { name: 'Thèmes' });
+        fireEvent.change(themes, { target: { value: 'famille' } });
+        fireEvent.keyDown(themes, { key: 'Enter' });
+        fireEvent.click(screen.getByRole('textbox', { name: 'Format' }));
+        fireEvent.click(await screen.findByText('Manhwa'));
+        await act(async () => {
+            fireEvent.click(
+                screen.getByRole('button', { name: /Enregistrer/ }),
+            );
+        });
+
+        // L'âge quitte les genres du fichier, les mots inconnus vont aux thèmes.
+        expect(requests[0]?.[2]).toEqual({
+            updates: volumes().map((volume) => ({
+                path: volume.path,
+                changes: {
+                    Genre: 'Comédie',
+                    Tags: 'Shonen, Espions, famille',
+                },
+            })),
+        });
+        expect(save).toHaveBeenCalledWith({ formatId: 2 });
+        expect(screen.getByText('Format enregistré.')).toBeTruthy();
+    });
+
+    it('shows the original value of a changed field, and goes back to it', async () => {
+        mockServer();
+        render(<Editor />);
+        const name = screen.getByRole('textbox', {
+            name: 'Nom',
+        }) as HTMLInputElement;
+
+        fireEvent.change(name, { target: { value: 'Gantz:G' } });
+        expect(name.getAttribute('data-changed')).toBe('true');
+        fireEvent.click(
+            screen.getByRole('button', {
+                name: 'Revenir à la valeur d’origine : Gantz',
+            }),
+        );
+
+        expect(name.value).toBe('Gantz');
+        expect(name.getAttribute('data-changed')).toBeNull();
+        expect(
+            screen.queryByRole('button', { name: /valeur d’origine/ }),
+        ).toBeNull();
+
+        // Un champ vide à l'origine.
+        fireEvent.change(numberOf(1), { target: { value: '7' } });
+        fireEvent.click(
+            screen.getByRole('button', {
+                name: 'Revenir à la valeur d’origine : (vide)',
+            }),
+        );
+        expect(numberOf(1).value).toBe('');
+    });
+
+    it('requires a format, and keeps the exact age in Bento', async () => {
+        mockServer();
+        const save = vi.fn().mockResolvedValue({});
+        render(
+            <MantineProvider>
+                <MetadataEditor
+                    libraryId={1}
+                    kind="manga"
+                    mode="drafts"
+                    volumes={volumes()}
+                    classification={{ formatId: null, age: null, save }}
+                    onChanged={() => {}}
+                />
+            </MantineProvider>,
+        );
+        expect(await screen.findByText('Format à choisir')).toBeTruthy();
+
+        fireEvent.click(screen.getByRole('textbox', { name: 'Âge' }));
+        fireEvent.click(await screen.findByRole('option', { name: '12+' }));
+        const saveButton = screen.getByRole('button', { name: /Enregistrer/ });
+        // Sans format, rien ne s'enregistre.
+        expect(saveButton.hasAttribute('disabled')).toBe(true);
+
+        fireEvent.click(screen.getByRole('textbox', { name: /Format/ }));
+        fireEvent.click(await screen.findByRole('option', { name: 'Manga' }));
+        await act(async () => {
+            fireEvent.click(saveButton);
+        });
+
+        expect(save).toHaveBeenCalledWith({ formatId: 1, age: 12 });
+        // Le ComicInfo reçoit la classification la plus proche, plus stricte.
+        expect(
+            (requests[0]?.[2] as { updates: { changes: object }[] }).updates[0]
+                ?.changes,
+        ).toEqual({ AgeRating: 'Teen' });
+    });
+
     it('saves the series status alone, with its own message', async () => {
         const save = vi.fn().mockResolvedValue({});
         render(
@@ -266,15 +420,15 @@ describe('MetadataEditor', () => {
             (screen.getByPlaceholderText('Nom de la série') as HTMLInputElement)
                 .value,
         ).toBe('Gantz');
+        // Un manga cherche d'abord sur Manga-news.
+        fireEvent.click(screen.getByText('Wikipédia'));
         fireEvent.click(searchButton);
         fireEvent.click(await screen.findByRole('button', { name: 'Gantz' }));
         fireEvent.click(
             await screen.findByRole('button', { name: 'Utiliser cette fiche' }),
         );
 
-        expect((screen.getByLabelText('Genre') as HTMLInputElement).value).toBe(
-            'Science-fiction',
-        );
+        expect(pillsOf('Genres')).toEqual(['Science-fiction']);
         // Puis les noms de fichiers : numéros, titres, années.
         expect(numberOf(2).value).toBe('2');
         expect(
@@ -284,6 +438,94 @@ describe('MetadataEditor', () => {
                 ) as HTMLInputElement
             ).value,
         ).toBe('Tome 2');
+    });
+
+    it('fills from Manga-news: sorted genres, themes, age and format', async () => {
+        mockServer();
+        const fetchMock = vi.mocked(fetch);
+        const answer = fetchMock.getMockImplementation()!;
+        fetchMock.mockImplementation(async (input, init) => {
+            const url = String(input);
+            const body = url.includes('/manga-news/search')
+                ? [{ id: 'Gantz', title: 'Gantz', year: 2000 }]
+                : url.includes('/manga-news/series')
+                  ? {
+                        id: 'Gantz',
+                        title: 'Gantz',
+                        url: 'https://www.manga-news.com/index.php/serie/Gantz',
+                        originalTitle: 'Gantz',
+                        summary: 'Des aliens.',
+                        genres: ['Suspense', 'Science-fiction'],
+                        themes: ['aliens'],
+                        writer: 'Hiroya OKU',
+                        penciller: 'Hiroya OKU',
+                        publisher: 'Tonkam',
+                        format: 'manga',
+                        age: 16,
+                        ageRating: 'Mature 17+',
+                        volumeCount: 37,
+                        ongoing: false,
+                    }
+                  : undefined;
+            if (!body) return answer(input, init);
+            return new Response(JSON.stringify(body), {
+                headers: { 'Content-Type': 'application/json' },
+            });
+        });
+        const save = vi.fn().mockResolvedValue({});
+        const saveStatus = vi.fn().mockResolvedValue({});
+        render(
+            <MantineProvider>
+                <MetadataEditor
+                    libraryId={1}
+                    kind="manga"
+                    mode="drafts"
+                    volumes={volumes()}
+                    status={{ value: null, save: saveStatus }}
+                    classification={{
+                        formatId: null,
+                        age: null,
+                        save,
+                    }}
+                    onChanged={() => {}}
+                />
+            </MantineProvider>,
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: /Remplir/ }));
+        fireEvent.click(
+            await screen.findByRole('button', { name: 'Rechercher' }),
+        );
+        fireEvent.click(await screen.findByRole('button', { name: /Gantz/ }));
+        expect(await screen.findByText('Âge conseillé : 16+')).toBeTruthy();
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Utiliser cette fiche' }),
+        );
+
+        // « Suspense » rangé dans « Thriller ».
+        expect(pillsOf('Genres')).toEqual(['Thriller', 'Science-fiction']);
+        expect(pillsOf('Thèmes')).toEqual(['aliens']);
+        await act(async () => {
+            fireEvent.click(
+                screen.getByRole('button', { name: /Enregistrer/ }),
+            );
+        });
+
+        const changes = (
+            requests[requests.length - 1]?.[2] as {
+                updates: { changes: Record<string, unknown> }[];
+            }
+        ).updates[0]?.changes;
+        expect(changes).toMatchObject({
+            Genre: 'Thriller, Science-fiction',
+            Tags: 'aliens',
+            AgeRating: 'Mature 17+',
+            Writer: 'Hiroya OKU',
+        });
+        expect(saveStatus).toHaveBeenCalledWith('completed');
+        // Format retrouvé parmi ceux des réglages, âge exact gardé dans Bento.
+        expect(save).toHaveBeenCalledWith({ formatId: 1, age: 16 });
+        expect(screen.getByText('Format et âge enregistrés.')).toBeTruthy();
     });
 
     it('saves the reading mode of a published series', async () => {

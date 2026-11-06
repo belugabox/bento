@@ -1,4 +1,4 @@
-import { and, isNotNull, lte } from 'drizzle-orm';
+import { sql } from 'drizzle-orm';
 
 import type { SessionUser } from '../auth/sessions';
 import { series } from '../db/schema';
@@ -12,11 +12,12 @@ export const ageLimit = (viewer: Viewer) =>
 
 /**
  * Condition sur `series` : séries visibles pour la personne. Un compte
- * limité ne voit que les séries d'âge connu, sous sa limite.
+ * limité ne voit que les séries d'âge connu (choisi dans Bento, sinon
+ * déduit des tomes), sous sa limite.
  */
 export const visibleTo = (viewer: Viewer) => {
     const limit = ageLimit(viewer);
     return limit === null
         ? undefined
-        : and(isNotNull(series.minAge), lte(series.minAge, limit));
+        : sql`coalesce(${series.age}, ${series.minAge}) <= ${limit}`;
 };

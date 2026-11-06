@@ -137,7 +137,7 @@ describe('parental control', () => {
         expect(await visibleNames(child)).toEqual(['Kids', 'Teen']);
         expect(
             (await call(`/series/${ids.Mixed!.series}`, admin)).body,
-        ).toMatchObject({ ageRating: 'Mature 17+', minAge: 17 });
+        ).toMatchObject({ ageRating: 'Mature 17+', fileAge: 17, age: null });
     });
 
     it('hides everything inside a hidden series', async () => {

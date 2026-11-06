@@ -1,6 +1,11 @@
 // Types partagés avec le client (importés via `@server/types`).
 export type { ApiType } from './api';
-export { AGE_RATINGS, type AgeRating } from './library/ageRating';
+export {
+    AGE_RATINGS,
+    type AgeRating,
+    minAgeOf,
+    ratingForAge,
+} from './library/ageRating';
 export {
     ACCENTS,
     type Accent,
@@ -8,6 +13,20 @@ export {
     COLOR_SCHEMES,
     type ColorScheme,
 } from './appearance';
+export {
+    classify,
+    type Classification,
+    ageLabel,
+    DEFAULT_AGE_STEPS,
+    DEFAULT_FORMATS,
+    DEFAULT_GENRES,
+    type FormatEntry,
+    type GenreEntry,
+    READING_MODES,
+    type ReadingMode,
+    genreKey,
+    splitList,
+} from './classification';
 export { parseVolumeFileName } from './archive/fileName';
 export type { ComicInfo } from './archive/comicInfo';
 export { publicationPathOf } from './library/publication';

@@ -1,8 +1,15 @@
 import { z } from 'zod';
 
 import { ACCENTS, COLOR_SCHEMES } from './appearance';
+import { DEFAULT_AGE_STEPS } from './classification';
 import type { Db } from './db';
 import { settings as settingsTable } from './db/schema';
+
+const ageStepsSchema = z
+    .array(z.number().int().min(0).max(21))
+    .min(1)
+    .max(22)
+    .transform((ages) => [...new Set(ages)].sort((a, b) => a - b));
 
 const appearanceSchema = z.object({
     // Mode et couleur de l'appli tant que l'appareil n'a pas les siens.
@@ -24,6 +31,8 @@ export const settingsSchema = z.object({
         .min(0)
         .max(7 * 24 * 60),
     appearance: appearanceSchema,
+    // Grille d'âges proposée pour les séries et les comptes (0 : tout public).
+    ages: ageStepsSchema,
 });
 
 export type Settings = z.infer<typeof settingsSchema>;
@@ -33,6 +42,7 @@ export const settingsUpdateSchema = z.object({
     compression: settingsSchema.shape.compression.partial().optional(),
     scanIntervalMinutes: settingsSchema.shape.scanIntervalMinutes.optional(),
     appearance: appearanceSchema.partial().optional(),
+    ages: ageStepsSchema.optional(),
 });
 
 export type SettingsUpdate = z.infer<typeof settingsUpdateSchema>;
@@ -41,6 +51,7 @@ export const defaultSettings = (scanIntervalMinutes = 30): Settings => ({
     compression: { quality: 90, maxHeight: 2400 },
     scanIntervalMinutes,
     appearance: { colorScheme: 'auto', accent: 'violet' },
+    ages: DEFAULT_AGE_STEPS,
 });
 
 const KEY = 'settings';

@@ -10,6 +10,7 @@ import {
 } from 'drizzle-orm/sqlite-core';
 
 import type { ComicInfo } from '../archive/comicInfo';
+import { READING_MODES } from '../classification';
 
 /** Compte Bento, créé à la première connexion via Pocket ID. */
 export const users = sqliteTable('users', {
@@ -36,6 +37,16 @@ export const libraries = sqliteTable('libraries', {
     lastScanAt: integer('last_scan_at', { mode: 'timestamp' }),
 });
 
+/**
+ * Formats de série (manga, BD…), gérés par l'admin, chacun avec le mode
+ * de lecture des séries qui n'en ont pas choisi.
+ */
+export const formats = sqliteTable('formats', {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    name: text('name').notNull().unique(),
+    readingMode: text('reading_mode', { enum: READING_MODES }).notNull(),
+});
+
 /** Série : un dossier de premier niveau de la bibliothèque. */
 export const series = sqliteTable(
     'series',
@@ -49,7 +60,10 @@ export const series = sqliteTable(
         name: text('name').notNull(),
         // Métadonnées reprises du premier tome.
         summary: text('summary'),
+        // Genres et thèmes bruts du premier tome (`Genre` et `Tags`), rangés
+        // à la lecture d'après la liste des genres.
         genre: text('genre'),
+        tags: text('tags'),
         ageRating: text('age_rating'),
         // Âge minimal pour la lire, déduit de la classification ; null = inconnu.
         minAge: integer('min_age'),
@@ -65,6 +79,13 @@ export const series = sqliteTable(
         readingMode: text('reading_mode', {
             enum: ['ltr', 'ltr-manga', 'rtl', 'webtoon'],
         }),
+        // Format, réglé dans Bento ; null = pas encore choisi.
+        formatId: integer('format_id').references(() => formats.id, {
+            onDelete: 'set null',
+        }),
+        // Âge minimal choisi dans Bento (grille des réglages) ; null = celui
+        // déduit de la classification des tomes (`minAge`).
+        age: integer('age'),
         writer: text('writer'),
         publisher: text('publisher'),
         createdAt: integer('created_at', { mode: 'timestamp' })
@@ -170,6 +191,10 @@ export const draftSettings = sqliteTable(
         readingMode: text('reading_mode', {
             enum: ['ltr', 'ltr-manga', 'rtl', 'webtoon'],
         }),
+        formatId: integer('format_id').references(() => formats.id, {
+            onDelete: 'set null',
+        }),
+        age: integer('age'),
         // Couverture choisie (fichier covers/drafts/…) ; null = aucune.
         coverUpdatedAt: integer('cover_updated_at', { mode: 'timestamp_ms' }),
     },
@@ -228,6 +253,19 @@ export const collectionSeries = sqliteTable(
         index('collection_series_series').on(t.seriesId),
     ],
 );
+
+/**
+ * Liste des genres, gérée par l'admin. Les alias sont les autres noms
+ * reconnus dans les fichiers (« Humour » pour « Comédie »).
+ */
+export const genres = sqliteTable('genres', {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    name: text('name').notNull().unique(),
+    aliases: text('aliases', { mode: 'json' })
+        .$type<string[]>()
+        .notNull()
+        .default(sql`'[]'`),
+});
 
 /** Réglages de l'admin (clé → valeur JSON). */
 export const settings = sqliteTable('settings', {

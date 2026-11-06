@@ -99,6 +99,41 @@
       "when": 1793891291910,
       "tag": "0013_settings",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "6",
+      "when": 1793972449265,
+      "tag": "0014_classification",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "6",
+      "when": 1793974908759,
+      "tag": "0015_drop_audience",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "6",
+      "when": 1793976062605,
+      "tag": "0016_formats_and_age",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "6",
+      "when": 1793976083322,
+      "tag": "0017_drop_text_format",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "6",
+      "when": 1793976460141,
+      "tag": "0018_seed_formats",
+      "breakpoints": true
     }
   ]
 }

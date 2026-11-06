@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
     type ListedSeries,
+    allFormats,
     allGenres,
     filterSeries,
     readingStateOf,
@@ -65,21 +66,28 @@ describe('started series', () => {
     });
 });
 
-describe('list, genre and status filters', () => {
+describe('list, format, genre and status filters', () => {
     const items: ListedSeries[] = [
         {
             ...series('Akira', 0, null),
-            genre: 'Science-fiction, Action',
+            genres: ['Science-fiction', 'Action'],
+            format: 'manga',
             status: 'completed',
             collectionIds: [4],
         },
         {
             ...series('Berserk', 0, null),
-            genre: 'Fantasy, action',
+            genres: ['Fantasy', 'Action'],
+            format: 'manga',
             status: 'ongoing',
             toRead: true,
         },
-        { ...series('Coq de combat', 0, null), genre: null, status: null },
+        {
+            ...series('Solo Leveling', 0, null),
+            genres: [],
+            format: 'manhwa',
+            status: null,
+        },
     ];
     const kept = (options: Partial<Parameters<typeof filterSeries>[1]>) =>
         names(filterSeries(items, { filter: 'all', sort: 'name', ...options }));
@@ -90,9 +98,14 @@ describe('list, genre and status filters', () => {
         expect(kept({ list: 'collection:5' })).toEqual([]);
     });
 
-    it('keeps a genre, whatever its case', () => {
+    it('keeps a genre', () => {
         expect(kept({ genre: 'Action' })).toEqual(['Akira', 'Berserk']);
         expect(kept({ genre: 'Fantasy' })).toEqual(['Berserk']);
+    });
+
+    it('keeps a format', () => {
+        expect(kept({ format: 'manhwa' })).toEqual(['Solo Leveling']);
+        expect(allFormats(items)).toEqual(['manga', 'manhwa']);
     });
 
     it('keeps a status', () => {

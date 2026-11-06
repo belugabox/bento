@@ -1,6 +1,6 @@
 import { hc } from 'hono/client';
 
-import type { ApiType } from '@server/types';
+import type { ApiType, ReadingMode } from '@server/types';
 
 /** Client typé de l'API (`/api`, servie par le même domaine). */
 export const api = hc<ApiType>('/api');
@@ -216,6 +216,7 @@ export const saveSettings = (changes: {
     compression?: Partial<Settings['compression']>;
     scanIntervalMinutes?: number;
     appearance?: Partial<Settings['appearance']>;
+    ages?: number[];
 }) => json(api.settings.$put({ json: changes }));
 
 /** Thème par défaut choisi par l'admin (lisible sans session). */
@@ -245,6 +246,18 @@ export type WikipediaResult = Awaited<
     ReturnType<typeof searchWikipedia>
 >[number];
 export type WikipediaDetails = Awaited<ReturnType<typeof fetchWikipediaSeries>>;
+
+export const searchMangaNews = (q: string) =>
+    json(api.metadata['manga-news'].search.$get({ query: { q } }));
+
+/** Fiche Manga-news, par la fin de son adresse (« Spy-X-Family »). */
+export const fetchMangaNewsSeries = (seriesId: string) =>
+    json(api.metadata['manga-news'].series.$get({ query: { id: seriesId } }));
+
+export type MangaNewsResult = Awaited<
+    ReturnType<typeof searchMangaNews>
+>[number];
+export type MangaNewsDetails = Awaited<ReturnType<typeof fetchMangaNewsSeries>>;
 
 /** Partie gardée de l'image, recadrée en 2:3. */
 export type CoverPosition = 'top' | 'center' | 'bottom';
@@ -350,8 +363,27 @@ export const setDraftReadingMode = (
     );
 
 /** Toute la série lue (`true`) ou non lue (progression effacée). */
-export const markSeriesRead = (seriesId: number, read: boolean) =>
-    json(api.series[':id'].read.$put({ ...id(seriesId), json: { read } }));
+/** Série lue ou non lue ; avec `upTo`, seulement jusqu'à ce tome. */
+export const markSeriesRead = (
+    seriesId: number,
+    read: boolean,
+    upTo?: number,
+) =>
+    json(
+        api.series[':id'].read.$put({
+            ...id(seriesId),
+            json: { read, ...(upTo !== undefined && { upTo }) },
+        }),
+    );
+
+/** Progression d'avant une action, renvoyée par le serveur pour l'annuler. */
+export type SavedProgress = Awaited<
+    ReturnType<typeof markSeriesRead>
+>['previous'][number];
+
+/** Annule une action : la progression redevient exactement celle d'avant. */
+export const restoreProgress = (items: SavedProgress[]) =>
+    json(api.progress.restore.$put({ json: { items } }));
 
 /** Mode de lecture d'une série (null : celui de la bibliothèque). */
 export const setSeriesReadingMode = (
@@ -364,3 +396,70 @@ export const setSeriesReadingMode = (
             json: { readingMode },
         }),
     );
+
+/** Format et âge d'une série ou d'un dossier de brouillons (null : aucun). */
+export type ClassificationChanges = {
+    formatId?: number | null;
+    age?: number | null;
+};
+
+export const setSeriesClassification = (
+    seriesId: number,
+    changes: ClassificationChanges,
+) =>
+    json(
+        api.series[':id'].classification.$put({
+            ...id(seriesId),
+            json: changes,
+        }),
+    );
+
+export const setDraftClassification = (
+    library: number,
+    folder: string,
+    changes: ClassificationChanges,
+) =>
+    json(
+        api.libraries[':id'].drafts.classification.$put({
+            ...libraryId(library),
+            json: { folder, ...changes },
+        }),
+    );
+
+/** Liste des genres, gérée par l'admin. */
+export const fetchGenres = () => json(api.genres.$get());
+
+export type Genre = Awaited<ReturnType<typeof fetchGenres>>[number];
+
+export const createGenre = (name: string, aliases: string[] = []) =>
+    json(api.genres.$post({ json: { name, aliases } }));
+
+export const updateGenre = (
+    genreId: number,
+    changes: { name?: string; aliases?: string[] },
+) => json(api.genres[':id'].$patch({ ...id(genreId), json: changes }));
+
+/** Supprime un genre, ou le fusionne dans `into`. */
+export const deleteGenre = (genreId: number, into?: number) =>
+    json(
+        api.genres[':id'].$delete({
+            ...id(genreId),
+            query: { into: into === undefined ? undefined : String(into) },
+        }),
+    );
+
+/** Formats de série (manga, BD…), gérés par l'admin. */
+export const fetchFormats = () => json(api.formats.$get());
+
+export type SeriesFormat = Awaited<ReturnType<typeof fetchFormats>>[number];
+
+export const createFormat = (name: string, readingMode: ReadingMode) =>
+    json(api.formats.$post({ json: { name, readingMode } }));
+
+export const updateFormat = (
+    formatId: number,
+    changes: { name?: string; readingMode?: ReadingMode },
+) => json(api.formats[':id'].$patch({ ...id(formatId), json: changes }));
+
+export const deleteFormat = (formatId: number) =>
+    json(api.formats[':id'].$delete(id(formatId)));

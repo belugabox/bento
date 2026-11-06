@@ -15,6 +15,7 @@ import {
     requireUser,
 } from './auth/routes';
 import { listUsers, setUserMaxAge } from './auth/users';
+import { READING_MODES } from './classification';
 import type { Db } from './db';
 import {
     getSeries,
@@ -23,6 +24,7 @@ import {
     listSeries,
     savePageSizes,
     seriesCoverOf,
+    setSeriesClassification,
     setSeriesReadingMode,
     setSeriesStatus,
 } from './library/catalog';
@@ -34,6 +36,19 @@ import {
     seriesCoverFile,
 } from './library/covers';
 import type { LibraryFiles } from './library/files';
+import {
+    checkFormatId,
+    createFormat,
+    deleteFormat,
+    listFormats,
+    updateFormat,
+} from './library/formats';
+import {
+    createGenre,
+    deleteGenre,
+    listGenres,
+    updateGenre,
+} from './library/genres';
 import {
     createCollection,
     deleteCollection,
@@ -47,11 +62,14 @@ import {
     listContinue,
     listRecentVolumes,
     markSeries,
+    restoreProgress,
     saveProgress,
+    snapshotProgress,
 } from './library/progress';
 import { type LibraryScanner, coverFile } from './library/scanner';
 import { readCover } from './library/smallCovers';
 import { getStats } from './library/stats';
+import { MangaNews } from './metadata/mangaNews';
 import type { Wikipedia } from './metadata/wikipedia';
 import { SettingsStore, settingsUpdateSchema } from './settings';
 import { AppError, notFound } from './tools/errors';
@@ -68,6 +86,8 @@ export type ApiDeps = {
     files: LibraryFiles;
     covers: SeriesCovers;
     wikipedia: Wikipedia;
+    /** Manga-news (le vrai site si absent). */
+    mangaNews?: MangaNews;
     /** Réglages de l'admin (valeurs par défaut si absents). */
     settings?: SettingsStore;
     /** File des compressions (créée avec `files` si absente). */
@@ -89,9 +109,23 @@ const smallCover = (size?: string) => (size === 'small' ? size : undefined);
 const imageCache = (version?: string) =>
     version ? 'private, max-age=31536000, immutable' : 'private, max-age=3600';
 
-const READING_MODES = ['ltr', 'ltr-manga', 'rtl', 'webtoon'] as const;
-
 const collectionBody = z.object({ name: z.string().trim().min(1).max(80) });
+
+// Format et âge d'une série, réglés dans Bento : null pour les retirer.
+const classificationBody = z.object({
+    formatId: z.number().int().positive().nullable().optional(),
+    age: z.number().int().min(0).max(99).nullable().optional(),
+});
+
+const formatBody = z.object({
+    name: z.string().trim().min(1).max(40),
+    readingMode: z.enum(READING_MODES),
+});
+
+const genreBody = z.object({
+    name: z.string().trim().min(1).max(60),
+    aliases: z.array(z.string().trim().max(60)).max(50).default([]),
+});
 
 // Couverture choisie, et partie gardée de l'image recadrée en 2:3.
 const position = z.enum(['top', 'center', 'bottom']).optional();
@@ -158,6 +192,7 @@ export const createApi = ({
     files,
     covers,
     wikipedia,
+    mangaNews = new MangaNews(),
     settings = new SettingsStore(db),
     compression = new CompressionQueue(
         files,
@@ -273,6 +308,86 @@ export const createApi = ({
                     ),
                 ),
         )
+        .put(
+            '/series/:id/classification',
+            requireAdmin,
+            zValidator('param', idParam),
+            zValidator('json', classificationBody),
+            (c) => {
+                checkFormatId(db, c.req.valid('json').formatId);
+                return c.json(
+                    setSeriesClassification(
+                        db,
+                        c.req.valid('param').id,
+                        c.req.valid('json'),
+                    ),
+                );
+            },
+        )
+        // Formats : lus par tous (filtres), gérés par l'admin.
+        .get('/formats', (c) => c.json(listFormats(db)))
+        .post('/formats', requireAdmin, zValidator('json', formatBody), (c) =>
+            c.json(createFormat(db, c.req.valid('json'))),
+        )
+        .patch(
+            '/formats/:id',
+            requireAdmin,
+            zValidator('param', idParam),
+            zValidator('json', formatBody.partial()),
+            (c) =>
+                c.json(
+                    updateFormat(
+                        db,
+                        c.req.valid('param').id,
+                        c.req.valid('json'),
+                    ),
+                ),
+        )
+        .delete(
+            '/formats/:id',
+            requireAdmin,
+            zValidator('param', idParam),
+            (c) => c.json(deleteFormat(db, c.req.valid('param').id)),
+        )
+        // Liste des genres : lue par tous (filtres), gérée par l'admin.
+        .get('/genres', (c) => c.json(listGenres(db)))
+        .post('/genres', requireAdmin, zValidator('json', genreBody), (c) =>
+            c.json(createGenre(db, c.req.valid('json'))),
+        )
+        .patch(
+            '/genres/:id',
+            requireAdmin,
+            zValidator('param', idParam),
+            zValidator('json', genreBody.partial()),
+            (c) =>
+                c.json(
+                    updateGenre(
+                        db,
+                        c.req.valid('param').id,
+                        c.req.valid('json'),
+                    ),
+                ),
+        )
+        .delete(
+            '/genres/:id',
+            requireAdmin,
+            zValidator('param', idParam),
+            // Genre dans lequel le fusionner.
+            zValidator(
+                'query',
+                z.object({
+                    into: z.coerce.number().int().positive().optional(),
+                }),
+            ),
+            (c) =>
+                c.json(
+                    deleteGenre(
+                        db,
+                        c.req.valid('param').id,
+                        c.req.valid('query').into,
+                    ),
+                ),
+        )
         // Liste « à lire » de la personne.
         .put(
             '/series/:id/lists',
@@ -292,7 +407,14 @@ export const createApi = ({
         .put(
             '/series/:id/read',
             zValidator('param', idParam),
-            zValidator('json', z.object({ read: z.boolean() })),
+            zValidator(
+                'json',
+                z.object({
+                    read: z.boolean(),
+                    // Seulement ce tome et ceux d'avant.
+                    upTo: z.number().int().positive().optional(),
+                }),
+            ),
             (c) =>
                 c.json(
                     markSeries(
@@ -300,7 +422,35 @@ export const createApi = ({
                         c.var.user,
                         c.req.valid('param').id,
                         c.req.valid('json').read,
+                        c.req.valid('json').upTo,
                     ),
+                ),
+        )
+        // Annulation : progression remise telle qu'elle était.
+        .put(
+            '/progress/restore',
+            zValidator(
+                'json',
+                z.object({
+                    items: z
+                        .array(
+                            z.object({
+                                volumeId: z.number().int().positive(),
+                                progress: z
+                                    .object({
+                                        page: z.number().int().min(0),
+                                        completed: z.boolean(),
+                                        updatedAt: z.number().int().min(0),
+                                    })
+                                    .nullable(),
+                            }),
+                        )
+                        .max(2000),
+                }),
+            ),
+            (c) =>
+                c.json(
+                    restoreProgress(db, c.var.user, c.req.valid('json').items),
                 ),
         )
         // Couverture de la série : celle choisie, sinon celle du premier tome.
@@ -363,6 +513,21 @@ export const createApi = ({
             async (c) =>
                 c.json(await wikipedia.series(c.req.valid('param').id)),
         )
+        // --- Métadonnées Manga-news (admin), lues à la demande.
+        .get(
+            '/metadata/manga-news/search',
+            requireAdmin,
+            zValidator('query', z.object({ q: z.string().trim().min(1) })),
+            async (c) => c.json(await mangaNews.search(c.req.valid('query').q)),
+        )
+        .get(
+            '/metadata/manga-news/series',
+            requireAdmin,
+            // Fin de l'adresse de la fiche (« Spy-X-Family »).
+            zValidator('query', z.object({ id: z.string().min(1).max(200) })),
+            async (c) =>
+                c.json(await mangaNews.series(c.req.valid('query').id)),
+        )
         .get('/volumes/:id', zValidator('param', idParam), (c) => {
             // Le chemin sur disque reste côté serveur.
             const {
@@ -392,6 +557,8 @@ export const createApi = ({
                     c.var.user,
                     c.req.valid('param').id,
                 );
+                // État d'avant, pour annuler (menus de l'accueil).
+                const [previous] = snapshotProgress(db, c.var.user.id, [id]);
                 return c.json({
                     progress: saveProgress(
                         db,
@@ -399,6 +566,7 @@ export const createApi = ({
                         id,
                         c.req.valid('json'),
                     ),
+                    previous: previous!,
                 });
             },
         )
@@ -563,6 +731,25 @@ export const createApi = ({
                     { readingMode },
                 );
                 return c.json({ readingMode: saved.readingMode });
+            },
+        )
+        .put(
+            '/libraries/:id/drafts/classification',
+            requireAdmin,
+            zValidator('param', idParam),
+            zValidator(
+                'json',
+                classificationBody.extend({ folder: z.string().min(1) }),
+            ),
+            (c) => {
+                const { folder, ...changes } = c.req.valid('json');
+                checkFormatId(db, changes.formatId);
+                const { formatId, age } = files.setDraftSettings(
+                    c.req.valid('param').id,
+                    folder,
+                    changes,
+                );
+                return c.json({ formatId, age });
             },
         )
         .get(

@@ -227,11 +227,13 @@ describe('settings', () => {
                 compression: { quality: 90, maxHeight: 2400 },
                 scanIntervalMinutes: 30,
                 appearance: { colorScheme: 'auto', accent: 'violet' },
+                ages: [0, 8, 10, 12, 14, 16, 18],
             },
             defaults: {
                 compression: { quality: 90, maxHeight: 2400 },
                 scanIntervalMinutes: 30,
                 appearance: { colorScheme: 'auto', accent: 'violet' },
+                ages: [0, 8, 10, 12, 14, 16, 18],
             },
         });
 
@@ -250,6 +252,7 @@ describe('settings', () => {
             compression: { quality: 70, maxHeight: 2400 },
             scanIntervalMinutes: 0,
             appearance: { colorScheme: 'auto', accent: 'teal' },
+            ages: [0, 8, 10, 12, 14, 16, 18],
         });
         // Thème par défaut, lu sans session (page de connexion).
         expect(await (await api.request('/appearance')).json()).toEqual({

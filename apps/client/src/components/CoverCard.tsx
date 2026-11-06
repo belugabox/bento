@@ -20,6 +20,7 @@ export const CoverCard = ({
     subtitle,
     progress,
     corner,
+    menu,
 }: {
     to: string;
     /** Adresse de l'image de couverture. */
@@ -35,6 +36,8 @@ export const CoverCard = ({
     progress?: number;
     /** Contenu en haut à droite de la couverture (badge, bouton). */
     corner?: ReactNode;
+    /** Menu d'actions (⋮), en bas à droite, à côté du titre. */
+    menu?: ReactNode;
 }) => (
     // Le coin est hors du lien : un bouton ne peut pas être dans un lien.
     <Box pos="relative">
@@ -72,7 +75,15 @@ export const CoverCard = ({
                     />
                 )}
             </Box>
-            <Text size="sm" fw={500} lineClamp={1} px="xs" pt={6} title={title}>
+            <Text
+                size="sm"
+                fw={500}
+                lineClamp={1}
+                pl="xs"
+                pr={menu ? 30 : 'xs'}
+                pt={6}
+                title={title}
+            >
                 {title}
             </Text>
             {caption !== undefined && (
@@ -86,7 +97,14 @@ export const CoverCard = ({
                 </Text>
             )}
             {subtitle && (
-                <Text size="xs" c="dimmed" lineClamp={1} px="xs" pb={6}>
+                <Text
+                    size="xs"
+                    c="dimmed"
+                    lineClamp={1}
+                    pl="xs"
+                    pr={menu ? 30 : 'xs'}
+                    pb={6}
+                >
                     {subtitle}
                 </Text>
             )}
@@ -94,6 +112,11 @@ export const CoverCard = ({
         {corner && (
             <Box pos="absolute" top={6} right={6}>
                 {corner}
+            </Box>
+        )}
+        {menu && (
+            <Box pos="absolute" bottom={4} right={2}>
+                {menu}
             </Box>
         )}
     </Box>

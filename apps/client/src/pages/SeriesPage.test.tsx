@@ -31,9 +31,13 @@ const SERIES = {
     id: 3,
     name: 'Gantz',
     summary: null,
-    genre: null,
+    formatId: 1,
+    format: 'Manga',
+    genres: ['Action', 'Sport'],
+    themes: ['boxe'],
     ageRating: null,
-    minAge: null,
+    age: null,
+    fileAge: null,
     year: null,
     status: 'completed',
     writer: null,
@@ -85,6 +89,10 @@ describe('SeriesPage', () => {
         );
 
         expect(await screen.findByText('Série terminée')).toBeTruthy();
+        // Format, genres et thèmes.
+        expect(screen.getByText('Manga')).toBeTruthy();
+        expect(screen.getByText('Sport')).toBeTruthy();
+        expect(screen.getByText('Thèmes : boxe')).toBeTruthy();
         fireEvent.click(
             screen.getByRole('button', { name: 'Lecture de la série' }),
         );

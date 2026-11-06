@@ -7,12 +7,14 @@ import { isDraft } from './paths';
 
 export type DraftSettings = Pick<
     typeof draftSettings.$inferSelect,
-    'status' | 'readingMode' | 'coverUpdatedAt'
+    'status' | 'readingMode' | 'formatId' | 'age' | 'coverUpdatedAt'
 >;
 
 const NONE: DraftSettings = {
     status: null,
     readingMode: null,
+    formatId: null,
+    age: null,
     coverUpdatedAt: null,
 };
 
@@ -31,9 +33,9 @@ export const draftSettingsOf = (db: Db, libraryId: number) =>
             .from(draftSettings)
             .where(eq(draftSettings.libraryId, libraryId))
             .all()
-            .map(({ folder, status, readingMode, coverUpdatedAt }) => [
+            .map(({ libraryId: _library, folder, ...settings }) => [
                 folder,
-                { status, readingMode, coverUpdatedAt } as DraftSettings,
+                settings as DraftSettings,
             ]),
     );
 

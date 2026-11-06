@@ -33,7 +33,7 @@ import { Link, useParams } from 'react-router';
 
 import { CollectionsModal } from '@/components/CollectionsModal';
 import { CoverCard } from '@/components/CoverCard';
-import { ageRatingLabel } from '@/components/ageLimits';
+import { ageLabel, seriesAgeOf } from '@/components/ageLimits';
 import {
     nextToRead,
     progressRatio,
@@ -80,7 +80,9 @@ export const SeriesPage = () => {
     ).length;
     // Titre de chaque tome sous son numéro, si l'un d'eux en a un.
     const withTitles = series.volumes.some((v) => volumeTitleOf(v));
+    const age = seriesAgeOf(series);
     const details = [
+        series.format,
         series.year && String(series.year),
         series.writer,
         series.publisher,
@@ -174,17 +176,22 @@ export const SeriesPage = () => {
                                 {readCount} lu{readCount > 1 ? 's' : ''}
                             </Badge>
                         )}
-                        {series.genre && (
-                            <Badge variant="light" color="gray">
-                                {series.genre}
+                        {series.genres.map((genre) => (
+                            <Badge key={genre} variant="light" color="gray">
+                                {genre}
                             </Badge>
-                        )}
-                        {ageRatingLabel(series.ageRating) && (
+                        ))}
+                        {age !== null && (
                             <Badge variant="light" color="orange">
-                                {ageRatingLabel(series.ageRating)}
+                                {ageLabel(age)}
                             </Badge>
                         )}
                     </Group>
+                    {series.themes.length > 0 && (
+                        <Text size="xs" c="dimmed">
+                            Thèmes : {series.themes.join(', ')}
+                        </Text>
+                    )}
                     {isAdmin && (
                         <Button
                             component={Link}

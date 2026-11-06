@@ -77,6 +77,8 @@ describe('reading progress', () => {
 
         expect((await save(gantz[0]!, { page: 1 })).body).toEqual({
             progress: { page: 1, completed: false },
+            // État d'avant, pour annuler.
+            previous: { volumeId: gantz[0], progress: null },
         });
 
         expect(await progressOf(gantz[0]!)).toEqual({
@@ -107,7 +109,9 @@ describe('reading progress', () => {
             completed: true,
         });
 
-        expect((await save(gantz[1]!, { completed: false })).body).toEqual({
+        expect(
+            (await save(gantz[1]!, { completed: false })).body,
+        ).toMatchObject({
             progress: null,
         });
         expect(await progressOf(gantz[1]!)).toBeNull();
@@ -186,7 +190,19 @@ describe('reading progress', () => {
             method: 'PUT',
             json: { read: true },
         });
-        expect(read.body).toEqual({ volumes: 3, read: true });
+        expect(read.body).toMatchObject({ volumes: 3, read: true });
+        expect(read.body.previous).toEqual([
+            { volumeId: gantz[0], progress: null },
+            {
+                volumeId: gantz[1],
+                progress: {
+                    page: 1,
+                    completed: false,
+                    updatedAt: expect.any(Number),
+                },
+            },
+            { volumeId: gantz[2], progress: null },
+        ]);
         expect(
             (await call(`/series/${gantzSeries}`, alice)).body.volumes.map(
                 (v: { progress: { completed: boolean } | null }) =>
@@ -208,5 +224,52 @@ describe('reading progress', () => {
                 })
             ).status,
         ).toBe(404);
+    });
+
+    it('marks a series read up to a volume', async () => {
+        const read = await call(`/series/${gantzSeries}/read`, alice, {
+            method: 'PUT',
+            json: { read: true, upTo: gantz[1] },
+        });
+        expect(read.body).toMatchObject({ volumes: 2, read: true });
+        expect((await progressOf(gantz[1]!))?.completed).toBe(true);
+        expect(await progressOf(gantz[2]!)).toBeNull();
+        expect(
+            (
+                await call(`/series/${gantzSeries}/read`, alice, {
+                    method: 'PUT',
+                    json: { read: true, upTo: 999 },
+                })
+            ).status,
+        ).toBe(404);
+    });
+
+    it('restores the progress as it was, date included', async () => {
+        await save(gantz[1]!, { page: 1 });
+        const resume = async () =>
+            (await call('/continue', alice)).body.map(
+                (v: { volumeId: number }) => v.volumeId,
+            );
+        const before = await resume();
+
+        const { body } = await call(`/series/${gantzSeries}/read`, alice, {
+            method: 'PUT',
+            json: { read: true },
+        });
+        expect(await resume()).toEqual([]);
+
+        const restored = await call('/progress/restore', alice, {
+            method: 'PUT',
+            json: { items: body.previous },
+        });
+        expect(restored.body).toEqual({ restored: 3 });
+        expect(await progressOf(gantz[1]!)).toEqual({
+            page: 1,
+            completed: false,
+        });
+        expect(await progressOf(gantz[0]!)).toBeNull();
+        expect(await resume()).toEqual(before);
+        // Les tomes d'une autre personne ne sont pas touchés.
+        expect(await progressOf(gantz[1]!, bob)).toBeNull();
     });
 });

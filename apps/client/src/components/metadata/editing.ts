@@ -4,6 +4,7 @@ import { type ComicInfo, parseVolumeFileName } from '@server/types';
 export const SERIES_FIELDS = [
     'Series',
     'Genre',
+    'Tags',
     'Writer',
     'Penciller',
     'Publisher',
@@ -149,22 +150,89 @@ export const statusFromWikipedia = (
 ): SeriesStatus | undefined =>
     wiki.lastYear ? 'completed' : wiki.ongoing ? 'ongoing' : undefined;
 
+/** Fiche Manga-news, telle que renvoyée par le serveur. */
+export type MangaNewsSeries = {
+    title: string;
+    summary: string;
+    genres: string[];
+    themes: string[];
+    writer: string;
+    penciller: string;
+    publisher: string;
+    /** Nom du format (« Manga »). */
+    format: string | null;
+    age?: number;
+    ageRating?: string;
+    ongoing?: boolean;
+};
+
 /**
- * Champs de série depuis Wikipédia. Le résumé ne va que sur le premier
- * tome. Sans `overwrite`, seuls les champs vides sont remplis.
+ * Fiche d'une série trouvée en ligne, quelle que soit sa source : ce qui
+ * remplit l'éditeur.
  */
-export const fillFromWikipedia = (
+export type SeriesSheet = {
+    title: string;
+    summary?: string;
+    genre?: string;
+    tags?: string;
+    writer?: string;
+    penciller?: string;
+    publisher?: string;
+    ageRating?: string;
+    status?: SeriesStatus;
+    /** Nom du format, à rapprocher de ceux des réglages. */
+    format?: string;
+    /** Âge conseillé (« 12+ » : 12). */
+    age?: number;
+};
+
+export const sheetFromWikipedia = (wiki: WikipediaSeries): SeriesSheet => ({
+    title: wiki.title,
+    summary: wiki.summary,
+    genre: wiki.genre,
+    writer: wiki.writer,
+    penciller: wiki.penciller,
+    publisher: wiki.publisher,
+    status: statusFromWikipedia(wiki),
+});
+
+export const sheetFromMangaNews = (series: MangaNewsSeries): SeriesSheet => ({
+    title: series.title,
+    summary: series.summary,
+    genre: series.genres.join(', '),
+    tags: series.themes.join(', '),
+    writer: series.writer,
+    penciller: series.penciller,
+    publisher: series.publisher,
+    ageRating: series.ageRating,
+    status:
+        series.ongoing === undefined
+            ? undefined
+            : series.ongoing
+              ? 'ongoing'
+              : 'completed',
+    format: series.format ?? undefined,
+    age: series.age,
+});
+
+/**
+ * Champs de série depuis une fiche en ligne. Le résumé ne va que sur le
+ * premier tome. Sans `overwrite`, seuls les champs vides sont remplis.
+ */
+export const fillFromSheet = (
     edits: Edits,
     paths: string[],
-    wiki: WikipediaSeries,
+    sheet: SeriesSheet,
     overwrite: boolean,
 ): Edits => {
-    const values: Partial<Record<SeriesField, string | number>> = {
-        Series: wiki.title,
-        Genre: wiki.genre,
-        Writer: wiki.writer,
-        Penciller: wiki.penciller,
-        Publisher: wiki.publisher,
+    const values: Partial<Record<SeriesField, string | number | undefined>> = {
+        Series: sheet.title,
+        Genre: sheet.genre,
+        Tags: sheet.tags,
+        Writer: sheet.writer,
+        Penciller: sheet.penciller,
+        Publisher: sheet.publisher,
+        AgeRating: sheet.ageRating,
     };
     let next = edits;
     for (const [field, value] of Object.entries(values) as [
@@ -179,11 +247,19 @@ export const fillFromWikipedia = (
         }
     }
     const first = paths[0];
-    if (first && wiki.summary && fillable(next[first]?.Summary, overwrite)) {
-        next = setVolumeField(next, first, 'Summary', wiki.summary);
+    if (first && sheet.summary && fillable(next[first]?.Summary, overwrite)) {
+        next = setVolumeField(next, first, 'Summary', sheet.summary);
     }
     return next;
 };
+
+/** Champs de série depuis Wikipédia (voir `fillFromSheet`). */
+export const fillFromWikipedia = (
+    edits: Edits,
+    paths: string[],
+    wiki: WikipediaSeries,
+    overwrite: boolean,
+): Edits => fillFromSheet(edits, paths, sheetFromWikipedia(wiki), overwrite);
 
 const same = (a: unknown, b: unknown) => String(a ?? '') === String(b ?? '');
 
@@ -202,6 +278,19 @@ export const isSeriesFieldChanged = (
     paths: string[],
     field: SeriesField,
 ) => paths.some((path) => isFieldChanged(original, edits, path, field));
+
+/** Le champ de série revient, tome par tome, à sa valeur enregistrée. */
+export const revertSeriesField = (
+    edits: Edits,
+    original: Edits,
+    paths: string[],
+    field: SeriesField,
+): Edits =>
+    paths.reduce(
+        (next, path) =>
+            setVolumeField(next, path, field, original[path]?.[field]),
+        edits,
+    );
 
 /** Champs modifiés d'un tome (null : champ retiré). */
 export const changesOf = (

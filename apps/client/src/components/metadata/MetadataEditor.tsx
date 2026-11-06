@@ -3,12 +3,12 @@ import {
     Alert,
     Button,
     Checkbox,
+    Grid,
     Group,
     Image,
     NumberInput,
     Paper,
     Select,
-    SimpleGrid,
     Stack,
     Table,
     Text,
@@ -18,17 +18,30 @@ import {
 } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import {
+    IconArrowBackUp,
     IconEye,
     IconFileText,
     IconFileZip,
+    IconPhoto,
     IconUpload,
     IconWand,
 } from '@tabler/icons-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
-import { type ComicInfo, publicationPathOf } from '@server/types';
+import {
+    type ComicInfo,
+    classify,
+    genreKey,
+    publicationPathOf,
+} from '@server/types';
 
-import { AGE_RATING_OPTIONS, canonicalRating } from '@/components/ageLimits';
+import {
+    ageLabel,
+    ageOfRating,
+    ageOptions,
+    ratingForAge,
+    useAgeSteps,
+} from '@/components/ageLimits';
 import { ReaderPreview } from '@/reader/ReaderPreview';
 import {
     READING_MODES,
@@ -36,15 +49,20 @@ import {
     readingModeLabel,
 } from '@/reader/navigation';
 import {
+    type ClassificationChanges,
     fetchFilePageSizes,
+    fetchFormats,
+    fetchGenres,
     filePageUrl,
     publishFiles,
     saveComicInfo,
 } from '@/services/api';
+import { useQuery } from '@/services/useQuery';
 
 import { CompressionModal } from './CompressionModal';
 import { ExistingSeriesPicker } from './ExistingSeriesPicker';
-import { WikipediaSearch } from './WikipediaSearch';
+import { GenreFields } from './GenreFields';
+import { SeriesSearch } from './SeriesSearch';
 import {
     type EditableVolume,
     type Edits,
@@ -52,16 +70,16 @@ import {
     type SeriesStatus,
     changesOf,
     fillFromFileNames,
-    fillFromWikipedia,
+    fillFromSheet,
     initialEdits,
     isFieldChanged,
     isMixed,
     isSeriesFieldChanged,
     joinSeries,
+    revertSeriesField,
     seriesValue,
     setSeriesField,
     setVolumeField,
-    statusFromWikipedia,
 } from './editing';
 
 export type EditorVolume = EditableVolume & {
@@ -74,8 +92,43 @@ export type EditorVolume = EditableVolume & {
 
 type Report = { color: string; lines: string[] };
 
-/** Champ modifié, pas encore enregistré : bordure et fond orange. */
-const changed = (isChanged: boolean) =>
+/** Valeur d'origine d'un champ modifié, et comment y revenir. */
+type Revert = { original: string; onRevert: () => void };
+
+// Un long résumé n'est montré qu'en partie dans la bulle.
+const ORIGINAL_PREVIEW = 300;
+
+/** Bouton dans un champ modifié : montre sa valeur d'origine, et y revient. */
+const RevertButton = ({ original, onRevert }: Revert) => {
+    const shown =
+        original.length > ORIGINAL_PREVIEW
+            ? `${original.slice(0, ORIGINAL_PREVIEW)}…`
+            : original || '(vide)';
+    return (
+        <Tooltip
+            label={`Valeur d’origine : ${shown}`}
+            multiline
+            maw={320}
+            withinPortal
+        >
+            <ActionIcon
+                variant="subtle"
+                color="orange"
+                size="sm"
+                aria-label={`Revenir à la valeur d’origine : ${shown}`}
+                onClick={onRevert}
+            >
+                <IconArrowBackUp size={14} />
+            </ActionIcon>
+        </Tooltip>
+    );
+};
+
+/**
+ * Champ modifié, pas encore enregistré : bordure et fond orange, et un
+ * bouton pour voir la valeur d'origine et y revenir.
+ */
+const changed = (isChanged: boolean, revert?: Revert) =>
     isChanged
         ? {
               'data-changed': true,
@@ -85,8 +138,16 @@ const changed = (isChanged: boolean) =>
                       backgroundColor: 'var(--mantine-color-orange-light)',
                   },
               },
+              ...(revert && {
+                  rightSection: <RevertButton {...revert} />,
+                  rightSectionPointerEvents: 'all' as const,
+              }),
           }
         : {};
+
+/** Libellé d'une valeur parmi des options (statut, format…). */
+const labelOf = (options: { value: string; label: string }[], value: string) =>
+    options.find((option) => option.value === value)?.label ?? value;
 
 // Valeur du statut « inconnu » (Select n'accepte pas de valeur vide).
 const UNKNOWN = 'unknown';
@@ -98,7 +159,6 @@ const STATUS_OPTIONS = [
 ];
 
 const SERIES_TEXT_FIELDS: { field: SeriesField; label: string }[] = [
-    { field: 'Genre', label: 'Genre' },
     { field: 'Writer', label: 'Scénario' },
     { field: 'Penciller', label: 'Dessin' },
     { field: 'Publisher', label: 'Éditeur' },
@@ -116,6 +176,8 @@ export const MetadataEditor = ({
     onChanged,
     status: seriesStatus,
     readingMode: seriesMode,
+    classification,
+    cover,
 }: {
     libraryId: number;
     kind: 'manga' | 'comics';
@@ -138,6 +200,17 @@ export const MetadataEditor = ({
         defaultMode: ReadingMode;
         save: (mode: ReadingMode | null) => Promise<unknown>;
     };
+    /**
+     * Format (obligatoire) et âge de la série, réglés dans Bento (null : pas
+     * encore choisis ; l'âge est alors celui des fichiers).
+     */
+    classification?: {
+        formatId: number | null;
+        age: number | null;
+        save: (changes: ClassificationChanges) => Promise<unknown>;
+    };
+    /** Couverture de la série, et son choix. */
+    cover?: { src?: string; disabled?: boolean; onEdit: () => void };
 }) => {
     // Contenu des données reçues : le parent peut recréer la liste à chaque
     // rendu, seule une vraie nouveauté (enregistrement) doit tout reprendre.
@@ -164,12 +237,36 @@ export const MetadataEditor = ({
     const [modeValue, setModeValue] = useState<string>(savedMode);
     useEffect(() => setModeValue(savedMode), [savedMode]);
     const modeChanged = !!seriesMode && modeValue !== savedMode;
+    // Format : son id, null tant qu'il n'est pas choisi (obligatoire).
+    const savedFormat =
+        classification?.formatId == null
+            ? null
+            : String(classification.formatId);
+    const [formatValue, setFormatValue] = useState<string | null>(savedFormat);
+    useEffect(() => setFormatValue(savedFormat), [savedFormat]);
+    const formatChanged = !!classification && formatValue !== savedFormat;
+    const formatMissing = !!classification && !formatValue;
+    // Âge choisi dans Bento : « unknown » pour celui des fichiers.
+    const savedAge =
+        classification?.age == null ? UNKNOWN : String(classification.age);
+    const [ageValue, setAgeValue] = useState<string>(savedAge);
+    useEffect(() => setAgeValue(savedAge), [savedAge]);
+    const ageChanged = !!classification && ageValue !== savedAge;
     // Réglages de la série modifiés (enregistrés avec les tomes).
-    const settingsChanged = statusChanged || modeChanged;
+    const settingsChanged =
+        statusChanged || modeChanged || formatChanged || ageChanged;
+    const genres = useQuery(fetchGenres, []);
+    const catalog = genres.data ?? [];
+    const formats = useQuery(fetchFormats, []);
+    const formatOptions = (formats.data ?? []).map((f) => ({
+        value: String(f.id),
+        label: f.name,
+    }));
+    const ageSteps = useAgeSteps();
     // Action en cours : roue de chargement sur son seul bouton.
     const [busy, setBusy] = useState<'save' | 'publish'>();
     const [report, setReport] = useState<Report>();
-    const [wikiOpened, wiki] = useDisclosure(false);
+    const [finderOpened, finder] = useDisclosure(false);
     const [compressionOpened, compression] = useDisclosure(false);
     // Tome ouvert en aperçu de lecture.
     const [preview, setPreview] = useState<EditorVolume>();
@@ -182,6 +279,13 @@ export const MetadataEditor = ({
     const canPreview = (volume?: EditorVolume) =>
         !!volume && !volume.error && !!volume.pageCount;
     const firstPreviewable = volumes.find(canPreview);
+    const modeOptions = [
+        {
+            value: DEFAULT_MODE,
+            label: `Par défaut : ${readingModeLabel(seriesMode?.defaultMode ?? previewMode)}`,
+        },
+        ...READING_MODES,
+    ];
 
     // Nouvelles données (après enregistrement) : repartir de celles-ci. Le
     // choix d'une série existante est alors acquis : plus rien à annuler.
@@ -194,6 +298,34 @@ export const MetadataEditor = ({
         isSeriesFieldChanged(original, edits, paths, field);
     const volumeChanged = (path: string, field: keyof ComicInfo) =>
         isFieldChanged(original, edits, path, field);
+    /** Champ de série : orange s'il a changé, avec sa valeur d'origine. */
+    const seriesField = (
+        field: SeriesField,
+        shown?: (value: string) => string,
+    ) => {
+        const value = String(seriesValue(original, paths, field) ?? '');
+        return changed(seriesChanged(field), {
+            original: shown ? shown(value) : value,
+            onRevert: () =>
+                setEdits((current) =>
+                    revertSeriesField(current, original, paths, field),
+                ),
+        });
+    };
+    /** Champ d'un tome : orange s'il a changé, avec sa valeur d'origine. */
+    const volumeField = (path: string, field: keyof ComicInfo) =>
+        changed(volumeChanged(path, field), {
+            original: String(original[path]?.[field] ?? ''),
+            onRevert: () =>
+                setEdits((current) =>
+                    setVolumeField(
+                        current,
+                        path,
+                        field,
+                        original[path]?.[field],
+                    ),
+                ),
+        });
 
     const changes = readable
         .map((v) => ({
@@ -218,6 +350,36 @@ export const MetadataEditor = ({
         value: string | number | undefined,
     ) => setEdits((current) => setSeriesField(current, field, value as never));
     const first = paths[0];
+    // Âge des fichiers (classification ComicInfo), sans âge choisi.
+    const fileAge = ageOfRating(
+        String(seriesValue(original, paths, 'AgeRating') ?? ''),
+    );
+    const ageChoices = [
+        ...ageOptions(
+            ageSteps,
+            ageValue === UNKNOWN ? undefined : Number(ageValue),
+        ),
+        {
+            value: UNKNOWN,
+            label:
+                fileAge === null
+                    ? 'Non classée'
+                    : `D’après les fichiers : ${ageLabel(fileAge)}`,
+        },
+    ];
+    /** Âge choisi, et la classification ComicInfo la plus proche. */
+    const chooseAge = (value: string) => {
+        setAgeValue(value);
+        setEdits((current) =>
+            value === UNKNOWN
+                ? revertSeriesField(current, original, paths, 'AgeRating')
+                : setSeriesField(
+                      current,
+                      'AgeRating',
+                      ratingForAge(Number(value)),
+                  ),
+        );
+    };
 
     const save = async () => {
         setBusy('save');
@@ -241,6 +403,23 @@ export const MetadataEditor = ({
                     status === UNKNOWN ? null : (status as SeriesStatus),
                 );
                 lines.push('Statut de la série enregistré.');
+            }
+            if (classification && (formatChanged || ageChanged)) {
+                await classification.save({
+                    ...(formatChanged && {
+                        formatId: formatValue ? Number(formatValue) : null,
+                    }),
+                    ...(ageChanged && {
+                        age: ageValue === UNKNOWN ? null : Number(ageValue),
+                    }),
+                });
+                lines.push(
+                    formatChanged && ageChanged
+                        ? 'Format et âge enregistrés.'
+                        : formatChanged
+                          ? 'Format enregistré.'
+                          : 'Âge enregistré.',
+                );
             }
             if (seriesMode && modeChanged) {
                 await seriesMode.save(
@@ -282,14 +461,15 @@ export const MetadataEditor = ({
         }
     };
 
-    const publishReason =
-        changes.length > 0
-            ? 'Enregistre d’abord les modifications'
-            : toMove.length === 0
-              ? incomplete > 0
-                  ? `Série et numéro requis (${incomplete} tome(s) incomplet(s))`
-                  : 'Tous les tomes sont déjà à leur place'
-              : undefined;
+    const publishReason = formatMissing
+        ? 'Choisis d’abord le format de la série'
+        : changes.length > 0
+          ? 'Enregistre d’abord les modifications'
+          : toMove.length === 0
+            ? incomplete > 0
+                ? `Série et numéro requis (${incomplete} tome(s) incomplet(s))`
+                : 'Tous les tomes sont déjà à leur place'
+            : undefined;
 
     return (
         <Stack>
@@ -298,7 +478,7 @@ export const MetadataEditor = ({
                     <Button
                         variant="default"
                         leftSection={<IconWand size={16} />}
-                        onClick={wiki.open}
+                        onClick={finder.open}
                     >
                         Remplir
                     </Button>
@@ -322,6 +502,8 @@ export const MetadataEditor = ({
                             setPickerKey((key) => key + 1);
                             setStatus(savedStatus);
                             setModeValue(savedMode);
+                            setFormatValue(savedFormat);
+                            setAgeValue(savedAge);
                         }}
                     >
                         Annuler
@@ -329,7 +511,13 @@ export const MetadataEditor = ({
                     <Button
                         disabled={
                             (changes.length === 0 && !settingsChanged) ||
+                            formatMissing ||
                             busy === 'publish'
+                        }
+                        title={
+                            formatMissing
+                                ? 'Choisis d’abord le format de la série'
+                                : undefined
                         }
                         loading={busy === 'save'}
                         onClick={() => void save()}
@@ -376,124 +564,252 @@ export const MetadataEditor = ({
             )}
 
             <Paper withBorder p="md" radius="md">
-                <Stack gap="sm">
-                    <Text fw={600}>Série</Text>
+                <Stack gap="md">
                     {mode === 'drafts' && (
-                        <SimpleGrid cols={{ base: 1, sm: 3 }}>
-                            <ExistingSeriesPicker
-                                key={pickerKey}
-                                libraryId={libraryId}
-                                onJoin={(name, source) =>
-                                    // Toujours depuis l'état d'avant le
-                                    // premier choix : une autre série ne
-                                    // garde rien de la précédente.
-                                    setEdits((current) => {
-                                        beforeJoin.current ??= current;
-                                        return joinSeries(
-                                            beforeJoin.current,
-                                            name,
-                                            source,
-                                        );
-                                    })
+                        <ExistingSeriesPicker
+                            key={pickerKey}
+                            libraryId={libraryId}
+                            onJoin={(name, source) =>
+                                // Toujours depuis l'état d'avant le premier
+                                // choix : une autre série ne garde rien de la
+                                // précédente.
+                                setEdits((current) => {
+                                    beforeJoin.current ??= current;
+                                    return joinSeries(
+                                        beforeJoin.current,
+                                        name,
+                                        source,
+                                    );
+                                })
+                            }
+                            onLeave={() => {
+                                if (beforeJoin.current) {
+                                    setEdits(beforeJoin.current);
                                 }
-                                onLeave={() => {
-                                    if (beforeJoin.current) {
-                                        setEdits(beforeJoin.current);
+                                beforeJoin.current = undefined;
+                            }}
+                        />
+                    )}
+                    <Group align="flex-start" wrap="nowrap" gap="lg">
+                        {cover && (
+                            <Stack gap="xs" align="center" visibleFrom="sm">
+                                <Image
+                                    src={cover.src}
+                                    w={120}
+                                    h={180}
+                                    fit="cover"
+                                    radius="sm"
+                                    alt=""
+                                    fallbackSrc="data:image/gif;base64,R0lGODlhAQABAAAAACw="
+                                    bg="var(--mantine-color-default-hover)"
+                                />
+                                <Button
+                                    size="xs"
+                                    variant="default"
+                                    leftSection={<IconPhoto size={14} />}
+                                    disabled={cover.disabled}
+                                    onClick={cover.onEdit}
+                                >
+                                    Couverture…
+                                </Button>
+                            </Stack>
+                        )}
+                        <Grid style={{ flex: 1 }} gutter="sm">
+                            <Grid.Col span={{ base: 12, sm: 8 }}>
+                                <TextInput
+                                    label="Nom"
+                                    {...seriesField('Series')}
+                                    value={String(series('Series'))}
+                                    description={
+                                        isMixed(edits, paths, 'Series')
+                                            ? 'Différent selon les tomes'
+                                            : undefined
                                     }
-                                    beforeJoin.current = undefined;
+                                    onChange={(e) =>
+                                        setSeries(
+                                            'Series',
+                                            e.currentTarget.value,
+                                        )
+                                    }
+                                />
+                            </Grid.Col>
+                            {classification && (
+                                <Grid.Col span={{ base: 12, sm: 4 }}>
+                                    <Select
+                                        label="Format"
+                                        withAsterisk
+                                        placeholder="À choisir"
+                                        allowDeselect={false}
+                                        value={formatValue}
+                                        onChange={setFormatValue}
+                                        data={formatOptions}
+                                        error={
+                                            formatMissing
+                                                ? 'Format à choisir'
+                                                : undefined
+                                        }
+                                        {...changed(formatChanged, {
+                                            original: savedFormat
+                                                ? labelOf(
+                                                      formatOptions,
+                                                      savedFormat,
+                                                  )
+                                                : '',
+                                            onRevert: () =>
+                                                setFormatValue(savedFormat),
+                                        })}
+                                    />
+                                </Grid.Col>
+                            )}
+                            {SERIES_TEXT_FIELDS.map(({ field, label }) => (
+                                <Grid.Col
+                                    key={field}
+                                    span={{ base: 12, xs: 6, sm: 4 }}
+                                >
+                                    <TextInput
+                                        {...seriesField(field)}
+                                        label={label}
+                                        value={String(series(field))}
+                                        onChange={(e) =>
+                                            setSeries(
+                                                field,
+                                                e.currentTarget.value,
+                                            )
+                                        }
+                                    />
+                                </Grid.Col>
+                            ))}
+                            {seriesStatus && (
+                                <Grid.Col span={{ base: 12, xs: 6, sm: 4 }}>
+                                    <Select
+                                        label="Statut"
+                                        allowDeselect={false}
+                                        value={status}
+                                        onChange={(value) =>
+                                            value && setStatus(value)
+                                        }
+                                        data={STATUS_OPTIONS}
+                                        {...changed(statusChanged, {
+                                            original: labelOf(
+                                                STATUS_OPTIONS,
+                                                savedStatus,
+                                            ),
+                                            onRevert: () =>
+                                                setStatus(savedStatus),
+                                        })}
+                                    />
+                                </Grid.Col>
+                            )}
+                            {classification && (
+                                <Grid.Col span={{ base: 12, xs: 6, sm: 4 }}>
+                                    <Select
+                                        label="Âge"
+                                        allowDeselect={false}
+                                        value={ageValue}
+                                        onChange={(value) =>
+                                            value && chooseAge(value)
+                                        }
+                                        data={ageChoices}
+                                        {...changed(ageChanged, {
+                                            original: labelOf(
+                                                ageChoices,
+                                                savedAge,
+                                            ),
+                                            onRevert: () => {
+                                                setAgeValue(savedAge);
+                                                setEdits((current) =>
+                                                    revertSeriesField(
+                                                        current,
+                                                        original,
+                                                        paths,
+                                                        'AgeRating',
+                                                    ),
+                                                );
+                                            },
+                                        })}
+                                    />
+                                </Grid.Col>
+                            )}
+                            {seriesMode && (
+                                <Grid.Col span={{ base: 12, xs: 6, sm: 4 }}>
+                                    <Select
+                                        label="Mode de lecture"
+                                        allowDeselect={false}
+                                        value={modeValue}
+                                        onChange={(value) =>
+                                            value && setModeValue(value)
+                                        }
+                                        data={modeOptions}
+                                        {...changed(modeChanged, {
+                                            original: labelOf(
+                                                modeOptions,
+                                                savedMode,
+                                            ),
+                                            onRevert: () =>
+                                                setModeValue(savedMode),
+                                        })}
+                                        inputContainer={(children) => (
+                                            <Group gap={4} wrap="nowrap">
+                                                <div style={{ flex: 1 }}>
+                                                    {children}
+                                                </div>
+                                                <Tooltip label="Aperçu de lecture">
+                                                    <ActionIcon
+                                                        variant="default"
+                                                        size="lg"
+                                                        aria-label="Aperçu de lecture de la série"
+                                                        disabled={
+                                                            !firstPreviewable
+                                                        }
+                                                        onClick={() =>
+                                                            setPreview(
+                                                                firstPreviewable,
+                                                            )
+                                                        }
+                                                    >
+                                                        <IconEye size={16} />
+                                                    </ActionIcon>
+                                                </Tooltip>
+                                            </Group>
+                                        )}
+                                    />
+                                </Grid.Col>
+                            )}
+                            <GenreFields
+                                genre={String(series('Genre'))}
+                                tags={String(series('Tags'))}
+                                catalog={catalog}
+                                wrap={(field) => (
+                                    <Grid.Col span={{ base: 12, sm: 6 }}>
+                                        {field}
+                                    </Grid.Col>
+                                )}
+                                genreProps={seriesField('Genre', (value) =>
+                                    classify(value, null, catalog).genres.join(
+                                        ', ',
+                                    ),
+                                )}
+                                tagsProps={seriesField('Tags')}
+                                onChange={(genre, tags) => {
+                                    setEdits((current) =>
+                                        setSeriesField(
+                                            setSeriesField(
+                                                current,
+                                                'Genre',
+                                                genre,
+                                            ),
+                                            'Tags',
+                                            tags,
+                                        ),
+                                    );
                                 }}
                             />
-                        </SimpleGrid>
-                    )}
-                    <SimpleGrid cols={{ base: 1, sm: 3 }}>
-                        <TextInput
-                            label="Nom"
-                            {...changed(seriesChanged('Series'))}
-                            value={String(series('Series'))}
-                            description={
-                                isMixed(edits, paths, 'Series')
-                                    ? 'Différent selon les tomes'
-                                    : undefined
-                            }
-                            onChange={(e) =>
-                                setSeries('Series', e.currentTarget.value)
-                            }
-                        />
-                        {seriesStatus && (
-                            <Select
-                                label="Statut"
-                                allowDeselect={false}
-                                value={status}
-                                onChange={(value) => value && setStatus(value)}
-                                data={STATUS_OPTIONS}
-                                {...changed(statusChanged)}
-                            />
-                        )}
-                        {seriesMode && (
-                            <Select
-                                label="Mode de lecture"
-                                allowDeselect={false}
-                                value={modeValue}
-                                onChange={(value) =>
-                                    value && setModeValue(value)
-                                }
-                                data={[
-                                    {
-                                        value: DEFAULT_MODE,
-                                        label: `Par défaut : ${readingModeLabel(seriesMode.defaultMode)}`,
-                                    },
-                                    ...READING_MODES,
-                                ]}
-                                {...changed(modeChanged)}
-                                inputContainer={(children) => (
-                                    <Group gap={4} wrap="nowrap">
-                                        <div style={{ flex: 1 }}>
-                                            {children}
-                                        </div>
-                                        <Tooltip label="Aperçu de lecture">
-                                            <ActionIcon
-                                                variant="default"
-                                                size="lg"
-                                                aria-label="Aperçu de lecture de la série"
-                                                disabled={!firstPreviewable}
-                                                onClick={() =>
-                                                    setPreview(firstPreviewable)
-                                                }
-                                            >
-                                                <IconEye size={16} />
-                                            </ActionIcon>
-                                        </Tooltip>
-                                    </Group>
-                                )}
-                            />
-                        )}
-                        <Select
-                            label="Classification"
-                            {...changed(seriesChanged('AgeRating'))}
-                            clearable
-                            placeholder="Aucune"
-                            value={canonicalRating(String(series('AgeRating')))}
-                            onChange={(value) =>
-                                setSeries('AgeRating', value ?? undefined)
-                            }
-                            data={AGE_RATING_OPTIONS}
-                        />
-                        {SERIES_TEXT_FIELDS.map(({ field, label }) => (
-                            <TextInput
-                                key={field}
-                                {...changed(seriesChanged(field))}
-                                label={label}
-                                value={String(series(field))}
-                                onChange={(e) =>
-                                    setSeries(field, e.currentTarget.value)
-                                }
-                            />
-                        ))}
-                    </SimpleGrid>
+                        </Grid>
+                    </Group>
                     {first && (
                         <Textarea
                             label="Résumé (enregistré sur le premier tome)"
-                            {...changed(volumeChanged(first, 'Summary'))}
+                            {...volumeField(first, 'Summary')}
                             autosize
                             minRows={3}
                             maxRows={10}
@@ -589,11 +905,9 @@ export const MetadataEditor = ({
                                             size="xs"
                                             disabled={!!volume.error}
                                             aria-label={`Numéro de ${volume.name}`}
-                                            {...changed(
-                                                volumeChanged(
-                                                    volume.path,
-                                                    'Number',
-                                                ),
+                                            {...volumeField(
+                                                volume.path,
+                                                'Number',
                                             )}
                                             value={info.Number ?? ''}
                                             onChange={(e) =>
@@ -609,11 +923,9 @@ export const MetadataEditor = ({
                                             size="xs"
                                             disabled={!!volume.error}
                                             aria-label={`Titre de ${volume.name}`}
-                                            {...changed(
-                                                volumeChanged(
-                                                    volume.path,
-                                                    'Title',
-                                                ),
+                                            {...volumeField(
+                                                volume.path,
+                                                'Title',
                                             )}
                                             value={info.Title ?? ''}
                                             onChange={(e) =>
@@ -629,11 +941,9 @@ export const MetadataEditor = ({
                                             size="xs"
                                             disabled={!!volume.error}
                                             aria-label={`Année de ${volume.name}`}
-                                            {...changed(
-                                                volumeChanged(
-                                                    volume.path,
-                                                    'Year',
-                                                ),
+                                            {...volumeField(
+                                                volume.path,
+                                                'Year',
                                             )}
                                             hideControls
                                             value={info.Year ?? ''}
@@ -697,26 +1007,49 @@ export const MetadataEditor = ({
                 onCompressed={() => onChanged()}
             />
 
-            <WikipediaSearch
-                opened={wikiOpened}
-                onClose={wiki.close}
+            <SeriesSearch
+                opened={finderOpened}
+                onClose={finder.close}
                 kind={kind}
                 initialQuery={String(series('Series'))}
-                onPick={(details) => {
+                onPick={({ sheet }) => {
+                    // Genres et thèmes rangés d'après la liste des genres
+                    // (« Suspense » devient « Thriller »).
+                    const sorted = classify(sheet.genre, sheet.tags, catalog);
+                    const tidy = {
+                        ...sheet,
+                        genre: sorted.genres.join(', '),
+                        tags: sorted.themes.join(', '),
+                    };
                     setEdits((current) => {
-                        const filled = fillFromWikipedia(
+                        const filled = fillFromSheet(
                             current,
                             paths,
-                            details,
+                            tidy,
                             overwrite,
                         );
                         return alsoFileNames
                             ? fillFromFileNames(filled, readable, overwrite)
                             : filled;
                     });
-                    const fromWiki = statusFromWikipedia(details);
-                    if (fromWiki && (overwrite || status === UNKNOWN)) {
-                        setStatus(fromWiki);
+                    if (sheet.status && (overwrite || status === UNKNOWN)) {
+                        setStatus(sheet.status);
+                    }
+                    if (!classification) return;
+                    // Format de la fiche, parmi ceux des réglages.
+                    const format = formats.data?.find(
+                        (f) =>
+                            !!sheet.format &&
+                            genreKey(f.name) === genreKey(sheet.format),
+                    );
+                    if (format && (overwrite || !formatValue)) {
+                        setFormatValue(String(format.id));
+                    }
+                    if (
+                        sheet.age !== undefined &&
+                        (overwrite || ageValue === UNKNOWN)
+                    ) {
+                        setAgeValue(String(sheet.age));
                     }
                 }}
                 footer={
@@ -747,10 +1080,10 @@ export const MetadataEditor = ({
                                             overwrite,
                                         ),
                                     );
-                                    wiki.close();
+                                    finder.close();
                                 }}
                             >
-                                Sans Wikipédia : noms de fichiers seulement
+                                Sans fiche en ligne : noms de fichiers seulement
                             </Button>
                         </Group>
                     </Stack>

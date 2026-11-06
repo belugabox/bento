@@ -1,15 +1,6 @@
-import {
-    Alert,
-    Anchor,
-    Button,
-    Group,
-    Image,
-    Loader,
-    Stack,
-    Title,
-} from '@mantine/core';
+import { Alert, Anchor, Group, Loader, Stack, Title } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
-import { IconArrowLeft, IconPhoto } from '@tabler/icons-react';
+import { IconArrowLeft } from '@tabler/icons-react';
 import { Link, useNavigate, useParams } from 'react-router';
 
 import { CoverPicker } from '@/components/metadata/CoverPicker';
@@ -21,6 +12,7 @@ import {
     fetchVolume,
     pageUrl,
     seriesCoverUrl,
+    setSeriesClassification,
     setSeriesCover,
     setSeriesReadingMode,
     setSeriesStatus,
@@ -69,28 +61,7 @@ export const SeriesEditPage = () => {
                     <IconArrowLeft size={14} /> {series.name}
                 </Group>
             </Anchor>
-            <Group justify="space-between" align="flex-start">
-                <Title order={2}>Modifier la série</Title>
-                <Group align="flex-end">
-                    {currentCover && (
-                        <Image
-                            src={currentCover}
-                            w={64}
-                            h={96}
-                            fit="cover"
-                            radius="sm"
-                            alt=""
-                        />
-                    )}
-                    <Button
-                        variant="default"
-                        leftSection={<IconPhoto size={16} />}
-                        onClick={cover.open}
-                    >
-                        Couverture…
-                    </Button>
-                </Group>
-            </Group>
+            <Title order={2}>Modifier la série</Title>
 
             <MetadataEditor
                 libraryId={series.library.id}
@@ -100,6 +71,13 @@ export const SeriesEditPage = () => {
                     value: series.status,
                     save: (status) => setSeriesStatus(series.id, status),
                 }}
+                classification={{
+                    formatId: series.formatId,
+                    age: series.age,
+                    save: (changes) =>
+                        setSeriesClassification(series.id, changes),
+                }}
+                cover={{ src: currentCover, onEdit: cover.open }}
                 readingMode={{
                     value: series.readingMode,
                     defaultMode: series.defaultReadingMode,
