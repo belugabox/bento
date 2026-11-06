@@ -9,6 +9,7 @@ Serveur de lecture et de gestion de mangas et BD, qui remplace Kavita pour la fa
 - **Branche de travail : `feat/reading-foundation`** (poussée, pas encore de PR). Commit et push sur cette branche à la fin de chaque demande terminée et testée : c'est acquis. Ne pas fusionner dans `main`, ne pas ouvrir de PR sans qu'il le demande.
 - Le déploiement est reporté (« on déploiera plus tard »).
 - Il a refusé un nom de tri modifiable par série (« oublie »).
+- Favoris retirés le 6 novembre 2026 (« À lire » seul, en filtre de la barre « Séries »). Les collections restent telles quelles, mises de côté. Changer de fournisseur de connexion (TinyAuth, Authelia) : « oublie pour le moment ».
 
 ## Règles impératives
 
