@@ -87,6 +87,20 @@ const app = new Hono()
         }),
     )
     // Client compilé ; toute autre adresse renvoie l'appli (routage côté client).
+    // Fichiers de Vite (empreinte dans le nom) : gardés un an. Les autres
+    // (index.html, manifeste, icônes) : revérifiés à chaque fois, pour
+    // qu'une nouvelle version arrive tout de suite.
+    .use('/*', async (c, next) => {
+        await next();
+        if (c.res.ok) {
+            c.res.headers.set(
+                'Cache-Control',
+                c.req.path.startsWith('/assets/')
+                    ? 'public, max-age=31536000, immutable'
+                    : 'no-cache',
+            );
+        }
+    })
     .use('/*', serveStatic({ root: path.relative(process.cwd(), CLIENT_DIST) }))
     .get('*', (c) =>
         c.html(readFileSync(path.join(CLIENT_DIST, 'index.html'), 'utf-8')),

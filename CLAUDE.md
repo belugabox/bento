@@ -45,6 +45,7 @@ Serveur de lecture et de gestion de mangas et BD, qui remplace Kavita pour la fa
 - La compression passe par une file en arrière-plan (`library/compression.ts`) : un gros tome dépasse le délai d'une requête derrière Cloudflare (100 s).
 - Les réglages de l'admin sont dans `settings.ts` (table `settings`, migration 0013) : compression (qualité 90, 2400 px par défaut) et intervalle du scan.
 - Les réglages d'un brouillon (statut, mode de lecture, couverture) sont dans la table `draft_statuses` (son nom d'origine est gardé) et sont appliqués à la publication. Quand une publication renomme une série, ses listes, ses collections et son mode de lecture la suivent.
+- **Cache des images** : la version d'un tome est la date de son fichier (`volumeVersion`, `cast(mtime_ms as integer)`). Avec `?v=` dans l'adresse, pages et couvertures sont servies `immutable` pour un an : toute réécriture du fichier doit changer sa date. Une couverture refaite sans toucher au fichier (nouvelle taille `COVER_SIZE`) garderait l'ancienne en cache : changer alors aussi le format de la version.
 - Le tri des séries ignore les articles (`library/sortName.ts`). Un nom de fichier « Boxer (The) » donne « The Boxer ».
 
 ## Où on en est
@@ -54,7 +55,7 @@ Les étapes 1 à 3 de la feuille de route sont faites, ainsi qu'une page Réglag
 Prochaines étapes possibles, à faire valider par l'utilisateur :
 
 1. **Tablettes et Android** (étape 4 de SPEC) : fait le 6 novembre 2026, à faire essayer par l'utilisateur sur ses appareils. Si Chrome ne propose pas « Installer l'application », ajouter un service worker (prévu à l'étape 7 de toute façon).
-2. **Optimisations proposées** : cache navigateur long pour les pages et couvertures (version dans l'adresse), découpage du client (`React.lazy` pour l'admin), dimensions des pages lues dans l'en-tête des images, enregistrement du ComicInfo en recopiant l'archive par morceaux au lieu d'AdmZip (« on verra après »).
+2. **Optimisations** : faites le 6 novembre 2026 (pages et couvertures gardées un an grâce à la version du tome dans l'adresse, pages d'admin chargées à la demande, tailles des pages lues dans le début des images). Un fichier `vendor` séparé a été essayé puis retiré : il alourdissait le premier chargement. Reste l'enregistrement du ComicInfo en recopiant l'archive par morceaux au lieu d'AdmZip (« on verra après »).
 3. **Pages redimensionnées selon l'écran** (étape 5).
 4. **Manga-news** (étape 6) : deuxième source de métadonnées, sans API, lecture du HTML à la demande seulement. L'âge conseillé remplit la classification. Fiche testée : `https://www.manga-news.com/index.php/serie/Spy-X-Family` (titre VO, auteurs, éditeurs, genres, « Age conseillé 12+ », résumé, liens `/manga/<Série>/vol-N`). Les pages de tome n'ont pas encore été examinées.
 5. **Hors ligne** (étape 7), **tomes manquants** (8), **bascule** (9).

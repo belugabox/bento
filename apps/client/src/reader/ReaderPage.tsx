@@ -94,8 +94,8 @@ export const ReaderPage = () => {
     );
 
     const pageSrc = useCallback(
-        (index: number) => pageUrl(volumeId, index),
-        [volumeId],
+        (index: number) => pageUrl(volumeId, volume?.version ?? 0, index),
+        [volumeId, volume?.version],
     );
     const loadSizes = useCallback(() => fetchPageSizes(volumeId), [volumeId]);
     const onBeforeFirst = useCallback(() => {

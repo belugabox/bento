@@ -133,6 +133,7 @@ export const SeriesPage = () => {
                         src={seriesCoverUrl({
                             ...series,
                             coverVolumeId: first.id,
+                            coverVolumeVersion: first.version,
                         })}
                         alt={series.name}
                         w={{ base: 160, sm: 200 }}
@@ -296,7 +297,7 @@ export const SeriesPage = () => {
                         <CoverCard
                             key={volume.id}
                             to={`/read/${volume.id}`}
-                            cover={coverUrl(volume.id, 'small')}
+                            cover={coverUrl(volume.id, volume.version, 'small')}
                             title={volumeLabel(volume)}
                             caption={
                                 withTitles

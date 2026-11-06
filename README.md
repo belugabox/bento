@@ -71,7 +71,7 @@ L'admin fixe le mode de chaque série dans « Modifier les métadonnées » (par
 
 ### Accueil, listes et collections
 
-- **Accueil** : « Reprendre la lecture » (le tome commencé de chaque série, avec l'avancement dans la série), « La suite de tes séries » (le premier tome pas encore ouvert des séries dont on a fini un tome), puis toutes les séries. Les vignettes utilisent une version réduite des couvertures, créée à la première demande.
+- **Accueil** : « Reprendre la lecture » (pour chaque série entamée, le tome commencé ou, à défaut, le premier pas encore ouvert, avec l'avancement dans la série ; la plus récemment lue d'abord), puis toutes les séries. Les vignettes utilisent une version réduite des couvertures, créée à la première demande.
 - **Filtres** : état de lecture (toutes, à lire, non lues, en cours, lues) ; le bouton « Filtres » pour la collection, le genre et le statut de parution, affichés ensuite en pastilles qu'on retire d'un clic ; et le tri par nom ou par ajouts récents. Tout reste dans l'adresse.
 - **« À lire »** : le marque-page de la fiche série, propre à chacun ; « À lire » dans la barre « Séries » n'affiche que ces séries. (Les favoris ont été retirés.)
 - **Collections** : des sélections partagées créées par l'admin (menu de l'avatar, « Collections »), visibles de tous selon leur contrôle parental. Une série s'y ajoute depuis le menu ⋯ de sa fiche. Listes et collections suivent une série renommée à la publication.
@@ -89,7 +89,7 @@ Par défaut, Bento suit le mode du système (clair ou sombre) en violet ; l'admi
 - **Android (Chrome)** : menu ⋮, « Installer l'application » (ou « Ajouter à l'écran d'accueil »). Bento s'ouvre alors depuis son icône, dans sa propre fenêtre, sans barre d'adresse.
 - **iPad, iPhone (Safari)** : bouton Partager, « Sur l'écran d'accueil ».
 - **Plein écran** : dans le lecteur, le bouton à côté des réglages masque la barre du navigateur et la barre d'état ; « Plein écran à l'ouverture », dans les réglages de lecture, l'active au premier toucher. Le plein écran continue d'un tome au suivant, et s'arrête en quittant le lecteur. Safari sur iPhone ne le permet pas : installer l'appli donne alors le plus grand écran possible.
-- L'icône de l'appli vient de `apps/client/public/icon.svg`, fond plein (Android la découpe, iOS remplace la transparence par du noir) ; les PNG de `public/icons/` en sont tirés (192, 512 et 180 px pour iOS). L'onglet du navigateur a la boîte seule, sur fond transparent (`public/favicon.svg`).
+- L'icône de l'appli vient de `apps/client/public/icon.svg`, fond plein (Android la découpe, iOS remplace la transparence par du noir) ; les PNG de `public/icons/` en sont tirés (192, 512 et 180 px pour iOS). L'onglet du navigateur et la barre du haut ont la boîte seule, sur fond transparent (`src/assets/logo.svg`, servi avec une empreinte dans son nom : jamais d'ancien logo en cache). Les barres du système prennent la couleur du fond de l'appli (clair ou sombre).
 
 ### Statistiques (admin)
 

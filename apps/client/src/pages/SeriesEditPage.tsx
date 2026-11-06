@@ -43,7 +43,11 @@ export const SeriesEditPage = () => {
 
     const first = series.volumes[0];
     const currentCover = first
-        ? seriesCoverUrl({ ...series, coverVolumeId: first.id })
+        ? seriesCoverUrl({
+              ...series,
+              coverVolumeId: first.id,
+              coverVolumeVersion: first.version,
+          })
         : undefined;
 
     /** Fichiers renommés : la série peut avoir changé (nouveau dossier). */
@@ -108,7 +112,7 @@ export const SeriesEditPage = () => {
                                   path: volume.admin.file,
                                   name: volume.admin.file.split('/').pop()!,
                                   comicInfo: volume.admin.comicInfo,
-                                  cover: coverUrl(volume.id),
+                                  cover: coverUrl(volume.id, volume.version),
                                   pageCount: volume.pageCount,
                               },
                           ]
@@ -127,8 +131,8 @@ export const SeriesEditPage = () => {
                     key: String(v.id),
                     label: volumeLabel(v),
                     pageCount: v.pageCount,
-                    cover: coverUrl(v.id),
-                    page: (index) => pageUrl(v.id, index),
+                    cover: coverUrl(v.id, v.version),
+                    page: (index) => pageUrl(v.id, v.version, index),
                     source: (page) => ({
                         type: 'volume',
                         volumeId: v.id,

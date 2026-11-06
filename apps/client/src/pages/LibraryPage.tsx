@@ -47,10 +47,8 @@ import {
 } from '@/components/seriesFilters';
 import {
     type InProgressVolume,
-    type NextVolume,
     coverUrl,
     fetchCollections,
-    fetchHome,
     fetchInProgress,
     fetchLibraries,
     fetchSeriesList,
@@ -78,14 +76,17 @@ const ShelfCard = ({
     subtitle = volumeLabel(volume),
     progress,
 }: {
-    volume: Pick<NextVolume, 'volumeId' | 'seriesName' | 'number' | 'title'>;
+    volume: Pick<
+        InProgressVolume,
+        'volumeId' | 'version' | 'seriesName' | 'number' | 'title'
+    >;
     subtitle?: string;
     progress?: number;
 }) => (
     <Box w={SHELF_CARD_WIDTH} style={{ flexShrink: 0 }}>
         <CoverCard
             to={`/read/${volume.volumeId}`}
-            cover={coverUrl(volume.volumeId, 'small')}
+            cover={coverUrl(volume.volumeId, volume.version, 'small')}
             title={volume.seriesName}
             subtitle={subtitle}
             progress={progress}
@@ -94,18 +95,21 @@ const ShelfCard = ({
 );
 
 /**
- * Avancement dans la série d'un tome commencé : tomes lus, plus la part
- * lue du tome en cours.
+ * Avancement dans la série : tomes lus, plus la part lue du tome en cours
+ * (rien pour un tome pas encore ouvert).
  */
 const seriesProgress = (volume: InProgressVolume) =>
     volume.volumeCount > 0
-        ? (volume.readCount + (volume.page + 1) / volume.pageCount) /
+        ? (volume.readCount +
+              (volume.page === null
+                  ? 0
+                  : (volume.page + 1) / volume.pageCount)) /
           volume.volumeCount
         : 0;
 
 /**
- * Accueil : reprendre la lecture, suite des séries entamées, puis toutes
- * les séries (recherche, filtres et tri).
+ * Accueil : reprendre la lecture (tomes en cours et suite des séries
+ * entamées), puis toutes les séries (recherche, filtres et tri).
  */
 export const LibraryPage = () => {
     // Bibliothèque, recherche, filtre et tri dans l'adresse : le retour
@@ -125,7 +129,6 @@ export const LibraryPage = () => {
 
     const libraries = useQuery(fetchLibraries, []);
     const inProgress = useQuery(fetchInProgress, []);
-    const home = useQuery(fetchHome, []);
     const collections = useQuery(fetchCollections, []);
     const libraryId =
         Number(params.get('library')) || libraries.data?.[0]?.id || undefined;
@@ -196,7 +199,6 @@ export const LibraryPage = () => {
     const filtered = filter !== 'all' || active.length > 0;
     // Pendant une recherche : seulement les séries.
     const resume = debouncedSearch ? [] : (inProgress.data ?? []);
-    const next = debouncedSearch ? [] : (home.data?.next ?? []);
     const genres = allGenres(series.data ?? []);
     const sortLabel = SERIES_SORTS.find((s) => s.value === sort)?.label;
 
@@ -223,13 +225,6 @@ export const LibraryPage = () => {
                             subtitle={`${volumeLabel(volume)} · ${volume.readCount} / ${volume.volumeCount} lus`}
                             progress={seriesProgress(volume)}
                         />
-                    ))}
-                </Shelf>
-            )}
-            {next.length > 0 && (
-                <Shelf title="La suite de tes séries">
-                    {next.map((volume) => (
-                        <ShelfCard key={volume.volumeId} volume={volume} />
                     ))}
                 </Shelf>
             )}

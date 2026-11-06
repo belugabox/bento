@@ -3,7 +3,7 @@ import { and, desc, eq, sql } from 'drizzle-orm';
 import type { Db } from '../db';
 import { readProgress, series, volumes } from '../db/schema';
 import { notFound } from '../tools/errors';
-import { volumeOrder } from './catalog';
+import { volumeOrder, volumeVersion } from './catalog';
 import { type Viewer, visibleTo } from './visibility';
 
 export type Progress = { page: number; completed: boolean };
@@ -82,6 +82,7 @@ export const listInProgress = (db: Db, viewer: Viewer, limit = 12) => {
     return db
         .select({
             volumeId: volumes.id,
+            version: volumeVersion,
             seriesId: series.id,
             seriesName: series.name,
             number: volumes.number,
@@ -144,6 +145,7 @@ export const listRecentVolumes = (db: Db, viewer: Viewer, limit = 12) => {
     const rows = db
         .select({
             volumeId: volumes.id,
+            version: volumeVersion,
             seriesId: series.id,
             seriesName: series.name,
             number: volumes.number,
@@ -164,17 +166,18 @@ export const listRecentVolumes = (db: Db, viewer: Viewer, limit = 12) => {
 /**
  * Suite des séries entamées : le premier tome pas encore ouvert des séries
  * dont la personne a fini au moins un tome, sans tome en cours (ceux-là
- * sont dans « Reprendre la lecture »). Séries lues le plus récemment
- * d'abord.
+ * sont dans `listInProgress`). Séries lues le plus récemment d'abord.
  */
 export const listNextVolumes = (db: Db, viewer: Viewer, limit = 12) => {
     const rows = db
         .select({
             volumeId: volumes.id,
+            version: volumeVersion,
             seriesId: series.id,
             seriesName: series.name,
             number: volumes.number,
             title: volumes.title,
+            pageCount: volumes.pageCount,
             completed: readProgress.completed,
             updatedAt: readProgress.updatedAt,
         })
@@ -202,24 +205,42 @@ export const listNextVolumes = (db: Db, viewer: Viewer, limit = 12) => {
             row,
         ]);
     }
-    const next: ((typeof rows)[number] & { lastReadAt: number })[] = [];
+    const next = [];
     for (const items of bySeries.values()) {
         if (items.some((v) => v.updatedAt && !v.completed)) continue;
         const unread = items.find((v) => !v.updatedAt);
         if (!unread) continue;
-        const lastReadAt = Math.max(
-            ...items.map((v) => v.updatedAt?.getTime() ?? 0),
-        );
-        next.push({ ...unread, lastReadAt });
+        const {
+            completed: _completed,
+            updatedAt: _updatedAt,
+            ...volume
+        } = unread;
+        next.push({
+            ...volume,
+            // Pas encore ouvert.
+            page: null,
+            // Date de la dernière lecture dans la série.
+            updatedAt: new Date(
+                Math.max(...items.map((v) => v.updatedAt?.getTime() ?? 0)),
+            ),
+            volumeCount: items.length,
+            readCount: items.filter((v) => v.completed).length,
+        });
     }
     return next
-        .sort((a, b) => b.lastReadAt - a.lastReadAt)
-        .slice(0, limit)
-        .map(({ volumeId, seriesId, seriesName, number, title }) => ({
-            volumeId,
-            seriesId,
-            seriesName,
-            number,
-            title,
-        }));
+        .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
+        .slice(0, limit);
 };
+
+/**
+ * « Reprendre la lecture » : dans chaque série entamée, le tome en cours ou,
+ * à défaut, le suivant à ouvrir. Du plus récemment lu au plus ancien.
+ */
+export const listContinue = (db: Db, viewer: Viewer, limit = 12) =>
+    [
+        ...listInProgress(db, viewer, limit),
+        ...listNextVolumes(db, viewer, limit),
+    ]
+        // Tri stable : à date égale, le tome en cours d'abord.
+        .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
+        .slice(0, limit);

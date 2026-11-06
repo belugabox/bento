@@ -1,6 +1,6 @@
 import { type FileHandle, open } from 'node:fs/promises';
 import { promisify } from 'node:util';
-import { inflateRaw } from 'node:zlib';
+import { constants, inflateRaw } from 'node:zlib';
 
 const inflate = promisify(inflateRaw);
 
@@ -158,10 +158,14 @@ const dataOffsetOf = async (file: FileHandle, entry: ZipEntry) => {
     );
 };
 
-/** Contenu décompressé d'une entrée (le fichier est ouvert le temps de la lire). */
+/**
+ * Contenu décompressé d'une entrée (le fichier est ouvert le temps de la
+ * lire). Avec `limit`, seulement ses premiers octets : l'en-tête d'une image.
+ */
 export const readZipEntry = async (
     fullPath: string,
     entry: ZipEntry,
+    limit?: number,
 ): Promise<Buffer> => {
     if (entry.isDirectory) return Buffer.alloc(0);
     if (entry.flags & FLAG_ENCRYPTED) {
@@ -178,12 +182,16 @@ export const readZipEntry = async (
         data = await readAt(
             file,
             await dataOffsetOf(file, entry),
-            entry.compressedSize,
+            Math.min(entry.compressedSize, limit ?? Infinity),
         );
     } finally {
         await file.close();
     }
-    return entry.method === STORED ? data : inflate(data);
+    if (entry.method === STORED) return data;
+    if (limit === undefined) return inflate(data);
+    // Données coupées : décompresser ce qui est là, sans attendre la fin.
+    const start = await inflate(data, { finishFlush: constants.Z_SYNC_FLUSH });
+    return start.subarray(0, limit);
 };
 
 /**

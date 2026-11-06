@@ -44,8 +44,7 @@ import {
 } from './library/lists';
 import {
     getProgress,
-    listInProgress,
-    listNextVolumes,
+    listContinue,
     listRecentVolumes,
     markSeries,
     saveProgress,
@@ -82,6 +81,13 @@ const idParam = z.object({ id: z.coerce.number().int().positive() });
 const fileQuery = z.object({ path: z.string().min(1) });
 // `?size=small` : version réduite d'une couverture (vignettes des grilles).
 const smallCover = (size?: string) => (size === 'small' ? size : undefined);
+
+/**
+ * Cache d'une image de la bibliothèque. Avec sa version dans l'adresse
+ * (`?v=`), elle ne change jamais : le navigateur la garde un an.
+ */
+const imageCache = (version?: string) =>
+    version ? 'private, max-age=31536000, immutable' : 'private, max-age=3600';
 
 const READING_MODES = ['ltr', 'ltr-manga', 'rtl', 'webtoon'] as const;
 
@@ -315,7 +321,7 @@ export const createApi = ({
             return c.body(new Uint8Array(cover), 200, {
                 'Content-Type': 'image/webp',
                 // L'adresse du client change avec la couverture (?v=).
-                'Cache-Control': 'private, max-age=3600',
+                'Cache-Control': imageCache(c.req.query('v')),
             });
         })
         .put(
@@ -412,14 +418,11 @@ export const createApi = ({
                 return c.json(sizes);
             },
         )
-        // Tomes commencés, pour « Reprendre la lecture ».
-        .get('/continue', (c) => c.json(listInProgress(db, c.var.user)))
-        // Accueil : derniers ajouts et suite des séries entamées.
+        // « Reprendre la lecture » : tomes en cours, ou suivants à ouvrir.
+        .get('/continue', (c) => c.json(listContinue(db, c.var.user)))
+        // Derniers ajouts (« Nouveautés », retirée de l'accueil pour l'instant).
         .get('/home', (c) =>
-            c.json({
-                recent: listRecentVolumes(db, c.var.user),
-                next: listNextVolumes(db, c.var.user),
-            }),
+            c.json({ recent: listRecentVolumes(db, c.var.user) }),
         )
         // Collections partagées : lecture pour tous, gestion par l'admin.
         .get('/collections', (c) => c.json(listCollections(db, c.var.user)))
@@ -480,7 +483,7 @@ export const createApi = ({
             if (!cover) throw notFound('Couverture introuvable');
             return c.body(new Uint8Array(cover), 200, {
                 'Content-Type': 'image/webp',
-                'Cache-Control': 'private, max-age=3600',
+                'Cache-Control': imageCache(c.req.query('v')),
             });
         })
         .get(
@@ -497,7 +500,7 @@ export const createApi = ({
                 );
                 return c.body(new Uint8Array(data), 200, {
                     'Content-Type': type,
-                    'Cache-Control': 'private, max-age=3600',
+                    'Cache-Control': imageCache(c.req.query('v')),
                 });
             },
         )
