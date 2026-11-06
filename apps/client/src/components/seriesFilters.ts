@@ -1,4 +1,4 @@
-import { type Format, compareNames } from '@server/types';
+import { compareNames } from '@server/types';
 
 /** Ce dont les filtres ont besoin pour une série de la liste. */
 export type ListedSeries = {
@@ -10,8 +10,9 @@ export type ListedSeries = {
     lastAddedAt: string | null;
     // Genres rangés par la liste des genres.
     genres?: string[];
-    format?: Format;
-        status?: 'ongoing' | 'completed' | null;
+    // Nom du format ; null = pas encore choisi.
+    format?: string | null;
+    status?: 'ongoing' | 'completed' | null;
     toRead?: boolean;
     collectionIds?: number[];
 };
@@ -91,8 +92,8 @@ export const filterSeries = <T extends ListedSeries>(
         sort: SeriesSort;
         list?: ListFilter;
         genre?: string | null;
-        format?: Format | null;
-                status?: StatusFilter;
+        format?: string | null;
+        status?: StatusFilter;
     },
 ): T[] => {
     const kept = series.filter(

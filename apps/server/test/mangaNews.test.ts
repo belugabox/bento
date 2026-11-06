@@ -3,9 +3,9 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import { createApi } from '../src/api';
+import { ratingForAge } from '../src/library/ageRating';
 import {
     MangaNews,
-    ageRatingOf,
     decodePage,
     parseSearchPage,
     parseSeriesPage,
@@ -34,7 +34,7 @@ describe('parseSeriesPage', () => {
             writer: 'Tatsuya ENDÔ',
             penciller: 'Tatsuya ENDÔ',
             publisher: 'Kurokawa',
-            format: 'manga',
+            format: 'Manga',
             genres: ['Suspense', 'Fantastique'],
             themes: [
                 'espion',
@@ -62,7 +62,7 @@ describe('parseSeriesPage', () => {
         ).toMatchObject({
             originalTitle: '나 혼자만 레벨업',
             publisher: 'Kbooks, Verytoon, Piccoma',
-            format: 'manhwa',
+            format: 'Manhwa',
             volumeCount: 19,
             ongoing: false,
         });
@@ -97,13 +97,13 @@ describe('decodePage', () => {
     });
 });
 
-describe('ageRatingOf', () => {
+describe('ratingForAge', () => {
     it('rounds up to the next ComicInfo rating', () => {
-        expect(ageRatingOf(0)).toBe('Everyone');
-        expect(ageRatingOf(10)).toBe('Everyone 10+');
-        expect(ageRatingOf(12)).toBe('Teen');
-        expect(ageRatingOf(16)).toBe('Mature 17+');
-        expect(ageRatingOf(18)).toBe('Adults Only 18+');
+        expect(ratingForAge(0)).toBe('Everyone');
+        expect(ratingForAge(10)).toBe('Everyone 10+');
+        expect(ratingForAge(12)).toBe('Teen');
+        expect(ratingForAge(16)).toBe('Mature 17+');
+        expect(ratingForAge(18)).toBe('Adults Only 18+');
     });
 });
 
@@ -192,7 +192,7 @@ describe('GET /metadata/manga-news', () => {
             '/metadata/manga-news/series?id=Spy-X-Family',
             'admin',
         );
-        expect((await sheet.json()).format).toBe('manga');
+        expect((await sheet.json()).format).toBe('Manga');
         expect(
             (await get('/metadata/manga-news/search?q=spy', 'reader')).status,
         ).toBe(403);

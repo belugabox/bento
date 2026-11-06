@@ -2,15 +2,16 @@ import { and, asc, count, eq, inArray, notInArray, sql } from 'drizzle-orm';
 import { rm } from 'node:fs/promises';
 import path from 'node:path';
 
-import {
-    type Format,
-    type GenreEntry,
-    classify,
-    defaultFormat,
-} from '../classification';
+import { type ReadingMode, classify } from '../classification';
 import type { LibraryConfig } from '../config';
 import type { Db } from '../db';
-import { libraries, readProgress, series, volumes } from '../db/schema';
+import {
+    formats,
+    libraries,
+    readProgress,
+    series,
+    volumes,
+} from '../db/schema';
 import { notFound } from '../tools/errors';
 import { genreCatalog } from './genres';
 import { publicationPathOf } from './paths';
@@ -105,18 +106,12 @@ export const listLibraries = (db: Db) =>
         }));
 
 /**
- * Format, genres et thèmes d'une série, d'après son réglage et les genres
- * bruts de ses fichiers rangés par la liste des genres.
+ * Âge minimal d'une série : celui choisi dans Bento, sinon celui déduit de
+ * la classification de ses tomes ; null = inconnu.
  */
-const classified = (
-    row: { genre: string | null; tags: string | null; format: Format | null },
-    libraryType: 'manga' | 'comics',
-    catalog: GenreEntry[],
-) => ({
-    format: row.format,
-    defaultFormat: defaultFormat(libraryType),
-    ...classify(row.genre, row.tags, catalog),
-});
+export const seriesAgeSql = sql<
+    number | null
+>`coalesce(${series.age}, ${series.minAge})`;
 
 /**
  * Séries, filtrées par bibliothèque et par texte (nom, genres et thèmes,
@@ -138,7 +133,9 @@ export const listSeries = (
             year: series.year,
             genre: series.genre,
             tags: series.tags,
-            format: series.format,
+            formatId: series.formatId,
+            format: formats.name,
+            age: seriesAgeSql,
             status: series.status,
             volumeCount: count(volumes.id),
             // Dernier tome ajouté (tri « ajouts récents »).
@@ -159,6 +156,7 @@ export const listSeries = (
         })
         .from(series)
         .innerJoin(libraries, eq(libraries.id, series.libraryId))
+        .leftJoin(formats, eq(formats.id, series.formatId))
         .leftJoin(volumes, eq(volumes.seriesId, series.id))
         .where(
             and(
@@ -174,20 +172,10 @@ export const listSeries = (
         .groupBy(series.id)
         .all()
         .sort((a, b) => compareNames(a.name, b.name))
-        .map(({ genre, tags, format, libraryType, ...row }) => {
-            const found = classified(
-                { genre, tags, format },
-                libraryType,
-                catalog,
-            );
-            return {
-                ...row,
-                // Réglages de la série, sinon ses valeurs par défaut.
-                format: found.format ?? found.defaultFormat,
-                genres: found.genres,
-                themes: found.themes,
-            };
-        });
+        .map(({ genre, tags, libraryType: _type, ...row }) => ({
+            ...row,
+            ...classify(genre, tags, catalog),
+        }));
 };
 
 export const getSeries = (db: Db, viewer: Viewer, id: number) => {
@@ -198,9 +186,13 @@ export const getSeries = (db: Db, viewer: Viewer, id: number) => {
             summary: series.summary,
             genre: series.genre,
             tags: series.tags,
-            format: series.format,
+            formatId: series.formatId,
+            formatName: formats.name,
+            formatReadingMode: formats.readingMode,
             ageRating: series.ageRating,
-            minAge: series.minAge,
+            // Âge choisi dans Bento, et celui déduit des tomes.
+            age: series.age,
+            fileAge: series.minAge,
             coverUpdatedAt: series.coverUpdatedAt,
             year: series.year,
             status: series.status,
@@ -216,6 +208,7 @@ export const getSeries = (db: Db, viewer: Viewer, id: number) => {
         })
         .from(series)
         .innerJoin(libraries, eq(libraries.id, series.libraryId))
+        .leftJoin(formats, eq(formats.id, series.formatId))
         .where(and(eq(series.id, id), visibleTo(viewer)))
         .get();
     if (!row) throw notFound('Série introuvable');
@@ -247,14 +240,14 @@ export const getSeries = (db: Db, viewer: Viewer, id: number) => {
         .where(eq(volumes.seriesId, id))
         .orderBy(...volumeOrder)
         .all();
-    const { genre, tags, ...details } = row;
-    const classification = classified(row, row.library.type, genreCatalog(db));
+    const { genre, tags, formatName, formatReadingMode, ...details } = row;
     return {
         ...details,
-        ...classification,
+        format: formatName,
+        ...classify(genre, tags, genreCatalog(db)),
         defaultReadingMode: defaultReadingMode(
             row.library.type,
-            classification.format ?? classification.defaultFormat,
+            formatReadingMode,
         ),
         volumes: items.map(({ file, comicInfo, ...volume }) => ({
             ...volume,
@@ -290,10 +283,11 @@ export const getVolume = (db: Db, viewer: Viewer, id: number) => {
             libraryPath: libraries.path,
             libraryType: libraries.type,
             seriesReadingMode: series.readingMode,
-            seriesFormat: series.format,
+            formatReadingMode: formats.readingMode,
         })
         .from(volumes)
         .innerJoin(series, eq(series.id, volumes.seriesId))
+        .leftJoin(formats, eq(formats.id, series.formatId))
         .innerJoin(libraries, eq(libraries.id, volumes.libraryId))
         .where(and(eq(volumes.id, id), visibleTo(viewer)))
         .get();
@@ -310,14 +304,14 @@ export const getVolume = (db: Db, viewer: Viewer, id: number) => {
         file,
         libraryPath,
         seriesReadingMode: _mode,
-        seriesFormat: _format,
+        formatReadingMode: _formatMode,
         ...volume
     } = row;
     return {
         ...volume,
         readingMode:
             row.seriesReadingMode ??
-            defaultReadingMode(row.libraryType, row.seriesFormat),
+            defaultReadingMode(row.libraryType, row.formatReadingMode),
         previousId: siblings[index - 1] ?? null,
         nextId: siblings[index + 1] ?? null,
         fullPath: path.join(libraryPath, ...file.split('/')),
@@ -372,33 +366,30 @@ export const setSeriesStatus = (
     return updated;
 };
 
-export type ReadingMode = 'ltr' | 'ltr-manga' | 'rtl' | 'webtoon';
+export type { ReadingMode };
 
 /**
- * Mode de lecture par défaut : défilement pour un webtoon, manga de gauche
- * à droite (doubles pages inversées) pour un manga, BD sinon. Sans format
- * choisi, celui de la bibliothèque.
+ * Mode de lecture par défaut : celui du format de la série, sinon celui
+ * de sa bibliothèque (manga de gauche à droite, doubles pages inversées ;
+ * BD sinon).
  */
 export const defaultReadingMode = (
     libraryType: 'manga' | 'comics',
-    format?: Format | null,
-): ReadingMode => {
-    const effective = format ?? defaultFormat(libraryType);
-    if (effective === 'webtoon') return 'webtoon';
-    return effective === 'manga' ? 'ltr-manga' : 'ltr';
-};
+    formatReadingMode?: ReadingMode | null,
+): ReadingMode =>
+    formatReadingMode ?? (libraryType === 'manga' ? 'ltr-manga' : 'ltr');
 
-/** Format d'une série (null : celui de la bibliothèque). */
+/** Format et âge d'une série, réglés dans Bento (null : pas choisis). */
 export const setSeriesClassification = (
     db: Db,
     id: number,
-    changes: { format?: Format | null },
+    changes: { formatId?: number | null; age?: number | null },
 ) => {
     const updated = db
         .update(series)
         .set(changes)
         .where(eq(series.id, id))
-        .returning({ format: series.format })
+        .returning({ formatId: series.formatId, age: series.age })
         .get();
     if (!updated) throw notFound('Série introuvable');
     return updated;

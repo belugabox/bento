@@ -9,13 +9,15 @@ Serveur de lecture et de gestion de mangas et BD, qui remplace Kavita pour la fa
 - **Branche de travail : `feat/reading-foundation`** (poussée, pas encore de PR). Commit et push sur cette branche à la fin de chaque demande terminée et testée : c'est acquis. Ne pas fusionner dans `main`, ne pas ouvrir de PR sans qu'il le demande.
 - Le déploiement est reporté (« on déploiera plus tard »).
 - Il a refusé un nom de tri modifiable par série (« oublie »).
-- Classement décidé le 6 novembre 2026 : format, genres, thèmes. La liste des genres est gérée par l'admin (Réglages) ; le format reste dans Bento (pas dans le ComicInfo). Le « public » (shonen, seinen…) a été retiré : « je ne l'utiliserai pas » (migration 0015).
+- Classement décidé le 6 novembre 2026 : format, âge, genres, thèmes. Formats, grille d'âges et genres sont gérés par l'admin (Réglages, onglet Classement). Le format est obligatoire, sans valeur par défaut ; format et âge exact restent dans Bento (le ComicInfo reçoit la classification la plus proche, plus stricte). Le « public » (shonen, seinen…) a été retiré : « je ne l'utiliserai pas » (migration 0015).
 - Favoris retirés le 6 novembre 2026 (« À lire » seul, en filtre de la barre « Séries »). Les collections restent telles quelles, mises de côté. Changer de fournisseur de connexion (TinyAuth, Authelia) : « oublie pour le moment ».
 
 ## Règles impératives
 
 - **Secret OIDC** : il est dans `apps/server/.env` (ignoré par Git). Ne jamais l'afficher, le copier ou le committer.
 - **Migrations Drizzle** : ne jamais modifier ni régénérer une migration qu'une base a pu appliquer ; en générer une nouvelle (`pnpm --filter server db:generate --name <nom>`). Avant de committer une migration, la vérifier sur une **copie** de `apps/server/data/bento.db*`, fichiers `-wal` et `-shm` compris : le serveur de dev de l'utilisateur tourne souvent et applique les migrations dès qu'elles apparaissent.
+    - **Ne jamais compléter à la main une migration générée** : le serveur de dev peut l'appliquer avant (cas de 0016, appliquée sans sa liste de départ ni `on delete set null`, réparée par 0018). Mettre les données et corrections dans une migration à part, créée vide par `db:generate --custom --name <nom>` puis remplie.
+    - drizzle-kit oublie `on delete` dans un `ALTER TABLE … ADD … REFERENCES` (SQLite).
     - drizzle-kit ne sait pas répondre à ses questions interactives : un renommage se fait en deux migrations.
     - Quand drizzle-kit recrée une table pour changer une colonne, il copie aussi les colonnes nouvelles depuis l'ancienne table : corriger l'`INSERT … SELECT` avant tout lancement (cas de 0011).
 - **Fichiers de l'utilisateur** : ne pas toucher à sa bibliothèque de dev (`O:/PERSO/beluga-box/apps/server/RED/Books/Manga`, voir `LIBRARIES` dans `.env`). Faire les essais sur des copies, dans le dossier temporaire de la session.
@@ -47,6 +49,8 @@ Serveur de lecture et de gestion de mangas et BD, qui remplace Kavita pour la fa
 - Les réglages de l'admin sont dans `settings.ts` (table `settings`, migration 0013) : compression (qualité 90, 2400 px par défaut) et intervalle du scan.
 - Les réglages d'un brouillon (statut, mode de lecture, couverture) sont dans la table `draft_statuses` (son nom d'origine est gardé) et sont appliqués à la publication. Quand une publication renomme une série, ses listes, ses collections et son mode de lecture la suivent.
 - **Cache des images** : la version d'un tome est la date de son fichier (`volumeVersion`, `cast(mtime_ms as integer)`). Avec `?v=` dans l'adresse, pages et couvertures sont servies `immutable` pour un an : toute réécriture du fichier doit changer sa date. Une couverture refaite sans toucher au fichier (nouvelle taille `COVER_SIZE`) garderait l'ancienne en cache : changer alors aussi le format de la version.
+- **Âge d'une série** : `coalesce(series.age, series.min_age)` (choisi dans Bento, sinon déduit des tomes), pour la visibilité et les statistiques. La grille d'âges est dans les réglages (`ages`).
+- **Formats** : table `formats` (0016, liste de départ par 0018), `series.format_id`. La clé étrangère n'a pas `on delete set null` sur la base de dev : `deleteFormat` détache les séries lui-même.
 - **Classement** : `classification.ts` (partagé avec le client) range les genres bruts des fichiers (`series.genre` et `series.tags`, du premier tome) d'après la table `genres` (migration 0014, avec sa liste de départ), à chaque lecture : renommer un genre ne réécrit aucun fichier.
 - Le tri des séries ignore les articles (`library/sortName.ts`). Un nom de fichier « Boxer (The) » donne « The Boxer ».
 

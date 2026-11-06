@@ -10,7 +10,7 @@ import {
 } from 'drizzle-orm/sqlite-core';
 
 import type { ComicInfo } from '../archive/comicInfo';
-import { FORMATS } from '../classification';
+import { READING_MODES } from '../classification';
 
 /** Compte Bento, créé à la première connexion via Pocket ID. */
 export const users = sqliteTable('users', {
@@ -35,6 +35,16 @@ export const libraries = sqliteTable('libraries', {
     path: text('path').notNull().unique(),
     type: text('type', { enum: ['manga', 'comics'] }).notNull(),
     lastScanAt: integer('last_scan_at', { mode: 'timestamp' }),
+});
+
+/**
+ * Formats de série (manga, BD…), gérés par l'admin, chacun avec le mode
+ * de lecture des séries qui n'en ont pas choisi.
+ */
+export const formats = sqliteTable('formats', {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    name: text('name').notNull().unique(),
+    readingMode: text('reading_mode', { enum: READING_MODES }).notNull(),
 });
 
 /** Série : un dossier de premier niveau de la bibliothèque. */
@@ -69,8 +79,13 @@ export const series = sqliteTable(
         readingMode: text('reading_mode', {
             enum: ['ltr', 'ltr-manga', 'rtl', 'webtoon'],
         }),
-        // Format, réglé dans Bento ; null = celui de la bibliothèque.
-        format: text('format', { enum: FORMATS }),
+        // Format, réglé dans Bento ; null = pas encore choisi.
+        formatId: integer('format_id').references(() => formats.id, {
+            onDelete: 'set null',
+        }),
+        // Âge minimal choisi dans Bento (grille des réglages) ; null = celui
+        // déduit de la classification des tomes (`minAge`).
+        age: integer('age'),
         writer: text('writer'),
         publisher: text('publisher'),
         createdAt: integer('created_at', { mode: 'timestamp' })
@@ -176,7 +191,10 @@ export const draftSettings = sqliteTable(
         readingMode: text('reading_mode', {
             enum: ['ltr', 'ltr-manga', 'rtl', 'webtoon'],
         }),
-        format: text('format', { enum: FORMATS }),
+        formatId: integer('format_id').references(() => formats.id, {
+            onDelete: 'set null',
+        }),
+        age: integer('age'),
         // Couverture choisie (fichier covers/drafts/…) ; null = aucune.
         coverUpdatedAt: integer('cover_updated_at', { mode: 'timestamp_ms' }),
     },

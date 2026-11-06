@@ -18,7 +18,7 @@ import { IconRefresh } from '@tabler/icons-react';
 import { useState } from 'react';
 import { Link } from 'react-router';
 
-import { AGE_GROUPS, ageLimitLabel } from '@/components/ageLimits';
+import { ageLabel, ageLimitLabel } from '@/components/ageLimits';
 import { formatNumber, formatRelative, formatSize } from '@/components/format';
 import { fetchStats, scanLibrary } from '@/services/api';
 import { useQuery } from '@/services/useQuery';
@@ -93,12 +93,17 @@ export const StatsPage = () => {
 
     // Séries par tranche d'âge, dans l'ordre des âges, puis sans classification.
     const ratingRows = [
-        ...AGE_GROUPS.map((group) => ({
-            label: group.label,
-            series:
-                stats.ratings.find((r) => r.minAge === group.age)?.series ?? 0,
-            unrated: false,
-        })),
+        ...stats.ratings.flatMap((r) =>
+            r.minAge === null
+                ? []
+                : [
+                      {
+                          label: ageLabel(r.minAge),
+                          series: r.series,
+                          unrated: false,
+                      },
+                  ],
+        ),
         {
             label: 'Sans classification',
             series: stats.ratings.find((r) => r.minAge === null)?.series ?? 0,

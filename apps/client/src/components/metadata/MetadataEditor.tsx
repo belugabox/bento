@@ -3,12 +3,12 @@ import {
     Alert,
     Button,
     Checkbox,
+    Grid,
     Group,
     Image,
     NumberInput,
     Paper,
     Select,
-    SimpleGrid,
     Stack,
     Table,
     Text,
@@ -22,6 +22,7 @@ import {
     IconEye,
     IconFileText,
     IconFileZip,
+    IconPhoto,
     IconUpload,
     IconWand,
 } from '@tabler/icons-react';
@@ -29,14 +30,18 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 
 import {
     type ComicInfo,
-    FORMATS,
-    FORMAT_LABELS,
-    type Format,
     classify,
+    genreKey,
     publicationPathOf,
 } from '@server/types';
 
-import { AGE_RATING_OPTIONS, canonicalRating } from '@/components/ageLimits';
+import {
+    ageLabel,
+    ageOfRating,
+    ageOptions,
+    ratingForAge,
+    useAgeSteps,
+} from '@/components/ageLimits';
 import { ReaderPreview } from '@/reader/ReaderPreview';
 import {
     READING_MODES,
@@ -46,6 +51,7 @@ import {
 import {
     type ClassificationChanges,
     fetchFilePageSizes,
+    fetchFormats,
     fetchGenres,
     filePageUrl,
     publishFiles,
@@ -171,6 +177,7 @@ export const MetadataEditor = ({
     status: seriesStatus,
     readingMode: seriesMode,
     classification,
+    cover,
 }: {
     libraryId: number;
     kind: 'manga' | 'comics';
@@ -193,12 +200,17 @@ export const MetadataEditor = ({
         defaultMode: ReadingMode;
         save: (mode: ReadingMode | null) => Promise<unknown>;
     };
-    /** Format de la série, réglé dans Bento (null : celui de la bibliothèque). */
+    /**
+     * Format (obligatoire) et âge de la série, réglés dans Bento (null : pas
+     * encore choisis ; l'âge est alors celui des fichiers).
+     */
     classification?: {
-        format: Format | null;
-        defaultFormat: Format;
+        formatId: number | null;
+        age: number | null;
         save: (changes: ClassificationChanges) => Promise<unknown>;
     };
+    /** Couverture de la série, et son choix. */
+    cover?: { src?: string; disabled?: boolean; onEdit: () => void };
 }) => {
     // Contenu des données reçues : le parent peut recréer la liste à chaque
     // rendu, seule une vraie nouveauté (enregistrement) doit tout reprendre.
@@ -225,15 +237,32 @@ export const MetadataEditor = ({
     const [modeValue, setModeValue] = useState<string>(savedMode);
     useEffect(() => setModeValue(savedMode), [savedMode]);
     const modeChanged = !!seriesMode && modeValue !== savedMode;
-    // Format : « default » pour celui de la bibliothèque.
-    const savedFormat = classification?.format ?? DEFAULT_MODE;
-    const [formatValue, setFormatValue] = useState<string>(savedFormat);
+    // Format : son id, null tant qu'il n'est pas choisi (obligatoire).
+    const savedFormat =
+        classification?.formatId == null
+            ? null
+            : String(classification.formatId);
+    const [formatValue, setFormatValue] = useState<string | null>(savedFormat);
     useEffect(() => setFormatValue(savedFormat), [savedFormat]);
     const formatChanged = !!classification && formatValue !== savedFormat;
+    const formatMissing = !!classification && !formatValue;
+    // Âge choisi dans Bento : « unknown » pour celui des fichiers.
+    const savedAge =
+        classification?.age == null ? UNKNOWN : String(classification.age);
+    const [ageValue, setAgeValue] = useState<string>(savedAge);
+    useEffect(() => setAgeValue(savedAge), [savedAge]);
+    const ageChanged = !!classification && ageValue !== savedAge;
     // Réglages de la série modifiés (enregistrés avec les tomes).
-    const settingsChanged = statusChanged || modeChanged || formatChanged;
+    const settingsChanged =
+        statusChanged || modeChanged || formatChanged || ageChanged;
     const genres = useQuery(fetchGenres, []);
     const catalog = genres.data ?? [];
+    const formats = useQuery(fetchFormats, []);
+    const formatOptions = (formats.data ?? []).map((f) => ({
+        value: String(f.id),
+        label: f.name,
+    }));
+    const ageSteps = useAgeSteps();
     // Action en cours : roue de chargement sur son seul bouton.
     const [busy, setBusy] = useState<'save' | 'publish'>();
     const [report, setReport] = useState<Report>();
@@ -256,13 +285,6 @@ export const MetadataEditor = ({
             label: `Par défaut : ${readingModeLabel(seriesMode?.defaultMode ?? previewMode)}`,
         },
         ...READING_MODES,
-    ];
-    const formatOptions = [
-        {
-            value: DEFAULT_MODE,
-            label: `Par défaut : ${FORMAT_LABELS[classification?.defaultFormat ?? (kind === 'manga' ? 'manga' : 'bd')]}`,
-        },
-        ...FORMATS.map((value) => ({ value, label: FORMAT_LABELS[value] })),
     ];
 
     // Nouvelles données (après enregistrement) : repartir de celles-ci. Le
@@ -328,6 +350,36 @@ export const MetadataEditor = ({
         value: string | number | undefined,
     ) => setEdits((current) => setSeriesField(current, field, value as never));
     const first = paths[0];
+    // Âge des fichiers (classification ComicInfo), sans âge choisi.
+    const fileAge = ageOfRating(
+        String(seriesValue(original, paths, 'AgeRating') ?? ''),
+    );
+    const ageChoices = [
+        ...ageOptions(
+            ageSteps,
+            ageValue === UNKNOWN ? undefined : Number(ageValue),
+        ),
+        {
+            value: UNKNOWN,
+            label:
+                fileAge === null
+                    ? 'Non classée'
+                    : `D’après les fichiers : ${ageLabel(fileAge)}`,
+        },
+    ];
+    /** Âge choisi, et la classification ComicInfo la plus proche. */
+    const chooseAge = (value: string) => {
+        setAgeValue(value);
+        setEdits((current) =>
+            value === UNKNOWN
+                ? revertSeriesField(current, original, paths, 'AgeRating')
+                : setSeriesField(
+                      current,
+                      'AgeRating',
+                      ratingForAge(Number(value)),
+                  ),
+        );
+    };
 
     const save = async () => {
         setBusy('save');
@@ -352,14 +404,22 @@ export const MetadataEditor = ({
                 );
                 lines.push('Statut de la série enregistré.');
             }
-            if (classification && formatChanged) {
+            if (classification && (formatChanged || ageChanged)) {
                 await classification.save({
-                    format:
-                        formatValue === DEFAULT_MODE
-                            ? null
-                            : (formatValue as Format),
+                    ...(formatChanged && {
+                        formatId: formatValue ? Number(formatValue) : null,
+                    }),
+                    ...(ageChanged && {
+                        age: ageValue === UNKNOWN ? null : Number(ageValue),
+                    }),
                 });
-                lines.push('Format enregistré.');
+                lines.push(
+                    formatChanged && ageChanged
+                        ? 'Format et âge enregistrés.'
+                        : formatChanged
+                          ? 'Format enregistré.'
+                          : 'Âge enregistré.',
+                );
             }
             if (seriesMode && modeChanged) {
                 await seriesMode.save(
@@ -401,14 +461,15 @@ export const MetadataEditor = ({
         }
     };
 
-    const publishReason =
-        changes.length > 0
-            ? 'Enregistre d’abord les modifications'
-            : toMove.length === 0
-              ? incomplete > 0
-                  ? `Série et numéro requis (${incomplete} tome(s) incomplet(s))`
-                  : 'Tous les tomes sont déjà à leur place'
-              : undefined;
+    const publishReason = formatMissing
+        ? 'Choisis d’abord le format de la série'
+        : changes.length > 0
+          ? 'Enregistre d’abord les modifications'
+          : toMove.length === 0
+            ? incomplete > 0
+                ? `Série et numéro requis (${incomplete} tome(s) incomplet(s))`
+                : 'Tous les tomes sont déjà à leur place'
+            : undefined;
 
     return (
         <Stack>
@@ -442,6 +503,7 @@ export const MetadataEditor = ({
                             setStatus(savedStatus);
                             setModeValue(savedMode);
                             setFormatValue(savedFormat);
+                            setAgeValue(savedAge);
                         }}
                     >
                         Annuler
@@ -449,7 +511,13 @@ export const MetadataEditor = ({
                     <Button
                         disabled={
                             (changes.length === 0 && !settingsChanged) ||
+                            formatMissing ||
                             busy === 'publish'
+                        }
+                        title={
+                            formatMissing
+                                ? 'Choisis d’abord le format de la série'
+                                : undefined
                         }
                         loading={busy === 'save'}
                         onClick={() => void save()}
@@ -496,166 +564,248 @@ export const MetadataEditor = ({
             )}
 
             <Paper withBorder p="md" radius="md">
-                <Stack gap="sm">
-                    <Text fw={600}>Série</Text>
+                <Stack gap="md">
                     {mode === 'drafts' && (
-                        <SimpleGrid cols={{ base: 1, sm: 3 }}>
-                            <ExistingSeriesPicker
-                                key={pickerKey}
-                                libraryId={libraryId}
-                                onJoin={(name, source) =>
-                                    // Toujours depuis l'état d'avant le
-                                    // premier choix : une autre série ne
-                                    // garde rien de la précédente.
-                                    setEdits((current) => {
-                                        beforeJoin.current ??= current;
-                                        return joinSeries(
-                                            beforeJoin.current,
-                                            name,
-                                            source,
-                                        );
-                                    })
-                                }
-                                onLeave={() => {
-                                    if (beforeJoin.current) {
-                                        setEdits(beforeJoin.current);
-                                    }
-                                    beforeJoin.current = undefined;
-                                }}
-                            />
-                        </SimpleGrid>
-                    )}
-                    <SimpleGrid cols={{ base: 1, sm: 3 }}>
-                        <TextInput
-                            label="Nom"
-                            {...seriesField('Series')}
-                            value={String(series('Series'))}
-                            description={
-                                isMixed(edits, paths, 'Series')
-                                    ? 'Différent selon les tomes'
-                                    : undefined
+                        <ExistingSeriesPicker
+                            key={pickerKey}
+                            libraryId={libraryId}
+                            onJoin={(name, source) =>
+                                // Toujours depuis l'état d'avant le premier
+                                // choix : une autre série ne garde rien de la
+                                // précédente.
+                                setEdits((current) => {
+                                    beforeJoin.current ??= current;
+                                    return joinSeries(
+                                        beforeJoin.current,
+                                        name,
+                                        source,
+                                    );
+                                })
                             }
-                            onChange={(e) =>
-                                setSeries('Series', e.currentTarget.value)
-                            }
-                        />
-                        {seriesStatus && (
-                            <Select
-                                label="Statut"
-                                allowDeselect={false}
-                                value={status}
-                                onChange={(value) => value && setStatus(value)}
-                                data={STATUS_OPTIONS}
-                                {...changed(statusChanged, {
-                                    original: labelOf(
-                                        STATUS_OPTIONS,
-                                        savedStatus,
-                                    ),
-                                    onRevert: () => setStatus(savedStatus),
-                                })}
-                            />
-                        )}
-                        {seriesMode && (
-                            <Select
-                                label="Mode de lecture"
-                                allowDeselect={false}
-                                value={modeValue}
-                                onChange={(value) =>
-                                    value && setModeValue(value)
+                            onLeave={() => {
+                                if (beforeJoin.current) {
+                                    setEdits(beforeJoin.current);
                                 }
-                                data={modeOptions}
-                                {...changed(modeChanged, {
-                                    original: labelOf(modeOptions, savedMode),
-                                    onRevert: () => setModeValue(savedMode),
-                                })}
-                                inputContainer={(children) => (
-                                    <Group gap={4} wrap="nowrap">
-                                        <div style={{ flex: 1 }}>
-                                            {children}
-                                        </div>
-                                        <Tooltip label="Aperçu de lecture">
-                                            <ActionIcon
-                                                variant="default"
-                                                size="lg"
-                                                aria-label="Aperçu de lecture de la série"
-                                                disabled={!firstPreviewable}
-                                                onClick={() =>
-                                                    setPreview(firstPreviewable)
-                                                }
-                                            >
-                                                <IconEye size={16} />
-                                            </ActionIcon>
-                                        </Tooltip>
-                                    </Group>
-                                )}
-                            />
-                        )}
-                        <Select
-                            label="Classification"
-                            {...seriesField('AgeRating', (value) =>
-                                labelOf(
-                                    AGE_RATING_OPTIONS,
-                                    canonicalRating(value) ?? value,
-                                ),
-                            )}
-                            clearable
-                            placeholder="Aucune"
-                            value={canonicalRating(String(series('AgeRating')))}
-                            onChange={(value) =>
-                                setSeries('AgeRating', value ?? undefined)
-                            }
-                            data={AGE_RATING_OPTIONS}
-                        />
-                        {classification && (
-                            <Select
-                                label="Format"
-                                allowDeselect={false}
-                                value={formatValue}
-                                onChange={(value) =>
-                                    value && setFormatValue(value)
-                                }
-                                data={formatOptions}
-                                {...changed(formatChanged, {
-                                    original: labelOf(
-                                        formatOptions,
-                                        savedFormat,
-                                    ),
-                                    onRevert: () => setFormatValue(savedFormat),
-                                })}
-                            />
-                        )}
-                        <GenreFields
-                            genre={String(series('Genre'))}
-                            tags={String(series('Tags'))}
-                            catalog={catalog}
-                            genreProps={seriesField('Genre', (value) =>
-                                classify(value, null, catalog).genres.join(
-                                    ', ',
-                                ),
-                            )}
-                            tagsProps={seriesField('Tags')}
-                            onChange={(genre, tags) => {
-                                setEdits((current) =>
-                                    setSeriesField(
-                                        setSeriesField(current, 'Genre', genre),
-                                        'Tags',
-                                        tags,
-                                    ),
-                                );
+                                beforeJoin.current = undefined;
                             }}
                         />
-                        {SERIES_TEXT_FIELDS.map(({ field, label }) => (
-                            <TextInput
-                                key={field}
-                                {...seriesField(field)}
-                                label={label}
-                                value={String(series(field))}
-                                onChange={(e) =>
-                                    setSeries(field, e.currentTarget.value)
-                                }
+                    )}
+                    <Group align="flex-start" wrap="nowrap" gap="lg">
+                        {cover && (
+                            <Stack gap="xs" align="center" visibleFrom="sm">
+                                <Image
+                                    src={cover.src}
+                                    w={120}
+                                    h={180}
+                                    fit="cover"
+                                    radius="sm"
+                                    alt=""
+                                    fallbackSrc="data:image/gif;base64,R0lGODlhAQABAAAAACw="
+                                    bg="var(--mantine-color-default-hover)"
+                                />
+                                <Button
+                                    size="xs"
+                                    variant="default"
+                                    leftSection={<IconPhoto size={14} />}
+                                    disabled={cover.disabled}
+                                    onClick={cover.onEdit}
+                                >
+                                    Couverture…
+                                </Button>
+                            </Stack>
+                        )}
+                        <Grid style={{ flex: 1 }} gutter="sm">
+                            <Grid.Col span={{ base: 12, sm: 8 }}>
+                                <TextInput
+                                    label="Nom"
+                                    {...seriesField('Series')}
+                                    value={String(series('Series'))}
+                                    description={
+                                        isMixed(edits, paths, 'Series')
+                                            ? 'Différent selon les tomes'
+                                            : undefined
+                                    }
+                                    onChange={(e) =>
+                                        setSeries(
+                                            'Series',
+                                            e.currentTarget.value,
+                                        )
+                                    }
+                                />
+                            </Grid.Col>
+                            {classification && (
+                                <Grid.Col span={{ base: 12, sm: 4 }}>
+                                    <Select
+                                        label="Format"
+                                        withAsterisk
+                                        placeholder="À choisir"
+                                        allowDeselect={false}
+                                        value={formatValue}
+                                        onChange={setFormatValue}
+                                        data={formatOptions}
+                                        error={
+                                            formatMissing
+                                                ? 'Format à choisir'
+                                                : undefined
+                                        }
+                                        {...changed(formatChanged, {
+                                            original: savedFormat
+                                                ? labelOf(
+                                                      formatOptions,
+                                                      savedFormat,
+                                                  )
+                                                : '',
+                                            onRevert: () =>
+                                                setFormatValue(savedFormat),
+                                        })}
+                                    />
+                                </Grid.Col>
+                            )}
+                            {SERIES_TEXT_FIELDS.map(({ field, label }) => (
+                                <Grid.Col
+                                    key={field}
+                                    span={{ base: 12, xs: 6, sm: 4 }}
+                                >
+                                    <TextInput
+                                        {...seriesField(field)}
+                                        label={label}
+                                        value={String(series(field))}
+                                        onChange={(e) =>
+                                            setSeries(
+                                                field,
+                                                e.currentTarget.value,
+                                            )
+                                        }
+                                    />
+                                </Grid.Col>
+                            ))}
+                            {seriesStatus && (
+                                <Grid.Col span={{ base: 12, xs: 6, sm: 4 }}>
+                                    <Select
+                                        label="Statut"
+                                        allowDeselect={false}
+                                        value={status}
+                                        onChange={(value) =>
+                                            value && setStatus(value)
+                                        }
+                                        data={STATUS_OPTIONS}
+                                        {...changed(statusChanged, {
+                                            original: labelOf(
+                                                STATUS_OPTIONS,
+                                                savedStatus,
+                                            ),
+                                            onRevert: () =>
+                                                setStatus(savedStatus),
+                                        })}
+                                    />
+                                </Grid.Col>
+                            )}
+                            {classification && (
+                                <Grid.Col span={{ base: 12, xs: 6, sm: 4 }}>
+                                    <Select
+                                        label="Âge"
+                                        allowDeselect={false}
+                                        value={ageValue}
+                                        onChange={(value) =>
+                                            value && chooseAge(value)
+                                        }
+                                        data={ageChoices}
+                                        {...changed(ageChanged, {
+                                            original: labelOf(
+                                                ageChoices,
+                                                savedAge,
+                                            ),
+                                            onRevert: () => {
+                                                setAgeValue(savedAge);
+                                                setEdits((current) =>
+                                                    revertSeriesField(
+                                                        current,
+                                                        original,
+                                                        paths,
+                                                        'AgeRating',
+                                                    ),
+                                                );
+                                            },
+                                        })}
+                                    />
+                                </Grid.Col>
+                            )}
+                            {seriesMode && (
+                                <Grid.Col span={{ base: 12, xs: 6, sm: 4 }}>
+                                    <Select
+                                        label="Mode de lecture"
+                                        allowDeselect={false}
+                                        value={modeValue}
+                                        onChange={(value) =>
+                                            value && setModeValue(value)
+                                        }
+                                        data={modeOptions}
+                                        {...changed(modeChanged, {
+                                            original: labelOf(
+                                                modeOptions,
+                                                savedMode,
+                                            ),
+                                            onRevert: () =>
+                                                setModeValue(savedMode),
+                                        })}
+                                        inputContainer={(children) => (
+                                            <Group gap={4} wrap="nowrap">
+                                                <div style={{ flex: 1 }}>
+                                                    {children}
+                                                </div>
+                                                <Tooltip label="Aperçu de lecture">
+                                                    <ActionIcon
+                                                        variant="default"
+                                                        size="lg"
+                                                        aria-label="Aperçu de lecture de la série"
+                                                        disabled={
+                                                            !firstPreviewable
+                                                        }
+                                                        onClick={() =>
+                                                            setPreview(
+                                                                firstPreviewable,
+                                                            )
+                                                        }
+                                                    >
+                                                        <IconEye size={16} />
+                                                    </ActionIcon>
+                                                </Tooltip>
+                                            </Group>
+                                        )}
+                                    />
+                                </Grid.Col>
+                            )}
+                            <GenreFields
+                                genre={String(series('Genre'))}
+                                tags={String(series('Tags'))}
+                                catalog={catalog}
+                                wrap={(field) => (
+                                    <Grid.Col span={{ base: 12, sm: 6 }}>
+                                        {field}
+                                    </Grid.Col>
+                                )}
+                                genreProps={seriesField('Genre', (value) =>
+                                    classify(value, null, catalog).genres.join(
+                                        ', ',
+                                    ),
+                                )}
+                                tagsProps={seriesField('Tags')}
+                                onChange={(genre, tags) => {
+                                    setEdits((current) =>
+                                        setSeriesField(
+                                            setSeriesField(
+                                                current,
+                                                'Genre',
+                                                genre,
+                                            ),
+                                            'Tags',
+                                            tags,
+                                        ),
+                                    );
+                                }}
                             />
-                        ))}
-                    </SimpleGrid>
+                        </Grid>
+                    </Group>
                     {first && (
                         <Textarea
                             label="Résumé (enregistré sur le premier tome)"
@@ -886,13 +1036,20 @@ export const MetadataEditor = ({
                         setStatus(sheet.status);
                     }
                     if (!classification) return;
-                    // Le format de la bibliothèque reste « par défaut ».
+                    // Format de la fiche, parmi ceux des réglages.
+                    const format = formats.data?.find(
+                        (f) =>
+                            !!sheet.format &&
+                            genreKey(f.name) === genreKey(sheet.format),
+                    );
+                    if (format && (overwrite || !formatValue)) {
+                        setFormatValue(String(format.id));
+                    }
                     if (
-                        sheet.format &&
-                        sheet.format !== classification.defaultFormat &&
-                        (overwrite || formatValue === DEFAULT_MODE)
+                        sheet.age !== undefined &&
+                        (overwrite || ageValue === UNKNOWN)
                     ) {
-                        setFormatValue(sheet.format);
+                        setAgeValue(String(sheet.age));
                     }
                 }}
                 footer={

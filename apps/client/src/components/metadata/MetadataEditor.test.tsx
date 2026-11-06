@@ -8,15 +8,27 @@ import {
 } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { DEFAULT_GENRES } from '@server/types';
+import {
+    DEFAULT_AGE_STEPS,
+    DEFAULT_FORMATS,
+    DEFAULT_GENRES,
+} from '@server/types';
 
 import { type EditorVolume, MetadataEditor } from './MetadataEditor';
 
-// Liste des genres : celle de départ, sans passer par le serveur.
+// Genres, formats et grille d'âges : ceux de départ, sans passer par le
+// serveur. Formats numérotés à partir de 1 (Manga : 1, Manhwa : 2…).
 vi.mock('@/services/api', async (original) => ({
     ...(await original<typeof import('@/services/api')>()),
     fetchGenres: async () =>
         DEFAULT_GENRES.map((genre, id) => ({ id, ...genre, seriesCount: 0 })),
+    fetchFormats: async () =>
+        DEFAULT_FORMATS.map((format, index) => ({
+            id: index + 1,
+            ...format,
+            seriesCount: 0,
+        })),
+    fetchSettings: async () => ({ settings: { ages: DEFAULT_AGE_STEPS } }),
 }));
 
 /** Pastilles d'un champ à valeurs multiples (genres, thèmes). */
@@ -235,8 +247,8 @@ describe('MetadataEditor', () => {
                         },
                     }))}
                     classification={{
-                        format: null,
-                        defaultFormat: 'manga',
+                        formatId: null,
+                        age: null,
                         save,
                     }}
                     onChanged={() => {}}
@@ -268,7 +280,7 @@ describe('MetadataEditor', () => {
                 },
             })),
         });
-        expect(save).toHaveBeenCalledWith({ format: 'manhwa' });
+        expect(save).toHaveBeenCalledWith({ formatId: 2 });
         expect(screen.getByText('Format enregistré.')).toBeTruthy();
     });
 
@@ -301,6 +313,43 @@ describe('MetadataEditor', () => {
             }),
         );
         expect(numberOf(1).value).toBe('');
+    });
+
+    it('requires a format, and keeps the exact age in Bento', async () => {
+        mockServer();
+        const save = vi.fn().mockResolvedValue({});
+        render(
+            <MantineProvider>
+                <MetadataEditor
+                    libraryId={1}
+                    kind="manga"
+                    mode="drafts"
+                    volumes={volumes()}
+                    classification={{ formatId: null, age: null, save }}
+                    onChanged={() => {}}
+                />
+            </MantineProvider>,
+        );
+        expect(await screen.findByText('Format à choisir')).toBeTruthy();
+
+        fireEvent.click(screen.getByRole('textbox', { name: 'Âge' }));
+        fireEvent.click(await screen.findByRole('option', { name: '12+' }));
+        const saveButton = screen.getByRole('button', { name: /Enregistrer/ });
+        // Sans format, rien ne s'enregistre.
+        expect(saveButton.hasAttribute('disabled')).toBe(true);
+
+        fireEvent.click(screen.getByRole('textbox', { name: /Format/ }));
+        fireEvent.click(await screen.findByRole('option', { name: 'Manga' }));
+        await act(async () => {
+            fireEvent.click(saveButton);
+        });
+
+        expect(save).toHaveBeenCalledWith({ formatId: 1, age: 12 });
+        // Le ComicInfo reçoit la classification la plus proche, plus stricte.
+        expect(
+            (requests[0]?.[2] as { updates: { changes: object }[] }).updates[0]
+                ?.changes,
+        ).toEqual({ AgeRating: 'Teen' });
     });
 
     it('saves the series status alone, with its own message', async () => {
@@ -434,8 +483,8 @@ describe('MetadataEditor', () => {
                     volumes={volumes()}
                     status={{ value: null, save: saveStatus }}
                     classification={{
-                        format: null,
-                        defaultFormat: 'manga',
+                        formatId: null,
+                        age: null,
                         save,
                     }}
                     onChanged={() => {}}
@@ -448,7 +497,7 @@ describe('MetadataEditor', () => {
             await screen.findByRole('button', { name: 'Rechercher' }),
         );
         fireEvent.click(await screen.findByRole('button', { name: /Gantz/ }));
-        expect(await screen.findByText(/Âge conseillé 16\+/)).toBeTruthy();
+        expect(await screen.findByText('Âge conseillé : 16+')).toBeTruthy();
         fireEvent.click(
             screen.getByRole('button', { name: 'Utiliser cette fiche' }),
         );
@@ -474,8 +523,9 @@ describe('MetadataEditor', () => {
             Writer: 'Hiroya OKU',
         });
         expect(saveStatus).toHaveBeenCalledWith('completed');
-        // Format de la bibliothèque : gardé « par défaut ».
-        expect(save).not.toHaveBeenCalled();
+        // Format retrouvé parmi ceux des réglages, âge exact gardé dans Bento.
+        expect(save).toHaveBeenCalledWith({ formatId: 1, age: 16 });
+        expect(screen.getByText('Format et âge enregistrés.')).toBeTruthy();
     });
 
     it('saves the reading mode of a published series', async () => {

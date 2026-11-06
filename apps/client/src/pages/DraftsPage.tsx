@@ -1,9 +1,7 @@
 import {
     Alert,
-    Button,
     Grid,
     Group,
-    Image,
     Loader,
     NavLink,
     Paper,
@@ -13,10 +11,8 @@ import {
     Title,
 } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
-import { IconFile, IconFolder, IconPhoto } from '@tabler/icons-react';
+import { IconFile, IconFolder } from '@tabler/icons-react';
 import { useState } from 'react';
-
-import { defaultFormat } from '@server/types';
 
 import { CoverPicker } from '@/components/metadata/CoverPicker';
 import { MetadataEditor } from '@/components/metadata/MetadataEditor';
@@ -178,31 +174,13 @@ export const DraftsPage = () => {
                             libraryId &&
                             library && (
                                 <Stack>
-                                    <Group gap="sm">
-                                        {currentCover && (
-                                            <Image
-                                                src={currentCover}
-                                                w={48}
-                                                h={72}
-                                                fit="cover"
-                                                radius="sm"
-                                                alt=""
-                                            />
-                                        )}
-                                        <Button
-                                            variant="default"
-                                            leftSection={
-                                                <IconPhoto size={16} />
-                                            }
-                                            disabled={
-                                                readableFiles.length === 0
-                                            }
-                                            onClick={cover.open}
-                                        >
-                                            Couverture de la série…
-                                        </Button>
-                                    </Group>
                                     <MetadataEditor
+                                        cover={{
+                                            src: currentCover,
+                                            disabled:
+                                                readableFiles.length === 0,
+                                            onEdit: cover.open,
+                                        }}
                                         key={selected}
                                         libraryId={libraryId}
                                         kind={library.type}
@@ -217,10 +195,8 @@ export const DraftsPage = () => {
                                                 ),
                                         }}
                                         classification={{
-                                            format: draft?.format ?? null,
-                                            defaultFormat: defaultFormat(
-                                                library.type,
-                                            ),
+                                            formatId: draft?.formatId ?? null,
+                                            age: draft?.age ?? null,
                                             save: (changes) =>
                                                 setDraftClassification(
                                                     libraryId,

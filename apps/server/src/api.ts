@@ -15,7 +15,7 @@ import {
     requireUser,
 } from './auth/routes';
 import { listUsers, setUserMaxAge } from './auth/users';
-import { FORMATS } from './classification';
+import { READING_MODES } from './classification';
 import type { Db } from './db';
 import {
     getSeries,
@@ -36,6 +36,12 @@ import {
     seriesCoverFile,
 } from './library/covers';
 import type { LibraryFiles } from './library/files';
+import {
+    createFormat,
+    deleteFormat,
+    listFormats,
+    updateFormat,
+} from './library/formats';
 import {
     createGenre,
     deleteGenre,
@@ -100,13 +106,17 @@ const smallCover = (size?: string) => (size === 'small' ? size : undefined);
 const imageCache = (version?: string) =>
     version ? 'private, max-age=31536000, immutable' : 'private, max-age=3600';
 
-const READING_MODES = ['ltr', 'ltr-manga', 'rtl', 'webtoon'] as const;
-
 const collectionBody = z.object({ name: z.string().trim().min(1).max(80) });
 
-// Format et public d'une série : null pour revenir à « par défaut ».
+// Format et âge d'une série, réglés dans Bento : null pour les retirer.
 const classificationBody = z.object({
-    format: z.enum(FORMATS).nullable().optional(),
+    formatId: z.number().int().positive().nullable().optional(),
+    age: z.number().int().min(0).max(99).nullable().optional(),
+});
+
+const formatBody = z.object({
+    name: z.string().trim().min(1).max(40),
+    readingMode: z.enum(READING_MODES),
 });
 
 const genreBody = z.object({
@@ -308,6 +318,31 @@ export const createApi = ({
                         c.req.valid('json'),
                     ),
                 ),
+        )
+        // Formats : lus par tous (filtres), gérés par l'admin.
+        .get('/formats', (c) => c.json(listFormats(db)))
+        .post('/formats', requireAdmin, zValidator('json', formatBody), (c) =>
+            c.json(createFormat(db, c.req.valid('json'))),
+        )
+        .patch(
+            '/formats/:id',
+            requireAdmin,
+            zValidator('param', idParam),
+            zValidator('json', formatBody.partial()),
+            (c) =>
+                c.json(
+                    updateFormat(
+                        db,
+                        c.req.valid('param').id,
+                        c.req.valid('json'),
+                    ),
+                ),
+        )
+        .delete(
+            '/formats/:id',
+            requireAdmin,
+            zValidator('param', idParam),
+            (c) => c.json(deleteFormat(db, c.req.valid('param').id)),
         )
         // Liste des genres : lue par tous (filtres), gérée par l'admin.
         .get('/genres', (c) => c.json(listGenres(db)))
@@ -665,12 +700,12 @@ export const createApi = ({
             ),
             (c) => {
                 const { folder, ...changes } = c.req.valid('json');
-                const { format } = files.setDraftSettings(
+                const { formatId, age } = files.setDraftSettings(
                     c.req.valid('param').id,
                     folder,
                     changes,
                 );
-                return c.json({ format });
+                return c.json({ formatId, age });
             },
         )
         .get(

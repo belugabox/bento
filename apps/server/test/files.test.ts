@@ -157,7 +157,8 @@ describe('drafts', () => {
                 ],
                 status: null,
                 readingMode: null,
-                format: null,
+                formatId: null,
+                age: null,
                 coverUpdatedAt: null,
             },
             {
@@ -169,7 +170,8 @@ describe('drafts', () => {
                 ],
                 status: null,
                 readingMode: null,
-                format: null,
+                formatId: null,
+                age: null,
                 coverUpdatedAt: null,
             },
             {
@@ -184,7 +186,8 @@ describe('drafts', () => {
                 ],
                 status: null,
                 readingMode: null,
-                format: null,
+                formatId: null,
+                age: null,
                 coverUpdatedAt: null,
             },
         ]);
@@ -486,7 +489,8 @@ describe('publishing', () => {
         ).toEqual({
             status: null,
             readingMode: null,
-            format: null,
+            formatId: null,
+            age: null,
             coverUpdatedAt: null,
         });
     });

@@ -31,8 +31,6 @@ import {
 import { type ReactNode, useState } from 'react';
 import { useSearchParams } from 'react-router';
 
-import { FORMAT_LABELS, type Format } from '@server/types';
-
 import { CoverCard } from '@/components/CoverCard';
 import { volumeLabel } from '@/components/readingStatus';
 import {
@@ -128,7 +126,7 @@ export const LibraryPage = () => {
         ? (rawList as ListFilter)
         : 'all';
     const genre = params.get('genre');
-    const format = params.get('format') as Format | null;
+    const format = params.get('format');
     const status = (params.get('status') as StatusFilter | null) ?? 'all';
 
     const libraries = useQuery(fetchLibraries, []);
@@ -192,7 +190,7 @@ export const LibraryPage = () => {
         },
         !!format && {
             key: 'format',
-            label: FORMAT_LABELS[format] ?? format,
+            label: format,
             clear: () => update({ format: '' }),
         },
         !!genre && {
@@ -342,10 +340,7 @@ export const LibraryPage = () => {
                                             update({ format: value ?? '' })
                                         }
                                         comboboxProps={{ withinPortal: false }}
-                                        data={formats.map((value) => ({
-                                            value,
-                                            label: FORMAT_LABELS[value],
-                                        }))}
+                                        data={formats}
                                     />
                                     <Select
                                         label="Genre"

@@ -1,5 +1,6 @@
 import { MantineProvider } from '@mantine/core';
 import { act, fireEvent, render, screen } from '@testing-library/react';
+import { MemoryRouter } from 'react-router';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { SettingsPage } from './SettingsPage';
@@ -39,7 +40,9 @@ describe('SettingsPage', () => {
         );
         render(
             <MantineProvider>
-                <SettingsPage />
+                <MemoryRouter>
+                    <SettingsPage />
+                </MemoryRouter>
             </MantineProvider>,
         );
 

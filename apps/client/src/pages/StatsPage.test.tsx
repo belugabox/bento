@@ -73,7 +73,7 @@ describe('StatsPage', () => {
         // Total et ligne de la bibliothèque.
         expect(screen.getAllByText('2 Go')).toHaveLength(2);
         expect(screen.getByText('Séries en attente')).toBeTruthy();
-        expect(screen.getByLabelText('10 ans et + : 1 séries')).toBeTruthy();
+        expect(screen.getByLabelText('10+ : 1 séries')).toBeTruthy();
         expect(
             screen.getByLabelText('Sans classification : 2 séries'),
         ).toBeTruthy();

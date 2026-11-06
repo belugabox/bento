@@ -10,7 +10,7 @@ import {
 } from '@mantine/core';
 import { useState } from 'react';
 
-import { AGE_LIMITS } from '@/components/ageLimits';
+import { ageLimitOptions, useAgeSteps } from '@/components/ageLimits';
 import { type Account, fetchUsers, setUserMaxAge } from '@/services/api';
 import { useQuery } from '@/services/useQuery';
 
@@ -20,6 +20,7 @@ const NO_LIMIT = 'none';
 /** Comptes et contrôle parental (admin). */
 export const UsersPage = () => {
     const { data: users, error, reload } = useQuery(fetchUsers, []);
+    const ages = useAgeSteps();
     const [saveError, setSaveError] = useState<string>();
 
     const change = async (user: Account, value: string | null) => {
@@ -101,7 +102,10 @@ export const UsersPage = () => {
                                             onChange={(value) =>
                                                 void change(user, value)
                                             }
-                                            data={AGE_LIMITS.map((limit) => ({
+                                            data={ageLimitOptions(
+                                                ages,
+                                                user.maxAge,
+                                            ).map((limit) => ({
                                                 value: String(
                                                     limit.value ?? NO_LIMIT,
                                                 ),

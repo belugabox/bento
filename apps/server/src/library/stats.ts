@@ -28,8 +28,8 @@ export const getStats = (db: Db) => {
         order by l.name`);
 
     const ratings = db.all<{ minAge: number | null; series: number }>(sql`
-        select min_age as minAge, count(*) as series
-        from series group by min_age order by min_age`);
+        select coalesce(age, min_age) as minAge, count(*) as series
+        from series group by 1 order by 1`);
 
     const statuses = db.all<{ status: string | null; series: number }>(sql`
         select status, count(*) as series from series group by status`);

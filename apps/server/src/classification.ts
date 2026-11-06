@@ -1,30 +1,36 @@
-// Format, public, genres et thèmes d'une série, partagés avec le client
+// Format, âge, genres et thèmes d'une série, partagés avec le client
 // (sans dépendance).
 
-/** Format d'une série : son origine et sa forme. */
-export const FORMATS = [
-    'manga',
-    'manhwa',
-    'manhua',
-    'webtoon',
-    'bd',
-    'comics',
-] as const;
+/** Sens de lecture : BD, manga (doubles pages inversées), manga, webtoon. */
+export const READING_MODES = ['ltr', 'ltr-manga', 'rtl', 'webtoon'] as const;
 
-export type Format = (typeof FORMATS)[number];
+export type ReadingMode = (typeof READING_MODES)[number];
 
-export const FORMAT_LABELS: Record<Format, string> = {
-    manga: 'Manga',
-    manhwa: 'Manhwa',
-    manhua: 'Manhua',
-    webtoon: 'Webtoon',
-    bd: 'BD',
-    comics: 'Comics',
-};
+/** Format de la liste gérée par l'admin, avec son mode de lecture. */
+export type FormatEntry = { name: string; readingMode: ReadingMode };
 
-/** Format d'une série sans format choisi : celui de sa bibliothèque. */
-export const defaultFormat = (libraryType: 'manga' | 'comics'): Format =>
-    libraryType === 'manga' ? 'manga' : 'bd';
+/**
+ * Liste de départ des formats. Le mode de lecture d'un format sert aux
+ * séries qui n'en ont pas choisi.
+ */
+export const DEFAULT_FORMATS: FormatEntry[] = [
+    { name: 'Manga', readingMode: 'ltr-manga' },
+    { name: 'Manhwa', readingMode: 'ltr' },
+    { name: 'Manhua', readingMode: 'ltr' },
+    { name: 'Webtoon', readingMode: 'webtoon' },
+    { name: 'BD', readingMode: 'ltr' },
+    { name: 'Comics', readingMode: 'ltr' },
+];
+
+/**
+ * Grille d'âges de départ, à la française (éditeurs, Manga-news) : l'admin
+ * la change dans les réglages.
+ */
+export const DEFAULT_AGE_STEPS = [0, 8, 10, 12, 14, 16, 18];
+
+/** « Tout public », « 12+ ». */
+export const ageLabel = (age: number) =>
+    age === 0 ? 'Tout public' : `${age}+`;
 
 /** Genre de la liste gérée par l'admin, avec les autres noms qu'il reconnaît. */
 export type GenreEntry = { name: string; aliases: string[] };

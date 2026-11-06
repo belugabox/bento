@@ -15,9 +15,6 @@ import {
 import { IconSearch } from '@tabler/icons-react';
 import { type FormEvent, type ReactNode, useEffect, useState } from 'react';
 
-import { FORMAT_LABELS } from '@server/types';
-
-import { ageRatingLabel } from '@/components/ageLimits';
 import {
     type MangaNewsDetails,
     type WikipediaDetails,
@@ -81,9 +78,7 @@ const fromMangaNews = (details: MangaNewsDetails): Preview => ({
     sheet: sheetFromMangaNews(details),
     themes: details.themes,
     lines: [
-        [details.format && FORMAT_LABELS[details.format], details.year]
-            .filter(Boolean)
-            .join(' · '),
+        [details.format, details.year].filter(Boolean).join(' · '),
         details.genres.join(', '),
         details.writer,
         details.publisher,
@@ -91,7 +86,7 @@ const fromMangaNews = (details: MangaNewsDetails): Preview => ({
             ? `${details.volumeCount} tomes en VF${details.ongoing === undefined ? '' : details.ongoing ? ' (en cours)' : ' (terminée)'}`
             : '',
         details.age !== undefined
-            ? `Âge conseillé ${details.age}+ : ${ageRatingLabel(details.ageRating) ?? details.ageRating}`
+            ? `Âge conseillé : ${details.age === 0 ? 'tout public' : `${details.age}+`}`
             : '',
     ].filter(Boolean),
 });

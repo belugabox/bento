@@ -1,7 +1,7 @@
 import { type CheerioAPI, load as cheerioLoad } from 'cheerio';
 
-import { type Format, genreKey } from '../classification';
-import { type AgeRating } from '../library/ageRating';
+import { genreKey } from '../classification';
+import { type AgeRating, ratingForAge } from '../library/ageRating';
 import { badGateway, badRequest, notFound } from '../tools/errors';
 
 // Métadonnées de séries depuis Manga-news. Le site n'a pas d'API : ses
@@ -29,7 +29,8 @@ export type MangaNewsSeries = {
     writer: string;
     penciller: string;
     publisher: string;
-    format: Format | null;
+    /** Nom du format (« Manga », « Manhwa »…), à rapprocher des formats gérés. */
+    format: string | null;
     /** Genres tels que les nomme Manga-news (rangés ensuite par la liste). */
     genres: string[];
     themes: string[];
@@ -75,46 +76,27 @@ const absolute = (src: string | undefined) =>
 
 // Type de Manga-news : un format pour les séries coréennes, chinoises et
 // les webtoons (sinon un public, shonen…, qui n'est pas gardé).
-const TYPE_FORMATS: Record<string, Format> = {
-    manhwa: 'manhwa',
-    manhua: 'manhua',
-    webtoon: 'webtoon',
-    'webtoon webcomic': 'webtoon',
+const TYPE_FORMATS: Record<string, string> = {
+    manhwa: 'Manhwa',
+    manhua: 'Manhua',
+    webtoon: 'Webtoon',
+    'webtoon webcomic': 'Webtoon',
 };
 
 // Pays d'origine → format.
-const COUNTRY_FORMATS: Record<string, Format> = {
-    japon: 'manga',
-    coree: 'manhwa',
-    'coree du sud': 'manhwa',
-    chine: 'manhua',
-    taiwan: 'manhua',
-    'hong kong': 'manhua',
-    france: 'bd',
-    belgique: 'bd',
-    suisse: 'bd',
-    usa: 'comics',
-    'etats unis': 'comics',
+const COUNTRY_FORMATS: Record<string, string> = {
+    japon: 'Manga',
+    coree: 'Manhwa',
+    'coree du sud': 'Manhwa',
+    chine: 'Manhua',
+    taiwan: 'Manhua',
+    'hong kong': 'Manhua',
+    france: 'BD',
+    belgique: 'BD',
+    suisse: 'BD',
+    usa: 'Comics',
+    'etats unis': 'Comics',
 };
-
-/**
- * Classification ComicInfo pour un âge conseillé, arrondie vers la plus
- * stricte : un « 12+ » devient « Teen » (13 ans), faute d'une classe à 12.
- */
-export const ageRatingOf = (age: number): AgeRating =>
-    age <= 0
-        ? 'Everyone'
-        : age <= 6
-          ? 'Kids to Adults'
-          : age <= 10
-            ? 'Everyone 10+'
-            : age <= 13
-              ? 'Teen'
-              : age <= 15
-                ? 'MA15+'
-                : age <= 17
-                  ? 'Mature 17+'
-                  : 'Adults Only 18+';
 
 /** Liens d'une ligne de la fiche (« Dessin : A, B »), séparés par des virgules. */
 const linksOf = ($: CheerioAPI, selector: string) =>
@@ -188,7 +170,7 @@ export const parseSeriesPage = (
             .join('\n'),
         ...(ageValue !== undefined && {
             age: ageValue,
-            ageRating: ageRatingOf(ageValue),
+            ageRating: ratingForAge(ageValue),
         }),
         ...(volumes && {
             volumeCount: Number(volumes[1]),

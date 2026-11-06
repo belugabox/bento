@@ -67,7 +67,7 @@ Bento est le serveur de lecture et de gestion des mangas et BD de la maison. Il 
 - **Brouillons** : liste des tomes et fiche de chaque tome avec sa couverture et son ComicInfo modifiable.
 - **Réglages de la future série dès les brouillons** : statut, mode de lecture et couverture, appliqués à la publication.
 - **Métadonnées** : recherche Wikipédia FR, remplissage depuis les noms de fichiers, option « écraser les valeurs existantes ».
-- **Classement** : format (manga, manhwa, manhua, webtoon, BD, comics) gardé dans Bento ; genres d'une liste gérée par l'admin (avec les autres noms qu'ils reconnaissent) et thèmes libres, dans `Genre` et `Tags` du ComicInfo.
+- **Classement** : format obligatoire, pris dans une liste gérée par l'admin (chacun avec son mode de lecture), et âge pris dans une grille réglable (Tout public, 8+, 10+, 12+, 14+, 16+, 18+ au départ), gardés dans Bento ; genres d'une liste gérée par l'admin (avec les autres noms qu'ils reconnaissent) et thèmes libres, dans `Genre` et `Tags` du ComicInfo.
 - **Manga-news** (fait pour les séries) : deuxième source de « Remplir », par défaut pour les mangas.
   - Série : auteurs, traducteurs, éditeurs VF et VO, type, genres, origine et année, **âge conseillé** (classification), résumé.
   - Tomes (pas encore fait) : année, titre et résumé de chaque tome, d'après leurs pages.

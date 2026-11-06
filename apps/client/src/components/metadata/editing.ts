@@ -1,8 +1,4 @@
-import {
-    type ComicInfo,
-    type Format,
-    parseVolumeFileName,
-} from '@server/types';
+import { type ComicInfo, parseVolumeFileName } from '@server/types';
 
 /** Champs communs à toute la série, appliqués à chaque tome. */
 export const SERIES_FIELDS = [
@@ -163,7 +159,9 @@ export type MangaNewsSeries = {
     writer: string;
     penciller: string;
     publisher: string;
-    format: Format | null;
+    /** Nom du format (« Manga »). */
+    format: string | null;
+    age?: number;
     ageRating?: string;
     ongoing?: boolean;
 };
@@ -182,7 +180,10 @@ export type SeriesSheet = {
     publisher?: string;
     ageRating?: string;
     status?: SeriesStatus;
-    format?: Format;
+    /** Nom du format, à rapprocher de ceux des réglages. */
+    format?: string;
+    /** Âge conseillé (« 12+ » : 12). */
+    age?: number;
 };
 
 export const sheetFromWikipedia = (wiki: WikipediaSeries): SeriesSheet => ({
@@ -211,6 +212,7 @@ export const sheetFromMangaNews = (series: MangaNewsSeries): SeriesSheet => ({
               ? 'ongoing'
               : 'completed',
     format: series.format ?? undefined,
+    age: series.age,
 });
 
 /**

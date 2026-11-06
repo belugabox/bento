@@ -24,6 +24,26 @@ export type AgeRating = keyof typeof AGE_RATINGS;
 export const isAgeRating = (value: unknown): value is AgeRating =>
     typeof value === 'string' && Object.hasOwn(AGE_RATINGS, value);
 
+/**
+ * Classification ComicInfo pour un âge (« 12+ »), arrondie vers la plus
+ * stricte : un « 12+ » devient « Teen » (13 ans), faute d'une classe à 12.
+ * Bento garde l'âge exact ; le ComicInfo sert aux autres lecteurs.
+ */
+export const ratingForAge = (age: number): AgeRating =>
+    age <= 0
+        ? 'Everyone'
+        : age <= 6
+          ? 'Kids to Adults'
+          : age <= 10
+            ? 'Everyone 10+'
+            : age <= 13
+              ? 'Teen'
+              : age <= 15
+                ? 'MA15+'
+                : age <= 17
+                  ? 'Mature 17+'
+                  : 'Adults Only 18+';
+
 /** Âge minimal d'une classification, ou `null` si elle est inconnue. */
 export const minAgeOf = (rating: string | null | undefined): number | null =>
     isAgeRating(rating) ? AGE_RATINGS[rating] : null;

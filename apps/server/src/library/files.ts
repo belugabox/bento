@@ -354,7 +354,8 @@ export class LibraryFiles {
             files,
             status: settings.get(folder)?.status ?? null,
             readingMode: settings.get(folder)?.readingMode ?? null,
-            format: settings.get(folder)?.format ?? null,
+            formatId: settings.get(folder)?.formatId ?? null,
+            age: settings.get(folder)?.age ?? null,
             coverUpdatedAt: settings.get(folder)?.coverUpdatedAt ?? null,
         }));
     };
@@ -364,7 +365,7 @@ export class LibraryFiles {
         libraryId: number,
         folder: string,
         changes: Partial<
-            Pick<DraftSettings, 'status' | 'readingMode' | 'format'>
+            Pick<DraftSettings, 'status' | 'readingMode' | 'formatId' | 'age'>
         >,
     ) => {
         this.library(libraryId);
@@ -469,7 +470,8 @@ export class LibraryFiles {
                     seriesId: series.id,
                     status: series.status,
                     readingMode: series.readingMode,
-                    format: series.format,
+                    formatId: series.formatId,
+                    age: series.age,
                 })
                 .from(volumes)
                 .innerJoin(series, eq(series.id, volumes.seriesId))
@@ -539,7 +541,10 @@ export class LibraryFiles {
                     ...(!draft?.status && old.status && { status: old.status }),
                     ...(!draft?.readingMode &&
                         old.readingMode && { readingMode: old.readingMode }),
-                    ...(!draft?.format && old.format && { format: old.format }),
+                    ...(!draft?.formatId &&
+                        old.formatId && { formatId: old.formatId }),
+                    ...(draft?.age == null &&
+                        old.age != null && { age: old.age }),
                 };
                 for (const [field, value] of Object.entries(carried)) {
                     this.db
@@ -581,7 +586,8 @@ export class LibraryFiles {
         // Un choix fait sur le brouillon l'emporte.
         if (draft.status) changes.status = draft.status;
         if (draft.readingMode) changes.readingMode = draft.readingMode;
-        if (draft.format) changes.format = draft.format;
+        if (draft.formatId) changes.formatId = draft.formatId;
+        if (draft.age != null) changes.age = draft.age;
         if (draft.coverUpdatedAt) {
             const copied = await copyFile(
                 draftCoverFile(this.coversPath, libraryId, folder),

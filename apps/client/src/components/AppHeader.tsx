@@ -36,7 +36,11 @@ import { Link, useLocation } from 'react-router';
 
 import logo from '@/assets/logo.svg';
 import { AppearanceModal } from '@/components/AppearanceModal';
-import { AGE_LIMITS, ageLimitLabel } from '@/components/ageLimits';
+import {
+    ageLimitLabel,
+    ageLimitOptions,
+    useAgeSteps,
+} from '@/components/ageLimits';
 import {
     type Task,
     fetchPendingDrafts,
@@ -215,6 +219,7 @@ const PreviewModal = ({
     onClose: () => void;
 }) => {
     const { preview } = useCurrentUser();
+    const ages = useAgeSteps(opened);
     // Âge proposé : celui de la vue en cours, sinon un enfant de 10 ans.
     const [maxAge, setMaxAge] = useState<string>(
         preview ? String(preview.maxAge ?? NO_LIMIT) : '10',
@@ -231,7 +236,7 @@ const PreviewModal = ({
                     allowDeselect={false}
                     value={maxAge}
                     onChange={(value) => value && setMaxAge(value)}
-                    data={AGE_LIMITS.map((limit) => ({
+                    data={ageLimitOptions(ages).map((limit) => ({
                         value: String(limit.value ?? NO_LIMIT),
                         label: limit.label,
                     }))}

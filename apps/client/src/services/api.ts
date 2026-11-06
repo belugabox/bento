@@ -1,6 +1,6 @@
 import { hc } from 'hono/client';
 
-import type { ApiType, Format } from '@server/types';
+import type { ApiType, ReadingMode } from '@server/types';
 
 /** Client typé de l'API (`/api`, servie par le même domaine). */
 export const api = hc<ApiType>('/api');
@@ -216,6 +216,7 @@ export const saveSettings = (changes: {
     compression?: Partial<Settings['compression']>;
     scanIntervalMinutes?: number;
     appearance?: Partial<Settings['appearance']>;
+    ages?: number[];
 }) => json(api.settings.$put({ json: changes }));
 
 /** Thème par défaut choisi par l'admin (lisible sans session). */
@@ -377,9 +378,10 @@ export const setSeriesReadingMode = (
         }),
     );
 
-/** Format d'une série ou d'un dossier de brouillons (null : par défaut). */
+/** Format et âge d'une série ou d'un dossier de brouillons (null : aucun). */
 export type ClassificationChanges = {
-    format?: Format | null;
+    formatId?: number | null;
+    age?: number | null;
 };
 
 export const setSeriesClassification = (
@@ -426,3 +428,19 @@ export const deleteGenre = (genreId: number, into?: number) =>
             query: { into: into === undefined ? undefined : String(into) },
         }),
     );
+
+/** Formats de série (manga, BD…), gérés par l'admin. */
+export const fetchFormats = () => json(api.formats.$get());
+
+export type SeriesFormat = Awaited<ReturnType<typeof fetchFormats>>[number];
+
+export const createFormat = (name: string, readingMode: ReadingMode) =>
+    json(api.formats.$post({ json: { name, readingMode } }));
+
+export const updateFormat = (
+    formatId: number,
+    changes: { name?: string; readingMode?: ReadingMode },
+) => json(api.formats[':id'].$patch({ ...id(formatId), json: changes }));
+
+export const deleteFormat = (formatId: number) =>
+    json(api.formats[':id'].$delete(id(formatId)));
