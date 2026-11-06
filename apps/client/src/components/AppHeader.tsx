@@ -24,7 +24,6 @@ import {
     IconActivity,
     IconChartBar,
     IconEye,
-    IconFolders,
     IconInbox,
     IconLogout,
     IconPalette,
@@ -324,15 +323,6 @@ const UserMenu = () => {
                             leftSection={<IconUsers size={14} />}
                         >
                             Comptes et contrôle parental
-                        </Menu.Item>
-                    )}
-                    {isAdmin && (
-                        <Menu.Item
-                            component={Link}
-                            to="/collections"
-                            leftSection={<IconFolders size={14} />}
-                        >
-                            Collections
                         </Menu.Item>
                     )}
                     {isAdmin && (

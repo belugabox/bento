@@ -14,15 +14,12 @@ export type ListedSeries = {
     format?: string | null;
     status?: 'ongoing' | 'completed' | null;
     toRead?: boolean;
-    collectionIds?: number[];
 };
 
 /** État de lecture, ou la liste « à lire » de la personne. */
 export type ReadingFilter = 'all' | 'toread' | 'unread' | 'started' | 'read';
 export type SeriesSort = 'name' | 'recent';
 export type StatusFilter = 'all' | 'ongoing' | 'completed';
-/** Toutes les séries, ou une collection (`collection:<id>`). */
-export type ListFilter = 'all' | `collection:${number}`;
 
 export const READING_FILTERS: { value: ReadingFilter; label: string }[] = [
     { value: 'all', label: 'Toutes' },
@@ -66,31 +63,25 @@ export const allGenres = (series: Pick<ListedSeries, 'genres'>[]) =>
 export const allFormats = (series: Pick<ListedSeries, 'format'>[]) =>
     present(series.flatMap((s) => (s.format ? [s.format] : [])));
 
-const inList = (s: ListedSeries, list: ListFilter) =>
-    list === 'all' ||
-    (s.collectionIds ?? []).includes(Number(list.split(':')[1]));
-
 const matchesReading = (s: ListedSeries, filter: ReadingFilter) =>
     filter === 'all' ||
     (filter === 'toread' ? !!s.toRead : readingStateOf(s) === filter);
 
 /**
- * Séries à afficher, filtrées (lecture, liste, format, genre,
- * statut) puis triées.
+ * Séries à afficher, filtrées (lecture, format, genre, statut) puis
+ * triées.
  */
 export const filterSeries = <T extends ListedSeries>(
     series: T[],
     {
         filter,
         sort,
-        list = 'all',
         genre = null,
         format = null,
         status = 'all',
     }: {
         filter: ReadingFilter;
         sort: SeriesSort;
-        list?: ListFilter;
         genre?: string | null;
         format?: string | null;
         status?: StatusFilter;
@@ -99,7 +90,6 @@ export const filterSeries = <T extends ListedSeries>(
     const kept = series.filter(
         (s) =>
             matchesReading(s, filter) &&
-            inList(s, list) &&
             (!genre || (s.genres ?? []).includes(genre)) &&
             (!format || s.format === format) &&
             (status === 'all' || s.status === status),

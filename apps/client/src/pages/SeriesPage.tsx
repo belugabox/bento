@@ -15,7 +15,6 @@ import {
     Title,
     Tooltip,
 } from '@mantine/core';
-import { useDisclosure } from '@mantine/hooks';
 import {
     IconArrowLeft,
     IconBookmark,
@@ -23,7 +22,6 @@ import {
     IconCheck,
     IconChecks,
     IconDots,
-    IconFolders,
     IconPencil,
     IconPlayerPlay,
     IconRestore,
@@ -33,7 +31,6 @@ import { Link, useParams } from 'react-router';
 
 import { VOLUME_KINDS } from '@server/types';
 
-import { CollectionsModal } from '@/components/CollectionsModal';
 import { CompletenessBadge } from '@/components/CompletenessBadge';
 import { CoverCard } from '@/components/CoverCard';
 import { ageLabel, seriesAgeOf } from '@/components/ageLimits';
@@ -75,7 +72,6 @@ export const SeriesPage = () => {
         error,
         reload,
     } = useQuery(() => fetchSeries(seriesId), [seriesId]);
-    const [collectionsOpened, collectionsModal] = useDisclosure(false);
     // Liste en cours d'enregistrement (bouton désactivé).
     const [savingList, setSavingList] = useState(false);
 
@@ -318,29 +314,11 @@ export const SeriesPage = () => {
                                 >
                                     Marquer toute la série comme non lue
                                 </Menu.Item>
-                                {isAdmin && (
-                                    <Menu.Item
-                                        leftSection={<IconFolders size={14} />}
-                                        onClick={collectionsModal.open}
-                                    >
-                                        Collections…
-                                    </Menu.Item>
-                                )}
                             </Menu.Dropdown>
                         </Menu>
                     </Group>
                 </Stack>
             </Flex>
-
-            {isAdmin && (
-                <CollectionsModal
-                    opened={collectionsOpened}
-                    onClose={collectionsModal.close}
-                    seriesId={series.id}
-                    collectionIds={series.collectionIds}
-                    onChanged={reload}
-                />
-            )}
 
             {VOLUME_KINDS.map((kind) => {
                 const group = series.volumes.filter((v) => v.kind === kind);

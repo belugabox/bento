@@ -49,7 +49,6 @@ const SERIES = {
     publisher: null,
     coverUpdatedAt: null,
     toRead: false,
-    collectionIds: [] as number[],
     library: { id: 1, name: 'Mangas', type: 'manga' },
     volumes: [volume(1, true), volume(2, null), volume(7, null, 'hors-serie')],
 };
@@ -193,11 +192,5 @@ describe('SeriesPage', () => {
                     .getAttribute('aria-pressed'),
             ).toBe('true'),
         );
-        // Les collections sont réservées à l'admin.
-        fireEvent.click(
-            screen.getByRole('button', { name: 'Lecture de la série' }),
-        );
-        expect(await screen.findByText(/comme lue/)).toBeTruthy();
-        expect(screen.queryByText('Collections…')).toBeNull();
     });
 });

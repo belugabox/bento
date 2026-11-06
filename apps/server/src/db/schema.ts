@@ -232,7 +232,10 @@ export const seriesLists = sqliteTable(
     ],
 );
 
-/** Collections partagées, créées par l'admin (« Pour les enfants »). */
+/**
+ * Collections partagées (« Pour les enfants »), retirées de Bento le
+ * 6 novembre 2026 : les tables restent en base, inutilisées.
+ */
 export const collections = sqliteTable(
     'collections',
     {

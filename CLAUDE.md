@@ -10,7 +10,7 @@ Serveur de lecture et de gestion de mangas et BD, qui remplace Kavita pour la fa
 - Le déploiement est reporté (« on déploiera plus tard »).
 - Il a refusé un nom de tri modifiable par série (« oublie »).
 - Classement décidé le 6 novembre 2026 : format, âge, genres, thèmes. Formats, grille d'âges et genres sont gérés par l'admin (Réglages, onglet Classement). Le format est obligatoire, sans valeur par défaut ; format et âge exact restent dans Bento (le ComicInfo reçoit la classification la plus proche, plus stricte). Le « public » (shonen, seinen…) a été retiré : « je ne l'utiliserai pas » (migration 0015).
-- Favoris retirés le 6 novembre 2026 (« À lire » seul, en filtre de la barre « Séries »). Les collections restent telles quelles, mises de côté. Changer de fournisseur de connexion (TinyAuth, Authelia) : « oublie pour le moment ».
+- Favoris retirés le 6 novembre 2026 (« À lire » seul, en filtre de la barre « Séries »). Collections retirées le même jour (« tu peux supprimer la partie collection ») : code supprimé, tables `collections` et `collection_series` gardées en base, inutilisées (les supprimer effacerait celles de la prod). Changer de fournisseur de connexion (TinyAuth, Authelia) : « oublie pour le moment ».
 
 ## Règles impératives
 
@@ -47,7 +47,7 @@ Serveur de lecture et de gestion de mangas et BD, qui remplace Kavita pour la fa
 - Le lecteur est découpé en trois : `reader/Reader.tsx` (composant), `ReaderPage.tsx` (route `/read/:id`), `ReaderPreview.tsx` (aperçu par-dessus l'éditeur). `ReaderPage` ignore le tome précédent pendant le chargement du suivant ; c'était un bug.
 - La compression passe par une file en arrière-plan (`library/compression.ts`) : un gros tome dépasse le délai d'une requête derrière Cloudflare (100 s).
 - Les réglages de l'admin sont dans `settings.ts` (table `settings`, migration 0013) : compression (qualité 90, 2400 px par défaut) et intervalle du scan.
-- Les réglages d'un brouillon (statut, mode de lecture, couverture) sont dans la table `draft_statuses` (son nom d'origine est gardé) et sont appliqués à la publication. Quand une publication renomme une série, ses listes, ses collections et son mode de lecture la suivent.
+- Les réglages d'un brouillon (statut, mode de lecture, couverture) sont dans la table `draft_statuses` (son nom d'origine est gardé) et sont appliqués à la publication. Quand une publication renomme une série, ses listes et son mode de lecture la suivent.
 - **Cache des images** : la version d'un tome est la date de son fichier (`volumeVersion`, `cast(mtime_ms as integer)`). Avec `?v=` dans l'adresse, pages et couvertures sont servies `immutable` pour un an : toute réécriture du fichier doit changer sa date. Une couverture refaite sans toucher au fichier (nouvelle taille `COVER_SIZE`) garderait l'ancienne en cache : changer alors aussi le format de la version.
 - **Âge d'une série** : `coalesce(series.age, series.min_age)` (choisi dans Bento, sinon déduit des tomes), pour la visibilité et les statistiques. La grille d'âges est dans les réglages (`ages`).
 - **Formats** : table `formats` (0016, liste de départ par 0018), `series.format_id`. La clé étrangère n'a pas `on delete set null` sur la base de dev : `deleteFormat` détache les séries lui-même.

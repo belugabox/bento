@@ -50,14 +50,7 @@ import {
     listGenres,
     updateGenre,
 } from './library/genres';
-import {
-    createCollection,
-    deleteCollection,
-    listCollections,
-    renameCollection,
-    setCollectionMember,
-    setSeriesLists,
-} from './library/lists';
+import { setSeriesLists } from './library/lists';
 import {
     getProgress,
     listContinue,
@@ -115,8 +108,6 @@ const smallCover = (size?: string) => (size === 'small' ? size : undefined);
  */
 const imageCache = (version?: string) =>
     version ? 'private, max-age=31536000, immutable' : 'private, max-age=3600';
-
-const collectionBody = z.object({ name: z.string().trim().min(1).max(80) });
 
 // Format, âge et fiches en ligne d'une série, réglés dans Bento : null
 // (liste vide pour les fiches) pour les retirer.
@@ -603,56 +594,6 @@ export const createApi = ({
         // Derniers ajouts (« Nouveautés », retirée de l'accueil pour l'instant).
         .get('/home', (c) =>
             c.json({ recent: listRecentVolumes(db, c.var.user) }),
-        )
-        // Collections partagées : lecture pour tous, gestion par l'admin.
-        .get('/collections', (c) => c.json(listCollections(db, c.var.user)))
-        .post(
-            '/collections',
-            requireAdmin,
-            zValidator('json', collectionBody),
-            (c) => c.json(createCollection(db, c.req.valid('json').name)),
-        )
-        .patch(
-            '/collections/:id',
-            requireAdmin,
-            zValidator('param', idParam),
-            zValidator('json', collectionBody),
-            (c) =>
-                c.json(
-                    renameCollection(
-                        db,
-                        c.req.valid('param').id,
-                        c.req.valid('json').name,
-                    ),
-                ),
-        )
-        .delete(
-            '/collections/:id',
-            requireAdmin,
-            zValidator('param', idParam),
-            (c) => c.json(deleteCollection(db, c.req.valid('param').id)),
-        )
-        .put(
-            '/collections/:id/series/:seriesId',
-            requireAdmin,
-            zValidator(
-                'param',
-                idParam.extend({
-                    seriesId: z.coerce.number().int().positive(),
-                }),
-            ),
-            zValidator('json', z.object({ member: z.boolean() })),
-            (c) => {
-                const { id, seriesId } = c.req.valid('param');
-                return c.json(
-                    setCollectionMember(
-                        db,
-                        id,
-                        seriesId,
-                        c.req.valid('json').member,
-                    ),
-                );
-            },
         )
         .get('/volumes/:id/cover', zValidator('param', idParam), async (c) => {
             const { id } = getVolume(db, c.var.user, c.req.valid('param').id);

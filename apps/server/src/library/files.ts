@@ -466,8 +466,8 @@ export class LibraryFiles {
         const folders = new Set<string>();
         // Réglages choisis pour les dossiers de brouillons publiés.
         const drafts = draftSettingsOf(this.db, libraryId);
-        // Séries des tomes publiés déplacés : statut, mode de lecture, listes
-        // et collections, reportés sur leur nouvelle série.
+        // Séries des tomes publiés déplacés : statut, mode de lecture et
+        // listes, reportés sur leur nouvelle série.
         const previous = new Map(
             this.db
                 .select({

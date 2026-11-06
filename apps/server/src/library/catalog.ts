@@ -55,17 +55,12 @@ export const volumeOrder = [
 ];
 
 /**
- * Listes de la personne et collections d'une série (SQL brut : Drizzle ne
- * préfixe pas les colonnes des sous-requêtes).
+ * Listes de la personne pour une série (SQL brut : Drizzle ne préfixe pas
+ * les colonnes des sous-requêtes).
  */
 const listsOf = (viewer: Viewer) => ({
     toRead: sql<boolean>`exists(select 1 from series_lists sl where sl.series_id = series.id and sl.user_id = ${viewer.id} and sl.list = 'toread')`.mapWith(
         Boolean,
-    ),
-    collectionIds: sql<
-        number[]
-    >`coalesce((select group_concat(cs.collection_id) from collection_series cs where cs.series_id = series.id), '')`.mapWith(
-        (value: string) => (value ? value.split(',').map(Number) : []),
     ),
 });
 

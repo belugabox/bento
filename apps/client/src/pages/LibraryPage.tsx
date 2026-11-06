@@ -35,7 +35,6 @@ import { SeriesCardMenu, VolumeCardMenu } from '@/components/CardMenus';
 import { CoverCard } from '@/components/CoverCard';
 import { volumeLabel, volumeShortLabel } from '@/components/readingStatus';
 import {
-    type ListFilter,
     READING_FILTERS,
     type ReadingFilter,
     SERIES_SORTS,
@@ -50,7 +49,6 @@ import {
 import {
     type InProgressVolume,
     coverUrl,
-    fetchCollections,
     fetchInProgress,
     fetchLibraries,
     fetchSeriesList,
@@ -132,11 +130,6 @@ export const LibraryPage = () => {
     const [debouncedSearch] = useDebouncedValue(search, 250);
     const filter = (params.get('filter') as ReadingFilter | null) ?? 'all';
     const sort = (params.get('sort') as SeriesSort | null) ?? 'name';
-    // Seulement une collection (les anciens « favoris » sont ignorés).
-    const rawList = params.get('list');
-    const list: ListFilter = rawList?.startsWith('collection:')
-        ? (rawList as ListFilter)
-        : 'all';
     const genre = params.get('genre');
     const format = params.get('format');
     const status = (params.get('status') as StatusFilter | null) ?? 'all';
@@ -144,7 +137,6 @@ export const LibraryPage = () => {
     const isAdmin = useContext(UserContext)?.role === 'admin';
     const libraries = useQuery(fetchLibraries, []);
     const inProgress = useQuery(fetchInProgress, []);
-    const collections = useQuery(fetchCollections, []);
     const libraryId =
         Number(params.get('library')) || libraries.data?.[0]?.id || undefined;
     const series = useQuery(
@@ -191,21 +183,12 @@ export const LibraryPage = () => {
     const visible = filterSeries(series.data ?? [], {
         filter,
         sort,
-        list,
         genre,
         format,
         status,
     });
     // Filtres du bouton « Filtres », affichés aussi en pastilles.
-    const listLabel = collections.data?.find(
-        (c) => `collection:${c.id}` === list,
-    )?.name;
     const active = [
-        list !== 'all' && {
-            key: 'list',
-            label: listLabel ?? 'Collection',
-            clear: () => update({ list: '' }),
-        },
         !!format && {
             key: 'format',
             label: format,
@@ -327,29 +310,6 @@ export const LibraryPage = () => {
                             <Popover.Dropdown>
                                 <Stack gap="sm">
                                     <Select
-                                        label="Collection"
-                                        size="xs"
-                                        allowDeselect={false}
-                                        disabled={!collections.data?.length}
-                                        value={list}
-                                        onChange={(value) =>
-                                            update({ list: value ?? '' }, 'all')
-                                        }
-                                        comboboxProps={{ withinPortal: false }}
-                                        data={[
-                                            {
-                                                value: 'all',
-                                                label: 'Toutes les séries',
-                                            },
-                                            ...(collections.data ?? []).map(
-                                                (c) => ({
-                                                    value: `collection:${c.id}`,
-                                                    label: c.name,
-                                                }),
-                                            ),
-                                        ]}
-                                    />
-                                    <Select
                                         label="Format"
                                         size="xs"
                                         clearable
@@ -396,7 +356,6 @@ export const LibraryPage = () => {
                                         disabled={active.length === 0}
                                         onClick={() =>
                                             update({
-                                                list: '',
                                                 format: '',
                                                 genre: '',
                                                 status: '',

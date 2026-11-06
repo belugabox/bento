@@ -11,7 +11,6 @@ let admin: string;
 let alice: string;
 let bob: string;
 let gantzSeries: number;
-let spiraleSeries: number;
 let gantz: number[];
 
 const call = async (
@@ -68,7 +67,6 @@ beforeEach(async () => {
     });
     await ctx.scanner.scan(ctx.library.id);
     gantzSeries = (await seriesOf(alice, 'Gantz')).id;
-    spiraleSeries = (await seriesOf(alice, 'Spirale')).id;
     gantz = (await call(`/series/${gantzSeries}`, alice)).body.volumes.map(
         (v: { id: number }) => v.id,
     );
@@ -124,66 +122,8 @@ describe('personal lists', () => {
     });
 });
 
-describe('collections', () => {
-    it('are managed by the admin and seen by everyone', async () => {
-        const created = await call('/collections', admin, {
-            method: 'POST',
-            json: { name: 'Pour les enfants' },
-        });
-        const id = created.body.id;
-        expect(
-            (
-                await call('/collections', admin, {
-                    method: 'POST',
-                    json: { name: 'pour les enfants' },
-                })
-            ).status,
-        ).toBe(409);
-        await call(`/collections/${id}/series/${spiraleSeries}`, admin, {
-            method: 'PUT',
-            json: { member: true },
-        });
-
-        expect((await call('/collections', alice)).body).toEqual([
-            { id, name: 'Pour les enfants', seriesCount: 1 },
-        ]);
-        expect((await seriesOf(alice, 'Spirale')).collectionIds).toEqual([id]);
-        expect((await seriesOf(alice, 'Gantz')).collectionIds).toEqual([]);
-
-        await call(`/collections/${id}`, admin, {
-            method: 'PATCH',
-            json: { name: 'Enfants' },
-        });
-        expect((await call('/collections', alice)).body[0].name).toBe(
-            'Enfants',
-        );
-        await call(`/collections/${id}`, admin, { method: 'DELETE' });
-        expect((await call('/collections', alice)).body).toEqual([]);
-        expect((await seriesOf(alice, 'Spirale')).collectionIds).toEqual([]);
-    });
-
-    it('are read-only for readers', async () => {
-        expect(
-            (
-                await call('/collections', alice, {
-                    method: 'POST',
-                    json: { name: 'X' },
-                })
-            ).status,
-        ).toBe(403);
-    });
-
-    it('follow a series renamed at publication', async () => {
-        const { id } = (
-            await call('/collections', admin, {
-                method: 'POST',
-                json: { name: 'Favoris de la maison' },
-            })
-        ).body;
-        await call(`/collections/${id}/series/${gantzSeries}`, admin, {
-            method: 'PUT',
-            json: { member: true },
-        });
+describe('to-read list', () => {
+    it('follows a series renamed at publication', async () => {
         await call(`/series/${gantzSeries}/lists`, alice, {
             method: 'PUT',
             json: { toRead: true },
@@ -204,7 +144,7 @@ describe('collections', () => {
 
         const renamed = await seriesOf(alice, 'Gantz Perfect');
         expect(renamed.id).not.toBe(gantzSeries);
-        expect(renamed).toMatchObject({ toRead: true, collectionIds: [id] });
+        expect(renamed).toMatchObject({ toRead: true });
     });
 });
 

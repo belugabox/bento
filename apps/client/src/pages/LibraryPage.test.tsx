@@ -24,7 +24,6 @@ const SERIES = [
     coverUpdatedAt: null,
     coverVolumeId: index + 10,
     toRead: index === 1,
-    collectionIds: index === 0 ? [7] : [],
     ...s,
 }));
 
@@ -78,9 +77,6 @@ beforeEach(() => {
                     volumeCount: 6,
                 },
             ]);
-        }
-        if (url === '/api/collections') {
-            return respond([{ id: 7, name: 'Classiques', seriesCount: 1 }]);
         }
         if (url.startsWith('/api/series')) return respond(SERIES);
         throw new Error(`requête inattendue : ${url}`);
@@ -159,7 +155,7 @@ describe('LibraryPage', () => {
         ).toBe(true);
     });
 
-    it('keeps the to-read list or a collection, in the address', async () => {
+    it('keeps the to-read list in the address', async () => {
         show();
         await screen.findByTestId('series-grid');
         await vi.waitFor(() => expect(titles()).toHaveLength(3));
@@ -168,21 +164,6 @@ describe('LibraryPage', () => {
         expect(titles()).toEqual(['/series/2']);
         expect(location).toBe('?filter=toread');
         fireEvent.click(screen.getByText('Toutes'));
-
-        fireEvent.click(screen.getByRole('button', { name: 'Filtres' }));
-        fireEvent.click(
-            await screen.findByRole('textbox', { name: 'Collection' }),
-        );
-        fireEvent.click(await screen.findByText('Classiques'));
-        // Filtre actif : en pastille, qu'on peut retirer.
-        expect(titles()).toEqual(['/series/1']);
-        expect(location).toBe('?list=collection%3A7');
-
-        fireEvent.click(
-            screen.getByRole('button', {
-                name: 'Retirer le filtre Classiques',
-            }),
-        );
         expect(titles()).toHaveLength(3);
         expect(location).toBe('');
     });
