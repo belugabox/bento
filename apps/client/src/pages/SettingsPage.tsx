@@ -19,6 +19,7 @@ import { useSearchParams } from 'react-router';
 import { AgesSettings } from '@/components/AgesSettings';
 import { FormatsSettings } from '@/components/FormatsSettings';
 import { GenresSettings } from '@/components/GenresSettings';
+import { SourcePrioritySettings } from '@/components/SourcePrioritySettings';
 import { AccentPicker, ColorSchemeControl } from '@/components/ThemePickers';
 import { useDefaultAppearance } from '@/components/theme';
 import {
@@ -251,7 +252,7 @@ type Tab = 'general' | 'classement';
 /**
  * Réglages de Bento (admin), en deux onglets : « Général » (compression,
  * scan, apparence ; enregistrés ensemble) et « Classement » (formats, âges,
- * genres ; enregistrés à chaque changement). L'onglet reste dans l'adresse.
+ * genres, sites des fiches en ligne ; enregistrés à chaque changement). L'onglet reste dans l'adresse.
  */
 export const SettingsPage = () => {
     const { data, error } = useQuery(fetchSettings, []);
@@ -301,6 +302,10 @@ export const SettingsPage = () => {
                             onSaved={setSaved}
                         />
                         <GenresSettings />
+                        <SourcePrioritySettings
+                            priority={current.settings.sourcePriority}
+                            onSaved={setSaved}
+                        />
                     </Stack>
                 </Tabs.Panel>
             </Tabs>

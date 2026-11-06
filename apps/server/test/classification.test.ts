@@ -351,3 +351,99 @@ describe('age', () => {
         expect((await call('/series', child)).body).toEqual([]);
     });
 });
+
+describe('online sheets', () => {
+    const links = [
+        { site: 'wikipedia', id: '123' },
+        { site: 'manga-news', id: 'Spy-X-Family' },
+    ];
+
+    it('are kept on a series, one per site, and checked', async () => {
+        const { id } = await series();
+        const { body } = await call(`/series/${id}/classification`, admin, {
+            method: 'PUT',
+            json: { sources: links },
+        });
+        // Rangées par site : Manga-news, puis Wikipédia.
+        expect(body.sources).toEqual([links[1], links[0]]);
+        expect((await call(`/series/${id}`, admin)).body.sources).toEqual([
+            links[1],
+            links[0],
+        ]);
+
+        for (const bad of [
+            { site: 'wikipedia', id: 'Gantz' },
+            { site: 'manga-news', id: 'a/b' },
+            { site: 'imdb', id: '1' },
+        ]) {
+            expect(
+                (
+                    await call(`/series/${id}/classification`, admin, {
+                        method: 'PUT',
+                        json: { sources: [bad] },
+                    })
+                ).status,
+            ).toBe(400);
+        }
+
+        // Liste vide : plus de fiche.
+        await call(`/series/${id}/classification`, admin, {
+            method: 'PUT',
+            json: { sources: [] },
+        });
+        expect((await call(`/series/${id}`, admin)).body.sources).toEqual([]);
+    });
+
+    it('chosen on a draft folder, go to its series when published', async () => {
+        await writeCbz(ctx.file('_draft/Solo/Solo T01.cbz'), {
+            comicInfo: '<Series>Solo</Series><Number>1</Number>',
+        });
+        await call(
+            `/libraries/${ctx.library.id}/drafts/classification`,
+            admin,
+            {
+                method: 'PUT',
+                json: {
+                    folder: '_draft/Solo',
+                    formatId: await formatId('Manhwa'),
+                    sources: [links[1]],
+                },
+            },
+        );
+        const drafts = (
+            await call(`/libraries/${ctx.library.id}/drafts`, admin)
+        ).body;
+        expect(drafts[0].sources).toEqual([links[1]]);
+
+        await ctx.files.publish(ctx.library.id, ['_draft/Solo/Solo T01.cbz']);
+
+        const solo = (await call('/series', reader)).body.find(
+            (s: { name: string }) => s.name === 'Solo',
+        );
+        expect((await call(`/series/${solo.id}`, admin)).body.sources).toEqual([
+            links[1],
+        ]);
+    });
+});
+
+describe('credits', () => {
+    it('lists the names already used, once each, for the admin', async () => {
+        await writeCbz(ctx.file('Gantz/Gantz #01.cbz'), {
+            comicInfo:
+                '<Series>Gantz</Series><Number>1</Number><Writer>Hiroya Oku</Writer><Penciller>Hiroya Oku, Kei Ichiro</Penciller><Publisher>Tonkam</Publisher>',
+        });
+        await writeCbz(ctx.file('Gantz/Gantz #02.cbz'), {
+            comicInfo:
+                '<Series>Gantz</Series><Number>2</Number><Writer>HIROYA OKU</Writer><Publisher>Delcourt</Publisher>',
+        });
+        await ctx.scanner.scan(ctx.library.id);
+
+        const path = `/libraries/${ctx.library.id}/credits`;
+        expect((await call(path, reader)).status).toBe(403);
+        expect((await call(path, admin)).body).toEqual({
+            writers: ['Hiroya Oku'],
+            pencillers: ['Hiroya Oku', 'Kei Ichiro'],
+            publishers: ['Delcourt', 'Tonkam'],
+        });
+    });
+});

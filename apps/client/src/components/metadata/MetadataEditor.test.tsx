@@ -5,6 +5,7 @@ import {
     render,
     screen,
     waitFor,
+    within,
 } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -12,6 +13,7 @@ import {
     DEFAULT_AGE_STEPS,
     DEFAULT_FORMATS,
     DEFAULT_GENRES,
+    DEFAULT_SOURCE_PRIORITY,
 } from '@server/types';
 
 import { type EditorVolume, MetadataEditor } from './MetadataEditor';
@@ -28,7 +30,17 @@ vi.mock('@/services/api', async (original) => ({
             ...format,
             seriesCount: 0,
         })),
-    fetchSettings: async () => ({ settings: { ages: DEFAULT_AGE_STEPS } }),
+    fetchSettings: async () => ({
+        settings: {
+            ages: DEFAULT_AGE_STEPS,
+            sourcePriority: DEFAULT_SOURCE_PRIORITY,
+        },
+    }),
+    fetchCredits: async () => ({
+        writers: ['Hiroya Oku'],
+        pencillers: [],
+        publishers: ['Tonkam'],
+    }),
 }));
 
 /** Pastilles d'un champ à valeurs multiples (genres, thèmes). */
@@ -58,24 +70,67 @@ const volumes = (): EditorVolume[] => [
 // Requêtes envoyées au serveur : [méthode, adresse, corps].
 let requests: [string, string, unknown][] = [];
 
-const mockServer = () => {
+/**
+ * Serveur simulé ; `online` : réponses des recherches en ligne, par début
+ * d'adresse après `/metadata/` (« wikipedia/search »).
+ */
+const mockServer = (online: Record<string, unknown> = {}) => {
     requests = [];
     vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+        const url = String(input);
         const body = init?.body ? JSON.parse(String(init.body)) : undefined;
-        requests.push([init?.method ?? 'GET', String(input), body]);
-        const response = String(input).endsWith('/publish')
-            ? {
-                  published: body.paths.map((p: string) => ({
-                      from: p,
-                      to: p,
-                  })),
-                  failures: [],
-              }
-            : { updated: body.updates, failures: [] };
+        requests.push([init?.method ?? 'GET', url, body]);
+        const site = Object.keys(online).find((key) =>
+            url.includes(`/metadata/${key}`),
+        );
+        const response = site
+            ? online[site]
+            : url.endsWith('/publish')
+              ? {
+                    published: body.paths.map((p: string) => ({
+                        from: p,
+                        to: p,
+                    })),
+                    failures: [],
+                }
+              : { updated: body.updates, failures: [] };
         return new Response(JSON.stringify(response), {
             headers: { 'Content-Type': 'application/json' },
         });
     });
+};
+
+const WIKI_GANTZ = {
+    id: 7,
+    title: 'Gantz',
+    url: 'https://fr.wikipedia.org/wiki/Gantz',
+    summary: 'Des aliens.',
+    genre: 'Science-fiction',
+    writer: 'Hiroya Oku',
+    penciller: 'Hiroya Oku',
+    publisher: 'Tonkam',
+    volumeCount: 37,
+    firstYear: 2000,
+    lastYear: 2013,
+    ongoing: false,
+};
+
+const MANGA_NEWS_GANTZ = {
+    id: 'Gantz',
+    title: 'Gantz',
+    url: 'https://www.manga-news.com/index.php/serie/Gantz',
+    originalTitle: 'Gantz',
+    summary: 'Des aliens.',
+    genres: ['Suspense', 'Science-fiction'],
+    themes: ['aliens'],
+    writer: 'Hiroya OKU',
+    penciller: 'Hiroya OKU',
+    publisher: 'Tonkam',
+    format: 'manga',
+    age: 16,
+    ageRating: 'Mature 17+',
+    volumeCount: 37,
+    ongoing: false,
 };
 
 const Editor = ({ onChanged = () => {} }: { onChanged?: () => void }) => (
@@ -385,53 +440,53 @@ describe('MetadataEditor', () => {
         expect(screen.queryByText(/tome\(s\) enregistré/)).toBeNull();
     });
 
-    it('fills from Wikipedia, then from the file names', async () => {
-        vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
-            const url = String(input);
-            const body = url.includes('/metadata/wikipedia/search')
-                ? [
-                      {
-                          id: 7,
-                          title: 'Gantz',
-                          url: 'https://fr.wikipedia.org/wiki/Gantz',
-                      },
-                  ]
-                : {
-                      id: 7,
-                      title: 'Gantz',
-                      url: 'https://fr.wikipedia.org/wiki/Gantz',
-                      summary: 'Des aliens.',
-                      genre: 'Science-fiction',
-                      writer: 'Hiroya Oku',
-                      penciller: 'Hiroya Oku',
-                      publisher: 'Tonkam',
-                      volumeCount: 37,
-                      firstYear: 2000,
-                      lastYear: 2013,
-                      ongoing: false,
-                  };
-            return new Response(JSON.stringify(body), {
-                headers: { 'Content-Type': 'application/json' },
-            });
+    it('searches both sites, then fills from the sheet chosen and the file names', async () => {
+        mockServer({
+            'manga-news/search': [],
+            'wikipedia/search': [
+                {
+                    id: 7,
+                    title: 'Gantz',
+                    url: 'https://fr.wikipedia.org/wiki/Gantz',
+                },
+            ],
+            'wikipedia/7': WIKI_GANTZ,
         });
         render(<Editor />);
 
         fireEvent.click(screen.getByRole('button', { name: /Remplir/ }));
-        const searchButton = await screen.findByRole('button', {
-            name: 'Rechercher',
-        });
         // La recherche part du nom de la série en cours d'édition.
         expect(
-            (screen.getByPlaceholderText('Nom de la série') as HTMLInputElement)
-                .value,
+            (
+                (await screen.findByPlaceholderText(
+                    'Nom de la série',
+                )) as HTMLInputElement
+            ).value,
         ).toBe('Gantz');
-        // Un manga cherche d'abord sur Manga-news.
-        fireEvent.click(screen.getByText('Wikipédia'));
-        fireEvent.click(searchButton);
-        fireEvent.click(await screen.findByRole('button', { name: 'Gantz' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Rechercher' }));
+        // Les deux sites à la fois ; un seul résultat au nom exact : ouvert.
+        const wikipedia = await screen.findByRole('region', {
+            name: 'Wikipédia',
+        });
+        expect(await within(wikipedia).findByText('Hiroya Oku')).toBeTruthy();
+        expect(
+            await within(
+                screen.getByRole('region', { name: 'Manga-news' }),
+            ).findByText(/Aucune série trouvée/),
+        ).toBeTruthy();
         fireEvent.click(
-            await screen.findByRole('button', { name: 'Utiliser cette fiche' }),
+            screen.getByRole('button', { name: 'Comparer la fiche' }),
         );
+
+        // Champs vides : la valeur de la fiche, proposée d'office.
+        expect(
+            (
+                (await screen.findByRole('radio', {
+                    name: 'Genres : Wikipédia',
+                })) as HTMLInputElement
+            ).checked,
+        ).toBe(true);
+        fireEvent.click(screen.getByRole('button', { name: 'Appliquer' }));
 
         expect(pillsOf('Genres')).toEqual(['Science-fiction']);
         // Puis les noms de fichiers : numéros, titres, années.
@@ -445,37 +500,11 @@ describe('MetadataEditor', () => {
         ).toBe('Tome 2');
     });
 
-    it('fills from Manga-news: sorted genres, themes, age and format', async () => {
-        mockServer();
-        const fetchMock = vi.mocked(fetch);
-        const answer = fetchMock.getMockImplementation()!;
-        fetchMock.mockImplementation(async (input, init) => {
-            const url = String(input);
-            const body = url.includes('/manga-news/search')
-                ? [{ id: 'Gantz', title: 'Gantz', year: 2000 }]
-                : url.includes('/manga-news/series')
-                  ? {
-                        id: 'Gantz',
-                        title: 'Gantz',
-                        url: 'https://www.manga-news.com/index.php/serie/Gantz',
-                        originalTitle: 'Gantz',
-                        summary: 'Des aliens.',
-                        genres: ['Suspense', 'Science-fiction'],
-                        themes: ['aliens'],
-                        writer: 'Hiroya OKU',
-                        penciller: 'Hiroya OKU',
-                        publisher: 'Tonkam',
-                        format: 'manga',
-                        age: 16,
-                        ageRating: 'Mature 17+',
-                        volumeCount: 37,
-                        ongoing: false,
-                    }
-                  : undefined;
-            if (!body) return answer(input, init);
-            return new Response(JSON.stringify(body), {
-                headers: { 'Content-Type': 'application/json' },
-            });
+    it('fills from Manga-news: sorted genres, themes, age, format, and keeps the sheet', async () => {
+        mockServer({
+            'manga-news/search': [{ id: 'Gantz', title: 'Gantz', year: 2000 }],
+            'manga-news/series': MANGA_NEWS_GANTZ,
+            'wikipedia/search': [],
         });
         const save = vi.fn().mockResolvedValue({});
         const saveStatus = vi.fn().mockResolvedValue({});
@@ -501,23 +530,29 @@ describe('MetadataEditor', () => {
         fireEvent.click(
             await screen.findByRole('button', { name: 'Rechercher' }),
         );
-        fireEvent.click(await screen.findByRole('button', { name: /Gantz/ }));
         expect(await screen.findByText('Âge conseillé : 16+')).toBeTruthy();
         fireEvent.click(
-            screen.getByRole('button', { name: 'Utiliser cette fiche' }),
+            screen.getByRole('button', { name: 'Comparer la fiche' }),
+        );
+        fireEvent.click(
+            await screen.findByRole('button', { name: 'Appliquer' }),
         );
 
         // « Suspense » rangé dans « Thriller ».
         expect(pillsOf('Genres')).toEqual(['Thriller', 'Science-fiction']);
         expect(pillsOf('Thèmes')).toEqual(['aliens']);
+        // Lien vers la fiche, gardé avec la série.
+        expect(screen.getByRole('link', { name: 'Manga-news' })).toBeTruthy();
         await act(async () => {
             fireEvent.click(
-                screen.getByRole('button', { name: /Enregistrer/ }),
+                screen.getByRole('button', { name: /^Enregistrer/ }),
             );
         });
 
         const changes = (
-            requests[requests.length - 1]?.[2] as {
+            [...requests]
+                .reverse()
+                .find(([method]) => method === 'PUT')?.[2] as {
                 updates: { changes: Record<string, unknown> }[];
             }
         ).updates[0]?.changes;
@@ -529,8 +564,103 @@ describe('MetadataEditor', () => {
         });
         expect(saveStatus).toHaveBeenCalledWith('completed');
         // Format retrouvé parmi ceux des réglages, âge exact gardé dans Bento.
-        expect(save).toHaveBeenCalledWith({ formatId: 1, age: 16 });
+        expect(save).toHaveBeenCalledWith({
+            formatId: 1,
+            age: 16,
+            sources: [{ site: 'manga-news', id: 'Gantz' }],
+        });
         expect(screen.getByText('Format et âge enregistrés.')).toBeTruthy();
+        expect(screen.getByText('Fiches en ligne enregistrées.')).toBeTruthy();
+    });
+
+    it('compares two sheets field by field, and rereads the saved ones', async () => {
+        mockServer({
+            'manga-news/series': MANGA_NEWS_GANTZ,
+            'wikipedia/7': WIKI_GANTZ,
+        });
+        render(
+            <MantineProvider>
+                <MetadataEditor
+                    libraryId={1}
+                    kind="manga"
+                    mode="series"
+                    volumes={volumes()}
+                    classification={{
+                        formatId: 1,
+                        age: 16,
+                        sources: [
+                            { site: 'manga-news', id: 'Gantz' },
+                            { site: 'wikipedia', id: '7' },
+                        ],
+                        save: vi.fn().mockResolvedValue({}),
+                    }}
+                    onChanged={() => {}}
+                />
+            </MantineProvider>,
+        );
+
+        // Fiches déjà choisies : relues sans recherche.
+        fireEvent.click(screen.getByRole('button', { name: /Mettre à jour/ }));
+        const writerFrom = async (site: string) =>
+            (await screen.findByRole('radio', {
+                name: `Scénario : ${site}`,
+            })) as HTMLInputElement;
+        // Champ vide, deux valeurs : celle du site préféré (Manga-news).
+        expect((await writerFrom('Manga-news')).checked).toBe(true);
+        fireEvent.click(await writerFrom('Wikipédia'));
+        // Format et âge déjà ceux des fiches : pas de ligne.
+        expect(screen.queryByRole('radio', { name: /^Format/ })).toBeNull();
+        fireEvent.click(screen.getByRole('button', { name: 'Appliquer' }));
+
+        expect(
+            (
+                screen.getByRole('textbox', {
+                    name: 'Scénario',
+                }) as HTMLInputElement
+            ).value,
+        ).toBe('Hiroya Oku');
+        expect(requests.filter(([, url]) => url.includes('/search'))).toEqual(
+            [],
+        );
+    });
+
+    it('saves, then goes to the next series to classify', async () => {
+        mockServer();
+        const go = vi.fn();
+        render(
+            <MantineProvider>
+                <MetadataEditor
+                    libraryId={1}
+                    kind="manga"
+                    mode="series"
+                    volumes={volumes()}
+                    next={{ name: 'Mashle', go }}
+                    onChanged={() => {}}
+                />
+            </MantineProvider>,
+        );
+        const next = screen.getByRole('button', { name: 'Suivante' });
+        expect(next.getAttribute('title')).toBe('Série suivante : Mashle');
+
+        fireEvent.change(numberOf(1), { target: { value: '1' } });
+        await act(async () => {
+            fireEvent.click(
+                screen.getByRole('button', { name: 'Enregistrer et suivante' }),
+            );
+        });
+
+        expect(requests.some(([method]) => method === 'PUT')).toBe(true);
+        expect(go).toHaveBeenCalledTimes(1);
+    });
+
+    it('suggests the names already known', async () => {
+        render(<Editor />);
+        fireEvent.change(screen.getByRole('textbox', { name: 'Éditeur' }), {
+            target: { value: 'ton' },
+        });
+        expect(
+            await screen.findByRole('option', { name: 'Tonkam' }),
+        ).toBeTruthy();
     });
 
     it('saves the reading mode of a published series', async () => {
@@ -659,7 +789,11 @@ describe('MetadataEditor', () => {
             ).toBe('Gantz Perfect'),
         );
         expect(
-            (screen.getByLabelText('Scénario') as HTMLInputElement).value,
+            (
+                screen.getByRole('textbox', {
+                    name: 'Scénario',
+                }) as HTMLInputElement
+            ).value,
         ).toBe('Hiroya Oku');
         expect(
             await screen.findByText('1 tome(s) publié(s), le dernier : Tome 1'),
@@ -673,7 +807,11 @@ describe('MetadataEditor', () => {
         );
         expect(name()).toBe(initialName);
         expect(
-            (screen.getByLabelText('Scénario') as HTMLInputElement).value,
+            (
+                screen.getByRole('textbox', {
+                    name: 'Scénario',
+                }) as HTMLInputElement
+            ).value,
         ).toBe('');
 
         // « Annuler » efface aussi le choix de la série.

@@ -86,6 +86,10 @@ export const series = sqliteTable(
         // Âge minimal choisi dans Bento (grille des réglages) ; null = celui
         // déduit de la classification des tomes (`minAge`).
         age: integer('age'),
+        // Fiches en ligne choisies, séparées par une espace
+        // (« manga-news:Dr-Stone wikipedia:123 », voir
+        // `metadata/sourceLink.ts`) ; null = aucune.
+        sources: text('source'),
         writer: text('writer'),
         publisher: text('publisher'),
         createdAt: integer('created_at', { mode: 'timestamp' })
@@ -195,6 +199,7 @@ export const draftSettings = sqliteTable(
             onDelete: 'set null',
         }),
         age: integer('age'),
+        sources: text('source'),
         // Couverture choisie (fichier covers/drafts/…) ; null = aucune.
         coverUpdatedAt: integer('cover_updated_at', { mode: 'timestamp_ms' }),
     },

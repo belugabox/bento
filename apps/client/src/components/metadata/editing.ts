@@ -1,7 +1,13 @@
 import {
     type ComicInfo,
     type GenreEntry,
+    METADATA_SOURCES,
+    type MetadataSource,
+    SHEET_FIELDS,
+    type SheetField,
+    type SourcePriority,
     classify,
+    genreKey,
     parseVolumeFileName,
 } from '@server/types';
 
@@ -221,94 +227,159 @@ export const sheetFromMangaNews = (series: MangaNewsSeries): SeriesSheet => ({
 });
 
 /**
- * Genres et thèmes après remplissage, rangés d'après la liste : « vide » se
- * juge sur ce que montre l'éditeur, pas sur le texte brut (un Genre
- * « Shonen » est un thème, un « Teen » disparaît : les genres sont vides).
+ * Valeurs d'une série comme l'éditeur les garde : texte, id du format, âge,
+ * statut, genres et thèmes rangés d'après la liste (« Suspense » devient
+ * « Thriller »). Une valeur vide n'y figure pas.
  */
-const fillGenres = (
-    current: { genre?: string; tags?: string },
+export type SheetValues = Partial<Record<SheetField, string>>;
+
+const withoutEmpty = (values: Record<string, string | undefined>) =>
+    Object.fromEntries(
+        Object.entries(values).filter(([, value]) => !!value?.trim()),
+    ) as SheetValues;
+
+/** Valeurs d'une fiche en ligne (le format parmi ceux des réglages). */
+export const sheetValues = (
     sheet: SeriesSheet,
     catalog: GenreEntry[],
-    overwrite: boolean,
-) => {
-    const now = classify(current.genre, current.tags, catalog);
-    const found = classify(sheet.genre, sheet.tags, catalog);
-    const takeGenres = (overwrite || !now.genres.length) && found.genres.length;
-    const takeThemes = (overwrite || !now.themes.length) && found.themes.length;
-    // Rien de la fiche : les champs restent tels quels.
-    if (!takeGenres && !takeThemes) return undefined;
-    return {
-        genre: (takeGenres ? found.genres : now.genres).join(', '),
-        tags: (takeThemes ? found.themes : now.themes).join(', '),
-    };
-};
-
-/**
- * Champs de série depuis une fiche en ligne. Le résumé ne va que sur le
- * premier tome. Sans `overwrite`, seuls les champs vides sont remplis. Avec
- * la liste des genres (`catalog`), genres et thèmes sont rangés et remplis
- * d'après ce que l'éditeur en montre.
- */
-export const fillFromSheet = (
-    edits: Edits,
-    paths: string[],
-    sheet: SeriesSheet,
-    overwrite: boolean,
-    catalog?: GenreEntry[],
-): Edits => {
-    const genres = catalog
-        ? fillGenres(
-              {
-                  genre: seriesValue(edits, paths, 'Genre'),
-                  tags: seriesValue(edits, paths, 'Tags'),
-              },
-              sheet,
-              catalog,
-              overwrite,
-          )
-        : undefined;
-    const values: Partial<Record<SeriesField, string | number | undefined>> = {
+    formats: { id: number; name: string }[],
+): SheetValues => {
+    const { genres, themes } = classify(sheet.genre, sheet.tags, catalog);
+    const wanted = sheet.format ? genreKey(sheet.format) : undefined;
+    const format = formats.find((f) => genreKey(f.name) === wanted);
+    return withoutEmpty({
         Series: sheet.title,
-        ...(!catalog && { Genre: sheet.genre, Tags: sheet.tags }),
+        Format: format && String(format.id),
+        Age: sheet.age === undefined ? undefined : String(sheet.age),
+        Status: sheet.status,
+        Genre: genres.join(', '),
+        Tags: themes.join(', '),
         Writer: sheet.writer,
         Penciller: sheet.penciller,
         Publisher: sheet.publisher,
-        AgeRating: sheet.ageRating,
-    };
+        Summary: sheet.summary,
+    });
+};
+
+/**
+ * Valeurs saisies dans les tomes : genres et thèmes rangés comme l'éditeur
+ * les montre (un Genre « Shonen » est un thème), résumé du premier tome.
+ */
+export const editedValues = (
+    edits: Edits,
+    paths: string[],
+    catalog: GenreEntry[],
+): SheetValues => {
+    const text = (field: SeriesField) =>
+        String(seriesValue(edits, paths, field) ?? '');
+    const { genres, themes } = classify(text('Genre'), text('Tags'), catalog);
+    const first = paths[0];
+    return withoutEmpty({
+        Series: text('Series'),
+        Genre: genres.join(', '),
+        Tags: themes.join(', '),
+        Writer: text('Writer'),
+        Penciller: text('Penciller'),
+        Publisher: text('Publisher'),
+        Summary: first ? edits[first]?.Summary : undefined,
+    });
+};
+
+/** Valeur gardée pour un champ : l'actuelle, ou celle d'une fiche. */
+export type SheetChoice = 'current' | MetadataSource;
+
+/** Une ligne du tableau de comparaison. */
+export type ComparisonRow = {
+    field: SheetField;
+    current?: string;
+    found: Partial<Record<MetadataSource, string>>;
+};
+
+const sameValue = (a?: string, b?: string) =>
+    (a ?? '').trim() === (b ?? '').trim();
+
+/**
+ * Lignes du tableau : les champs pour lesquels une fiche apporte une valeur
+ * différente de l'actuelle.
+ */
+export const comparisonRows = (
+    current: SheetValues,
+    sheets: { site: MetadataSource; values: SheetValues }[],
+): ComparisonRow[] =>
+    SHEET_FIELDS.flatMap((field) => {
+        const found = Object.fromEntries(
+            sheets
+                .filter((sheet) => sheet.values[field])
+                .map((sheet) => [sheet.site, sheet.values[field]]),
+        );
+        return Object.values(found).some(
+            (value) => !sameValue(value, current[field]),
+        )
+            ? [{ field, current: current[field], found }]
+            : [];
+    });
+
+/**
+ * Choix de départ : la valeur actuelle si le champ est rempli, sinon celle
+ * du site préféré pour ce champ (réglages), sinon celle de l'autre fiche.
+ */
+export const defaultChoice = (
+    row: ComparisonRow,
+    priority: SourcePriority,
+): SheetChoice => {
+    if (row.current) return 'current';
+    const preferred = priority[row.field];
+    if (row.found[preferred]) return preferred;
+    return METADATA_SOURCES.find((site) => row.found[site]) ?? 'current';
+};
+
+/** Nouvelles valeurs : celles des fiches choisies. */
+export const chosenValues = (
+    rows: ComparisonRow[],
+    choices: Partial<Record<SheetField, SheetChoice>>,
+): SheetValues =>
+    Object.fromEntries(
+        rows.flatMap((row) => {
+            const choice = choices[row.field];
+            const value =
+                choice && choice !== 'current' ? row.found[choice] : undefined;
+            return value === undefined ? [] : [[row.field, value]];
+        }),
+    );
+
+/**
+ * Applique aux tomes les valeurs choisies (champs du ComicInfo ; format,
+ * âge et statut sont réglés par l'éditeur). Genres et thèmes sont réécrits
+ * ensemble, rangés : un mot des fichiers rangé en thème le reste.
+ */
+export const applySheetValues = (
+    edits: Edits,
+    paths: string[],
+    values: SheetValues,
+    catalog: GenreEntry[],
+): Edits => {
     let next = edits;
-    for (const [field, value] of Object.entries(values) as [
-        SeriesField,
-        string | number,
-    ][]) {
-        if (isEmpty(value)) continue;
-        for (const path of paths) {
-            if (fillable(next[path]?.[field], overwrite)) {
-                next = setVolumeField(next, path, field, value as never);
-            }
+    for (const field of [
+        'Series',
+        'Writer',
+        'Penciller',
+        'Publisher',
+    ] as const) {
+        if (values[field] !== undefined) {
+            next = setSeriesField(next, field, values[field]);
         }
     }
-    // Genres et thèmes sur tous les tomes, rangés : un tome n'en garde pas
-    // d'autres que ceux affichés.
-    if (genres) {
-        for (const path of paths) {
-            next = setVolumeField(next, path, 'Genre', genres.genre);
-            next = setVolumeField(next, path, 'Tags', genres.tags);
-        }
+    if (values.Genre !== undefined || values.Tags !== undefined) {
+        const now = editedValues(next, paths, catalog);
+        next = setSeriesField(next, 'Genre', values.Genre ?? now.Genre);
+        next = setSeriesField(next, 'Tags', values.Tags ?? now.Tags);
     }
     const first = paths[0];
-    if (first && sheet.summary && fillable(next[first]?.Summary, overwrite)) {
-        next = setVolumeField(next, first, 'Summary', sheet.summary);
+    if (first && values.Summary !== undefined) {
+        next = setVolumeField(next, first, 'Summary', values.Summary);
     }
     return next;
 };
-
-/** Champs de série depuis Wikipédia (voir `fillFromSheet`). */
-export const fillFromWikipedia = (
-    edits: Edits,
-    paths: string[],
-    wiki: WikipediaSeries,
-    overwrite: boolean,
-): Edits => fillFromSheet(edits, paths, sheetFromWikipedia(wiki), overwrite);
 
 const same = (a: unknown, b: unknown) => String(a ?? '') === String(b ?? '');
 

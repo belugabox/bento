@@ -13,8 +13,7 @@ import {
 import { IconPencil, IconWand } from '@tabler/icons-react';
 import { Link } from 'react-router';
 
-import { compareNames } from '@server/types';
-
+import { toClassify } from '@/components/toClassify';
 import { fetchSeriesList, seriesCoverUrl } from '@/services/api';
 import { useQuery } from '@/services/useQuery';
 
@@ -29,9 +28,7 @@ export const ToClassifyPage = () => {
     if (error) return <Alert color="red">{error.message}</Alert>;
     if (!data) return <Loader mx="auto" />;
 
-    const series = data
-        .filter((s) => !s.formatId || s.age === null)
-        .sort((a, b) => compareNames(a.name, b.name));
+    const series = toClassify(data);
 
     return (
         <Stack>
@@ -39,7 +36,8 @@ export const ToClassifyPage = () => {
                 <Title order={2}>Séries à classer</Title>
                 <Text size="sm" c="dimmed">
                     Séries sans format ou sans âge. Sans âge, une série est
-                    masquée aux comptes limités (contrôle parental).
+                    masquée aux comptes limités (contrôle parental). Depuis
+                    l’éditeur, « Suivante » passe à la série d’après.
                 </Text>
             </div>
             {series.length === 0 ? (
@@ -105,7 +103,7 @@ export const ToClassifyPage = () => {
                                         >
                                             <Button
                                                 component={Link}
-                                                to={`/series/${s.id}/edit?fill=online`}
+                                                to={`/series/${s.id}/edit?fill=online&from=to-classify`}
                                                 size="xs"
                                                 variant="light"
                                                 leftSection={
@@ -116,7 +114,7 @@ export const ToClassifyPage = () => {
                                             </Button>
                                             <Button
                                                 component={Link}
-                                                to={`/series/${s.id}/edit`}
+                                                to={`/series/${s.id}/edit?from=to-classify`}
                                                 size="xs"
                                                 variant="default"
                                                 leftSection={

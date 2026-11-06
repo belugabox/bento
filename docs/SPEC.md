@@ -66,7 +66,7 @@ Bento est le serveur de lecture et de gestion des mangas et BD de la maison. Il 
 ### F. Gestion (admin)
 - **Brouillons** : liste des tomes et fiche de chaque tome avec sa couverture et son ComicInfo modifiable.
 - **Réglages de la future série dès les brouillons** : statut, mode de lecture et couverture, appliqués à la publication.
-- **Métadonnées** : recherche Wikipédia FR, remplissage depuis les noms de fichiers, option « écraser les valeurs existantes ».
+- **Métadonnées** : recherche sur Wikipédia FR et Manga-news à la fois, comparaison champ par champ (valeur actuelle ou celle d'une fiche, site préféré par champ dans les réglages), lien des fiches gardé pour les relire, remplissage depuis les noms de fichiers, suggestions des noms déjà connus.
 - **Classement** : format obligatoire, pris dans une liste gérée par l'admin (chacun avec son mode de lecture), et âge pris dans une grille réglable (Tout public, 8+, 10+, 12+, 14+, 16+, 18+ au départ), gardés dans Bento ; genres d'une liste gérée par l'admin (avec les autres noms qu'ils reconnaissent) et thèmes libres, dans `Genre` et `Tags` du ComicInfo.
 - **Manga-news** (fait pour les séries) : deuxième source de « Remplir », par défaut pour les mangas.
   - Série : auteurs, traducteurs, éditeurs VF et VO, type, genres, origine et année, **âge conseillé** (classification), résumé.
@@ -119,7 +119,7 @@ Bento est le serveur de lecture et de gestion des mangas et BD de la maison. Il 
 7. **Fiches à compléter** — fait :
    - **Complétude d'une série**, en pourcentage : part des informations remplies (nom, format, âge, statut, genres, scénario, dessin, éditeur, résumé, numéro et année de chaque tome au prorata). La couverture n'y compte pas : chaque série en a une, celle de son premier tome. Affichée dans l'éditeur (brouillons et séries, mise à jour pendant la saisie), et sur la fiche série pour l'admin tant qu'elle n'est pas à 100 %, avec la liste de ce qui manque.
    - **Taille totale d'une série** : somme des fichiers de ses tomes, sur la fiche série et dans les brouillons.
-   - **Séries à classer** : liste des séries sans format ou sans âge (masquées aux comptes limités), avec un lien vers leur éditeur et un bouton Manga-news par série (sur clic, jamais en masse).
+   - **Séries à classer** : liste des séries sans format ou sans âge (masquées aux comptes limités), avec un lien vers leur éditeur et un bouton Manga-news par série (sur clic, jamais en masse), puis « Enregistrer et suivante » dans l'éditeur.
 8. **Suggestions** : proposer des séries à lire, d'après les genres, les thèmes et les lectures de la famille, sans service extérieur. Elles marchent d'autant mieux que les séries sont classées.
    - **« Dans le même genre »** sur la fiche série : genres en commun (beaucoup), thèmes en commun (un peu), même format (un petit bonus) ; les séries déjà lues après les autres.
    - **« Lu par la famille »** sur l'accueil : séries finies ou bien avancées par un autre membre, pas commencées par la personne (« Léo a fini Mashle »).

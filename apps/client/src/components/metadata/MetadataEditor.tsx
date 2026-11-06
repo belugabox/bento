@@ -1,8 +1,10 @@
 import {
     ActionIcon,
     Alert,
+    Anchor,
     Button,
     Checkbox,
+    CloseButton,
     Grid,
     Group,
     Image,
@@ -20,10 +22,12 @@ import {
 import { useDisclosure } from '@mantine/hooks';
 import {
     IconArrowBackUp,
+    IconArrowRight,
     IconEye,
     IconFileText,
     IconFileZip,
     IconPhoto,
+    IconRefresh,
     IconUpload,
     IconWand,
 } from '@tabler/icons-react';
@@ -31,9 +35,13 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 
 import {
     type ComicInfo,
+    DEFAULT_SOURCE_PRIORITY,
+    SOURCE_LABELS,
+    type SheetField,
+    type SourceLink,
     classify,
-    genreKey,
     publicationPathOf,
+    sourceUrl,
 } from '@server/types';
 
 import { CompletenessBadge } from '@/components/CompletenessBadge';
@@ -54,9 +62,11 @@ import {
 } from '@/reader/navigation';
 import {
     type ClassificationChanges,
+    fetchCredits,
     fetchFilePageSizes,
     fetchFormats,
     fetchGenres,
+    fetchSettings,
     filePageUrl,
     publishFiles,
     saveComicInfo,
@@ -64,17 +74,21 @@ import {
 import { useQuery } from '@/services/useQuery';
 
 import { CompressionModal } from './CompressionModal';
+import { CreditInput } from './CreditInput';
 import { ExistingSeriesPicker } from './ExistingSeriesPicker';
 import { GenreFields } from './GenreFields';
 import { SeriesSearch } from './SeriesSearch';
+import { SheetComparison } from './SheetComparison';
 import {
     type EditableVolume,
     type Edits,
     type SeriesField,
     type SeriesStatus,
+    type SheetValues,
+    applySheetValues,
     changesOf,
+    editedValues,
     fillFromFileNames,
-    fillFromSheet,
     initialEdits,
     isFieldChanged,
     isMixed,
@@ -85,6 +99,7 @@ import {
     setSeriesField,
     setVolumeField,
 } from './editing';
+import { type FoundSeries, loadFound, sitesFor } from './onlineSheets';
 
 export type EditorVolume = EditableVolume & {
     /** Adresse de la couverture du tome. */
@@ -198,6 +213,18 @@ const STATUS_OPTIONS = [
     { value: UNKNOWN, label: 'Inconnu' },
 ];
 
+/** Une seule fiche par site : les nouvelles remplacent les anciennes. */
+const mergeSources = (links: SourceLink[], added: SourceLink[]) => [
+    ...links.filter((link) => !added.some((a) => a.site === link.site)),
+    ...added,
+];
+
+const sourcesKey = (links: SourceLink[]) =>
+    links
+        .map((link) => `${link.site}:${link.id}`)
+        .sort()
+        .join(' ');
+
 const SERIES_TEXT_FIELDS: { field: SeriesField; label: string }[] = [
     { field: 'Writer', label: 'Scénario' },
     { field: 'Penciller', label: 'Dessin' },
@@ -219,6 +246,7 @@ export const MetadataEditor = ({
     classification,
     cover,
     autoFill = false,
+    next,
 }: {
     libraryId: number;
     kind: 'manga' | 'comics';
@@ -248,12 +276,19 @@ export const MetadataEditor = ({
     classification?: {
         formatId: number | null;
         age: number | null;
+        /** Fiches en ligne choisies (Manga-news, Wikipédia). */
+        sources?: SourceLink[];
         save: (changes: ClassificationChanges) => Promise<unknown>;
     };
     /** Couverture de la série, et son choix. */
     cover?: { src?: string; disabled?: boolean; onEdit: () => void };
-    /** Ouvrir « Remplir », recherche lancée (série à classer). */
+    /**
+     * Ouvrir « Remplir », recherche lancée (série à classer) ; avec des
+     * fiches déjà choisies, elles sont relues et comparées.
+     */
     autoFill?: boolean;
+    /** Série suivante à traiter (« Séries à classer »). */
+    next?: { name: string; go: () => void };
 }) => {
     // Contenu des données reçues : le parent peut recréer la liste à chaque
     // rendu, seule une vraie nouveauté (enregistrement) doit tout reprendre.
@@ -267,9 +302,11 @@ export const MetadataEditor = ({
     // Modifications d'avant le choix d'une série existante (pour l'annuler).
     const beforeJoin = useRef<Edits>(undefined);
     const [pickerKey, setPickerKey] = useState(0);
-    const [overwrite, setOverwrite] = useState(false);
-    // Après Wikipédia, compléter numéros, titres et années des tomes.
+    // Après une fiche en ligne, compléter numéros, titres et années des tomes.
     const [alsoFileNames, setAlsoFileNames] = useState(true);
+    // Fiches trouvées, en cours de comparaison.
+    const [comparing, setComparing] = useState<FoundSeries[]>();
+    const [refreshing, setRefreshing] = useState(false);
     // Statut de la série (publiée) : « unknown » pour « inconnu ».
     const savedStatus = seriesStatus?.value ?? UNKNOWN;
     const [status, setStatus] = useState<string>(savedStatus);
@@ -295,9 +332,24 @@ export const MetadataEditor = ({
     const [ageValue, setAgeValue] = useState<string>(savedAge);
     useEffect(() => setAgeValue(savedAge), [savedAge]);
     const ageChanged = !!classification && ageValue !== savedAge;
+    // Fiches en ligne choisies pour la série.
+    const savedSources = useMemo(
+        () => classification?.sources ?? [],
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        [sourcesKey(classification?.sources ?? [])],
+    );
+    const [sourcesValue, setSourcesValue] = useState(savedSources);
+    useEffect(() => setSourcesValue(savedSources), [savedSources]);
+    const sourcesChanged =
+        !!classification &&
+        sourcesKey(sourcesValue) !== sourcesKey(savedSources);
     // Réglages de la série modifiés (enregistrés avec les tomes).
     const settingsChanged =
-        statusChanged || modeChanged || formatChanged || ageChanged;
+        statusChanged ||
+        modeChanged ||
+        formatChanged ||
+        ageChanged ||
+        sourcesChanged;
     const genres = useQuery(fetchGenres, []);
     const catalog = genres.data ?? [];
     const formats = useQuery(fetchFormats, []);
@@ -306,10 +358,26 @@ export const MetadataEditor = ({
         label: f.name,
     }));
     const ageSteps = useAgeSteps();
+    // Site préféré pour chaque champ (réglages), pour la comparaison.
+    const settings = useQuery(fetchSettings, []);
+    const priority =
+        settings.data?.settings.sourcePriority ?? DEFAULT_SOURCE_PRIORITY;
+    // Noms déjà connus : suggestions de Scénario, Dessin, Éditeur.
+    const credits = useQuery(() => fetchCredits(libraryId), [libraryId]);
+    const creditNames = (field: SeriesField) => {
+        const known = credits.data;
+        if (!known) return [];
+        return field === 'Publisher'
+            ? known.publishers
+            : [...new Set([...known.writers, ...known.pencillers])];
+    };
     // Action en cours : roue de chargement sur son seul bouton.
     const [busy, setBusy] = useState<'save' | 'publish'>();
     const [report, setReport] = useState<Report>();
-    const [finderOpened, finder] = useDisclosure(autoFill);
+    // Série à classer : recherche lancée, ou ses fiches relues.
+    const [finderOpened, finder] = useDisclosure(
+        autoFill && savedSources.length === 0,
+    );
     const [compressionOpened, compression] = useDisclosure(false);
     // Tome ouvert en aperçu de lecture.
     const [preview, setPreview] = useState<EditorVolume>();
@@ -424,6 +492,69 @@ export const MetadataEditor = ({
         );
     };
 
+    /** Valeurs actuelles, comparées aux fiches en ligne. */
+    const currentSheet: SheetValues = {
+        ...editedValues(edits, paths, catalog),
+        ...(classification && formatValue && { Format: formatValue }),
+        ...(classification && ageValue !== UNKNOWN && { Age: ageValue }),
+        ...(seriesStatus && status !== UNKNOWN && { Status: status }),
+    };
+    const display = (field: SheetField, value: string) =>
+        field === 'Format'
+            ? labelOf(formatOptions, value)
+            : field === 'Age'
+              ? ageLabel(Number(value))
+              : field === 'Status'
+                ? labelOf(STATUS_OPTIONS, value)
+                : value;
+
+    /** Valeurs choisies dans la comparaison, et les fiches gardées. */
+    const applyComparison = (values: SheetValues, found: FoundSeries[]) => {
+        setEdits((current) => {
+            const filled = applySheetValues(current, paths, values, catalog);
+            return alsoFileNames
+                ? fillFromFileNames(filled, readable, false)
+                : filled;
+        });
+        if (seriesStatus && values.Status) setStatus(values.Status);
+        if (!classification) return;
+        if (values.Format) setFormatValue(values.Format);
+        if (values.Age) chooseAge(values.Age);
+        setSourcesValue((current) =>
+            mergeSources(
+                current,
+                found.map((f) => ({ site: f.source, id: f.id })),
+            ),
+        );
+    };
+
+    /** Fiches déjà choisies, relues sur leur site puis comparées. */
+    const refresh = async () => {
+        setRefreshing(true);
+        setReport(undefined);
+        const results = await Promise.allSettled(sourcesValue.map(loadFound));
+        setRefreshing(false);
+        const loaded = results.flatMap((r) =>
+            r.status === 'fulfilled' ? [r.value] : [],
+        );
+        const errors = results.flatMap((r) =>
+            r.status === 'rejected' ? [(r.reason as Error).message] : [],
+        );
+        if (errors.length) {
+            setReport({
+                color: loaded.length ? 'orange' : 'red',
+                lines: errors,
+            });
+        }
+        if (loaded.length) setComparing(loaded);
+    };
+    // Série à classer avec des fiches : relues dès l'ouverture.
+    useEffect(() => {
+        if (autoFill && savedSources.length > 0) void refresh();
+        // Une seule fois, à l'ouverture.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
     // Complétude de la fiche, avec ce qui est saisi (pas encore enregistré).
     const completeness = completenessOf({
         name: String(series('Series')),
@@ -448,6 +579,7 @@ export const MetadataEditor = ({
     });
     const totalSize = volumes.reduce((sum, v) => sum + (v.size ?? 0), 0);
 
+    /** Enregistre tout ; vrai si tout s'est bien passé. */
     const save = async () => {
         setBusy('save');
         setReport(undefined);
@@ -471,7 +603,10 @@ export const MetadataEditor = ({
                 );
                 lines.push('Statut de la série enregistré.');
             }
-            if (classification && (formatChanged || ageChanged)) {
+            if (
+                classification &&
+                (formatChanged || ageChanged || sourcesChanged)
+            ) {
                 await classification.save({
                     ...(formatChanged && {
                         formatId: formatValue ? Number(formatValue) : null,
@@ -479,14 +614,18 @@ export const MetadataEditor = ({
                     ...(ageChanged && {
                         age: ageValue === UNKNOWN ? null : Number(ageValue),
                     }),
+                    ...(sourcesChanged && { sources: sourcesValue }),
                 });
-                lines.push(
-                    formatChanged && ageChanged
-                        ? 'Format et âge enregistrés.'
-                        : formatChanged
-                          ? 'Format enregistré.'
-                          : 'Âge enregistré.',
-                );
+                if (formatChanged || ageChanged) {
+                    lines.push(
+                        formatChanged && ageChanged
+                            ? 'Format et âge enregistrés.'
+                            : formatChanged
+                              ? 'Format enregistré.'
+                              : 'Âge enregistré.',
+                    );
+                }
+                if (sourcesChanged) lines.push('Fiches en ligne enregistrées.');
             }
             if (seriesMode && modeChanged) {
                 await seriesMode.save(
@@ -498,11 +637,21 @@ export const MetadataEditor = ({
             }
             setReport({ color, lines });
             onChanged();
+            return color === 'green';
         } catch (e) {
             setReport({ color: 'red', lines: [(e as Error).message] });
+            return false;
         } finally {
             setBusy(undefined);
         }
+    };
+
+    const dirty = changes.length > 0 || settingsChanged;
+    /** Enregistre (s'il y a lieu), puis passe à la série suivante. */
+    const saveAndNext = async () => {
+        if (!next) return;
+        if (dirty && !(await save())) return;
+        next.go();
     };
 
     const publish = async () => {
@@ -549,6 +698,17 @@ export const MetadataEditor = ({
                     >
                         Remplir
                     </Button>
+                    {sourcesValue.length > 0 && (
+                        <Button
+                            variant="default"
+                            leftSection={<IconRefresh size={16} />}
+                            loading={refreshing}
+                            onClick={() => void refresh()}
+                            title="Relire les fiches en ligne de la série et comparer"
+                        >
+                            Mettre à jour
+                        </Button>
+                    )}
                     <Button
                         variant="default"
                         leftSection={<IconFileZip size={16} />}
@@ -571,6 +731,7 @@ export const MetadataEditor = ({
                             setModeValue(savedMode);
                             setFormatValue(savedFormat);
                             setAgeValue(savedAge);
+                            setSourcesValue(savedSources);
                         }}
                     >
                         Annuler
@@ -606,6 +767,17 @@ export const MetadataEditor = ({
                             ? ` (${toMove.length})`
                             : ''}
                     </Button>
+                    {next && (
+                        <Button
+                            variant="light"
+                            rightSection={<IconArrowRight size={16} />}
+                            disabled={(dirty && formatMissing) || !!busy}
+                            title={`Série suivante : ${next.name}`}
+                            onClick={() => void saveAndNext()}
+                        >
+                            {dirty ? 'Enregistrer et suivante' : 'Suivante'}
+                        </Button>
+                    )}
                 </Group>
             </Group>
             {publishReason &&
@@ -639,6 +811,37 @@ export const MetadataEditor = ({
                             {volumes.length > 1 ? 's' : ''}
                             {totalSize > 0 && ` · ${formatSize(totalSize)}`}
                         </Text>
+                        {sourcesValue.length > 0 && (
+                            <Group gap={6}>
+                                <Text size="xs" c="dimmed">
+                                    Fiches :
+                                </Text>
+                                {sourcesValue.map((link) => (
+                                    <Group key={link.site} gap={0}>
+                                        <Anchor
+                                            href={sourceUrl(link)}
+                                            target="_blank"
+                                            size="xs"
+                                        >
+                                            {SOURCE_LABELS[link.site]}
+                                        </Anchor>
+                                        <CloseButton
+                                            size="xs"
+                                            aria-label={`Oublier la fiche ${SOURCE_LABELS[link.site]}`}
+                                            onClick={() =>
+                                                setSourcesValue((current) =>
+                                                    current.filter(
+                                                        (l) =>
+                                                            l.site !==
+                                                            link.site,
+                                                    ),
+                                                )
+                                            }
+                                        />
+                                    </Group>
+                                ))}
+                            </Group>
+                        )}
                     </Group>
                     {mode === 'drafts' && (
                         <ExistingSeriesPicker
@@ -741,15 +944,13 @@ export const MetadataEditor = ({
                                     key={field}
                                     span={{ base: 12, xs: 6, sm: 4 }}
                                 >
-                                    <TextInput
+                                    <CreditInput
                                         {...seriesField(field)}
                                         label={label}
+                                        names={creditNames(field)}
                                         value={String(series(field))}
-                                        onChange={(e) =>
-                                            setSeries(
-                                                field,
-                                                e.currentTarget.value,
-                                            )
+                                        onChange={(value) =>
+                                            setSeries(field, value)
                                         }
                                     />
                                 </Grid.Col>
@@ -1088,76 +1289,43 @@ export const MetadataEditor = ({
                 kind={kind}
                 autoSearch={autoFill}
                 initialQuery={String(series('Series'))}
-                onPick={({ sheet }) => {
-                    setEdits((current) => {
-                        // Genres et thèmes rangés d'après la liste des genres
-                        // (« Suspense » devient « Thriller »).
-                        const filled = fillFromSheet(
-                            current,
-                            paths,
-                            sheet,
-                            overwrite,
-                            catalog,
-                        );
-                        return alsoFileNames
-                            ? fillFromFileNames(filled, readable, overwrite)
-                            : filled;
-                    });
-                    if (sheet.status && (overwrite || status === UNKNOWN)) {
-                        setStatus(sheet.status);
-                    }
-                    if (!classification) return;
-                    // Format de la fiche, parmi ceux des réglages.
-                    const format = formats.data?.find(
-                        (f) =>
-                            !!sheet.format &&
-                            genreKey(f.name) === genreKey(sheet.format),
-                    );
-                    if (format && (overwrite || !formatValue)) {
-                        setFormatValue(String(format.id));
-                    }
-                    if (
-                        sheet.age !== undefined &&
-                        (overwrite || ageValue === UNKNOWN)
-                    ) {
-                        setAgeValue(String(sheet.age));
-                    }
-                }}
+                onCompare={setComparing}
                 footer={
-                    <Stack gap="xs">
-                        <Checkbox
-                            label="Puis compléter depuis les noms de fichiers (numéro, titre, année)"
-                            checked={alsoFileNames}
-                            onChange={(e) =>
-                                setAlsoFileNames(e.currentTarget.checked)
-                            }
-                        />
-                        <Checkbox
-                            label="Écraser les valeurs existantes"
-                            checked={overwrite}
-                            onChange={(e) =>
-                                setOverwrite(e.currentTarget.checked)
-                            }
-                        />
-                        <Group justify="flex-end">
-                            <Button
-                                variant="subtle"
-                                leftSection={<IconFileText size={16} />}
-                                onClick={() => {
-                                    setEdits((current) =>
-                                        fillFromFileNames(
-                                            current,
-                                            readable,
-                                            overwrite,
-                                        ),
-                                    );
-                                    finder.close();
-                                }}
-                            >
-                                Sans fiche en ligne : noms de fichiers seulement
-                            </Button>
-                        </Group>
-                    </Stack>
+                    <Group justify="flex-end">
+                        <Button
+                            variant="subtle"
+                            leftSection={<IconFileText size={16} />}
+                            onClick={() => {
+                                setEdits((current) =>
+                                    fillFromFileNames(current, readable, false),
+                                );
+                                finder.close();
+                            }}
+                        >
+                            Sans fiche en ligne : noms de fichiers seulement
+                        </Button>
+                    </Group>
+                }
+            />
+
+            <SheetComparison
+                found={comparing}
+                onClose={() => setComparing(undefined)}
+                current={currentSheet}
+                catalog={catalog}
+                formats={formats.data ?? []}
+                order={sitesFor(kind)}
+                priority={priority}
+                display={display}
+                onApply={(values) => applyComparison(values, comparing ?? [])}
+                footer={
+                    <Checkbox
+                        label="Puis compléter depuis les noms de fichiers (numéro, titre, année)"
+                        checked={alsoFileNames}
+                        onChange={(e) =>
+                            setAlsoFileNames(e.currentTarget.checked)
+                        }
+                    />
                 }
             />
         </Stack>

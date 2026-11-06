@@ -2,7 +2,12 @@ import { and, asc, count, eq, inArray, notInArray, sql } from 'drizzle-orm';
 import { rm } from 'node:fs/promises';
 import path from 'node:path';
 
-import { type ReadingMode, classify, genreKey } from '../classification';
+import {
+    type ReadingMode,
+    classify,
+    genreKey,
+    splitList,
+} from '../classification';
 import type { LibraryConfig } from '../config';
 import type { Db } from '../db';
 import {
@@ -12,6 +17,11 @@ import {
     series,
     volumes,
 } from '../db/schema';
+import {
+    type SourceLink,
+    parseSources,
+    sourcesText,
+} from '../metadata/sourceLink';
 import { notFound } from '../tools/errors';
 import { genreCatalog } from './genres';
 import { publicationPathOf } from './paths';
@@ -206,6 +216,7 @@ export const getSeries = (db: Db, viewer: Viewer, id: number) => {
             year: series.year,
             status: series.status,
             readingMode: series.readingMode,
+            sources: series.sources,
             writer: series.writer,
             publisher: series.publisher,
             ...listsOf(viewer),
@@ -249,10 +260,12 @@ export const getSeries = (db: Db, viewer: Viewer, id: number) => {
         .where(eq(volumes.seriesId, id))
         .orderBy(...volumeOrder)
         .all();
-    const { genre, tags, formatName, formatReadingMode, ...details } = row;
+    const { genre, tags, formatName, formatReadingMode, sources, ...details } =
+        row;
     return {
         ...details,
         format: formatName,
+        sources: parseSources(sources),
         ...classify(genre, tags, genreCatalog(db)),
         defaultReadingMode: defaultReadingMode(
             row.library.type,
@@ -388,20 +401,37 @@ export const defaultReadingMode = (
 ): ReadingMode =>
     formatReadingMode ?? (libraryType === 'manga' ? 'ltr-manga' : 'ltr');
 
-/** Format et âge d'une série, réglés dans Bento (null : pas choisis). */
+/**
+ * Format, âge et fiches en ligne d'une série, réglés dans Bento (null, ou
+ * liste vide : pas choisis).
+ */
 export const setSeriesClassification = (
     db: Db,
     id: number,
-    changes: { formatId?: number | null; age?: number | null },
+    {
+        sources,
+        ...changes
+    }: {
+        formatId?: number | null;
+        age?: number | null;
+        sources?: SourceLink[];
+    },
 ) => {
     const updated = db
         .update(series)
-        .set(changes)
+        .set({
+            ...changes,
+            ...(sources && { sources: sourcesText(sources) }),
+        })
         .where(eq(series.id, id))
-        .returning({ formatId: series.formatId, age: series.age })
+        .returning({
+            formatId: series.formatId,
+            age: series.age,
+            sources: series.sources,
+        })
         .get();
     if (!updated) throw notFound('Série introuvable');
-    return updated;
+    return { ...updated, sources: parseSources(updated.sources) };
 };
 
 /** Mode de lecture d'une série (null : celui de la bibliothèque). */
@@ -418,4 +448,36 @@ export const setSeriesReadingMode = (
         .get();
     if (!updated) throw notFound('Série introuvable');
     return updated;
+};
+
+/**
+ * Scénaristes, dessinateurs et éditeurs déjà présents dans les tomes d'une
+ * bibliothèque (une personne par nom, « A, B » compte pour deux) : les
+ * suggestions de l'éditeur, pour éviter les doublons d'écriture.
+ */
+export const listCredits = (db: Db, libraryId: number) => {
+    const valuesOf = (field: 'Writer' | 'Penciller' | 'Publisher') => {
+        const rows = db
+            .selectDistinct({
+                value: sql<
+                    string | null
+                >`json_extract(${volumes.comicInfo}, ${`$.${field}`})`,
+            })
+            .from(volumes)
+            .where(eq(volumes.libraryId, libraryId))
+            .all();
+        // Une seule écriture par nom, sans casse ni accents.
+        const names = new Map<string, string>();
+        for (const { value } of rows) {
+            for (const name of splitList(value)) {
+                names.set(genreKey(name), names.get(genreKey(name)) ?? name);
+            }
+        }
+        return [...names.values()].sort((a, b) => a.localeCompare(b, 'fr'));
+    };
+    return {
+        writers: valuesOf('Writer'),
+        pencillers: valuesOf('Penciller'),
+        publishers: valuesOf('Publisher'),
+    };
 };

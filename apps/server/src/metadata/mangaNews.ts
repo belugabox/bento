@@ -3,6 +3,7 @@ import { type CheerioAPI, load as cheerioLoad } from 'cheerio';
 import { genreKey } from '../classification';
 import { type AgeRating, ratingForAge } from '../library/ageRating';
 import { badGateway, badRequest, notFound } from '../tools/errors';
+import { mangaNewsSeriesUrl } from './sourceLink';
 
 // Métadonnées de séries depuis Manga-news. Le site n'a pas d'API : ses
 // pages sont lues à la demande de l'admin, une à la fois, jamais en masse.
@@ -44,8 +45,7 @@ export type MangaNewsSeries = {
     coverUrl?: string;
 };
 
-const seriesUrl = (id: string) =>
-    `${BASE_URL}/serie/${encodeURIComponent(id).replace(/%3A/gi, ':')}`;
+const seriesUrl = mangaNewsSeriesUrl;
 
 // Octets 0x80 à 0x9f de Windows-1252 (le reste est ISO-8859-1). Le
 // TextDecoder de Node 22 les lit en ISO-8859-1 : « ’ » y serait perdu.

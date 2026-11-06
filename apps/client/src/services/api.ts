@@ -1,6 +1,6 @@
 import { hc } from 'hono/client';
 
-import type { ApiType, ReadingMode } from '@server/types';
+import type { ApiType, ReadingMode, SourceLink } from '@server/types';
 
 /** Client typé de l'API (`/api`, servie par le même domaine). */
 export const api = hc<ApiType>('/api');
@@ -217,6 +217,7 @@ export const saveSettings = (changes: {
     scanIntervalMinutes?: number;
     appearance?: Partial<Settings['appearance']>;
     ages?: number[];
+    sourcePriority?: Partial<Settings['sourcePriority']>;
 }) => json(api.settings.$put({ json: changes }));
 
 /** Thème par défaut choisi par l'admin (lisible sans session). */
@@ -397,10 +398,14 @@ export const setSeriesReadingMode = (
         }),
     );
 
-/** Format et âge d'une série ou d'un dossier de brouillons (null : aucun). */
+/**
+ * Format, âge et fiches en ligne d'une série ou d'un dossier de brouillons
+ * (null, liste vide : aucun).
+ */
 export type ClassificationChanges = {
     formatId?: number | null;
     age?: number | null;
+    sources?: SourceLink[];
 };
 
 export const setSeriesClassification = (
@@ -425,6 +430,12 @@ export const setDraftClassification = (
             json: { folder, ...changes },
         }),
     );
+
+/** Noms déjà connus dans la bibliothèque (suggestions de l'éditeur). */
+export const fetchCredits = (library: number) =>
+    json(api.libraries[':id'].credits.$get(libraryId(library)));
+
+export type Credits = Awaited<ReturnType<typeof fetchCredits>>;
 
 /** Liste des genres, gérée par l'admin. */
 export const fetchGenres = () => json(api.genres.$get());

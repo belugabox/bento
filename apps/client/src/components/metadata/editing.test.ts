@@ -1,11 +1,16 @@
 import { describe, expect, it } from 'vitest';
 
+import { DEFAULT_SOURCE_PRIORITY } from '@server/types';
+
 import {
     type EditableVolume,
+    applySheetValues,
     changesOf,
+    chosenValues,
+    comparisonRows,
+    defaultChoice,
+    editedValues,
     fillFromFileNames,
-    fillFromSheet,
-    fillFromWikipedia,
     initialEdits,
     isFieldChanged,
     isMixed,
@@ -13,6 +18,8 @@ import {
     joinSeries,
     seriesValue,
     setSeriesField,
+    sheetFromWikipedia,
+    sheetValues,
     statusFromWikipedia,
 } from './editing';
 
@@ -124,87 +131,120 @@ describe('fillFromFileNames', () => {
     });
 });
 
-describe('fillFromWikipedia', () => {
-    it('fills empty series fields, and the summary of the first volume only', () => {
-        const edits = fillFromWikipedia(
-            initialEdits(volumes),
-            paths,
-            wiki,
-            false,
-        );
-        expect(edits[first]).toEqual({
-            Series: 'Spy x Family',
-            Number: '1',
-            Genre: 'Action',
+describe('comparison with online sheets', () => {
+    const catalog = [
+        { id: 1, name: 'Aventure', aliases: [] },
+        { id: 2, name: 'Fantastique', aliases: [] },
+        { id: 3, name: 'Thriller', aliases: ['Suspense'] },
+    ];
+    const formats = [{ id: 1, name: 'Manga' }];
+
+    it('reads a sheet as the editor keeps it', () => {
+        expect(
+            sheetValues(
+                {
+                    ...sheetFromWikipedia(wiki),
+                    genre: 'Suspense, Shōnen',
+                    format: 'manga',
+                    age: 12,
+                },
+                catalog,
+                formats,
+            ),
+        ).toEqual({
+            Series: 'Spy × Family',
+            Format: '1',
+            Age: '12',
+            Status: 'ongoing',
+            Genre: 'Thriller',
+            Tags: 'Shōnen',
             Writer: 'Tatsuya Endō',
             Penciller: 'Tatsuya Endō',
             Publisher: 'Kurokawa',
             Summary: 'Un espion.',
         });
-        expect(edits[second]?.Series).toBe('Spy × Family');
-        expect(edits[second]?.Summary).toBeUndefined();
     });
 
-    it('replaces existing values when asked', () => {
-        const edits = fillFromWikipedia(
+    it('reads the edited volumes, genres sorted as shown', () => {
+        const edits = setSeriesField(
             initialEdits(volumes),
-            paths,
-            wiki,
-            true,
+            'Genre',
+            'Shonen, Teen',
         );
-        expect(edits[first]?.Series).toBe('Spy × Family');
-    });
-});
-
-describe('fillFromSheet with the genre list', () => {
-    const catalog = [
-        { id: 1, name: 'Aventure', aliases: [] },
-        { id: 2, name: 'Fantastique', aliases: [] },
-    ];
-    const sheet = {
-        title: 'Dr. Stone',
-        genre: 'Aventure, Fantastique',
-        tags: 'survie',
-    };
-    const withGenre = (genre: string, tags?: string) =>
-        Object.fromEntries(
-            paths.map((path) => [path, { Genre: genre, Tags: tags }]),
-        );
-
-    it('fills genres hidden by a raw word that is a theme or an age', () => {
-        const edits = fillFromSheet(
-            withGenre('Shonen, Teen'),
-            paths,
-            sheet,
-            false,
-            catalog,
-        );
-        // « Shonen » est un thème déjà là, gardé ; « Teen » disparaît.
-        expect(edits[second]).toMatchObject({
-            Genre: 'Aventure, Fantastique',
+        // « Shonen » est un thème, « Teen » un âge : pas de genre.
+        expect(editedValues(edits, paths, catalog)).toEqual({
+            Series: 'Spy x Family',
             Tags: 'Shonen',
         });
     });
 
-    it('keeps genres already chosen, and leaves the fields untouched', () => {
-        const before = withGenre('Fantastique', 'robots');
-        const edits = fillFromSheet(before, paths, sheet, false, catalog);
-        expect(edits[first]?.Genre).toBe('Fantastique');
-        expect(edits[first]?.Tags).toBe('robots');
+    it('lists only the fields a sheet changes, the current value first', () => {
+        const rows = comparisonRows(
+            { Series: 'Spy x Family', Tags: 'aliens' },
+            [
+                {
+                    site: 'manga-news',
+                    values: { Series: 'Spy x Family', Writer: 'Endō' },
+                },
+                {
+                    site: 'wikipedia',
+                    values: { Series: 'Spy × Family', Writer: 'Tatsuya Endō' },
+                },
+            ],
+        );
+        expect(rows).toEqual([
+            {
+                field: 'Series',
+                current: 'Spy x Family',
+                found: {
+                    'manga-news': 'Spy x Family',
+                    wikipedia: 'Spy × Family',
+                },
+            },
+            {
+                field: 'Writer',
+                current: undefined,
+                found: { 'manga-news': 'Endō', wikipedia: 'Tatsuya Endō' },
+            },
+        ]);
+        const priority = {
+            ...DEFAULT_SOURCE_PRIORITY,
+            Writer: 'wikipedia' as const,
+        };
+        // Champ rempli : gardé ; vide : le site préféré pour ce champ.
+        expect(rows.map((row) => defaultChoice(row, priority))).toEqual([
+            'current',
+            'wikipedia',
+        ]);
+        // Le site préféré sans valeur : l'autre.
+        expect(
+            defaultChoice(
+                { field: 'Writer', found: { 'manga-news': 'Endō' } },
+                priority,
+            ),
+        ).toBe('manga-news');
+        expect(
+            chosenValues(rows, { Series: 'current', Writer: 'wikipedia' }),
+        ).toEqual({ Writer: 'Tatsuya Endō' });
     });
 
-    it('replaces genres and themes when asked', () => {
-        const edits = fillFromSheet(
-            withGenre('Fantastique', 'robots'),
+    it('applies the chosen values, keeping themes from the files', () => {
+        const edits = applySheetValues(
+            setSeriesField(initialEdits(volumes), 'Genre', 'Shonen'),
             paths,
-            sheet,
-            true,
+            {
+                Genre: 'Aventure, Fantastique',
+                Writer: 'Endō',
+                Summary: 'Un espion.',
+            },
             catalog,
         );
-        expect(edits[first]).toMatchObject({
+        expect(edits[second]).toEqual({
             Genre: 'Aventure, Fantastique',
-            Tags: 'survie',
+            Tags: 'Shonen',
+            Writer: 'Endō',
         });
+        expect(edits[first]?.Summary).toBe('Un espion.');
     });
 });
 

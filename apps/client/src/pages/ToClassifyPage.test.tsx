@@ -57,6 +57,6 @@ describe('ToClassifyPage', () => {
             within(rows[0]!)
                 .getByRole('link', { name: /Remplir/ })
                 .getAttribute('href'),
-        ).toBe('/series/2/edit?fill=online');
+        ).toBe('/series/2/edit?fill=online&from=to-classify');
     });
 });

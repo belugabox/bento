@@ -20,6 +20,7 @@ import type { Db } from './db';
 import {
     getSeries,
     getVolume,
+    listCredits,
     listLibraries,
     listSeries,
     savePageSizes,
@@ -70,6 +71,12 @@ import { type LibraryScanner, coverFile } from './library/scanner';
 import { readCover } from './library/smallCovers';
 import { getStats } from './library/stats';
 import { MangaNews } from './metadata/mangaNews';
+import {
+    METADATA_SOURCES,
+    isSourceId,
+    parseSources,
+    sourcesText,
+} from './metadata/sourceLink';
 import type { Wikipedia } from './metadata/wikipedia';
 import { SettingsStore, settingsUpdateSchema } from './settings';
 import { AppError, notFound } from './tools/errors';
@@ -111,10 +118,15 @@ const imageCache = (version?: string) =>
 
 const collectionBody = z.object({ name: z.string().trim().min(1).max(80) });
 
-// Format et âge d'une série, réglés dans Bento : null pour les retirer.
+// Format, âge et fiches en ligne d'une série, réglés dans Bento : null
+// (liste vide pour les fiches) pour les retirer.
+const sourceLink = z
+    .object({ site: z.enum(METADATA_SOURCES), id: z.string() })
+    .refine(isSourceId, 'Fiche en ligne invalide');
 const classificationBody = z.object({
     formatId: z.number().int().positive().nullable().optional(),
     age: z.number().int().min(0).max(99).nullable().optional(),
+    sources: z.array(sourceLink).max(METADATA_SOURCES.length).optional(),
 });
 
 const formatBody = z.object({
@@ -684,6 +696,13 @@ export const createApi = ({
         .get('/drafts/pending', requireAdmin, async (c) =>
             c.json({ series: await files.pendingSeries() }),
         )
+        // Noms déjà connus (suggestions de l'éditeur de métadonnées).
+        .get(
+            '/libraries/:id/credits',
+            requireAdmin,
+            zValidator('param', idParam),
+            (c) => c.json(listCredits(db, c.req.valid('param').id)),
+        )
         .get(
             '/libraries/:id/drafts',
             requireAdmin,
@@ -742,14 +761,25 @@ export const createApi = ({
                 classificationBody.extend({ folder: z.string().min(1) }),
             ),
             (c) => {
-                const { folder, ...changes } = c.req.valid('json');
+                const {
+                    folder,
+                    sources: links,
+                    ...changes
+                } = c.req.valid('json');
                 checkFormatId(db, changes.formatId);
-                const { formatId, age } = files.setDraftSettings(
+                const { formatId, age, sources } = files.setDraftSettings(
                     c.req.valid('param').id,
                     folder,
-                    changes,
+                    {
+                        ...changes,
+                        ...(links && { sources: sourcesText(links) }),
+                    },
                 );
-                return c.json({ formatId, age });
+                return c.json({
+                    formatId,
+                    age,
+                    sources: parseSources(sources),
+                });
             },
         )
         .get(
