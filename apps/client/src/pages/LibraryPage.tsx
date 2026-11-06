@@ -28,9 +28,10 @@ import {
     IconSearch,
     IconX,
 } from '@tabler/icons-react';
-import { type ReactNode, useState } from 'react';
+import { type ReactNode, useContext, useState } from 'react';
 import { useSearchParams } from 'react-router';
 
+import { SeriesCardMenu, VolumeCardMenu } from '@/components/CardMenus';
 import { CoverCard } from '@/components/CoverCard';
 import { volumeLabel } from '@/components/readingStatus';
 import {
@@ -55,6 +56,7 @@ import {
     fetchSeriesList,
     seriesCoverUrl,
 } from '@/services/api';
+import { UserContext } from '@/services/auth';
 import { useQuery } from '@/services/useQuery';
 
 // Largeur des vignettes des rangées (défilement horizontal).
@@ -76,13 +78,22 @@ const ShelfCard = ({
     volume,
     subtitle = volumeLabel(volume),
     progress,
+    onChanged,
 }: {
     volume: Pick<
         InProgressVolume,
-        'volumeId' | 'version' | 'seriesName' | 'number' | 'title'
+        | 'volumeId'
+        | 'version'
+        | 'seriesId'
+        | 'seriesName'
+        | 'number'
+        | 'title'
+        | 'page'
     >;
     subtitle?: string;
     progress?: number;
+    /** Après une action du menu (recharger l'accueil). */
+    onChanged: () => void;
 }) => (
     <Box w={SHELF_CARD_WIDTH} style={{ flexShrink: 0 }}>
         <CoverCard
@@ -91,6 +102,7 @@ const ShelfCard = ({
             title={volume.seriesName}
             subtitle={subtitle}
             progress={progress}
+            menu={<VolumeCardMenu volume={volume} onChanged={onChanged} />}
         />
     </Box>
 );
@@ -129,6 +141,7 @@ export const LibraryPage = () => {
     const format = params.get('format');
     const status = (params.get('status') as StatusFilter | null) ?? 'all';
 
+    const isAdmin = useContext(UserContext)?.role === 'admin';
     const libraries = useQuery(fetchLibraries, []);
     const inProgress = useQuery(fetchInProgress, []);
     const collections = useQuery(fetchCollections, []);
@@ -142,6 +155,11 @@ export const LibraryPage = () => {
         [libraryId, debouncedSearch],
     );
 
+    /** Après une action d'un menu ⋮ : reprises et séries à jour. */
+    const reloadHome = () => {
+        inProgress.reload();
+        series.reload();
+    };
     const update = (changes: Record<string, string>, fallback = '') =>
         setParams(
             (current) => {
@@ -233,6 +251,7 @@ export const LibraryPage = () => {
                             volume={volume}
                             subtitle={`${volumeLabel(volume)} · ${volume.readCount} / ${volume.volumeCount} lus`}
                             progress={seriesProgress(volume)}
+                            onChanged={reloadHome}
                         />
                     ))}
                 </Shelf>
@@ -476,6 +495,13 @@ export const LibraryPage = () => {
                             <CoverCard
                                 key={item.id}
                                 to={`/series/${item.id}`}
+                                menu={
+                                    <SeriesCardMenu
+                                        series={item}
+                                        isAdmin={isAdmin}
+                                        onChanged={reloadHome}
+                                    />
+                                }
                                 cover={seriesCoverUrl(item, 'small')}
                                 title={item.name}
                                 subtitle={

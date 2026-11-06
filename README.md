@@ -75,6 +75,10 @@ L'admin fixe le mode de chaque série dans « Modifier les métadonnées » (par
 ### Accueil, listes et collections
 
 - **Accueil** : « Reprendre la lecture » (pour chaque série entamée, le tome commencé ou, à défaut, le premier pas encore ouvert, avec l'avancement dans la série ; la plus récemment lue d'abord), puis toutes les séries. Les vignettes utilisent une version réduite des couvertures, créée à la première demande.
+- **Menu ⋮ des cartes** (en bas à droite) :
+  - sur une série : lire, reprendre ou relire ; marquer comme lue, lue jusqu'à un tome, ou non lue (après confirmation) ; ajouter à « À lire » ou l'en retirer ; modifier la série (admin) ;
+  - sur un tome de « Reprendre la lecture » : le marquer comme lu, le retirer de « Reprendre » (progression effacée), voir la série.
+  - Chaque action affiche un message avec « Annuler » pendant quelques secondes : la progression revient exactement comme avant, ordre de « Reprendre » compris.
 - **Filtres** : état de lecture (toutes, à lire, non lues, en cours, lues) ; le bouton « Filtres » pour la collection, le format, le genre et le statut de parution, affichés ensuite en pastilles qu'on retire d'un clic ; et le tri par nom ou par ajouts récents. Tout reste dans l'adresse.
 - **« À lire »** : le marque-page de la fiche série, propre à chacun ; « À lire » dans la barre « Séries » n'affiche que ces séries. (Les favoris ont été retirés.)
 - **Collections** : des sélections partagées créées par l'admin (menu de l'avatar, « Collections »), visibles de tous selon leur contrôle parental. Une série s'y ajoute depuis le menu ⋯ de sa fiche. Listes et collections suivent une série renommée à la publication.

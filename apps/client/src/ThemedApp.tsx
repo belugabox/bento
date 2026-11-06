@@ -1,4 +1,5 @@
 import { MantineProvider, createTheme } from '@mantine/core';
+import { Notifications } from '@mantine/notifications';
 import { useEffect, useMemo } from 'react';
 import { BrowserRouter } from 'react-router';
 
@@ -33,6 +34,7 @@ export const ThemedApp = () => {
     );
     return (
         <MantineProvider theme={theme} forceColorScheme={resolved}>
+            <Notifications position="bottom-center" />
             <BrowserRouter>
                 <App />
             </BrowserRouter>

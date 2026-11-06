@@ -363,8 +363,27 @@ export const setDraftReadingMode = (
     );
 
 /** Toute la série lue (`true`) ou non lue (progression effacée). */
-export const markSeriesRead = (seriesId: number, read: boolean) =>
-    json(api.series[':id'].read.$put({ ...id(seriesId), json: { read } }));
+/** Série lue ou non lue ; avec `upTo`, seulement jusqu'à ce tome. */
+export const markSeriesRead = (
+    seriesId: number,
+    read: boolean,
+    upTo?: number,
+) =>
+    json(
+        api.series[':id'].read.$put({
+            ...id(seriesId),
+            json: { read, ...(upTo !== undefined && { upTo }) },
+        }),
+    );
+
+/** Progression d'avant une action, renvoyée par le serveur pour l'annuler. */
+export type SavedProgress = Awaited<
+    ReturnType<typeof markSeriesRead>
+>['previous'][number];
+
+/** Annule une action : la progression redevient exactement celle d'avant. */
+export const restoreProgress = (items: SavedProgress[]) =>
+    json(api.progress.restore.$put({ json: { items } }));
 
 /** Mode de lecture d'une série (null : celui de la bibliothèque). */
 export const setSeriesReadingMode = (

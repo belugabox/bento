@@ -1,4 +1,4 @@
-import { and, desc, eq, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 
 import type { Db } from '../db';
 import { readProgress, series, volumes } from '../db/schema';
@@ -7,6 +7,103 @@ import { volumeOrder, volumeVersion } from './catalog';
 import { type Viewer, visibleTo } from './visibility';
 
 export type Progress = { page: number; completed: boolean };
+
+/**
+ * Progression exacte d'un tome (date comprise : l'ordre de « Reprendre la
+ * lecture » en dépend), pour annuler une action ; null = pas commencé.
+ */
+export type SavedProgress = {
+    volumeId: number;
+    progress: (Progress & { updatedAt: number }) | null;
+};
+
+/** Progression actuelle de tomes, telle qu'il faudra la remettre. */
+export const snapshotProgress = (
+    db: Db,
+    userId: number,
+    volumeIds: number[],
+): SavedProgress[] => {
+    const rows = new Map(
+        db
+            .select()
+            .from(readProgress)
+            .where(
+                and(
+                    eq(readProgress.userId, userId),
+                    inArray(readProgress.volumeId, volumeIds),
+                ),
+            )
+            .all()
+            .map((row) => [row.volumeId, row]),
+    );
+    return volumeIds.map((volumeId) => {
+        const row = rows.get(volumeId);
+        return {
+            volumeId,
+            progress: row
+                ? {
+                      page: row.page,
+                      completed: row.completed,
+                      updatedAt: row.updatedAt.getTime(),
+                  }
+                : null,
+        };
+    });
+};
+
+/**
+ * Remet la progression de tomes à l'identique (annulation d'une action).
+ * Les tomes masqués à la personne sont ignorés.
+ */
+export const restoreProgress = (
+    db: Db,
+    viewer: Viewer,
+    items: SavedProgress[],
+) => {
+    const visible = new Set(
+        db
+            .select({ id: volumes.id })
+            .from(volumes)
+            .innerJoin(series, eq(series.id, volumes.seriesId))
+            .where(
+                and(
+                    inArray(
+                        volumes.id,
+                        items.map((item) => item.volumeId),
+                    ),
+                    visibleTo(viewer),
+                ),
+            )
+            .all()
+            .map((v) => v.id),
+    );
+    db.transaction((tx) => {
+        for (const { volumeId, progress } of items) {
+            if (!visible.has(volumeId)) continue;
+            const where = and(
+                eq(readProgress.userId, viewer.id),
+                eq(readProgress.volumeId, volumeId),
+            );
+            if (!progress) {
+                tx.delete(readProgress).where(where).run();
+                continue;
+            }
+            const values = {
+                page: progress.page,
+                completed: progress.completed,
+                updatedAt: new Date(progress.updatedAt),
+            };
+            tx.insert(readProgress)
+                .values({ userId: viewer.id, volumeId, ...values })
+                .onConflictDoUpdate({
+                    target: [readProgress.userId, readProgress.volumeId],
+                    set: values,
+                })
+                .run();
+        }
+    });
+    return { restored: items.filter((i) => visible.has(i.volumeId)).length };
+};
 
 export const getProgress = (
     db: Db,
@@ -122,19 +219,26 @@ export const markSeries = (
     viewer: Viewer,
     seriesId: number,
     read: boolean,
+    upTo?: number,
 ) => {
-    const ids = db
+    const all = db
         .select({ id: volumes.id })
         .from(volumes)
         .innerJoin(series, eq(series.id, volumes.seriesId))
         .where(and(eq(series.id, seriesId), visibleTo(viewer)))
+        .orderBy(...volumeOrder)
         .all()
         .map((v) => v.id);
-    if (ids.length === 0) throw notFound('Série introuvable');
+    if (all.length === 0) throw notFound('Série introuvable');
+    // « Jusqu'au tome » : ce tome et ceux d'avant, dans l'ordre de la série.
+    const last = upTo === undefined ? all.length - 1 : all.indexOf(upTo);
+    if (last < 0) throw notFound('Tome introuvable dans cette série');
+    const ids = all.slice(0, last + 1);
+    const previous = snapshotProgress(db, viewer.id, ids);
     for (const id of ids) {
         saveProgress(db, viewer.id, id, { completed: read });
     }
-    return { volumes: ids.length, read };
+    return { volumes: ids.length, read, previous };
 };
 
 /**

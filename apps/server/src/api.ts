@@ -61,7 +61,9 @@ import {
     listContinue,
     listRecentVolumes,
     markSeries,
+    restoreProgress,
     saveProgress,
+    snapshotProgress,
 } from './library/progress';
 import { type LibraryScanner, coverFile } from './library/scanner';
 import { readCover } from './library/smallCovers';
@@ -402,7 +404,14 @@ export const createApi = ({
         .put(
             '/series/:id/read',
             zValidator('param', idParam),
-            zValidator('json', z.object({ read: z.boolean() })),
+            zValidator(
+                'json',
+                z.object({
+                    read: z.boolean(),
+                    // Seulement ce tome et ceux d'avant.
+                    upTo: z.number().int().positive().optional(),
+                }),
+            ),
             (c) =>
                 c.json(
                     markSeries(
@@ -410,7 +419,35 @@ export const createApi = ({
                         c.var.user,
                         c.req.valid('param').id,
                         c.req.valid('json').read,
+                        c.req.valid('json').upTo,
                     ),
+                ),
+        )
+        // Annulation : progression remise telle qu'elle était.
+        .put(
+            '/progress/restore',
+            zValidator(
+                'json',
+                z.object({
+                    items: z
+                        .array(
+                            z.object({
+                                volumeId: z.number().int().positive(),
+                                progress: z
+                                    .object({
+                                        page: z.number().int().min(0),
+                                        completed: z.boolean(),
+                                        updatedAt: z.number().int().min(0),
+                                    })
+                                    .nullable(),
+                            }),
+                        )
+                        .max(2000),
+                }),
+            ),
+            (c) =>
+                c.json(
+                    restoreProgress(db, c.var.user, c.req.valid('json').items),
                 ),
         )
         // Couverture de la série : celle choisie, sinon celle du premier tome.
@@ -517,6 +554,8 @@ export const createApi = ({
                     c.var.user,
                     c.req.valid('param').id,
                 );
+                // État d'avant, pour annuler (menus de l'accueil).
+                const [previous] = snapshotProgress(db, c.var.user.id, [id]);
                 return c.json({
                     progress: saveProgress(
                         db,
@@ -524,6 +563,7 @@ export const createApi = ({
                         id,
                         c.req.valid('json'),
                     ),
+                    previous: previous!,
                 });
             },
         )
