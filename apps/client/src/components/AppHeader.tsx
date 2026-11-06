@@ -24,11 +24,11 @@ import {
     IconActivity,
     IconChartBar,
     IconEye,
-    IconFolders,
     IconInbox,
     IconLogout,
     IconPalette,
     IconSettings,
+    IconTags,
     IconUsers,
 } from '@tabler/icons-react';
 import { useEffect, useState } from 'react';
@@ -310,19 +310,19 @@ const UserMenu = () => {
                     {isAdmin && (
                         <Menu.Item
                             component={Link}
-                            to="/users"
-                            leftSection={<IconUsers size={14} />}
+                            to="/to-classify"
+                            leftSection={<IconTags size={14} />}
                         >
-                            Comptes et contrôle parental
+                            Séries à classer
                         </Menu.Item>
                     )}
                     {isAdmin && (
                         <Menu.Item
                             component={Link}
-                            to="/collections"
-                            leftSection={<IconFolders size={14} />}
+                            to="/users"
+                            leftSection={<IconUsers size={14} />}
                         >
-                            Collections
+                            Comptes et contrôle parental
                         </Menu.Item>
                     )}
                     {isAdmin && (

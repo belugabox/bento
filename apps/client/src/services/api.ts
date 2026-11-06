@@ -1,6 +1,6 @@
 import { hc } from 'hono/client';
 
-import type { ApiType, ReadingMode } from '@server/types';
+import type { ApiType, ReadingMode, SourceLink } from '@server/types';
 
 /** Client typé de l'API (`/api`, servie par le même domaine). */
 export const api = hc<ApiType>('/api');
@@ -92,35 +92,6 @@ export type InProgressVolume = Awaited<
 /** Liste « à lire » de la personne. */
 export const setSeriesLists = (seriesId: number, lists: { toRead?: boolean }) =>
     json(api.series[':id'].lists.$put({ ...id(seriesId), json: lists }));
-
-// --- Collections partagées ----------------------------------------------------
-
-export const fetchCollections = () => json(api.collections.$get());
-
-export type Collection = Awaited<ReturnType<typeof fetchCollections>>[number];
-
-export const createCollection = (name: string) =>
-    json(api.collections.$post({ json: { name } }));
-
-export const renameCollection = (collectionId: number, name: string) =>
-    json(
-        api.collections[':id'].$patch({ ...id(collectionId), json: { name } }),
-    );
-
-export const deleteCollection = (collectionId: number) =>
-    json(api.collections[':id'].$delete(id(collectionId)));
-
-export const setCollectionMember = (
-    collectionId: number,
-    seriesId: number,
-    member: boolean,
-) =>
-    json(
-        api.collections[':id'].series[':seriesId'].$put({
-            param: { id: String(collectionId), seriesId: String(seriesId) },
-            json: { member },
-        }),
-    );
 
 export const fetchUsers = () => json(api.users.$get());
 
@@ -217,6 +188,7 @@ export const saveSettings = (changes: {
     scanIntervalMinutes?: number;
     appearance?: Partial<Settings['appearance']>;
     ages?: number[];
+    sourcePriority?: Partial<Settings['sourcePriority']>;
 }) => json(api.settings.$put({ json: changes }));
 
 /** Thème par défaut choisi par l'admin (lisible sans session). */
@@ -397,10 +369,14 @@ export const setSeriesReadingMode = (
         }),
     );
 
-/** Format et âge d'une série ou d'un dossier de brouillons (null : aucun). */
+/**
+ * Format, âge et fiches en ligne d'une série ou d'un dossier de brouillons
+ * (null, liste vide : aucun).
+ */
 export type ClassificationChanges = {
     formatId?: number | null;
     age?: number | null;
+    sources?: SourceLink[];
 };
 
 export const setSeriesClassification = (
@@ -425,6 +401,12 @@ export const setDraftClassification = (
             json: { folder, ...changes },
         }),
     );
+
+/** Noms déjà connus dans la bibliothèque (suggestions de l'éditeur). */
+export const fetchCredits = (library: number) =>
+    json(api.libraries[':id'].credits.$get(libraryId(library)));
+
+export type Credits = Awaited<ReturnType<typeof fetchCredits>>;
 
 /** Liste des genres, gérée par l'admin. */
 export const fetchGenres = () => json(api.genres.$get());

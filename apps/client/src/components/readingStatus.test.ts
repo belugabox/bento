@@ -4,7 +4,9 @@ import {
     type VolumeWithProgress,
     nextToRead,
     progressRatio,
+    volumeCountLabel,
     volumeLabel,
+    volumeShortLabel,
     volumeTitleOf,
 } from './readingStatus';
 
@@ -70,6 +72,51 @@ describe('volumeLabel', () => {
         expect(volumeLabel({ number: '12', title: 'X' })).toBe('Tome 12');
         expect(volumeLabel({ number: null, title: 'Bonus' })).toBe('Bonus');
         expect(volumeLabel({ number: null, title: null })).toBe('Hors-série');
+    });
+
+    it('names hors-séries and specials', () => {
+        expect(
+            volumeLabel({ number: '1', title: null, kind: 'hors-serie' }),
+        ).toBe('Hors-série 1');
+        expect(volumeLabel({ number: '2', title: null, kind: 'special' })).toBe(
+            'Spécial 2',
+        );
+        expect(
+            volumeTitleOf({ number: '1', title: 'Hors-série 1' }),
+        ).toBeNull();
+        expect(volumeTitleOf({ number: '1', title: 'HS 01' })).toBeNull();
+    });
+});
+
+describe('volumeCountLabel', () => {
+    it('counts each kind apart', () => {
+        expect(
+            volumeCountLabel([
+                ...Array.from({ length: 12 }, () => ({
+                    kind: 'volume' as const,
+                })),
+                { kind: 'special' },
+            ]),
+        ).toBe('12 tomes · 1 spécial');
+        expect(
+            volumeCountLabel([
+                {},
+                { kind: 'hors-serie' },
+                { kind: 'hors-serie' },
+            ]),
+        ).toBe('1 tome · 2 hors-séries');
+    });
+});
+
+describe('volumeShortLabel', () => {
+    it('fits a narrow card', () => {
+        expect(volumeShortLabel({ number: '12', title: null })).toBe('T12');
+        expect(
+            volumeShortLabel({ number: '1', title: null, kind: 'hors-serie' }),
+        ).toBe('HS1');
+        expect(volumeShortLabel({ number: null, title: 'Bonus' })).toBe(
+            'Bonus',
+        );
     });
 });
 

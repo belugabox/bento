@@ -7,7 +7,7 @@ import { isDraft } from './paths';
 
 export type DraftSettings = Pick<
     typeof draftSettings.$inferSelect,
-    'status' | 'readingMode' | 'formatId' | 'age' | 'coverUpdatedAt'
+    'status' | 'readingMode' | 'formatId' | 'age' | 'sources' | 'coverUpdatedAt'
 >;
 
 const NONE: DraftSettings = {
@@ -15,6 +15,7 @@ const NONE: DraftSettings = {
     readingMode: null,
     formatId: null,
     age: null,
+    sources: null,
     coverUpdatedAt: null,
 };
 

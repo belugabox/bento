@@ -197,6 +197,7 @@ export const DraftsPage = () => {
                                         classification={{
                                             formatId: draft?.formatId ?? null,
                                             age: draft?.age ?? null,
+                                            sources: draft?.sources ?? [],
                                             save: (changes) =>
                                                 setDraftClassification(
                                                     libraryId,
@@ -221,6 +222,7 @@ export const DraftsPage = () => {
                                             comicInfo: file.comicInfo,
                                             error: file.error,
                                             pageCount: file.pageCount,
+                                            size: file.size,
                                             cover: file.error
                                                 ? null
                                                 : fileCoverUrl(

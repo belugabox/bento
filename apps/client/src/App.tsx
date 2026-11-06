@@ -12,11 +12,6 @@ import { useCurrentUser } from '@/services/auth';
 
 // Pages de l'admin : chargées à la demande, les lecteurs n'en téléchargent
 // pas le code (éditeur, recherche de métadonnées…).
-const CollectionsPage = lazy(() =>
-    import('@/pages/CollectionsPage').then((m) => ({
-        default: m.CollectionsPage,
-    })),
-);
 const DraftsPage = lazy(() =>
     import('@/pages/DraftsPage').then((m) => ({ default: m.DraftsPage })),
 );
@@ -30,6 +25,11 @@ const SettingsPage = lazy(() =>
 );
 const StatsPage = lazy(() =>
     import('@/pages/StatsPage').then((m) => ({ default: m.StatsPage })),
+);
+const ToClassifyPage = lazy(() =>
+    import('@/pages/ToClassifyPage').then((m) => ({
+        default: m.ToClassifyPage,
+    })),
 );
 const UsersPage = lazy(() =>
     import('@/pages/UsersPage').then((m) => ({ default: m.UsersPage })),
@@ -91,6 +91,14 @@ export const App = () => (
                     }
                 />
                 <Route
+                    path="to-classify"
+                    element={
+                        <AdminOnly>
+                            <ToClassifyPage />
+                        </AdminOnly>
+                    }
+                />
+                <Route
                     path="stats"
                     element={
                         <AdminOnly>
@@ -111,14 +119,6 @@ export const App = () => (
                     element={
                         <AdminOnly>
                             <SettingsPage />
-                        </AdminOnly>
-                    }
-                />
-                <Route
-                    path="collections"
-                    element={
-                        <AdminOnly>
-                            <CollectionsPage />
                         </AdminOnly>
                     }
                 />

@@ -134,6 +134,27 @@
       "when": 1793976460141,
       "tag": "0018_seed_formats",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "6",
+      "when": 1793996911319,
+      "tag": "0019_metadata_source",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "6",
+      "when": 1793998987680,
+      "tag": "0020_volume_kind",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "6",
+      "when": 1793999000255,
+      "tag": "0021_rescan_special_volumes",
+      "breakpoints": true
     }
   ]
 }

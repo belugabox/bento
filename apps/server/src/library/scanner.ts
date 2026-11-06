@@ -16,6 +16,7 @@ import { TaskList } from '../tasks';
 import type { Logger } from '../tools/logger';
 import { seriesAge } from './ageRating';
 import { smallCoverFile } from './smallCovers';
+import { volumeNumbering } from './volumeKind';
 
 export type ScanResult = {
     added: number;
@@ -89,6 +90,9 @@ export const seriesKeyOf = (file: string, seriesName?: string) => {
     if (rest.length > 0) return first!;
     return seriesName ?? parseVolumeFileName(stem(file)).series ?? stem(file);
 };
+
+/** Tomes d'abord, puis hors-séries, puis spéciaux. */
+export const kindOrder = sql`case ${volumes.kind} when 'volume' then 0 when 'hors-serie' then 1 else 2 end`;
 
 const toSortNumber = (number?: string) => {
     const value = number === undefined ? NaN : Number.parseFloat(number);
@@ -230,13 +234,15 @@ export class LibraryScanner {
             .returning({ id: series.id })
             .get();
 
-        const number = comicInfo.Number ?? fromName.number;
+        // Type et numéro : « HS01 » est le hors-série 1.
+        const { kind, number } = volumeNumbering(comicInfo, fromName);
         const values = {
             libraryId,
             seriesId: seriesRow.id,
             file: archive.file,
             number: number ?? null,
             sortNumber: toSortNumber(number),
+            kind,
             title: comicInfo.Title ?? null,
             comicInfo,
             pageCount: pages.length,
@@ -340,6 +346,7 @@ export class LibraryScanner {
                 .from(volumes)
                 .where(eq(volumes.seriesId, row.id))
                 .orderBy(
+                    kindOrder,
                     sql`${volumes.sortNumber} is null`,
                     asc(volumes.sortNumber),
                     asc(volumes.file),

@@ -86,6 +86,10 @@ export const series = sqliteTable(
         // Âge minimal choisi dans Bento (grille des réglages) ; null = celui
         // déduit de la classification des tomes (`minAge`).
         age: integer('age'),
+        // Fiches en ligne choisies, séparées par une espace
+        // (« manga-news:Dr-Stone wikipedia:123 », voir
+        // `metadata/sourceLink.ts`) ; null = aucune.
+        sources: text('source'),
         writer: text('writer'),
         publisher: text('publisher'),
         createdAt: integer('created_at', { mode: 'timestamp' })
@@ -114,6 +118,11 @@ export const volumes = sqliteTable(
         number: text('number'),
         // Numéro en nombre, pour trier (« 12.5 » entre 12 et 13).
         sortNumber: real('sort_number'),
+        // Tome, hors-série ou spécial (`library/volumeKind.ts`) : chaque type
+        // a sa numérotation, hors-séries et spéciaux viennent après les tomes.
+        kind: text('kind', { enum: ['volume', 'hors-serie', 'special'] })
+            .notNull()
+            .default('volume'),
         title: text('title'),
         // ComicInfo.xml complet du tome ({} s'il n'en a pas).
         comicInfo: text('comic_info', { mode: 'json' })
@@ -195,6 +204,7 @@ export const draftSettings = sqliteTable(
             onDelete: 'set null',
         }),
         age: integer('age'),
+        sources: text('source'),
         // Couverture choisie (fichier covers/drafts/…) ; null = aucune.
         coverUpdatedAt: integer('cover_updated_at', { mode: 'timestamp_ms' }),
     },
@@ -222,7 +232,10 @@ export const seriesLists = sqliteTable(
     ],
 );
 
-/** Collections partagées, créées par l'admin (« Pour les enfants »). */
+/**
+ * Collections partagées (« Pour les enfants »), retirées de Bento le
+ * 6 novembre 2026 : les tables restent en base, inutilisées.
+ */
 export const collections = sqliteTable(
     'collections',
     {

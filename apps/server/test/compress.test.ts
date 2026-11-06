@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createApi } from '../src/api';
 import { listSeries } from '../src/library/catalog';
 import { CompressionQueue } from '../src/library/compression';
+import { DEFAULT_SOURCE_PRIORITY } from '../src/metadata/sourceLink';
 import { SettingsStore } from '../src/settings';
 import { authDeps, sessionCookie, setup, silent, writeCbz } from './helpers';
 
@@ -228,12 +229,14 @@ describe('settings', () => {
                 scanIntervalMinutes: 30,
                 appearance: { colorScheme: 'auto', accent: 'violet' },
                 ages: [0, 8, 10, 12, 14, 16, 18],
+                sourcePriority: DEFAULT_SOURCE_PRIORITY,
             },
             defaults: {
                 compression: { quality: 90, maxHeight: 2400 },
                 scanIntervalMinutes: 30,
                 appearance: { colorScheme: 'auto', accent: 'violet' },
                 ages: [0, 8, 10, 12, 14, 16, 18],
+                sourcePriority: DEFAULT_SOURCE_PRIORITY,
             },
         });
 
@@ -247,13 +250,19 @@ describe('settings', () => {
             compression: { quality: 70 },
             scanIntervalMinutes: 0,
             appearance: { accent: 'teal' },
+            // Un champ seulement : les autres gardent leur site.
+            sourcePriority: { Writer: 'wikipedia' },
         });
         expect((await changed.json()).settings).toEqual({
             compression: { quality: 70, maxHeight: 2400 },
             scanIntervalMinutes: 0,
             appearance: { colorScheme: 'auto', accent: 'teal' },
             ages: [0, 8, 10, 12, 14, 16, 18],
+            sourcePriority: { ...DEFAULT_SOURCE_PRIORITY, Writer: 'wikipedia' },
         });
+        expect((await put({ sourcePriority: { Writer: 'imdb' } })).status).toBe(
+            400,
+        );
         // Thème par défaut, lu sans session (page de connexion).
         expect(await (await api.request('/appearance')).json()).toEqual({
             colorScheme: 'auto',

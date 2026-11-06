@@ -1,4 +1,22 @@
-import { type ComicInfo, parseVolumeFileName } from '@server/types';
+import {
+    type ComicInfo,
+    type GenreEntry,
+    KIND_FORMATS,
+    METADATA_SOURCES,
+    type MetadataSource,
+    SHEET_FIELDS,
+    type SheetField,
+    type SourcePriority,
+    VOLUME_KIND_LABELS,
+    type VolumeKind,
+    classify,
+    genreKey,
+    kindOfWord,
+    parseVolumeFileName,
+    volumeNumbering,
+} from '@server/types';
+
+import { type KnownNames, cleanNames } from './credits';
 
 /** Champs communs à toute la série, appliqués à chaque tome. */
 export const SERIES_FIELDS = [
@@ -92,6 +110,34 @@ export const setVolumeField = <F extends keyof ComicInfo>(
     value: ComicInfo[F] | undefined,
 ): Edits => ({ ...edits, [path]: setField(edits[path] ?? {}, field, value) });
 
+/** Type d'un tome (tome, hors-série, spécial), d'après son ComicInfo. */
+export const volumeKindOf = (info: ComicInfo): VolumeKind =>
+    volumeNumbering(info).kind;
+
+/**
+ * Change le type d'un tome : gardé dans le champ `Format` du ComicInfo
+ * (retiré pour un tome) ; un numéro préfixé (« HS01 ») devient un nombre.
+ */
+export const setVolumeKind = (
+    edits: Edits,
+    path: string,
+    kind: VolumeKind,
+): Edits => {
+    const info = edits[path] ?? {};
+    let next = edits;
+    const { number } = volumeNumbering(info);
+    if (number && number !== info.Number?.trim()) {
+        next = setVolumeField(next, path, 'Number', number);
+    }
+    if (kind !== 'volume') {
+        return setVolumeField(next, path, 'Format', KIND_FORMATS[kind]);
+    }
+    // Un autre Format (« TPB ») n'est pas un type : gardé.
+    return kindOfWord(info.Format)
+        ? setVolumeField(next, path, 'Format', undefined)
+        : next;
+};
+
 /** Le champ peut être rempli : vide, ou remplacement demandé. */
 const fillable = (current: unknown, overwrite: boolean) =>
     overwrite || isEmpty(current);
@@ -114,10 +160,19 @@ export const fillFromFileNames = (
         if (parsed.number && fillable(info.Number, overwrite)) {
             next = setVolumeField(next, volume.path, 'Number', parsed.number);
         }
-        // Titre par défaut : « Tome N ».
-        const number = parsed.number ?? info.Number;
+        // « HS01 », « SP01 » : hors-série, spécial (type d'un tome sinon).
+        if (parsed.kind && (overwrite || !kindOfWord(info.Format))) {
+            next = setVolumeKind(next, volume.path, parsed.kind);
+        }
+        // Titre par défaut : « Tome N », « Hors-série N ».
+        const { kind, number } = volumeNumbering(next[volume.path] ?? {});
         if (number && fillable(info.Title, overwrite)) {
-            next = setVolumeField(next, volume.path, 'Title', `Tome ${number}`);
+            next = setVolumeField(
+                next,
+                volume.path,
+                'Title',
+                `${VOLUME_KIND_LABELS[kind]} ${number}`,
+            );
         }
         if (parsed.year && fillable(info.Year, overwrite)) {
             next = setVolumeField(next, volume.path, 'Year', parsed.year);
@@ -216,50 +271,163 @@ export const sheetFromMangaNews = (series: MangaNewsSeries): SeriesSheet => ({
 });
 
 /**
- * Champs de série depuis une fiche en ligne. Le résumé ne va que sur le
- * premier tome. Sans `overwrite`, seuls les champs vides sont remplis.
+ * Valeurs d'une série comme l'éditeur les garde : texte, id du format, âge,
+ * statut, genres et thèmes rangés d'après la liste (« Suspense » devient
+ * « Thriller »). Une valeur vide n'y figure pas.
  */
-export const fillFromSheet = (
+export type SheetValues = Partial<Record<SheetField, string>>;
+
+const withoutEmpty = (values: Record<string, string | undefined>) =>
+    Object.fromEntries(
+        Object.entries(values).filter(([, value]) => !!value?.trim()),
+    ) as SheetValues;
+
+/**
+ * Valeurs d'une fiche en ligne : le format parmi ceux des réglages, les
+ * noms nettoyés (`cleanNames`) d'après ceux déjà connus.
+ */
+export const sheetValues = (
+    sheet: SeriesSheet,
+    catalog: GenreEntry[],
+    formats: { id: number; name: string }[],
+    known: KnownNames = { people: [], publishers: [] },
+): SheetValues => {
+    const { genres, themes } = classify(sheet.genre, sheet.tags, catalog);
+    const wanted = sheet.format ? genreKey(sheet.format) : undefined;
+    const format = formats.find((f) => genreKey(f.name) === wanted);
+    return withoutEmpty({
+        Series: sheet.title,
+        Format: format && String(format.id),
+        Age: sheet.age === undefined ? undefined : String(sheet.age),
+        Status: sheet.status,
+        Genre: genres.join(', '),
+        Tags: themes.join(', '),
+        Writer: cleanNames(sheet.writer, known.people),
+        Penciller: cleanNames(sheet.penciller, known.people),
+        Publisher: cleanNames(sheet.publisher, known.publishers),
+        Summary: sheet.summary,
+    });
+};
+
+/**
+ * Valeurs saisies dans les tomes : genres et thèmes rangés comme l'éditeur
+ * les montre (un Genre « Shonen » est un thème), résumé du premier tome.
+ */
+export const editedValues = (
     edits: Edits,
     paths: string[],
-    sheet: SeriesSheet,
-    overwrite: boolean,
+    catalog: GenreEntry[],
+): SheetValues => {
+    const text = (field: SeriesField) =>
+        String(seriesValue(edits, paths, field) ?? '');
+    const { genres, themes } = classify(text('Genre'), text('Tags'), catalog);
+    const first = paths[0];
+    return withoutEmpty({
+        Series: text('Series'),
+        Genre: genres.join(', '),
+        Tags: themes.join(', '),
+        Writer: text('Writer'),
+        Penciller: text('Penciller'),
+        Publisher: text('Publisher'),
+        Summary: first ? edits[first]?.Summary : undefined,
+    });
+};
+
+/** Valeur gardée pour un champ : l'actuelle, ou celle d'une fiche. */
+export type SheetChoice = 'current' | MetadataSource;
+
+/** Une ligne du tableau de comparaison. */
+export type ComparisonRow = {
+    field: SheetField;
+    current?: string;
+    found: Partial<Record<MetadataSource, string>>;
+};
+
+const sameValue = (a?: string, b?: string) =>
+    (a ?? '').trim() === (b ?? '').trim();
+
+/**
+ * Lignes du tableau : les champs pour lesquels une fiche apporte une valeur
+ * différente de l'actuelle.
+ */
+export const comparisonRows = (
+    current: SheetValues,
+    sheets: { site: MetadataSource; values: SheetValues }[],
+): ComparisonRow[] =>
+    SHEET_FIELDS.flatMap((field) => {
+        const found = Object.fromEntries(
+            sheets
+                .filter((sheet) => sheet.values[field])
+                .map((sheet) => [sheet.site, sheet.values[field]]),
+        );
+        return Object.values(found).some(
+            (value) => !sameValue(value, current[field]),
+        )
+            ? [{ field, current: current[field], found }]
+            : [];
+    });
+
+/**
+ * Choix de départ : la valeur actuelle si le champ est rempli, sinon celle
+ * du site préféré pour ce champ (réglages), sinon celle de l'autre fiche.
+ */
+export const defaultChoice = (
+    row: ComparisonRow,
+    priority: SourcePriority,
+): SheetChoice => {
+    if (row.current) return 'current';
+    const preferred = priority[row.field];
+    if (row.found[preferred]) return preferred;
+    return METADATA_SOURCES.find((site) => row.found[site]) ?? 'current';
+};
+
+/** Nouvelles valeurs : celles des fiches choisies. */
+export const chosenValues = (
+    rows: ComparisonRow[],
+    choices: Partial<Record<SheetField, SheetChoice>>,
+): SheetValues =>
+    Object.fromEntries(
+        rows.flatMap((row) => {
+            const choice = choices[row.field];
+            const value =
+                choice && choice !== 'current' ? row.found[choice] : undefined;
+            return value === undefined ? [] : [[row.field, value]];
+        }),
+    );
+
+/**
+ * Applique aux tomes les valeurs choisies (champs du ComicInfo ; format,
+ * âge et statut sont réglés par l'éditeur). Genres et thèmes sont réécrits
+ * ensemble, rangés : un mot des fichiers rangé en thème le reste.
+ */
+export const applySheetValues = (
+    edits: Edits,
+    paths: string[],
+    values: SheetValues,
+    catalog: GenreEntry[],
 ): Edits => {
-    const values: Partial<Record<SeriesField, string | number | undefined>> = {
-        Series: sheet.title,
-        Genre: sheet.genre,
-        Tags: sheet.tags,
-        Writer: sheet.writer,
-        Penciller: sheet.penciller,
-        Publisher: sheet.publisher,
-        AgeRating: sheet.ageRating,
-    };
     let next = edits;
-    for (const [field, value] of Object.entries(values) as [
-        SeriesField,
-        string | number,
-    ][]) {
-        if (isEmpty(value)) continue;
-        for (const path of paths) {
-            if (fillable(next[path]?.[field], overwrite)) {
-                next = setVolumeField(next, path, field, value as never);
-            }
+    for (const field of [
+        'Series',
+        'Writer',
+        'Penciller',
+        'Publisher',
+    ] as const) {
+        if (values[field] !== undefined) {
+            next = setSeriesField(next, field, values[field]);
         }
     }
+    if (values.Genre !== undefined || values.Tags !== undefined) {
+        const now = editedValues(next, paths, catalog);
+        next = setSeriesField(next, 'Genre', values.Genre ?? now.Genre);
+        next = setSeriesField(next, 'Tags', values.Tags ?? now.Tags);
+    }
     const first = paths[0];
-    if (first && sheet.summary && fillable(next[first]?.Summary, overwrite)) {
-        next = setVolumeField(next, first, 'Summary', sheet.summary);
+    if (first && values.Summary !== undefined) {
+        next = setVolumeField(next, first, 'Summary', values.Summary);
     }
     return next;
 };
-
-/** Champs de série depuis Wikipédia (voir `fillFromSheet`). */
-export const fillFromWikipedia = (
-    edits: Edits,
-    paths: string[],
-    wiki: WikipediaSeries,
-    overwrite: boolean,
-): Edits => fillFromSheet(edits, paths, sheetFromWikipedia(wiki), overwrite);
 
 const same = (a: unknown, b: unknown) => String(a ?? '') === String(b ?? '');
 

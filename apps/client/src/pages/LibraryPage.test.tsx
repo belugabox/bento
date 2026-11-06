@@ -24,7 +24,6 @@ const SERIES = [
     coverUpdatedAt: null,
     coverVolumeId: index + 10,
     toRead: index === 1,
-    collectionIds: index === 0 ? [7] : [],
     ...s,
 }));
 
@@ -79,9 +78,6 @@ beforeEach(() => {
                 },
             ]);
         }
-        if (url === '/api/collections') {
-            return respond([{ id: 7, name: 'Classiques', seriesCount: 1 }]);
-        }
         if (url.startsWith('/api/series')) return respond(SERIES);
         throw new Error(`requête inattendue : ${url}`);
     });
@@ -107,7 +103,7 @@ describe('LibraryPage', () => {
 
         expect(await screen.findByText('Reprendre la lecture')).toBeTruthy();
         // Le tome en cours, et l'avancement dans la série.
-        expect(screen.getByText('Tome 2 · 1 / 3 lus')).toBeTruthy();
+        expect(screen.getByText('T2 · 1/3 lus')).toBeTruthy();
         // Un tome lu sur trois, plus la moitié du deuxième.
         expect(
             screen
@@ -145,7 +141,7 @@ describe('LibraryPage', () => {
     it('resumes with the next volume of a series, in the same row', async () => {
         show();
 
-        expect(await screen.findByText('Tome 4 · 3 / 6 lus')).toBeTruthy();
+        expect(await screen.findByText('T4 · 3/6 lus')).toBeTruthy();
         expect(screen.queryByText('La suite de tes séries')).toBeNull();
         expect(
             screen
@@ -159,7 +155,7 @@ describe('LibraryPage', () => {
         ).toBe(true);
     });
 
-    it('keeps the to-read list or a collection, in the address', async () => {
+    it('keeps the to-read list in the address', async () => {
         show();
         await screen.findByTestId('series-grid');
         await vi.waitFor(() => expect(titles()).toHaveLength(3));
@@ -168,21 +164,6 @@ describe('LibraryPage', () => {
         expect(titles()).toEqual(['/series/2']);
         expect(location).toBe('?filter=toread');
         fireEvent.click(screen.getByText('Toutes'));
-
-        fireEvent.click(screen.getByRole('button', { name: 'Filtres' }));
-        fireEvent.click(
-            await screen.findByRole('textbox', { name: 'Collection' }),
-        );
-        fireEvent.click(await screen.findByText('Classiques'));
-        // Filtre actif : en pastille, qu'on peut retirer.
-        expect(titles()).toEqual(['/series/1']);
-        expect(location).toBe('?list=collection%3A7');
-
-        fireEvent.click(
-            screen.getByRole('button', {
-                name: 'Retirer le filtre Classiques',
-            }),
-        );
         expect(titles()).toHaveLength(3);
         expect(location).toBe('');
     });

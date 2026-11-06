@@ -4,12 +4,26 @@ import { ACCENTS, COLOR_SCHEMES } from './appearance';
 import { DEFAULT_AGE_STEPS } from './classification';
 import type { Db } from './db';
 import { settings as settingsTable } from './db/schema';
+import {
+    DEFAULT_SOURCE_PRIORITY,
+    METADATA_SOURCES,
+    SHEET_FIELDS,
+    type SheetField,
+} from './metadata/sourceLink';
 
 const ageStepsSchema = z
     .array(z.number().int().min(0).max(21))
     .min(1)
     .max(22)
     .transform((ages) => [...new Set(ages)].sort((a, b) => a - b));
+
+// Site préféré pour chaque champ d'une fiche de série.
+const siteSchema = z.enum(METADATA_SOURCES);
+const sourcePrioritySchema = z.object(
+    Object.fromEntries(
+        SHEET_FIELDS.map((field) => [field, siteSchema]),
+    ) as unknown as Record<SheetField, typeof siteSchema>,
+);
 
 const appearanceSchema = z.object({
     // Mode et couleur de l'appli tant que l'appareil n'a pas les siens.
@@ -33,6 +47,7 @@ export const settingsSchema = z.object({
     appearance: appearanceSchema,
     // Grille d'âges proposée pour les séries et les comptes (0 : tout public).
     ages: ageStepsSchema,
+    sourcePriority: sourcePrioritySchema,
 });
 
 export type Settings = z.infer<typeof settingsSchema>;
@@ -43,6 +58,7 @@ export const settingsUpdateSchema = z.object({
     scanIntervalMinutes: settingsSchema.shape.scanIntervalMinutes.optional(),
     appearance: appearanceSchema.partial().optional(),
     ages: ageStepsSchema.optional(),
+    sourcePriority: sourcePrioritySchema.partial().optional(),
 });
 
 export type SettingsUpdate = z.infer<typeof settingsUpdateSchema>;
@@ -52,6 +68,7 @@ export const defaultSettings = (scanIntervalMinutes = 30): Settings => ({
     scanIntervalMinutes,
     appearance: { colorScheme: 'auto', accent: 'violet' },
     ages: DEFAULT_AGE_STEPS,
+    sourcePriority: DEFAULT_SOURCE_PRIORITY,
 });
 
 const KEY = 'settings';
@@ -82,6 +99,10 @@ export class SettingsStore {
                 ...this.defaults.appearance,
                 ...saved.appearance,
             },
+            sourcePriority: {
+                ...this.defaults.sourcePriority,
+                ...saved.sourcePriority,
+            },
         };
         const parsed = settingsSchema.safeParse(merged);
         return parsed.success ? parsed.data : this.defaults;
@@ -94,6 +115,10 @@ export class SettingsStore {
             ...changes,
             compression: { ...current.compression, ...changes.compression },
             appearance: { ...current.appearance, ...changes.appearance },
+            sourcePriority: {
+                ...current.sourcePriority,
+                ...changes.sourcePriority,
+            },
         });
         this.db
             .insert(settingsTable)

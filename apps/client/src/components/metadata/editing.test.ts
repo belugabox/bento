@@ -1,10 +1,16 @@
 import { describe, expect, it } from 'vitest';
 
+import { DEFAULT_SOURCE_PRIORITY } from '@server/types';
+
 import {
     type EditableVolume,
+    applySheetValues,
     changesOf,
+    chosenValues,
+    comparisonRows,
+    defaultChoice,
+    editedValues,
     fillFromFileNames,
-    fillFromWikipedia,
     initialEdits,
     isFieldChanged,
     isMixed,
@@ -12,7 +18,11 @@ import {
     joinSeries,
     seriesValue,
     setSeriesField,
+    setVolumeKind,
+    sheetFromWikipedia,
+    sheetValues,
     statusFromWikipedia,
+    volumeKindOf,
 } from './editing';
 
 const volumes: EditableVolume[] = [
@@ -93,6 +103,55 @@ describe('fillFromFileNames', () => {
         });
     });
 
+    it('reads hors-séries and specials (HS01, SP01)', () => {
+        const specials: EditableVolume[] = [
+            {
+                path: '_draft/Gantz/Gantz HS01 (2010).cbz',
+                name: 'Gantz HS01 (2010).cbz',
+                comicInfo: {},
+            },
+            {
+                path: '_draft/Gantz/Gantz SP02.cbz',
+                name: 'Gantz SP02.cbz',
+                // Ancienne écriture du numéro, préfixé.
+                comicInfo: { Number: 'SP02' },
+            },
+        ];
+        const edits = fillFromFileNames(
+            initialEdits(specials),
+            specials,
+            false,
+        );
+        expect(edits[specials[0]!.path]).toEqual({
+            Series: 'Gantz',
+            Number: '1',
+            Format: 'Hors-série',
+            Title: 'Hors-série 1',
+            Year: 2010,
+        });
+        expect(edits[specials[1]!.path]).toMatchObject({
+            Number: '2',
+            Format: 'Spécial',
+            Title: 'Spécial 2',
+        });
+    });
+
+    it('changes the kind of a volume in its Format field', () => {
+        const edits = { [first]: { Number: 'HS01', Format: 'TPB' } };
+        expect(volumeKindOf(edits[first])).toBe('hors-serie');
+        const special = setVolumeKind(edits, first, 'special');
+        expect(special[first]).toEqual({ Number: '1', Format: 'Spécial' });
+        expect(setVolumeKind(special, first, 'volume')[first]).toEqual({
+            Number: '1',
+        });
+        // Un autre Format n'est pas un type : gardé.
+        expect(
+            setVolumeKind({ [first]: { Format: 'TPB' } }, first, 'volume')[
+                first
+            ],
+        ).toEqual({ Format: 'TPB' });
+    });
+
     it('puts back an article written after the series name', () => {
         const boxer: EditableVolume[] = [
             {
@@ -123,35 +182,120 @@ describe('fillFromFileNames', () => {
     });
 });
 
-describe('fillFromWikipedia', () => {
-    it('fills empty series fields, and the summary of the first volume only', () => {
-        const edits = fillFromWikipedia(
-            initialEdits(volumes),
-            paths,
-            wiki,
-            false,
-        );
-        expect(edits[first]).toEqual({
-            Series: 'Spy x Family',
-            Number: '1',
-            Genre: 'Action',
+describe('comparison with online sheets', () => {
+    const catalog = [
+        { id: 1, name: 'Aventure', aliases: [] },
+        { id: 2, name: 'Fantastique', aliases: [] },
+        { id: 3, name: 'Thriller', aliases: ['Suspense'] },
+    ];
+    const formats = [{ id: 1, name: 'Manga' }];
+
+    it('reads a sheet as the editor keeps it', () => {
+        expect(
+            sheetValues(
+                {
+                    ...sheetFromWikipedia(wiki),
+                    genre: 'Suspense, Shōnen',
+                    format: 'manga',
+                    age: 12,
+                },
+                catalog,
+                formats,
+            ),
+        ).toEqual({
+            Series: 'Spy × Family',
+            Format: '1',
+            Age: '12',
+            Status: 'ongoing',
+            Genre: 'Thriller',
+            Tags: 'Shōnen',
             Writer: 'Tatsuya Endō',
             Penciller: 'Tatsuya Endō',
             Publisher: 'Kurokawa',
             Summary: 'Un espion.',
         });
-        expect(edits[second]?.Series).toBe('Spy × Family');
-        expect(edits[second]?.Summary).toBeUndefined();
     });
 
-    it('replaces existing values when asked', () => {
-        const edits = fillFromWikipedia(
+    it('reads the edited volumes, genres sorted as shown', () => {
+        const edits = setSeriesField(
             initialEdits(volumes),
-            paths,
-            wiki,
-            true,
+            'Genre',
+            'Shonen, Teen',
         );
-        expect(edits[first]?.Series).toBe('Spy × Family');
+        // « Shonen » est un thème, « Teen » un âge : pas de genre.
+        expect(editedValues(edits, paths, catalog)).toEqual({
+            Series: 'Spy x Family',
+            Tags: 'Shonen',
+        });
+    });
+
+    it('lists only the fields a sheet changes, the current value first', () => {
+        const rows = comparisonRows(
+            { Series: 'Spy x Family', Tags: 'aliens' },
+            [
+                {
+                    site: 'manga-news',
+                    values: { Series: 'Spy x Family', Writer: 'Endō' },
+                },
+                {
+                    site: 'wikipedia',
+                    values: { Series: 'Spy × Family', Writer: 'Tatsuya Endō' },
+                },
+            ],
+        );
+        expect(rows).toEqual([
+            {
+                field: 'Series',
+                current: 'Spy x Family',
+                found: {
+                    'manga-news': 'Spy x Family',
+                    wikipedia: 'Spy × Family',
+                },
+            },
+            {
+                field: 'Writer',
+                current: undefined,
+                found: { 'manga-news': 'Endō', wikipedia: 'Tatsuya Endō' },
+            },
+        ]);
+        const priority = {
+            ...DEFAULT_SOURCE_PRIORITY,
+            Writer: 'wikipedia' as const,
+        };
+        // Champ rempli : gardé ; vide : le site préféré pour ce champ.
+        expect(rows.map((row) => defaultChoice(row, priority))).toEqual([
+            'current',
+            'wikipedia',
+        ]);
+        // Le site préféré sans valeur : l'autre.
+        expect(
+            defaultChoice(
+                { field: 'Writer', found: { 'manga-news': 'Endō' } },
+                priority,
+            ),
+        ).toBe('manga-news');
+        expect(
+            chosenValues(rows, { Series: 'current', Writer: 'wikipedia' }),
+        ).toEqual({ Writer: 'Tatsuya Endō' });
+    });
+
+    it('applies the chosen values, keeping themes from the files', () => {
+        const edits = applySheetValues(
+            setSeriesField(initialEdits(volumes), 'Genre', 'Shonen'),
+            paths,
+            {
+                Genre: 'Aventure, Fantastique',
+                Writer: 'Endō',
+                Summary: 'Un espion.',
+            },
+            catalog,
+        );
+        expect(edits[second]).toEqual({
+            Genre: 'Aventure, Fantastique',
+            Tags: 'Shonen',
+            Writer: 'Endō',
+        });
+        expect(edits[first]?.Summary).toBe('Un espion.');
     });
 });
 

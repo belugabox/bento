@@ -15,7 +15,6 @@ import {
     Title,
     Tooltip,
 } from '@mantine/core';
-import { useDisclosure } from '@mantine/hooks';
 import {
     IconArrowLeft,
     IconBookmark,
@@ -23,7 +22,6 @@ import {
     IconCheck,
     IconChecks,
     IconDots,
-    IconFolders,
     IconPencil,
     IconPlayerPlay,
     IconRestore,
@@ -31,12 +29,17 @@ import {
 import { useState } from 'react';
 import { Link, useParams } from 'react-router';
 
-import { CollectionsModal } from '@/components/CollectionsModal';
+import { VOLUME_KINDS } from '@server/types';
+
+import { CompletenessBadge } from '@/components/CompletenessBadge';
 import { CoverCard } from '@/components/CoverCard';
 import { ageLabel, seriesAgeOf } from '@/components/ageLimits';
+import { completenessOf } from '@/components/completeness';
+import { formatSize } from '@/components/format';
 import {
     nextToRead,
     progressRatio,
+    volumeCountLabel,
     volumeLabel,
     volumeTitleOf,
 } from '@/components/readingStatus';
@@ -58,6 +61,9 @@ const ACTION_LABELS = {
 };
 
 /** Fiche d'une série : informations, tomes et où en est la personne. */
+// Titre des sections de la fiche, sous les tomes.
+const KIND_SECTIONS = { 'hors-serie': 'Hors-séries', special: 'Spéciaux' };
+
 export const SeriesPage = () => {
     const seriesId = Number(useParams().id);
     const isAdmin = useCurrentUser().role === 'admin';
@@ -66,7 +72,6 @@ export const SeriesPage = () => {
         error,
         reload,
     } = useQuery(() => fetchSeries(seriesId), [seriesId]);
-    const [collectionsOpened, collectionsModal] = useDisclosure(false);
     // Liste en cours d'enregistrement (bouton désactivé).
     const [savingList, setSavingList] = useState(false);
 
@@ -81,12 +86,32 @@ export const SeriesPage = () => {
     // Titre de chaque tome sous son numéro, si l'un d'eux en a un.
     const withTitles = series.volumes.some((v) => volumeTitleOf(v));
     const age = seriesAgeOf(series);
+    const totalSize = series.volumes.reduce((sum, v) => sum + v.size, 0);
     const details = [
         series.format,
         series.year && String(series.year),
         series.writer,
         series.publisher,
+        totalSize > 0 && formatSize(totalSize),
     ].filter(Boolean);
+    // Fiche incomplète : montrée à l'admin seulement (ComicInfo des tomes).
+    const completeness = isAdmin
+        ? completenessOf({
+              name: series.name,
+              hasFormat: !!series.formatId,
+              hasAge: age !== null,
+              hasStatus: !!series.status,
+              genreCount: series.genres.length,
+              writer: series.writer,
+              penciller: first?.admin?.comicInfo.Penciller,
+              publisher: series.publisher,
+              summary: series.summary,
+              volumes: series.volumes.map((v) => ({
+                  number: v.number,
+                  year: v.admin?.comicInfo.Year,
+              })),
+          })
+        : undefined;
 
     /** Toute la série lue, ou non lue (la progression est alors effacée). */
     const markAll = async (read: boolean) => {
@@ -154,8 +179,7 @@ export const SeriesPage = () => {
                     )}
                     <Group gap="xs">
                         <Badge variant="light">
-                            {series.volumes.length} tome
-                            {series.volumes.length > 1 ? 's' : ''}
+                            {volumeCountLabel(series.volumes)}
                         </Badge>
                         {series.status && (
                             <Badge
@@ -191,6 +215,23 @@ export const SeriesPage = () => {
                         <Text size="xs" c="dimmed">
                             Thèmes : {series.themes.join(', ')}
                         </Text>
+                    )}
+                    {completeness && completeness.percent < 100 && (
+                        <div>
+                            <CompletenessBadge
+                                completeness={completeness}
+                                action={
+                                    <Button
+                                        component={Link}
+                                        to={`/series/${series.id}/edit`}
+                                        size="xs"
+                                        variant="light"
+                                    >
+                                        Compléter la fiche
+                                    </Button>
+                                }
+                            />
+                        </div>
                     )}
                     {isAdmin && (
                         <Button
@@ -273,78 +314,90 @@ export const SeriesPage = () => {
                                 >
                                     Marquer toute la série comme non lue
                                 </Menu.Item>
-                                {isAdmin && (
-                                    <Menu.Item
-                                        leftSection={<IconFolders size={14} />}
-                                        onClick={collectionsModal.open}
-                                    >
-                                        Collections…
-                                    </Menu.Item>
-                                )}
                             </Menu.Dropdown>
                         </Menu>
                     </Group>
                 </Stack>
             </Flex>
 
-            {isAdmin && (
-                <CollectionsModal
-                    opened={collectionsOpened}
-                    onClose={collectionsModal.close}
-                    seriesId={series.id}
-                    collectionIds={series.collectionIds}
-                    onChanged={reload}
-                />
-            )}
-
-            <SimpleGrid cols={{ base: 3, xs: 4, sm: 5, md: 6, lg: 8 }}>
-                {series.volumes.map((volume) => {
-                    const read = volume.progress?.completed ?? false;
-                    return (
-                        <CoverCard
-                            key={volume.id}
-                            to={`/read/${volume.id}`}
-                            cover={coverUrl(volume.id, volume.version, 'small')}
-                            title={volumeLabel(volume)}
-                            caption={
-                                withTitles
-                                    ? (volumeTitleOf(volume) ?? '')
-                                    : undefined
-                            }
-                            subtitle={
-                                volume.progress && !read
-                                    ? `Page ${volume.progress.page + 1} / ${volume.pageCount}`
-                                    : `${volume.pageCount} pages`
-                            }
-                            progress={read ? undefined : progressRatio(volume)}
-                            corner={
-                                <Tooltip
-                                    label={
-                                        read
-                                            ? 'Marquer comme non lu'
-                                            : 'Marquer comme lu'
-                                    }
-                                >
-                                    <ActionIcon
-                                        radius="xl"
-                                        size="sm"
-                                        variant={read ? 'filled' : 'default'}
-                                        style={{ opacity: read ? 1 : 0.8 }}
-                                        aria-label={
-                                            read
-                                                ? `${volumeLabel(volume)} lu`
-                                                : `Marquer ${volumeLabel(volume)} comme lu`
+            {VOLUME_KINDS.map((kind) => {
+                const group = series.volumes.filter((v) => v.kind === kind);
+                if (group.length === 0) return null;
+                return (
+                    <Stack key={kind} gap="xs">
+                        {kind !== 'volume' && (
+                            <Title order={4}>{KIND_SECTIONS[kind]}</Title>
+                        )}
+                        <SimpleGrid
+                            cols={{ base: 3, xs: 4, sm: 5, md: 6, lg: 8 }}
+                        >
+                            {group.map((volume) => {
+                                const read =
+                                    volume.progress?.completed ?? false;
+                                return (
+                                    <CoverCard
+                                        key={volume.id}
+                                        to={`/read/${volume.id}`}
+                                        cover={coverUrl(
+                                            volume.id,
+                                            volume.version,
+                                            'small',
+                                        )}
+                                        title={volumeLabel(volume)}
+                                        caption={
+                                            withTitles
+                                                ? (volumeTitleOf(volume) ?? '')
+                                                : undefined
                                         }
-                                        onClick={() => void toggleRead(volume)}
-                                    >
-                                        <IconCheck size={14} />
-                                    </ActionIcon>
-                                </Tooltip>
-                            }
-                        />
-                    );
-                })}
-            </SimpleGrid>
+                                        subtitle={
+                                            volume.progress && !read
+                                                ? `Page ${volume.progress.page + 1} / ${volume.pageCount}`
+                                                : `${volume.pageCount} pages`
+                                        }
+                                        progress={
+                                            read
+                                                ? undefined
+                                                : progressRatio(volume)
+                                        }
+                                        corner={
+                                            <Tooltip
+                                                label={
+                                                    read
+                                                        ? 'Marquer comme non lu'
+                                                        : 'Marquer comme lu'
+                                                }
+                                            >
+                                                <ActionIcon
+                                                    radius="xl"
+                                                    size="sm"
+                                                    variant={
+                                                        read
+                                                            ? 'filled'
+                                                            : 'default'
+                                                    }
+                                                    style={{
+                                                        opacity: read ? 1 : 0.8,
+                                                    }}
+                                                    aria-label={
+                                                        read
+                                                            ? `${volumeLabel(volume)} lu`
+                                                            : `Marquer ${volumeLabel(volume)} comme lu`
+                                                    }
+                                                    onClick={() =>
+                                                        void toggleRead(volume)
+                                                    }
+                                                >
+                                                    <IconCheck size={14} />
+                                                </ActionIcon>
+                                            </Tooltip>
+                                        }
+                                    />
+                                );
+                            })}
+                        </SimpleGrid>
+                    </Stack>
+                );
+            })}
         </Stack>
     );
 };

@@ -60,13 +60,12 @@ Bento est le serveur de lecture et de gestion des mangas et BD de la maison. Il 
 ### E. Suivi de lecture (tous)
 - **Progression** par tome et par personne : page atteinte, tome lu ou en cours. Elle est synchronisée entre les appareils.
 - **Listes** :
-  - une liste « à lire » personnelle (les favoris, trop proches, ont été retirés) ;
-  - des collections partagées créées par l'admin, par exemple « Pour les enfants ».
+  - une liste « à lire » personnelle (les favoris, trop proches, ont été retirés, puis les collections partagées).
 
 ### F. Gestion (admin)
 - **Brouillons** : liste des tomes et fiche de chaque tome avec sa couverture et son ComicInfo modifiable.
 - **Réglages de la future série dès les brouillons** : statut, mode de lecture et couverture, appliqués à la publication.
-- **Métadonnées** : recherche Wikipédia FR, remplissage depuis les noms de fichiers, option « écraser les valeurs existantes ».
+- **Métadonnées** : recherche sur Wikipédia FR et Manga-news à la fois, comparaison champ par champ (valeur actuelle ou celle d'une fiche, site préféré par champ dans les réglages), lien des fiches gardé pour les relire, remplissage depuis les noms de fichiers, suggestions des noms déjà connus.
 - **Classement** : format obligatoire, pris dans une liste gérée par l'admin (chacun avec son mode de lecture), et âge pris dans une grille réglable (Tout public, 8+, 10+, 12+, 14+, 16+, 18+ au départ), gardés dans Bento ; genres d'une liste gérée par l'admin (avec les autres noms qu'ils reconnaissent) et thèmes libres, dans `Genre` et `Tags` du ComicInfo.
 - **Manga-news** (fait pour les séries) : deuxième source de « Remplir », par défaut pour les mangas.
   - Série : auteurs, traducteurs, éditeurs VF et VO, type, genres, origine et année, **âge conseillé** (classification), résumé.
@@ -97,7 +96,7 @@ Bento est le serveur de lecture et de gestion des mangas et BD de la maison. Il 
 - **Base SQLite**, avec l'ORM Drizzle et ses migrations. Elle stocke :
   - les utilisateurs et les bibliothèques ;
   - les séries et les tomes ;
-  - la progression, les listes et les collections.
+  - la progression et les listes.
 - **Images** : vignettes et images redimensionnées gardées dans un cache disque, générées avec sharp. Le navigateur garde pages et couvertures un an : leur adresse contient la version du tome (date du fichier), qui change à chaque réécriture.
 - **Déploiement** :
   - image Docker `ghcr.io/belugabox/bento`, publiée par GitHub Actions ;
@@ -110,15 +109,25 @@ Bento est le serveur de lecture et de gestion des mangas et BD de la maison. Il 
 
 1. **Socle de lecture** — fait : dépôt, connexion Pocket ID, bibliothèques, scan (à la demande, toutes les 30 min, après publication), grille et fiche série, lecteur, progression.
 2. **Gestion** — fait : brouillons, métadonnées, Wikipédia, publication, réparations, couvertures, statut et mode de lecture dès les brouillons, aperçu de lecture, compression des images.
-3. **Famille** — fait : contrôle parental, vue lecteur pour l'admin, thèmes, statistiques, série lue / non lue, liste « à lire », collections partagées, filtres par liste, genre et statut, la suite des séries entamées dans « Reprendre la lecture » (« Nouveautés » retirée pour l'instant, à revoir).
+3. **Famille** — fait : contrôle parental, vue lecteur pour l'admin, thèmes, statistiques, série lue / non lue, liste « à lire », filtres par liste, genre et statut, la suite des séries entamées dans « Reprendre la lecture » (« Nouveautés » retirée pour l'instant, à revoir).
 4. **Tablettes et Android** — fait, à essayer sur les appareils :
    - **plein écran du lecteur** : bouton dans la barre du lecteur, et option « Plein écran à l'ouverture » (au premier toucher, le navigateur l'exige) ; il continue d'un tome au suivant ;
-   - **appli web installable** : manifeste et icônes (boîte à bento violette), pour « Installer l'application » dans Chrome sur Android et « Sur l'écran d'accueil » sur iPad. Pas encore de service worker : le hors ligne reste pour l'étape 7.
+   - **appli web installable** : manifeste et icônes (boîte à bento violette), pour « Installer l'application » dans Chrome sur Android et « Sur l'écran d'accueil » sur iPad. Pas encore de service worker : le hors ligne reste pour l'étape 9.
 5. **Lecteur avancé** — fait : double page, modes BD / manga / webtoon, gestes tactiles, zoom. Reste : images redimensionnées selon l'écran (les pages sont servies en taille d'origine).
 6. **Manga-news** — fait pour les séries (voir F), avec le classement par format, genres gérés et thèmes. Reste : les fiches des tomes.
-7. **Hors ligne** : téléchargements, lecture sans réseau, synchronisation de la progression.
-8. **Tomes manquants et sorties** : trous dans la numérotation, tomes parus (Wikipédia, puis manga-news) absents de la bibliothèque.
-9. **Bascule** : retirer le module manga de beluga-box (la synchro vers `_draft` reste en place), arrêter Kavita.
+7. **Fiches à compléter** — fait :
+   - **Complétude d'une série**, en pourcentage : part des informations remplies (nom, format, âge, statut, genres, scénario, dessin, éditeur, résumé, numéro et année de chaque tome au prorata). La couverture n'y compte pas : chaque série en a une, celle de son premier tome. Affichée dans l'éditeur (brouillons et séries, mise à jour pendant la saisie), et sur la fiche série pour l'admin tant qu'elle n'est pas à 100 %, avec la liste de ce qui manque.
+   - **Taille totale d'une série** : somme des fichiers de ses tomes, sur la fiche série et dans les brouillons.
+   - **Séries à classer** : liste des séries sans format ou sans âge (masquées aux comptes limités), avec un lien vers leur éditeur et un bouton Manga-news par série (sur clic, jamais en masse), puis « Enregistrer et suivante » dans l'éditeur.
+8. **Suggestions** : proposer des séries à lire, d'après les genres, les thèmes et les lectures de la famille, sans service extérieur. Elles marchent d'autant mieux que les séries sont classées.
+   - **« Dans le même genre »** sur la fiche série : genres en commun (beaucoup), thèmes en commun (un peu), même format (un petit bonus) ; les séries déjà lues après les autres.
+   - **« Lu par la famille »** sur l'accueil : séries finies ou bien avancées par un autre membre, pas commencées par la personne (« Léo a fini Mashle »).
+   - **« Pour toi »** sur l'accueil, ensuite : d'après les genres et thèmes des séries lues ou commencées (pondérés par les tomes lus), séries pas commencées, avec la raison (« Parce que tu as lu Spy × Family »).
+   - Plus tard : 👍 / 👎 dans le menu ⋮ pour affiner, nouveautés dans les genres préférés, séries courtes ou terminées pour une lecture rapide.
+   - Toujours dans la limite d'âge du compte.
+9. **Hors ligne** : téléchargements, lecture sans réseau, synchronisation de la progression.
+10. **Tomes manquants et sorties** : trous dans la numérotation, tomes parus (Wikipédia, puis manga-news) absents de la bibliothèque.
+11. **Bascule** : retirer le module manga de beluga-box (la synchro vers `_draft` reste en place), arrêter Kavita.
 
 ## Décisions de déploiement
 

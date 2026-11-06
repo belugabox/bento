@@ -1,8 +1,13 @@
-import { and, asc, count, eq, inArray, notInArray, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, notInArray, sql } from 'drizzle-orm';
 import { rm } from 'node:fs/promises';
 import path from 'node:path';
 
-import { type ReadingMode, classify, genreKey } from '../classification';
+import {
+    type ReadingMode,
+    classify,
+    genreKey,
+    splitList,
+} from '../classification';
 import type { LibraryConfig } from '../config';
 import type { Db } from '../db';
 import {
@@ -12,38 +17,50 @@ import {
     series,
     volumes,
 } from '../db/schema';
+import {
+    type SourceLink,
+    parseSources,
+    sourcesText,
+} from '../metadata/sourceLink';
 import { notFound } from '../tools/errors';
 import { genreCatalog } from './genres';
 import { publicationPathOf } from './paths';
-import { coverFile } from './scanner';
+import { coverFile, kindOrder } from './scanner';
 import { compareNames } from './sortName';
 import { type Viewer, visibleTo } from './visibility';
 
-// Tomes sans numéro en dernier, puis par numéro, puis par fichier.
 /**
  * Version d'un tome : la date de son fichier, qui change à chaque réécriture.
  * Dans l'adresse de ses images, elle permet au navigateur de les garder.
  */
 export const volumeVersion = sql<number>`cast(${volumes.mtimeMs} as integer)`;
 
+/**
+ * Tome compté d'une série (« 12 tomes », « 3 / 12 lus », série lue) : un
+ * tome, pas un hors-série ni un spécial ; tous si la série n'a que ceux-là.
+ * `alias` : nom de la table des tomes dans la requête.
+ */
+export const countedVolume = (alias: string) =>
+    sql.raw(
+        `(${alias}.kind = 'volume' or not exists (select 1 from volumes w where w.series_id = ${alias}.series_id and w.kind = 'volume'))`,
+    );
+
+// Tomes, hors-séries puis spéciaux ; sans numéro en dernier, puis par
+// numéro, puis par fichier.
 export const volumeOrder = [
+    kindOrder,
     sql`${volumes.sortNumber} is null`,
     asc(volumes.sortNumber),
     asc(volumes.file),
 ];
 
 /**
- * Listes de la personne et collections d'une série (SQL brut : Drizzle ne
- * préfixe pas les colonnes des sous-requêtes).
+ * Listes de la personne pour une série (SQL brut : Drizzle ne préfixe pas
+ * les colonnes des sous-requêtes).
  */
 const listsOf = (viewer: Viewer) => ({
     toRead: sql<boolean>`exists(select 1 from series_lists sl where sl.series_id = series.id and sl.user_id = ${viewer.id} and sl.list = 'toread')`.mapWith(
         Boolean,
-    ),
-    collectionIds: sql<
-        number[]
-    >`coalesce((select group_concat(cs.collection_id) from collection_series cs where cs.series_id = series.id), '')`.mapWith(
-        (value: string) => (value ? value.split(',').map(Number) : []),
     ),
 });
 
@@ -138,7 +155,7 @@ export const listSeries = (
             format: formats.name,
             age: seriesAgeSql,
             status: series.status,
-            volumeCount: count(volumes.id),
+            volumeCount: sql<number>`(select count(*) from volumes v where v.series_id = series.id and ${countedVolume('v')})`,
             // Dernier tome ajouté (tri « ajouts récents »).
             lastAddedAt: sql<number>`max(${volumes.addedAt})`.mapWith(
                 (value: number) => new Date(value * 1000),
@@ -147,10 +164,10 @@ export const listSeries = (
             // Sous-requêtes en SQL brut : Drizzle n'y préfixe pas les colonnes
             // par leur table.
             coverUpdatedAt: series.coverUpdatedAt,
-            coverVolumeId: sql<number>`(select v.id from volumes v where v.series_id = series.id order by v.sort_number is null, v.sort_number, v.file limit 1)`,
-            coverVolumeVersion: sql<number>`(select cast(v.mtime_ms as integer) from volumes v where v.series_id = series.id order by v.sort_number is null, v.sort_number, v.file limit 1)`,
+            coverVolumeId: sql<number>`(select v.id from volumes v where v.series_id = series.id order by v.kind != 'volume', v.kind, v.sort_number is null, v.sort_number, v.file limit 1)`,
+            coverVolumeVersion: sql<number>`(select cast(v.mtime_ms as integer) from volumes v where v.series_id = series.id order by v.kind != 'volume', v.kind, v.sort_number is null, v.sort_number, v.file limit 1)`,
             // Tomes lus par la personne.
-            readCount: sql<number>`(select count(*) from read_progress rp join volumes v on v.id = rp.volume_id where v.series_id = series.id and rp.user_id = ${viewer.id} and rp.completed = 1)`,
+            readCount: sql<number>`(select count(*) from read_progress rp join volumes v on v.id = rp.volume_id where v.series_id = series.id and rp.user_id = ${viewer.id} and rp.completed = 1 and ${countedVolume('v')})`,
             // Tomes ouverts (lus ou en cours) : série commencée.
             startedCount: sql<number>`(select count(*) from read_progress rp join volumes v on v.id = rp.volume_id where v.series_id = series.id and rp.user_id = ${viewer.id})`,
             ...listsOf(viewer),
@@ -206,6 +223,7 @@ export const getSeries = (db: Db, viewer: Viewer, id: number) => {
             year: series.year,
             status: series.status,
             readingMode: series.readingMode,
+            sources: series.sources,
             writer: series.writer,
             publisher: series.publisher,
             ...listsOf(viewer),
@@ -225,6 +243,7 @@ export const getSeries = (db: Db, viewer: Viewer, id: number) => {
         .select({
             id: volumes.id,
             number: volumes.number,
+            kind: volumes.kind,
             title: volumes.title,
             pageCount: volumes.pageCount,
             version: volumeVersion,
@@ -249,10 +268,12 @@ export const getSeries = (db: Db, viewer: Viewer, id: number) => {
         .where(eq(volumes.seriesId, id))
         .orderBy(...volumeOrder)
         .all();
-    const { genre, tags, formatName, formatReadingMode, ...details } = row;
+    const { genre, tags, formatName, formatReadingMode, sources, ...details } =
+        row;
     return {
         ...details,
         format: formatName,
+        sources: parseSources(sources),
         ...classify(genre, tags, genreCatalog(db)),
         defaultReadingMode: defaultReadingMode(
             row.library.type,
@@ -284,6 +305,7 @@ export const getVolume = (db: Db, viewer: Viewer, id: number) => {
             seriesId: volumes.seriesId,
             seriesName: series.name,
             number: volumes.number,
+            kind: volumes.kind,
             title: volumes.title,
             pageCount: volumes.pageCount,
             version: volumeVersion,
@@ -348,7 +370,7 @@ export const seriesCoverOf = (db: Db, viewer: Viewer, id: number) => {
             coverUpdatedAt: series.coverUpdatedAt,
             firstVolumeId: sql<
                 number | null
-            >`(select v.id from volumes v where v.series_id = series.id order by v.sort_number is null, v.sort_number, v.file limit 1)`,
+            >`(select v.id from volumes v where v.series_id = series.id order by v.kind != 'volume', v.kind, v.sort_number is null, v.sort_number, v.file limit 1)`,
         })
         .from(series)
         .where(and(eq(series.id, id), visibleTo(viewer)))
@@ -388,20 +410,37 @@ export const defaultReadingMode = (
 ): ReadingMode =>
     formatReadingMode ?? (libraryType === 'manga' ? 'ltr-manga' : 'ltr');
 
-/** Format et âge d'une série, réglés dans Bento (null : pas choisis). */
+/**
+ * Format, âge et fiches en ligne d'une série, réglés dans Bento (null, ou
+ * liste vide : pas choisis).
+ */
 export const setSeriesClassification = (
     db: Db,
     id: number,
-    changes: { formatId?: number | null; age?: number | null },
+    {
+        sources,
+        ...changes
+    }: {
+        formatId?: number | null;
+        age?: number | null;
+        sources?: SourceLink[];
+    },
 ) => {
     const updated = db
         .update(series)
-        .set(changes)
+        .set({
+            ...changes,
+            ...(sources && { sources: sourcesText(sources) }),
+        })
         .where(eq(series.id, id))
-        .returning({ formatId: series.formatId, age: series.age })
+        .returning({
+            formatId: series.formatId,
+            age: series.age,
+            sources: series.sources,
+        })
         .get();
     if (!updated) throw notFound('Série introuvable');
-    return updated;
+    return { ...updated, sources: parseSources(updated.sources) };
 };
 
 /** Mode de lecture d'une série (null : celui de la bibliothèque). */
@@ -418,4 +457,36 @@ export const setSeriesReadingMode = (
         .get();
     if (!updated) throw notFound('Série introuvable');
     return updated;
+};
+
+/**
+ * Scénaristes, dessinateurs et éditeurs déjà présents dans les tomes d'une
+ * bibliothèque (une personne par nom, « A, B » compte pour deux) : les
+ * suggestions de l'éditeur, pour éviter les doublons d'écriture.
+ */
+export const listCredits = (db: Db, libraryId: number) => {
+    const valuesOf = (field: 'Writer' | 'Penciller' | 'Publisher') => {
+        const rows = db
+            .selectDistinct({
+                value: sql<
+                    string | null
+                >`json_extract(${volumes.comicInfo}, ${`$.${field}`})`,
+            })
+            .from(volumes)
+            .where(eq(volumes.libraryId, libraryId))
+            .all();
+        // Une seule écriture par nom, sans casse ni accents.
+        const names = new Map<string, string>();
+        for (const { value } of rows) {
+            for (const name of splitList(value)) {
+                names.set(genreKey(name), names.get(genreKey(name)) ?? name);
+            }
+        }
+        return [...names.values()].sort((a, b) => a.localeCompare(b, 'fr'));
+    };
+    return {
+        writers: valuesOf('Writer'),
+        pencillers: valuesOf('Penciller'),
+        publishers: valuesOf('Publisher'),
+    };
 };

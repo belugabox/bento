@@ -73,7 +73,6 @@ describe('list, format, genre and status filters', () => {
             genres: ['Science-fiction', 'Action'],
             format: 'manga',
             status: 'completed',
-            collectionIds: [4],
         },
         {
             ...series('Berserk', 0, null),
@@ -92,10 +91,8 @@ describe('list, format, genre and status filters', () => {
     const kept = (options: Partial<Parameters<typeof filterSeries>[1]>) =>
         names(filterSeries(items, { filter: 'all', sort: 'name', ...options }));
 
-    it('keeps the to-read list or a collection', () => {
+    it('keeps the to-read list', () => {
         expect(kept({ filter: 'toread' })).toEqual(['Berserk']);
-        expect(kept({ list: 'collection:4' })).toEqual(['Akira']);
-        expect(kept({ list: 'collection:5' })).toEqual([]);
     });
 
     it('keeps a genre', () => {

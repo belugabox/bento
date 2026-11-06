@@ -29,6 +29,7 @@ import { COVER_QUALITY, COVER_SIZE, readImage } from '../archive/image';
 import { updateComicInfo } from '../archive/write';
 import type { Db } from '../db';
 import { libraries, series, volumes } from '../db/schema';
+import { parseSources } from '../metadata/sourceLink';
 import { conflict, notFound } from '../tools/errors';
 import type { Logger } from '../tools/logger';
 import { draftCoverFile, seriesCoverFile } from './covers';
@@ -356,6 +357,7 @@ export class LibraryFiles {
             readingMode: settings.get(folder)?.readingMode ?? null,
             formatId: settings.get(folder)?.formatId ?? null,
             age: settings.get(folder)?.age ?? null,
+            sources: parseSources(settings.get(folder)?.sources),
             coverUpdatedAt: settings.get(folder)?.coverUpdatedAt ?? null,
         }));
     };
@@ -365,7 +367,10 @@ export class LibraryFiles {
         libraryId: number,
         folder: string,
         changes: Partial<
-            Pick<DraftSettings, 'status' | 'readingMode' | 'formatId' | 'age'>
+            Pick<
+                DraftSettings,
+                'status' | 'readingMode' | 'formatId' | 'age' | 'sources'
+            >
         >,
     ) => {
         this.library(libraryId);
@@ -461,8 +466,8 @@ export class LibraryFiles {
         const folders = new Set<string>();
         // Réglages choisis pour les dossiers de brouillons publiés.
         const drafts = draftSettingsOf(this.db, libraryId);
-        // Séries des tomes publiés déplacés : statut, mode de lecture, listes
-        // et collections, reportés sur leur nouvelle série.
+        // Séries des tomes publiés déplacés : statut, mode de lecture et
+        // listes, reportés sur leur nouvelle série.
         const previous = new Map(
             this.db
                 .select({
@@ -472,6 +477,7 @@ export class LibraryFiles {
                     readingMode: series.readingMode,
                     formatId: series.formatId,
                     age: series.age,
+                    sources: series.sources,
                 })
                 .from(volumes)
                 .innerJoin(series, eq(series.id, volumes.seriesId))
@@ -551,6 +557,8 @@ export class LibraryFiles {
                         old.formatId && { formatId: old.formatId }),
                     ...(draft?.age == null &&
                         old.age != null && { age: old.age }),
+                    ...(!draft?.sources &&
+                        old.sources && { sources: old.sources }),
                 };
                 for (const [field, value] of Object.entries(carried)) {
                     this.db
@@ -594,6 +602,7 @@ export class LibraryFiles {
         if (draft.readingMode) changes.readingMode = draft.readingMode;
         if (draft.formatId) changes.formatId = draft.formatId;
         if (draft.age != null) changes.age = draft.age;
+        if (draft.sources) changes.sources = draft.sources;
         if (draft.coverUpdatedAt) {
             const copied = await copyFile(
                 draftCoverFile(this.coversPath, libraryId, folder),

@@ -3,7 +3,7 @@ import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 import type { Db } from '../db';
 import { readProgress, series, volumes } from '../db/schema';
 import { notFound } from '../tools/errors';
-import { volumeOrder, volumeVersion } from './catalog';
+import { countedVolume, volumeOrder, volumeVersion } from './catalog';
 import { type Viewer, visibleTo } from './visibility';
 
 export type Progress = { page: number; completed: boolean };
@@ -183,13 +183,14 @@ export const listInProgress = (db: Db, viewer: Viewer, limit = 12) => {
             seriesId: series.id,
             seriesName: series.name,
             number: volumes.number,
+            kind: volumes.kind,
             title: volumes.title,
             page: readProgress.page,
             pageCount: volumes.pageCount,
             updatedAt: readProgress.updatedAt,
             // SQL brut : Drizzle ne préfixerait pas les colonnes par leur table.
-            volumeCount: sql<number>`(select count(*) from volumes v where v.series_id = series.id)`,
-            readCount: sql<number>`(select count(*) from read_progress rp join volumes v on v.id = rp.volume_id where v.series_id = series.id and rp.user_id = ${viewer.id} and rp.completed = 1)`,
+            volumeCount: sql<number>`(select count(*) from volumes v where v.series_id = series.id and ${countedVolume('v')})`,
+            readCount: sql<number>`(select count(*) from read_progress rp join volumes v on v.id = rp.volume_id where v.series_id = series.id and rp.user_id = ${viewer.id} and rp.completed = 1 and ${countedVolume('v')})`,
         })
         .from(readProgress)
         .innerJoin(volumes, eq(volumes.id, readProgress.volumeId))
@@ -253,6 +254,7 @@ export const listRecentVolumes = (db: Db, viewer: Viewer, limit = 12) => {
             seriesId: series.id,
             seriesName: series.name,
             number: volumes.number,
+            kind: volumes.kind,
             title: volumes.title,
             addedAt: volumes.addedAt,
         })
@@ -280,6 +282,7 @@ export const listNextVolumes = (db: Db, viewer: Viewer, limit = 12) => {
             seriesId: series.id,
             seriesName: series.name,
             number: volumes.number,
+            kind: volumes.kind,
             title: volumes.title,
             pageCount: volumes.pageCount,
             completed: readProgress.completed,
@@ -319,6 +322,10 @@ export const listNextVolumes = (db: Db, viewer: Viewer, limit = 12) => {
             updatedAt: _updatedAt,
             ...volume
         } = unread;
+        // Comptés : les tomes, sans hors-séries ni spéciaux (voir
+        // `countedVolume`).
+        const regular = items.filter((v) => v.kind === 'volume');
+        const counted = regular.length > 0 ? regular : items;
         next.push({
             ...volume,
             // Pas encore ouvert.
@@ -327,8 +334,8 @@ export const listNextVolumes = (db: Db, viewer: Viewer, limit = 12) => {
             updatedAt: new Date(
                 Math.max(...items.map((v) => v.updatedAt?.getTime() ?? 0)),
             ),
-            volumeCount: items.length,
-            readCount: items.filter((v) => v.completed).length,
+            volumeCount: counted.length,
+            readCount: counted.filter((v) => v.completed).length,
         });
     }
     return next

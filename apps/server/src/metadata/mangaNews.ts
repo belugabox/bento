@@ -3,6 +3,7 @@ import { type CheerioAPI, load as cheerioLoad } from 'cheerio';
 import { genreKey } from '../classification';
 import { type AgeRating, ratingForAge } from '../library/ageRating';
 import { badGateway, badRequest, notFound } from '../tools/errors';
+import { mangaNewsSeriesUrl } from './sourceLink';
 
 // Métadonnées de séries depuis Manga-news. Le site n'a pas d'API : ses
 // pages sont lues à la demande de l'admin, une à la fois, jamais en masse.
@@ -44,8 +45,7 @@ export type MangaNewsSeries = {
     coverUrl?: string;
 };
 
-const seriesUrl = (id: string) =>
-    `${BASE_URL}/serie/${encodeURIComponent(id).replace(/%3A/gi, ':')}`;
+const seriesUrl = mangaNewsSeriesUrl;
 
 // Octets 0x80 à 0x9f de Windows-1252 (le reste est ISO-8859-1). Le
 // TextDecoder de Node 22 les lit en ISO-8859-1 : « ’ » y serait perdu.
@@ -231,19 +231,28 @@ export class MangaNews {
             throw badGateway(`Manga-news injoignable : ${reason}`);
         }
         const html = decodePage(await response.arrayBuffer());
-        // Contrôle anti-robot : jamais contourné. (Cloudflare ajoute un script
-        // « challenge-platform » à toutes les pages : il ne compte pas.)
+        // Contrôle anti-robot : jamais contourné. Cloudflare le signale par
+        // `cf-mitigated: challenge` ou une page « Just a moment » (le script
+        // « challenge-platform » de toutes les pages ne compte pas). Il peut
+        // être ponctuel : un nouvel essai passe parfois.
         if (
-            [403, 429, 503].includes(response.status) ||
+            response.headers.get('cf-mitigated') === 'challenge' ||
             /<title>\s*(Just a moment|Attention Required)/i.test(html)
         ) {
             throw badGateway(
-                'Manga-news refuse la requête (protection anti-robot) : utilise Wikipédia',
+                `Manga-news refuse la requête (protection anti-robot, ${response.status}) : réessaie plus tard ou utilise Wikipédia`,
+            );
+        }
+        if (response.status === 429) {
+            throw badGateway(
+                'Manga-news limite les requêtes : réessaie dans quelques secondes',
             );
         }
         if (response.status === 404) return undefined;
         if (!response.ok) {
-            throw badGateway(`Manga-news a répondu ${response.status}`);
+            throw badGateway(
+                `Manga-news indisponible (${response.status}) : réessaie dans un instant`,
+            );
         }
         return html;
     };

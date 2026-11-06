@@ -160,6 +160,7 @@ describe('drafts', () => {
                 readingMode: null,
                 formatId: null,
                 age: null,
+                sources: [],
                 coverUpdatedAt: null,
             },
             {
@@ -173,6 +174,7 @@ describe('drafts', () => {
                 readingMode: null,
                 formatId: null,
                 age: null,
+                sources: [],
                 coverUpdatedAt: null,
             },
             {
@@ -189,6 +191,7 @@ describe('drafts', () => {
                 readingMode: null,
                 formatId: null,
                 age: null,
+                sources: [],
                 coverUpdatedAt: null,
             },
         ]);
@@ -497,6 +500,7 @@ describe('publishing', () => {
             readingMode: null,
             formatId: null,
             age: null,
+            sources: null,
             coverUpdatedAt: null,
         });
     });

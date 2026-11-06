@@ -10,7 +10,7 @@ Serveur de lecture et de gestion de mangas et BD, qui remplace Kavita pour la fa
 - Le déploiement est reporté (« on déploiera plus tard »).
 - Il a refusé un nom de tri modifiable par série (« oublie »).
 - Classement décidé le 6 novembre 2026 : format, âge, genres, thèmes. Formats, grille d'âges et genres sont gérés par l'admin (Réglages, onglet Classement). Le format est obligatoire, sans valeur par défaut ; format et âge exact restent dans Bento (le ComicInfo reçoit la classification la plus proche, plus stricte). Le « public » (shonen, seinen…) a été retiré : « je ne l'utiliserai pas » (migration 0015).
-- Favoris retirés le 6 novembre 2026 (« À lire » seul, en filtre de la barre « Séries »). Les collections restent telles quelles, mises de côté. Changer de fournisseur de connexion (TinyAuth, Authelia) : « oublie pour le moment ».
+- Favoris retirés le 6 novembre 2026 (« À lire » seul, en filtre de la barre « Séries »). Collections retirées le même jour (« tu peux supprimer la partie collection ») : code supprimé, tables `collections` et `collection_series` gardées en base, inutilisées (les supprimer effacerait celles de la prod). Changer de fournisseur de connexion (TinyAuth, Authelia) : « oublie pour le moment ».
 
 ## Règles impératives
 
@@ -47,12 +47,13 @@ Serveur de lecture et de gestion de mangas et BD, qui remplace Kavita pour la fa
 - Le lecteur est découpé en trois : `reader/Reader.tsx` (composant), `ReaderPage.tsx` (route `/read/:id`), `ReaderPreview.tsx` (aperçu par-dessus l'éditeur). `ReaderPage` ignore le tome précédent pendant le chargement du suivant ; c'était un bug.
 - La compression passe par une file en arrière-plan (`library/compression.ts`) : un gros tome dépasse le délai d'une requête derrière Cloudflare (100 s).
 - Les réglages de l'admin sont dans `settings.ts` (table `settings`, migration 0013) : compression (qualité 90, 2400 px par défaut) et intervalle du scan.
-- Les réglages d'un brouillon (statut, mode de lecture, couverture) sont dans la table `draft_statuses` (son nom d'origine est gardé) et sont appliqués à la publication. Quand une publication renomme une série, ses listes, ses collections et son mode de lecture la suivent.
+- Les réglages d'un brouillon (statut, mode de lecture, couverture) sont dans la table `draft_statuses` (son nom d'origine est gardé) et sont appliqués à la publication. Quand une publication renomme une série, ses listes et son mode de lecture la suivent.
 - **Cache des images** : la version d'un tome est la date de son fichier (`volumeVersion`, `cast(mtime_ms as integer)`). Avec `?v=` dans l'adresse, pages et couvertures sont servies `immutable` pour un an : toute réécriture du fichier doit changer sa date. Une couverture refaite sans toucher au fichier (nouvelle taille `COVER_SIZE`) garderait l'ancienne en cache : changer alors aussi le format de la version.
 - **Âge d'une série** : `coalesce(series.age, series.min_age)` (choisi dans Bento, sinon déduit des tomes), pour la visibilité et les statistiques. La grille d'âges est dans les réglages (`ages`).
 - **Formats** : table `formats` (0016, liste de départ par 0018), `series.format_id`. La clé étrangère n'a pas `on delete set null` sur la base de dev : `deleteFormat` détache les séries lui-même.
 - **Classement** : `classification.ts` (partagé avec le client) range les genres bruts des fichiers (`series.genre` et `series.tags`, du premier tome) d'après la table `genres` (migration 0014, avec sa liste de départ), à chaque lecture : renommer un genre ne réécrit aucun fichier.
 - Le tri des séries ignore les articles (`library/sortName.ts`). Un nom de fichier « Boxer (The) » donne « The Boxer ».
+- **Hors-séries et spéciaux** (décidé le 6 novembre 2026 : trois types, à part, fichiers « HS01 » et « SP01 ») : `library/volumeKind.ts` (partagé), type dans le `Format` du ComicInfo, colonne `volumes.kind` (0020), triée avant le numéro (`kindOrder`). Un ancien numéro préfixé (« HS01 ») est lu comme hors-série 1.
 
 ## Où on en est
 
@@ -60,8 +61,10 @@ Les étapes 1 à 3 de la feuille de route sont faites, ainsi qu'une page Réglag
 
 Prochaines étapes possibles, à faire valider par l'utilisateur :
 
-1. **Tablettes et Android** (étape 4 de SPEC) : fait le 6 novembre 2026, à faire essayer par l'utilisateur sur ses appareils. Si Chrome ne propose pas « Installer l'application », ajouter un service worker (prévu à l'étape 7 de toute façon).
+1. **Tablettes et Android** (étape 4 de SPEC) : fait le 6 novembre 2026, à faire essayer par l'utilisateur sur ses appareils. Si Chrome ne propose pas « Installer l'application », ajouter un service worker (prévu à l'étape 9 de toute façon).
 2. **Optimisations** : faites le 6 novembre 2026 (pages et couvertures gardées un an grâce à la version du tome dans l'adresse, pages d'admin chargées à la demande, tailles des pages lues dans le début des images). Un fichier `vendor` séparé a été essayé puis retiré : il alourdissait le premier chargement. Reste l'enregistrement du ComicInfo en recopiant l'archive par morceaux au lieu d'AdmZip (« on verra après »).
 3. **Pages redimensionnées selon l'écran** (étape 5).
 4. **Manga-news** (étape 6) : fait pour les séries le 6 novembre 2026 (`metadata/mangaNews.ts`, extraits de pages dans `test/fixtures/manga-news`). Les pages sont en UTF-8 ou en Windows-1252 selon la série, quel que soit l'en-tête ; le `TextDecoder('windows-1252')` de Node 22 lit en fait de l'ISO-8859-1, d'où la table maison. Reste : les pages de tome (liens `/manga/<Série>/vol-N`), pas encore examinées.
-5. **Hors ligne** (étape 7), **tomes manquants** (8), **bascule** (9).
+5. **Fiches à compléter** (étape 7) : faite le 6 novembre 2026 (`components/completeness.ts`, page « Séries à classer », `?fill=online` sur l'éditeur pour lancer la recherche en ligne, `&from=to-classify` pour « Suivante »). Remplissage revu le même jour : recherche sur les deux sites à la fois, tableau de comparaison (`SheetComparison.tsx`, logique dans `editing.ts`), site préféré par champ (réglage `sourcePriority`), fiches gardées dans `series.source` (colonne nommée `sources` dans le code, migration 0019 : « manga-news:Id wikipedia:123 », voir `metadata/sourceLink.ts`), suggestions de noms (`/libraries/:id/credits`).
+6. **Suggestions** (étape 8) : « Dans le même genre » sur la fiche série et « Lu par la famille » sur l'accueil d'abord, puis « Pour toi ».
+7. **Hors ligne** (étape 9), **tomes manquants** (10), **bascule** (11).
