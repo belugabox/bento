@@ -267,17 +267,11 @@ export const createApi = ({
                     ),
                 ),
         )
-        // Favoris et liste « à lire » de la personne.
+        // Liste « à lire » de la personne.
         .put(
             '/series/:id/lists',
             zValidator('param', idParam),
-            zValidator(
-                'json',
-                z.object({
-                    favorite: z.boolean().optional(),
-                    toRead: z.boolean().optional(),
-                }),
-            ),
+            zValidator('json', z.object({ toRead: z.boolean().optional() })),
             (c) =>
                 c.json(
                     setSeriesLists(

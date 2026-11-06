@@ -39,7 +39,6 @@ const SERIES = {
     writer: null,
     publisher: null,
     coverUpdatedAt: null,
-    favorite: false,
     toRead: false,
     collectionIds: [] as number[],
     library: { id: 1, name: 'Mangas', type: 'manga' },
@@ -116,8 +115,8 @@ describe('SeriesPage', () => {
         ]);
     });
 
-    it('adds the series to the favorites', async () => {
-        let favorite = false;
+    it('adds the series to the to-read list', async () => {
+        let toRead = false;
         const requests: [string, string, unknown][] = [];
         vi.spyOn(globalThis, 'fetch').mockImplementation(
             async (input, init) => {
@@ -126,13 +125,13 @@ describe('SeriesPage', () => {
                     : undefined;
                 requests.push([init?.method ?? 'GET', String(input), body]);
                 if (String(input).endsWith('/lists')) {
-                    favorite = body.favorite;
+                    toRead = body.toRead;
                 }
                 return new Response(
                     JSON.stringify(
                         String(input).endsWith('/lists')
-                            ? { favorite, toRead: false }
-                            : { ...SERIES, favorite },
+                            ? { toRead }
+                            : { ...SERIES, toRead },
                     ),
                     { headers: { 'Content-Type': 'application/json' } },
                 );
@@ -154,7 +153,7 @@ describe('SeriesPage', () => {
             </MantineProvider>,
         );
 
-        const button = await screen.findByRole('button', { name: 'Favori' });
+        const button = await screen.findByRole('button', { name: 'À lire' });
         expect(button.getAttribute('aria-pressed')).toBe('false');
         await act(async () => {
             fireEvent.click(button);
@@ -163,12 +162,12 @@ describe('SeriesPage', () => {
         expect(requests).toContainEqual([
             'PUT',
             '/api/series/3/lists',
-            { favorite: true },
+            { toRead: true },
         ]);
         await vi.waitFor(() =>
             expect(
                 screen
-                    .getByRole('button', { name: 'Favori' })
+                    .getByRole('button', { name: 'À lire' })
                     .getAttribute('aria-pressed'),
             ).toBe('true'),
         );

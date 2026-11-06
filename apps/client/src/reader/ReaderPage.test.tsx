@@ -182,6 +182,46 @@ describe('ReaderPage', () => {
         expect(location).toBe('/series/3');
     });
 
+    it('goes full screen, and leaves it with the reader', async () => {
+        // jsdom n'a pas de plein écran : celui d'un navigateur, simulé.
+        let element: Element | null = null;
+        const change = () =>
+            document.dispatchEvent(new Event('fullscreenchange'));
+        Object.defineProperty(document, 'fullscreenEnabled', {
+            configurable: true,
+            value: true,
+        });
+        Object.defineProperty(document, 'fullscreenElement', {
+            configurable: true,
+            get: () => element,
+        });
+        document.documentElement.requestFullscreen = vi.fn(async () => {
+            element = document.documentElement;
+            change();
+        });
+        document.exitFullscreen = vi.fn(async () => {
+            element = null;
+            change();
+        });
+        await open('rtl');
+
+        await act(async () => {
+            fireEvent.click(
+                screen.getByRole('button', { name: 'Plein écran' }),
+            );
+        });
+        expect(
+            screen.getByRole('button', { name: 'Quitter le plein écran' }),
+        ).toBeTruthy();
+
+        press('Escape');
+        await vi.waitFor(() =>
+            expect(document.exitFullscreen).toHaveBeenCalled(),
+        );
+        Reflect.deleteProperty(document, 'fullscreenEnabled');
+        Reflect.deleteProperty(document, 'fullscreenElement');
+    });
+
     it('resumes where the person stopped', async () => {
         await open('rtl', '/read/7', { page: 1, completed: false });
 

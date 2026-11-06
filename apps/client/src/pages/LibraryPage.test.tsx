@@ -23,8 +23,7 @@ const SERIES = [
     startedCount: s.readCount,
     coverUpdatedAt: null,
     coverVolumeId: index + 10,
-    favorite: index === 1,
-    toRead: false,
+    toRead: index === 1,
     collectionIds: index === 0 ? [7] : [],
     ...s,
 }));
@@ -140,7 +139,7 @@ describe('LibraryPage', () => {
         await screen.findByTestId('series-grid');
         await vi.waitFor(() => expect(titles()).toHaveLength(3));
 
-        fireEvent.click(screen.getByText('Commencées'));
+        fireEvent.click(screen.getByText('En cours'));
         expect(titles()).toEqual(['/series/3']);
         expect(location).toBe('?filter=started');
 
@@ -166,21 +165,22 @@ describe('LibraryPage', () => {
         ).toBe(true);
     });
 
-    it('keeps the favorites or a collection, in the address', async () => {
+    it('keeps the to-read list or a collection, in the address', async () => {
         show();
         await screen.findByTestId('series-grid');
         await vi.waitFor(() => expect(titles()).toHaveLength(3));
 
-        fireEvent.click(screen.getByRole('button', { name: 'Filtres' }));
-        fireEvent.click(await screen.findByRole('textbox', { name: 'Liste' }));
-        fireEvent.click(await screen.findByText('Mes favoris'));
+        fireEvent.click(screen.getByText('À lire'));
         expect(titles()).toEqual(['/series/2']);
-        expect(location).toBe('?list=favorite');
-        // Filtre actif : en pastille, qu'on peut retirer.
-        expect(screen.getAllByText('Mes favoris').length).toBeGreaterThan(0);
+        expect(location).toBe('?filter=toread');
+        fireEvent.click(screen.getByText('Toutes'));
 
-        fireEvent.click(screen.getByRole('textbox', { name: 'Liste' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Filtres' }));
+        fireEvent.click(
+            await screen.findByRole('textbox', { name: 'Collection' }),
+        );
         fireEvent.click(await screen.findByText('Classiques'));
+        // Filtre actif : en pastille, qu'on peut retirer.
         expect(titles()).toEqual(['/series/1']);
         expect(location).toBe('?list=collection%3A7');
 

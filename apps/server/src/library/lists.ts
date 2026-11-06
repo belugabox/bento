@@ -20,18 +20,18 @@ const checkVisible = (db: Db, viewer: Viewer, seriesId: number) => {
     if (!row) throw notFound('Série introuvable');
 };
 
-/** Ajoute ou retire une série des favoris et de la liste « à lire ». */
+/**
+ * Ajoute ou retire une série de la liste « à lire ». (Les favoris ont été
+ * retirés le 6 novembre 2026 ; leurs lignes restent en base, ignorées.)
+ */
 export const setSeriesLists = (
     db: Db,
     viewer: Viewer,
     seriesId: number,
-    changes: { favorite?: boolean; toRead?: boolean },
+    changes: { toRead?: boolean },
 ) => {
     checkVisible(db, viewer, seriesId);
-    const lists = [
-        ['favorite', changes.favorite],
-        ['toread', changes.toRead],
-    ] as const;
+    const lists = [['toread', changes.toRead]] as const;
     for (const [list, member] of lists) {
         if (member === undefined) continue;
         if (member) {
@@ -62,10 +62,7 @@ export const setSeriesLists = (
         )
         .all()
         .map((row) => row.list);
-    return {
-        favorite: kept.includes('favorite'),
-        toRead: kept.includes('toread'),
-    };
+    return { toRead: kept.includes('toread') };
 };
 
 /** Collections, avec le nombre de séries que la personne y voit. */
@@ -165,7 +162,12 @@ export const listsSnapshot = (db: Db, seriesId: number) => ({
     lists: db
         .select({ userId: seriesLists.userId, list: seriesLists.list })
         .from(seriesLists)
-        .where(eq(seriesLists.seriesId, seriesId))
+        .where(
+            and(
+                eq(seriesLists.seriesId, seriesId),
+                eq(seriesLists.list, 'toread'),
+            ),
+        )
         .all(),
     collectionIds: db
         .select({ id: collectionSeries.collectionId })

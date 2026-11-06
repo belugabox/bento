@@ -23,10 +23,6 @@ export const volumeOrder = [
  * préfixe pas les colonnes des sous-requêtes).
  */
 const listsOf = (viewer: Viewer) => ({
-    favorite:
-        sql<boolean>`exists(select 1 from series_lists sl where sl.series_id = series.id and sl.user_id = ${viewer.id} and sl.list = 'favorite')`.mapWith(
-            Boolean,
-        ),
     toRead: sql<boolean>`exists(select 1 from series_lists sl where sl.series_id = series.id and sl.user_id = ${viewer.id} and sl.list = 'toread')`.mapWith(
         Boolean,
     ),

@@ -11,21 +11,22 @@ export type ListedSeries = {
     // « Action, Aventure ».
     genre?: string | null;
     status?: 'ongoing' | 'completed' | null;
-    favorite?: boolean;
     toRead?: boolean;
     collectionIds?: number[];
 };
 
-export type ReadingFilter = 'all' | 'unread' | 'started' | 'read';
+/** État de lecture, ou la liste « à lire » de la personne. */
+export type ReadingFilter = 'all' | 'toread' | 'unread' | 'started' | 'read';
 export type SeriesSort = 'name' | 'recent';
 export type StatusFilter = 'all' | 'ongoing' | 'completed';
-/** Toutes les séries, une liste personnelle, ou `collection:<id>`. */
-export type ListFilter = 'all' | 'favorite' | 'toread' | `collection:${number}`;
+/** Toutes les séries, ou une collection (`collection:<id>`). */
+export type ListFilter = 'all' | `collection:${number}`;
 
 export const READING_FILTERS: { value: ReadingFilter; label: string }[] = [
     { value: 'all', label: 'Toutes' },
+    { value: 'toread', label: 'À lire' },
     { value: 'unread', label: 'Non lues' },
-    { value: 'started', label: 'Commencées' },
+    { value: 'started', label: 'En cours' },
     { value: 'read', label: 'Lues' },
 ];
 
@@ -43,7 +44,7 @@ export const STATUS_FILTERS: { value: StatusFilter; label: string }[] = [
 /** État de lecture d'une série pour la personne. */
 export const readingStateOf = (
     s: ListedSeries,
-): Exclude<ReadingFilter, 'all'> =>
+): Exclude<ReadingFilter, 'all' | 'toread'> =>
     s.readCount >= s.volumeCount
         ? 'read'
         : s.startedCount > 0
@@ -67,12 +68,13 @@ export const allGenres = (series: Pick<ListedSeries, 'genre'>[]) => {
     return [...byKey.values()].sort((a, b) => a.localeCompare(b, 'fr'));
 };
 
-const inList = (s: ListedSeries, list: ListFilter) => {
-    if (list === 'all') return true;
-    if (list === 'favorite') return !!s.favorite;
-    if (list === 'toread') return !!s.toRead;
-    return (s.collectionIds ?? []).includes(Number(list.split(':')[1]));
-};
+const inList = (s: ListedSeries, list: ListFilter) =>
+    list === 'all' ||
+    (s.collectionIds ?? []).includes(Number(list.split(':')[1]));
+
+const matchesReading = (s: ListedSeries, filter: ReadingFilter) =>
+    filter === 'all' ||
+    (filter === 'toread' ? !!s.toRead : readingStateOf(s) === filter);
 
 /** Séries à afficher, filtrées (lecture, liste, genre, statut) puis triées. */
 export const filterSeries = <T extends ListedSeries>(
@@ -94,7 +96,7 @@ export const filterSeries = <T extends ListedSeries>(
     const genreKey = genre?.toLocaleLowerCase('fr');
     const kept = series.filter(
         (s) =>
-            (filter === 'all' || readingStateOf(s) === filter) &&
+            matchesReading(s, filter) &&
             inList(s, list) &&
             (!genreKey ||
                 genresOf(s).some(

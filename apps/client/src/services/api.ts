@@ -91,11 +91,9 @@ export const fetchHome = () => json(api.home.$get());
 
 export type NextVolume = Awaited<ReturnType<typeof fetchHome>>['next'][number];
 
-/** Favoris et liste « à lire » de la personne. */
-export const setSeriesLists = (
-    seriesId: number,
-    lists: { favorite?: boolean; toRead?: boolean },
-) => json(api.series[':id'].lists.$put({ ...id(seriesId), json: lists }));
+/** Liste « à lire » de la personne. */
+export const setSeriesLists = (seriesId: number, lists: { toRead?: boolean }) =>
+    json(api.series[':id'].lists.$put({ ...id(seriesId), json: lists }));
 
 // --- Collections partagées ----------------------------------------------------
 

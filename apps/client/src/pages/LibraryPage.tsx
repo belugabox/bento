@@ -103,11 +103,6 @@ const seriesProgress = (volume: InProgressVolume) =>
           volume.volumeCount
         : 0;
 
-const LIST_LABELS: Record<string, string> = {
-    favorite: 'Mes favoris',
-    toread: 'À lire',
-};
-
 /**
  * Accueil : reprendre la lecture, suite des séries entamées, puis toutes
  * les séries (recherche, filtres et tri).
@@ -120,7 +115,11 @@ export const LibraryPage = () => {
     const [debouncedSearch] = useDebouncedValue(search, 250);
     const filter = (params.get('filter') as ReadingFilter | null) ?? 'all';
     const sort = (params.get('sort') as SeriesSort | null) ?? 'name';
-    const list = (params.get('list') as ListFilter | null) ?? 'all';
+    // Seulement une collection (les anciens « favoris » sont ignorés).
+    const rawList = params.get('list');
+    const list: ListFilter = rawList?.startsWith('collection:')
+        ? (rawList as ListFilter)
+        : 'all';
     const genre = params.get('genre');
     const status = (params.get('status') as StatusFilter | null) ?? 'all';
 
@@ -174,9 +173,9 @@ export const LibraryPage = () => {
         status,
     });
     // Filtres du bouton « Filtres », affichés aussi en pastilles.
-    const listLabel =
-        LIST_LABELS[list] ??
-        collections.data?.find((c) => `collection:${c.id}` === list)?.name;
+    const listLabel = collections.data?.find(
+        (c) => `collection:${c.id}` === list,
+    )?.name;
     const active = [
         list !== 'all' && {
             key: 'list',
@@ -203,40 +202,17 @@ export const LibraryPage = () => {
 
     return (
         <Stack gap="xl">
-            <Group justify="space-between" gap="sm">
-                {libraries.data && libraries.data.length > 1 ? (
-                    <SegmentedControl
-                        value={String(libraryId)}
-                        onChange={(value) => update({ library: value })}
-                        data={libraries.data.map((library) => ({
-                            value: String(library.id),
-                            label: library.name,
-                        }))}
-                    />
-                ) : (
-                    <Title order={2}>{libraries.data?.[0]?.name}</Title>
-                )}
-                <TextInput
-                    w={{ base: '100%', xs: 320 }}
-                    size="md"
-                    radius="xl"
-                    placeholder="Rechercher une série"
-                    aria-label="Rechercher une série"
-                    leftSection={<IconSearch size={18} />}
-                    rightSection={
-                        search && (
-                            <CloseButton
-                                aria-label="Effacer la recherche"
-                                onClick={() => setSearchText('')}
-                            />
-                        )
-                    }
-                    value={search}
-                    onChange={(event) =>
-                        setSearchText(event.currentTarget.value)
-                    }
+            {libraries.data && libraries.data.length > 1 && (
+                <SegmentedControl
+                    style={{ alignSelf: 'flex-start' }}
+                    value={String(libraryId)}
+                    onChange={(value) => update({ library: value })}
+                    data={libraries.data.map((library) => ({
+                        value: String(library.id),
+                        label: library.name,
+                    }))}
                 />
-            </Group>
+            )}
 
             {resume.length > 0 && (
                 <Shelf title="Reprendre la lecture">
@@ -269,6 +245,27 @@ export const LibraryPage = () => {
                         )}
                     </Group>
                     <Group gap="xs">
+                        <TextInput
+                            w={{ base: '100%', xs: 240 }}
+                            size="xs"
+                            radius="xl"
+                            placeholder="Rechercher une série"
+                            aria-label="Rechercher une série"
+                            leftSection={<IconSearch size={14} />}
+                            rightSection={
+                                search && (
+                                    <CloseButton
+                                        size="sm"
+                                        aria-label="Effacer la recherche"
+                                        onClick={() => setSearchText('')}
+                                    />
+                                )
+                            }
+                            value={search}
+                            onChange={(event) =>
+                                setSearchText(event.currentTarget.value)
+                            }
+                        />
                         <SegmentedControl
                             size="xs"
                             radius="xl"
@@ -306,9 +303,10 @@ export const LibraryPage = () => {
                             <Popover.Dropdown>
                                 <Stack gap="sm">
                                     <Select
-                                        label="Liste"
+                                        label="Collection"
                                         size="xs"
                                         allowDeselect={false}
+                                        disabled={!collections.data?.length}
                                         value={list}
                                         onChange={(value) =>
                                             update({ list: value ?? '' }, 'all')
@@ -318,14 +316,6 @@ export const LibraryPage = () => {
                                             {
                                                 value: 'all',
                                                 label: 'Toutes les séries',
-                                            },
-                                            {
-                                                value: 'favorite',
-                                                label: 'Mes favoris',
-                                            },
-                                            {
-                                                value: 'toread',
-                                                label: 'À lire',
                                             },
                                             ...(collections.data ?? []).map(
                                                 (c) => ({

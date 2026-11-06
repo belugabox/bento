@@ -5,6 +5,7 @@ import {
     Avatar,
     Button,
     Group,
+    Image,
     Indicator,
     Loader,
     Menu,
@@ -366,7 +367,18 @@ export const AppHeader = () => {
     return (
         <Group h="100%" justify="space-between">
             <Anchor component={Link} to="/" underline="never" c="inherit">
-                <Title order={3}>🍱 Bento</Title>
+                <Group gap={10} wrap="nowrap">
+                    <Image src="/favicon.svg" alt="" w={30} h={30} />
+                    <Title
+                        order={1}
+                        fz={22}
+                        fw={800}
+                        lh={1}
+                        style={{ letterSpacing: '-0.02em' }}
+                    >
+                        Bento
+                    </Title>
+                </Group>
             </Anchor>
             <Group gap="sm">
                 {user.role === 'admin' && <TasksIndicator />}

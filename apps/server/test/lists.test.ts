@@ -79,27 +79,25 @@ afterEach(async () => {
 });
 
 describe('personal lists', () => {
-    it('keeps favorites and the to-read list per person', async () => {
+    it('keeps the to-read list per person', async () => {
         const set = await call(`/series/${gantzSeries}/lists`, alice, {
             method: 'PUT',
-            json: { favorite: true, toRead: true },
+            json: { toRead: true },
         });
-        expect(set.body).toEqual({ favorite: true, toRead: true });
+        expect(set.body).toEqual({ toRead: true });
+
+        expect(await seriesOf(alice, 'Gantz')).toMatchObject({ toRead: true });
+        expect(
+            (await call(`/series/${gantzSeries}`, alice)).body,
+        ).toMatchObject({ toRead: true });
+        // Bob n'a rien choisi.
+        expect(await seriesOf(bob, 'Gantz')).toMatchObject({ toRead: false });
+
         await call(`/series/${gantzSeries}/lists`, alice, {
             method: 'PUT',
             json: { toRead: false },
         });
-
         expect(await seriesOf(alice, 'Gantz')).toMatchObject({
-            favorite: true,
-            toRead: false,
-        });
-        expect(
-            (await call(`/series/${gantzSeries}`, alice)).body,
-        ).toMatchObject({ favorite: true, toRead: false });
-        // Bob n'a rien choisi.
-        expect(await seriesOf(bob, 'Gantz')).toMatchObject({
-            favorite: false,
             toRead: false,
         });
     });
@@ -119,7 +117,7 @@ describe('personal lists', () => {
             (
                 await call(`/series/${gantzSeries}/lists`, kid, {
                     method: 'PUT',
-                    json: { favorite: true },
+                    json: { toRead: true },
                 })
             ).status,
         ).toBe(404);
@@ -188,7 +186,7 @@ describe('collections', () => {
         });
         await call(`/series/${gantzSeries}/lists`, alice, {
             method: 'PUT',
-            json: { favorite: true },
+            json: { toRead: true },
         });
         const volumes = (await call(`/series/${gantzSeries}`, admin)).body
             .volumes;
@@ -206,7 +204,7 @@ describe('collections', () => {
 
         const renamed = await seriesOf(alice, 'Gantz Perfect');
         expect(renamed.id).not.toBe(gantzSeries);
-        expect(renamed).toMatchObject({ favorite: true, collectionIds: [id] });
+        expect(renamed).toMatchObject({ toRead: true, collectionIds: [id] });
     });
 });
 

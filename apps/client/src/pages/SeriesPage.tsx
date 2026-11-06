@@ -24,8 +24,6 @@ import {
     IconChecks,
     IconDots,
     IconFolders,
-    IconHeart,
-    IconHeartFilled,
     IconPencil,
     IconPlayerPlay,
     IconRestore,
@@ -70,7 +68,7 @@ export const SeriesPage = () => {
     } = useQuery(() => fetchSeries(seriesId), [seriesId]);
     const [collectionsOpened, collectionsModal] = useDisclosure(false);
     // Liste en cours d'enregistrement (bouton désactivé).
-    const [savingList, setSavingList] = useState<'favorite' | 'toRead'>();
+    const [savingList, setSavingList] = useState(false);
 
     if (error) return <Alert color="red">{error.message}</Alert>;
     if (!series) return <Loader mx="auto" />;
@@ -102,14 +100,14 @@ export const SeriesPage = () => {
         reload();
     };
 
-    /** Ajoute ou retire la série des favoris ou de la liste « à lire ». */
-    const toggleList = async (list: 'favorite' | 'toRead') => {
-        setSavingList(list);
+    /** Ajoute ou retire la série de la liste « à lire ». */
+    const toggleToRead = async () => {
+        setSavingList(true);
         try {
-            await setSeriesLists(series.id, { [list]: !series[list] });
+            await setSeriesLists(series.id, { toRead: !series.toRead });
             reload();
         } finally {
-            setSavingList(undefined);
+            setSavingList(false);
         }
     };
 
@@ -218,28 +216,6 @@ export const SeriesPage = () => {
                         )}
                         <Tooltip
                             label={
-                                series.favorite
-                                    ? 'Retirer des favoris'
-                                    : 'Ajouter aux favoris'
-                            }
-                        >
-                            <ActionIcon
-                                variant={series.favorite ? 'light' : 'default'}
-                                size="lg"
-                                aria-label="Favori"
-                                aria-pressed={series.favorite}
-                                loading={savingList === 'favorite'}
-                                onClick={() => void toggleList('favorite')}
-                            >
-                                {series.favorite ? (
-                                    <IconHeartFilled size={18} />
-                                ) : (
-                                    <IconHeart size={18} />
-                                )}
-                            </ActionIcon>
-                        </Tooltip>
-                        <Tooltip
-                            label={
                                 series.toRead
                                     ? 'Retirer de « À lire »'
                                     : 'Ajouter à « À lire »'
@@ -250,8 +226,8 @@ export const SeriesPage = () => {
                                 size="lg"
                                 aria-label="À lire"
                                 aria-pressed={series.toRead}
-                                loading={savingList === 'toRead'}
-                                onClick={() => void toggleList('toRead')}
+                                loading={savingList}
+                                onClick={() => void toggleToRead()}
                             >
                                 {series.toRead ? (
                                     <IconBookmarkFilled size={18} />

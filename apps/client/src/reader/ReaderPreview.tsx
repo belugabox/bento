@@ -3,6 +3,7 @@ import { IconCheck } from '@tabler/icons-react';
 import { useEffect, useState } from 'react';
 
 import { Reader } from './Reader';
+import { exitFullscreen } from './fullscreen';
 import { type ReadingMode, readingModeLabel } from './navigation';
 
 /**
@@ -32,12 +33,14 @@ export const ReaderPreview = ({
     const [page, setPage] = useState(0);
     const [mode, setMode] = useState(initialMode);
 
-    // La page dessous ne défile plus pendant l'aperçu.
+    // La page dessous ne défile plus pendant l'aperçu ; le fermer quitte
+    // le plein écran.
     useEffect(() => {
         const previous = document.body.style.overflow;
         document.body.style.overflow = 'hidden';
         return () => {
             document.body.style.overflow = previous;
+            void exitFullscreen();
         };
     }, []);
 

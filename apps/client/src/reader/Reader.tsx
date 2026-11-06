@@ -8,11 +8,14 @@ import {
     Select,
     Slider,
     Stack,
+    Switch,
     Text,
 } from '@mantine/core';
 import { useLocalStorage, useMediaQuery } from '@mantine/hooks';
 import {
     IconArrowLeft,
+    IconMaximize,
+    IconMinimize,
     IconSettings,
     IconZoomIn,
     IconZoomOut,
@@ -38,6 +41,7 @@ import {
 import { useQuery } from '@/services/useQuery';
 
 import { WebtoonView } from './WebtoonView';
+import { useFullscreen } from './fullscreen';
 import {
     type Fit,
     type Move,
@@ -129,6 +133,7 @@ export const Reader = ({
         defaultValue: 'auto',
     });
     const [toolbar, setToolbar] = useState(true);
+    const fullscreen = useFullscreen();
     const [ended, setEnded] = useState(false);
     const [zoomed, setZoomed] = useState(false);
     const zoom = useRef<ReactZoomPanPinchRef>(null);
@@ -453,6 +458,24 @@ export const Reader = ({
                                     </ActionIcon>
                                 </>
                             )}
+                            {fullscreen.supported && (
+                                <ActionIcon
+                                    variant="subtle"
+                                    color="gray"
+                                    aria-label={
+                                        fullscreen.active
+                                            ? 'Quitter le plein écran'
+                                            : 'Plein écran'
+                                    }
+                                    onClick={fullscreen.toggle}
+                                >
+                                    {fullscreen.active ? (
+                                        <IconMinimize size={18} />
+                                    ) : (
+                                        <IconMaximize size={18} />
+                                    )}
+                                </ActionIcon>
+                            )}
                             <Popover position="bottom-end" withinPortal>
                                 <Popover.Target>
                                     <ActionIcon
@@ -536,6 +559,19 @@ export const Reader = ({
                                                     ]}
                                                 />
                                             </>
+                                        )}
+                                        {fullscreen.supported && (
+                                            <Switch
+                                                size="xs"
+                                                label="Plein écran à l’ouverture"
+                                                checked={fullscreen.auto}
+                                                onChange={(event) =>
+                                                    fullscreen.setAuto(
+                                                        event.currentTarget
+                                                            .checked,
+                                                    )
+                                                }
+                                            />
                                         )}
                                     </Stack>
                                 </Popover.Dropdown>
