@@ -60,6 +60,7 @@ import {
 import { type LibraryScanner, coverFile } from './library/scanner';
 import { readCover } from './library/smallCovers';
 import { getStats } from './library/stats';
+import { MangaNews } from './metadata/mangaNews';
 import type { Wikipedia } from './metadata/wikipedia';
 import { SettingsStore, settingsUpdateSchema } from './settings';
 import { AppError, notFound } from './tools/errors';
@@ -76,6 +77,8 @@ export type ApiDeps = {
     files: LibraryFiles;
     covers: SeriesCovers;
     wikipedia: Wikipedia;
+    /** Manga-news (le vrai site si absent). */
+    mangaNews?: MangaNews;
     /** Réglages de l'admin (valeurs par défaut si absents). */
     settings?: SettingsStore;
     /** File des compressions (créée avec `files` si absente). */
@@ -177,6 +180,7 @@ export const createApi = ({
     files,
     covers,
     wikipedia,
+    mangaNews = new MangaNews(),
     settings = new SettingsStore(db),
     compression = new CompressionQueue(
         files,
@@ -434,6 +438,21 @@ export const createApi = ({
             zValidator('param', idParam),
             async (c) =>
                 c.json(await wikipedia.series(c.req.valid('param').id)),
+        )
+        // --- Métadonnées Manga-news (admin), lues à la demande.
+        .get(
+            '/metadata/manga-news/search',
+            requireAdmin,
+            zValidator('query', z.object({ q: z.string().trim().min(1) })),
+            async (c) => c.json(await mangaNews.search(c.req.valid('query').q)),
+        )
+        .get(
+            '/metadata/manga-news/series',
+            requireAdmin,
+            // Fin de l'adresse de la fiche (« Spy-X-Family »).
+            zValidator('query', z.object({ id: z.string().min(1).max(200) })),
+            async (c) =>
+                c.json(await mangaNews.series(c.req.valid('query').id)),
         )
         .get('/volumes/:id', zValidator('param', idParam), (c) => {
             // Le chemin sur disque reste côté serveur.

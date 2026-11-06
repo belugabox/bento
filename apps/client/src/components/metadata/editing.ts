@@ -1,4 +1,9 @@
-import { type ComicInfo, parseVolumeFileName } from '@server/types';
+import {
+    type Audience,
+    type ComicInfo,
+    type Format,
+    parseVolumeFileName,
+} from '@server/types';
 
 /** Champs communs à toute la série, appliqués à chaque tome. */
 export const SERIES_FIELDS = [
@@ -150,22 +155,86 @@ export const statusFromWikipedia = (
 ): SeriesStatus | undefined =>
     wiki.lastYear ? 'completed' : wiki.ongoing ? 'ongoing' : undefined;
 
+/** Fiche Manga-news, telle que renvoyée par le serveur. */
+export type MangaNewsSeries = {
+    title: string;
+    summary: string;
+    genres: string[];
+    themes: string[];
+    writer: string;
+    penciller: string;
+    publisher: string;
+    format: Format | null;
+    audience: Audience | null;
+    ageRating?: string;
+    ongoing?: boolean;
+};
+
 /**
- * Champs de série depuis Wikipédia. Le résumé ne va que sur le premier
- * tome. Sans `overwrite`, seuls les champs vides sont remplis.
+ * Fiche d'une série trouvée en ligne, quelle que soit sa source : ce qui
+ * remplit l'éditeur.
  */
-export const fillFromWikipedia = (
+export type SeriesSheet = {
+    title: string;
+    summary?: string;
+    genre?: string;
+    tags?: string;
+    writer?: string;
+    penciller?: string;
+    publisher?: string;
+    ageRating?: string;
+    status?: SeriesStatus;
+    format?: Format;
+    audience?: Audience;
+};
+
+export const sheetFromWikipedia = (wiki: WikipediaSeries): SeriesSheet => ({
+    title: wiki.title,
+    summary: wiki.summary,
+    genre: wiki.genre,
+    writer: wiki.writer,
+    penciller: wiki.penciller,
+    publisher: wiki.publisher,
+    status: statusFromWikipedia(wiki),
+});
+
+export const sheetFromMangaNews = (series: MangaNewsSeries): SeriesSheet => ({
+    title: series.title,
+    summary: series.summary,
+    genre: series.genres.join(', '),
+    tags: series.themes.join(', '),
+    writer: series.writer,
+    penciller: series.penciller,
+    publisher: series.publisher,
+    ageRating: series.ageRating,
+    status:
+        series.ongoing === undefined
+            ? undefined
+            : series.ongoing
+              ? 'ongoing'
+              : 'completed',
+    format: series.format ?? undefined,
+    audience: series.audience ?? undefined,
+});
+
+/**
+ * Champs de série depuis une fiche en ligne. Le résumé ne va que sur le
+ * premier tome. Sans `overwrite`, seuls les champs vides sont remplis.
+ */
+export const fillFromSheet = (
     edits: Edits,
     paths: string[],
-    wiki: WikipediaSeries,
+    sheet: SeriesSheet,
     overwrite: boolean,
 ): Edits => {
-    const values: Partial<Record<SeriesField, string | number>> = {
-        Series: wiki.title,
-        Genre: wiki.genre,
-        Writer: wiki.writer,
-        Penciller: wiki.penciller,
-        Publisher: wiki.publisher,
+    const values: Partial<Record<SeriesField, string | number | undefined>> = {
+        Series: sheet.title,
+        Genre: sheet.genre,
+        Tags: sheet.tags,
+        Writer: sheet.writer,
+        Penciller: sheet.penciller,
+        Publisher: sheet.publisher,
+        AgeRating: sheet.ageRating,
     };
     let next = edits;
     for (const [field, value] of Object.entries(values) as [
@@ -180,11 +249,19 @@ export const fillFromWikipedia = (
         }
     }
     const first = paths[0];
-    if (first && wiki.summary && fillable(next[first]?.Summary, overwrite)) {
-        next = setVolumeField(next, first, 'Summary', wiki.summary);
+    if (first && sheet.summary && fillable(next[first]?.Summary, overwrite)) {
+        next = setVolumeField(next, first, 'Summary', sheet.summary);
     }
     return next;
 };
+
+/** Champs de série depuis Wikipédia (voir `fillFromSheet`). */
+export const fillFromWikipedia = (
+    edits: Edits,
+    paths: string[],
+    wiki: WikipediaSeries,
+    overwrite: boolean,
+): Edits => fillFromSheet(edits, paths, sheetFromWikipedia(wiki), overwrite);
 
 const same = (a: unknown, b: unknown) => String(a ?? '') === String(b ?? '');
 

@@ -348,6 +348,8 @@ describe('MetadataEditor', () => {
             (screen.getByPlaceholderText('Nom de la série') as HTMLInputElement)
                 .value,
         ).toBe('Gantz');
+        // Un manga cherche d'abord sur Manga-news.
+        fireEvent.click(screen.getByText('Wikipédia'));
         fireEvent.click(searchButton);
         fireEvent.click(await screen.findByRole('button', { name: 'Gantz' }));
         fireEvent.click(
@@ -364,6 +366,95 @@ describe('MetadataEditor', () => {
                 ) as HTMLInputElement
             ).value,
         ).toBe('Tome 2');
+    });
+
+    it('fills from Manga-news: sorted genres, themes, age, format and audience', async () => {
+        mockServer();
+        const fetchMock = vi.mocked(fetch);
+        const answer = fetchMock.getMockImplementation()!;
+        fetchMock.mockImplementation(async (input, init) => {
+            const url = String(input);
+            const body = url.includes('/manga-news/search')
+                ? [{ id: 'Gantz', title: 'Gantz', year: 2000 }]
+                : url.includes('/manga-news/series')
+                  ? {
+                        id: 'Gantz',
+                        title: 'Gantz',
+                        url: 'https://www.manga-news.com/index.php/serie/Gantz',
+                        originalTitle: 'Gantz',
+                        summary: 'Des aliens.',
+                        genres: ['Suspense', 'Science-fiction'],
+                        themes: ['aliens'],
+                        writer: 'Hiroya OKU',
+                        penciller: 'Hiroya OKU',
+                        publisher: 'Tonkam',
+                        format: 'manga',
+                        audience: 'seinen',
+                        age: 16,
+                        ageRating: 'Mature 17+',
+                        volumeCount: 37,
+                        ongoing: false,
+                    }
+                  : undefined;
+            if (!body) return answer(input, init);
+            return new Response(JSON.stringify(body), {
+                headers: { 'Content-Type': 'application/json' },
+            });
+        });
+        const save = vi.fn().mockResolvedValue({});
+        const saveStatus = vi.fn().mockResolvedValue({});
+        render(
+            <MantineProvider>
+                <MetadataEditor
+                    libraryId={1}
+                    kind="manga"
+                    mode="drafts"
+                    volumes={volumes()}
+                    status={{ value: null, save: saveStatus }}
+                    classification={{
+                        format: null,
+                        defaultFormat: 'manga',
+                        audience: null,
+                        save,
+                    }}
+                    onChanged={() => {}}
+                />
+            </MantineProvider>,
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: /Remplir/ }));
+        fireEvent.click(
+            await screen.findByRole('button', { name: 'Rechercher' }),
+        );
+        fireEvent.click(await screen.findByRole('button', { name: /Gantz/ }));
+        expect(await screen.findByText(/Âge conseillé 16\+/)).toBeTruthy();
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Utiliser cette fiche' }),
+        );
+
+        // « Suspense » rangé dans « Thriller ».
+        expect(pillsOf('Genres')).toEqual(['Thriller', 'Science-fiction']);
+        expect(pillsOf('Thèmes')).toEqual(['aliens']);
+        await act(async () => {
+            fireEvent.click(
+                screen.getByRole('button', { name: /Enregistrer/ }),
+            );
+        });
+
+        const changes = (
+            requests[requests.length - 1]?.[2] as {
+                updates: { changes: Record<string, unknown> }[];
+            }
+        ).updates[0]?.changes;
+        expect(changes).toMatchObject({
+            Genre: 'Thriller, Science-fiction',
+            Tags: 'aliens',
+            AgeRating: 'Mature 17+',
+            Writer: 'Hiroya OKU',
+        });
+        expect(saveStatus).toHaveBeenCalledWith('completed');
+        // Format de la bibliothèque : gardé « par défaut ».
+        expect(save).toHaveBeenCalledWith({ audience: 'seinen' });
     });
 
     it('saves the reading mode of a published series', async () => {

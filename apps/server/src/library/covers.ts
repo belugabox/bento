@@ -14,8 +14,9 @@ import { resolveInLibrary } from './paths';
 import { coverFile } from './scanner';
 
 export const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
-// Seules les images de Wikimedia sont téléchargées (pas d'adresse arbitraire).
-const ALLOWED_IMAGE_HOSTS = ['upload.wikimedia.org'];
+// Seules les images de Wikimedia et de Manga-news sont téléchargées (pas
+// d'adresse arbitraire).
+const ALLOWED_IMAGE_HOSTS = ['upload.wikimedia.org', 'www.manga-news.com'];
 const USER_AGENT = 'bento/1.0 (https://github.com/belugabox/bento)';
 const ADMIN = { id: 0, role: 'admin' as const, maxAge: null };
 

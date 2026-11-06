@@ -20,7 +20,7 @@ Bento est le serveur de lecture et de gestion des mangas et BD de la maison. Il 
 | Contenus | Mangas et BD/comics en CBZ | EPUB, PDF |
 | Appareils | Navigateur, tablette et téléphone (appli installable), lecture hors ligne | Liseuses (OPDS) |
 | Utilisateurs | L'admin (gestion) et la famille (lecture) | Accès public |
-| Métadonnées | Wikipédia FR (mangas et BD), manga-news (mangas, prévu), noms de fichiers, saisie | Bedetheque (bloque les robots) |
+| Métadonnées | Wikipédia FR (mangas et BD), Manga-news (mangas), noms de fichiers, saisie | Bedetheque (bloque les robots) |
 
 ## Fonctionnalités
 
@@ -68,9 +68,9 @@ Bento est le serveur de lecture et de gestion des mangas et BD de la maison. Il 
 - **Réglages de la future série dès les brouillons** : statut, mode de lecture et couverture, appliqués à la publication.
 - **Métadonnées** : recherche Wikipédia FR, remplissage depuis les noms de fichiers, option « écraser les valeurs existantes ».
 - **Classement** : format (manga, manhwa, manhua, webtoon, BD, comics) et public (jeunesse, shonen, shojo, seinen, josei) gardés dans Bento ; genres d'une liste gérée par l'admin (avec les autres noms qu'ils reconnaissent) et thèmes libres, dans `Genre` et `Tags` du ComicInfo.
-- **Manga-news** (prévu) : deuxième source de « Remplir », par défaut pour les mangas.
+- **Manga-news** (fait pour les séries) : deuxième source de « Remplir », par défaut pour les mangas.
   - Série : auteurs, traducteurs, éditeurs VF et VO, type, genres, origine et année, **âge conseillé** (classification), résumé.
-  - Tomes : année, titre et résumé de chaque tome, d'après leurs pages.
+  - Tomes (pas encore fait) : année, titre et résumé de chaque tome, d'après leurs pages.
   - Pas d'API : lecture du HTML, à la demande seulement (jamais d'aspiration en masse), avec des tests sur des pages enregistrées. Si le site affiche un contrôle anti-robot (Cloudflare), Bento ne le contourne pas : Wikipédia reste disponible.
 - **Publication** : rangement en `Série/Série #NN (Année).cbz`, l'année étant facultative.
   - Ajout de tomes à une série existante.
@@ -115,7 +115,7 @@ Bento est le serveur de lecture et de gestion des mangas et BD de la maison. Il 
    - **plein écran du lecteur** : bouton dans la barre du lecteur, et option « Plein écran à l'ouverture » (au premier toucher, le navigateur l'exige) ; il continue d'un tome au suivant ;
    - **appli web installable** : manifeste et icônes (boîte à bento violette), pour « Installer l'application » dans Chrome sur Android et « Sur l'écran d'accueil » sur iPad. Pas encore de service worker : le hors ligne reste pour l'étape 7.
 5. **Lecteur avancé** — fait : double page, modes BD / manga / webtoon, gestes tactiles, zoom. Reste : images redimensionnées selon l'écran (les pages sont servies en taille d'origine).
-6. **Manga-news** : deuxième source de métadonnées pour les mangas (voir F).
+6. **Manga-news** — fait pour les séries (voir F), avec le classement par format, public, genres gérés et thèmes. Reste : les fiches des tomes.
 7. **Hors ligne** : téléchargements, lecture sans réseau, synchronisation de la progression.
 8. **Tomes manquants et sorties** : trous dans la numérotation, tomes parus (Wikipédia, puis manga-news) absents de la bibliothèque.
 9. **Bascule** : retirer le module manga de beluga-box (la synchro vers `_draft` reste en place), arrêter Kavita.

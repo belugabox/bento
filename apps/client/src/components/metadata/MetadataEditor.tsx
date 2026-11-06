@@ -58,7 +58,7 @@ import { useQuery } from '@/services/useQuery';
 import { CompressionModal } from './CompressionModal';
 import { ExistingSeriesPicker } from './ExistingSeriesPicker';
 import { GenreFields } from './GenreFields';
-import { WikipediaSearch } from './WikipediaSearch';
+import { SeriesSearch } from './SeriesSearch';
 import {
     type EditableVolume,
     type Edits,
@@ -66,7 +66,7 @@ import {
     type SeriesStatus,
     changesOf,
     fillFromFileNames,
-    fillFromWikipedia,
+    fillFromSheet,
     initialEdits,
     isFieldChanged,
     isMixed,
@@ -75,7 +75,6 @@ import {
     seriesValue,
     setSeriesField,
     setVolumeField,
-    statusFromWikipedia,
 } from './editing';
 
 export type EditorVolume = EditableVolume & {
@@ -205,7 +204,7 @@ export const MetadataEditor = ({
     // Action en cours : roue de chargement sur son seul bouton.
     const [busy, setBusy] = useState<'save' | 'publish'>();
     const [report, setReport] = useState<Report>();
-    const [wikiOpened, wiki] = useDisclosure(false);
+    const [finderOpened, finder] = useDisclosure(false);
     const [compressionOpened, compression] = useDisclosure(false);
     // Tome ouvert en aperçu de lecture.
     const [preview, setPreview] = useState<EditorVolume>();
@@ -357,7 +356,7 @@ export const MetadataEditor = ({
                     <Button
                         variant="default"
                         leftSection={<IconWand size={16} />}
-                        onClick={wiki.open}
+                        onClick={finder.open}
                     >
                         Remplir
                     </Button>
@@ -826,26 +825,46 @@ export const MetadataEditor = ({
                 onCompressed={() => onChanged()}
             />
 
-            <WikipediaSearch
-                opened={wikiOpened}
-                onClose={wiki.close}
+            <SeriesSearch
+                opened={finderOpened}
+                onClose={finder.close}
                 kind={kind}
                 initialQuery={String(series('Series'))}
-                onPick={(details) => {
+                onPick={({ sheet }) => {
+                    // Genres et thèmes rangés d'après la liste des genres
+                    // (« Suspense » devient « Thriller »).
+                    const sorted = classify(sheet.genre, sheet.tags, catalog);
+                    const tidy = {
+                        ...sheet,
+                        genre: sorted.genres.join(', '),
+                        tags: sorted.themes.join(', '),
+                    };
                     setEdits((current) => {
-                        const filled = fillFromWikipedia(
+                        const filled = fillFromSheet(
                             current,
                             paths,
-                            details,
+                            tidy,
                             overwrite,
                         );
                         return alsoFileNames
                             ? fillFromFileNames(filled, readable, overwrite)
                             : filled;
                     });
-                    const fromWiki = statusFromWikipedia(details);
-                    if (fromWiki && (overwrite || status === UNKNOWN)) {
-                        setStatus(fromWiki);
+                    if (sheet.status && (overwrite || status === UNKNOWN)) {
+                        setStatus(sheet.status);
+                    }
+                    if (!classification) return;
+                    // Le format de la bibliothèque reste « par défaut ».
+                    if (
+                        sheet.format &&
+                        sheet.format !== classification.defaultFormat &&
+                        (overwrite || formatValue === DEFAULT_MODE)
+                    ) {
+                        setFormatValue(sheet.format);
+                    }
+                    const audience = sheet.audience ?? sorted.audience;
+                    if (audience && (overwrite || audienceValue === UNKNOWN)) {
+                        setAudienceValue(audience);
                     }
                 }}
                 footer={
@@ -876,10 +895,10 @@ export const MetadataEditor = ({
                                             overwrite,
                                         ),
                                     );
-                                    wiki.close();
+                                    finder.close();
                                 }}
                             >
-                                Sans Wikipédia : noms de fichiers seulement
+                                Sans fiche en ligne : noms de fichiers seulement
                             </Button>
                         </Group>
                     </Stack>

@@ -246,6 +246,18 @@ export type WikipediaResult = Awaited<
 >[number];
 export type WikipediaDetails = Awaited<ReturnType<typeof fetchWikipediaSeries>>;
 
+export const searchMangaNews = (q: string) =>
+    json(api.metadata['manga-news'].search.$get({ query: { q } }));
+
+/** Fiche Manga-news, par la fin de son adresse (« Spy-X-Family »). */
+export const fetchMangaNewsSeries = (seriesId: string) =>
+    json(api.metadata['manga-news'].series.$get({ query: { id: seriesId } }));
+
+export type MangaNewsResult = Awaited<
+    ReturnType<typeof searchMangaNews>
+>[number];
+export type MangaNewsDetails = Awaited<ReturnType<typeof fetchMangaNewsSeries>>;
+
 /** Partie gardée de l'image, recadrée en 2:3. */
 export type CoverPosition = 'top' | 'center' | 'bottom';
 

@@ -22,7 +22,7 @@ import { useEffect, useState } from 'react';
 
 import type { CoverPosition, CoverSource } from '@/services/api';
 
-import { WikipediaSearch } from './WikipediaSearch';
+import { SeriesSearch } from './SeriesSearch';
 
 /** Tome (série publiée) ou fichier (brouillon) où prendre une couverture. */
 export type CoverVolume = {
@@ -101,7 +101,7 @@ const Thumb = ({
 
 /**
  * Choix de la couverture d'une série (ou de la future série d'un dossier de
- * brouillons) : un tome, une page, une image de l'appareil ou de Wikipédia,
+ * brouillons) : un tome, une page, une image de l'appareil ou d'une fiche en ligne,
  * recadrée en 2:3 en gardant le haut, le centre ou le bas.
  */
 export const CoverPicker = ({
@@ -130,7 +130,7 @@ export const CoverPicker = ({
     const [position, setPosition] = useState<CoverPosition>('top');
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string>();
-    const [wikiOpened, wiki] = useDisclosure(false);
+    const [finderOpened, finder] = useDisclosure(false);
     const volume = volumes.find((v) => v.key === volumeKey) ?? volumes[0];
 
     // Image de l'appareil : son adresse locale est libérée ensuite.
@@ -180,7 +180,7 @@ export const CoverPicker = ({
     return (
         <>
             <Modal
-                opened={opened && !wikiOpened}
+                opened={opened && !finderOpened}
                 onClose={onClose}
                 title="Couverture de la série"
                 size="xl"
@@ -200,7 +200,7 @@ export const CoverPicker = ({
                             <Tabs.Tab value="volume">Un tome</Tabs.Tab>
                             <Tabs.Tab value="page">Une page</Tabs.Tab>
                             <Tabs.Tab value="image">Une image</Tabs.Tab>
-                            <Tabs.Tab value="wikipedia">Wikipédia</Tabs.Tab>
+                            <Tabs.Tab value="wikipedia">En ligne</Tabs.Tab>
                         </Tabs.List>
 
                         <Tabs.Panel value="volume" pt="sm">
@@ -349,12 +349,12 @@ export const CoverPicker = ({
                         <Tabs.Panel value="wikipedia" pt="sm">
                             <Stack align="flex-start">
                                 <Text size="sm" c="dimmed">
-                                    L’image de l’article Wikipédia de la série
-                                    (souvent un logo ou la couverture du premier
-                                    tome).
+                                    L’image de la fiche de la série sur
+                                    Manga-news (couverture du premier tome) ou
+                                    Wikipédia (souvent un logo).
                                 </Text>
-                                <Button variant="default" onClick={wiki.open}>
-                                    Chercher sur Wikipédia…
+                                <Button variant="default" onClick={finder.open}>
+                                    Chercher en ligne…
                                 </Button>
                             </Stack>
                         </Tabs.Panel>
@@ -465,23 +465,23 @@ export const CoverPicker = ({
                     </Group>
                 </Stack>
             </Modal>
-            <WikipediaSearch
-                opened={wikiOpened}
-                onClose={wiki.close}
+            <SeriesSearch
+                opened={finderOpened}
+                onClose={finder.close}
                 kind={kind}
                 initialQuery={seriesName}
                 actionLabel="Utiliser son image"
-                onPick={(details) => {
-                    if (!details.coverUrl) {
-                        setError('Cet article n’a pas d’image.');
+                onPick={(found) => {
+                    if (!found.coverUrl) {
+                        setError('Cette fiche n’a pas d’image.');
                         return;
                     }
                     setError(undefined);
                     setCandidate({
-                        id: 'wikipedia',
-                        src: details.coverUrl,
-                        source: { type: 'url', url: details.coverUrl },
-                        label: `Wikipédia : ${details.title}`,
+                        id: found.source,
+                        src: found.coverUrl,
+                        source: { type: 'url', url: found.coverUrl },
+                        label: `${found.source === 'wikipedia' ? 'Wikipédia' : 'Manga-news'} : ${found.title}`,
                     });
                 }}
             />
