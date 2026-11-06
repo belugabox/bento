@@ -18,6 +18,15 @@ export const ThemedApp = () => {
                 // Hors ligne : le thème déjà connu reste.
             });
     }, [setDefaults]);
+    // Barres du système (Android) : du fond de l'appli, discrètes.
+    useEffect(() => {
+        document
+            .querySelector('meta[name="theme-color"]')
+            ?.setAttribute(
+                'content',
+                resolved === 'dark' ? '#242424' : '#ffffff',
+            );
+    }, [resolved]);
     const theme = useMemo(
         () => createTheme({ primaryColor: accent }),
         [accent],

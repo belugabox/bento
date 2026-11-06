@@ -34,6 +34,7 @@ import {
 import { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router';
 
+import logo from '@/assets/logo.svg';
 import { AppearanceModal } from '@/components/AppearanceModal';
 import { AGE_LIMITS, ageLimitLabel } from '@/components/ageLimits';
 import {
@@ -368,7 +369,7 @@ export const AppHeader = () => {
         <Group h="100%" justify="space-between">
             <Anchor component={Link} to="/" underline="never" c="inherit">
                 <Group gap={10} wrap="nowrap">
-                    <Image src="/favicon.svg" alt="" w={30} h={30} />
+                    <Image src={logo} alt="" w={30} h={30} />
                     <Title
                         order={1}
                         fz={22}
