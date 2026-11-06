@@ -113,12 +113,18 @@ Bento est le serveur de lecture et de gestion des mangas et BD de la maison. Il 
 3. **Famille** — fait : contrôle parental, vue lecteur pour l'admin, thèmes, statistiques, série lue / non lue, liste « à lire », collections partagées, filtres par liste, genre et statut, la suite des séries entamées dans « Reprendre la lecture » (« Nouveautés » retirée pour l'instant, à revoir).
 4. **Tablettes et Android** — fait, à essayer sur les appareils :
    - **plein écran du lecteur** : bouton dans la barre du lecteur, et option « Plein écran à l'ouverture » (au premier toucher, le navigateur l'exige) ; il continue d'un tome au suivant ;
-   - **appli web installable** : manifeste et icônes (boîte à bento violette), pour « Installer l'application » dans Chrome sur Android et « Sur l'écran d'accueil » sur iPad. Pas encore de service worker : le hors ligne reste pour l'étape 7.
+   - **appli web installable** : manifeste et icônes (boîte à bento violette), pour « Installer l'application » dans Chrome sur Android et « Sur l'écran d'accueil » sur iPad. Pas encore de service worker : le hors ligne reste pour l'étape 8.
 5. **Lecteur avancé** — fait : double page, modes BD / manga / webtoon, gestes tactiles, zoom. Reste : images redimensionnées selon l'écran (les pages sont servies en taille d'origine).
 6. **Manga-news** — fait pour les séries (voir F), avec le classement par format, genres gérés et thèmes. Reste : les fiches des tomes.
-7. **Hors ligne** : téléchargements, lecture sans réseau, synchronisation de la progression.
-8. **Tomes manquants et sorties** : trous dans la numérotation, tomes parus (Wikipédia, puis manga-news) absents de la bibliothèque.
-9. **Bascule** : retirer le module manga de beluga-box (la synchro vers `_draft` reste en place), arrêter Kavita.
+7. **Suggestions** : proposer des séries à lire, d'après les genres, les thèmes et les lectures de la famille, sans service extérieur. Elles marchent d'autant mieux que les séries sont classées.
+   - **« Dans le même genre »** sur la fiche série : genres en commun (beaucoup), thèmes en commun (un peu), même format (un petit bonus) ; les séries déjà lues après les autres.
+   - **« Lu par la famille »** sur l'accueil : séries finies ou bien avancées par un autre membre, pas commencées par la personne (« Léo a fini Mashle »).
+   - **« Pour toi »** sur l'accueil, ensuite : d'après les genres et thèmes des séries lues ou commencées (pondérés par les tomes lus), séries pas commencées, avec la raison (« Parce que tu as lu Spy × Family »).
+   - Plus tard : 👍 / 👎 dans le menu ⋮ pour affiner, nouveautés dans les genres préférés, séries courtes ou terminées pour une lecture rapide.
+   - Toujours dans la limite d'âge du compte.
+8. **Hors ligne** : téléchargements, lecture sans réseau, synchronisation de la progression.
+9. **Tomes manquants et sorties** : trous dans la numérotation, tomes parus (Wikipédia, puis manga-news) absents de la bibliothèque.
+10. **Bascule** : retirer le module manga de beluga-box (la synchro vers `_draft` reste en place), arrêter Kavita.
 
 ## Décisions de déploiement
 
