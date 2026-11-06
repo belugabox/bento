@@ -184,6 +184,8 @@ export const createApi = ({
             db.run(sql`select 1`);
             return c.json({ status: 'ok' as const, version });
         })
+        // Public : la page de connexion prend aussi le thème par défaut.
+        .get('/appearance', (c) => c.json(settings.get().appearance))
         .route('/auth', createAuthRoutes({ db, logger, ...auth }))
         // Tout ce qui suit exige une session.
         .use('*', requireUser(db))

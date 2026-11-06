@@ -78,11 +78,11 @@ L'admin fixe le mode de chaque série dans « Modifier les métadonnées » (par
 
 ### Réglages (admin)
 
-Depuis le menu de l'avatar, « Réglages » : qualité JPEG et hauteur maximale des pages pour la compression, et intervalle du scan automatique (la variable `SCAN_INTERVAL_MINUTES` n'en donne plus que la valeur par défaut). Les réglages sont gardés en base et s'appliquent tout de suite.
+Depuis le menu de l'avatar, « Réglages » : qualité JPEG et hauteur maximale des pages pour la compression, intervalle du scan automatique, et apparence par défaut (la variable `SCAN_INTERVAL_MINUTES` n'en donne plus que la valeur par défaut). Les réglages sont gardés en base et s'appliquent tout de suite.
 
 ### Apparence
 
-Chacun choisit, depuis le menu de l'avatar (« Apparence… »), le mode clair, sombre ou celui du système, et une couleur d'accent parmi douze. Le réglage est gardé sur l'appareil.
+Par défaut, Bento suit le mode du système (clair ou sombre) en violet ; l'admin change ce thème par défaut dans les réglages. Chacun peut choisir le sien depuis le menu de l'avatar (« Apparence… ») : mode clair, sombre ou celui du système, et une couleur d'accent parmi douze. Ce choix est gardé sur l'appareil ; « Thème par défaut » y revient.
 
 ### Statistiques (admin)
 

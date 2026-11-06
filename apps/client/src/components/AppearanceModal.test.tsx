@@ -3,49 +3,69 @@ import { act, fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import { AppearanceModal } from './AppearanceModal';
-import { useAccent } from './theme';
+import { useAppearance } from './theme';
 
-/** Couleur d'accent telle que la voit le reste de l'appli. */
-const AccentProbe = () => <span data-testid="accent">{useAccent()[0]}</span>;
+/** Thème tel que le voit le reste de l'appli. */
+const Probe = () => {
+    const { accent, colorScheme, resolved } = useAppearance();
+    return (
+        <span data-testid="theme">{`${accent} ${colorScheme} ${resolved}`}</span>
+    );
+};
+
+const theme = () => screen.getByTestId('theme').textContent;
 
 beforeEach(() => {
     localStorage.clear();
-    document.documentElement.removeAttribute('data-mantine-color-scheme');
 });
 
 const show = () =>
     render(
-        <MantineProvider defaultColorScheme="dark">
+        <MantineProvider>
             <AppearanceModal opened onClose={() => {}} />
-            <AccentProbe />
+            <Probe />
         </MantineProvider>,
     );
 
 describe('AppearanceModal', () => {
-    it('changes the accent color for the whole app, and keeps it', async () => {
+    it('follows the system, in violet, by default', () => {
         show();
-        expect(screen.getByTestId('accent').textContent).toBe('teal');
 
-        await act(async () => {
-            fireEvent.click(await screen.findByLabelText('Violet'));
-        });
-
-        expect(screen.getByTestId('accent').textContent).toBe('violet');
-        expect(
-            screen.getByLabelText('Violet').getAttribute('aria-pressed'),
-        ).toBe('true');
-        expect(localStorage.getItem('bento:theme:accent')).toBe('"violet"');
+        // Pas de préférence sombre dans les tests : « Système » donne le clair.
+        expect(theme()).toBe('violet auto light');
+        expect(screen.getByText('Thème par défaut de Bento.')).toBeTruthy();
     });
 
-    it('switches between light, dark and system modes', async () => {
+    it("uses the admin's default theme while the device has none", () => {
+        localStorage.setItem(
+            'bento:theme:defaults',
+            JSON.stringify({ colorScheme: 'light', accent: 'teal' }),
+        );
+        show();
+
+        expect(theme()).toBe('teal light light');
+    });
+
+    it('keeps the choice of the device, until it goes back to the default', async () => {
         show();
 
         await act(async () => {
-            fireEvent.click(await screen.findByText('Clair'));
+            fireEvent.click(await screen.findByLabelText('Prune'));
+            fireEvent.click(screen.getByText('Clair'));
         });
 
+        expect(theme()).toBe('grape light light');
         expect(
-            document.documentElement.getAttribute('data-mantine-color-scheme'),
-        ).toBe('light');
+            screen.getByLabelText('Prune').getAttribute('aria-pressed'),
+        ).toBe('true');
+        expect(localStorage.getItem('bento:theme:accent')).toBe('"grape"');
+
+        await act(async () => {
+            fireEvent.click(
+                screen.getByRole('button', { name: 'Thème par défaut' }),
+            );
+        });
+
+        expect(theme()).toBe('violet auto light');
     });
 });

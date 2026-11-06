@@ -219,7 +219,11 @@ export type Settings = SettingsResponse['settings'];
 export const saveSettings = (changes: {
     compression?: Partial<Settings['compression']>;
     scanIntervalMinutes?: number;
+    appearance?: Partial<Settings['appearance']>;
 }) => json(api.settings.$put({ json: changes }));
+
+/** Thème par défaut choisi par l'admin (lisible sans session). */
+export const fetchAppearance = () => json(api.appearance.$get());
 
 export const fetchCompression = () => json(api.compression.$get());
 

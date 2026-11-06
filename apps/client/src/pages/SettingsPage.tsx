@@ -13,6 +13,8 @@ import {
 } from '@mantine/core';
 import { useEffect, useState } from 'react';
 
+import { AccentPicker, ColorSchemeControl } from '@/components/ThemePickers';
+import { useDefaultAppearance } from '@/components/theme';
 import {
     type Settings,
     type SettingsResponse,
@@ -52,6 +54,7 @@ const SettingsForm = ({
     onSaved: (saved: SettingsResponse) => void;
 }) => {
     const [values, setValues] = useState<Settings>(saved.settings);
+    const [, setDefaultAppearance] = useDefaultAppearance();
     useEffect(() => setValues(saved.settings), [saved.settings]);
     const [busy, setBusy] = useState(false);
     const [report, setReport] = useState<{ color: string; text: string }>();
@@ -64,11 +67,20 @@ const SettingsForm = ({
             compression: { ...current.compression, ...changes },
         }));
 
+    const setAppearance = (changes: Partial<Settings['appearance']>) =>
+        setValues((current) => ({
+            ...current,
+            appearance: { ...current.appearance, ...changes },
+        }));
+
     const save = async () => {
         setBusy(true);
         setReport(undefined);
         try {
-            onSaved(await saveSettings(values));
+            const result = await saveSettings(values);
+            onSaved(result);
+            // Appliqué tout de suite aux appareils sans thème à eux.
+            setDefaultAppearance(result.settings.appearance);
             setReport({ color: 'green', text: 'Réglages enregistrés.' });
         } catch (e) {
             setReport({ color: 'red', text: (e as Error).message });
@@ -145,6 +157,28 @@ const SettingsForm = ({
                                 scanIntervalMinutes: Number(value) || 0,
                             }))
                         }
+                    />
+                </Stack>
+            </Paper>
+
+            <Paper withBorder p="md" radius="md">
+                <Stack gap="md">
+                    <div>
+                        <Text fw={600}>Apparence par défaut</Text>
+                        <Text size="sm" c="dimmed">
+                            Pour tous les appareils, tant que la personne n’a
+                            pas choisi la sienne (menu « Apparence »).
+                        </Text>
+                    </div>
+                    <ColorSchemeControl
+                        value={values.appearance.colorScheme}
+                        onChange={(colorScheme) =>
+                            setAppearance({ colorScheme })
+                        }
+                    />
+                    <AccentPicker
+                        value={values.appearance.accent}
+                        onChange={(accent) => setAppearance({ accent })}
                     />
                 </Stack>
             </Paper>
