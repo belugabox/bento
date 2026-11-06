@@ -25,7 +25,7 @@ import {
     compressArchive,
     estimateCompression,
 } from '../archive/compress';
-import { readImage } from '../archive/image';
+import { COVER_QUALITY, COVER_SIZE, readImage } from '../archive/image';
 import { updateComicInfo } from '../archive/write';
 import type { Db } from '../db';
 import { libraries, series, volumes } from '../db/schema';
@@ -71,15 +71,6 @@ export type ComicInfoChanges = {
 };
 
 type Failure = { path: string; reason: string };
-
-// Format d'une couverture (2:3), recadrée depuis le haut : une page très
-// haute (webtoon) ne donne pas une vignette interminable.
-const COVER_SIZE = {
-    width: 400,
-    height: 600,
-    fit: 'cover',
-    position: 'top',
-} as const;
 
 const exists = (fullPath: string) =>
     access(fullPath).then(
@@ -186,7 +177,7 @@ export class LibraryFiles {
                 await mkdir(path.dirname(cover), { recursive: true });
                 await readImage(await pages[0].getData())
                     .resize(COVER_SIZE)
-                    .webp({ quality: 80 })
+                    .webp({ quality: COVER_QUALITY })
                     .toFile(cover)
                     .catch(() => undefined);
             }

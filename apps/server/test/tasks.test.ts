@@ -95,7 +95,7 @@ describe('small covers', () => {
         const { width, height } = await sharp(
             Buffer.from(await response.arrayBuffer()),
         ).metadata();
-        expect([width, height]).toEqual([200, 300]);
+        expect([width, height]).toEqual([360, 540]);
         const made = await stat(small);
         // La série sert la même version réduite.
         expect(

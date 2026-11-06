@@ -4,7 +4,7 @@ import { copyFile, mkdir, rm } from 'node:fs/promises';
 import path from 'node:path';
 
 import type { PageReader } from '../archive/archive';
-import { readImage } from '../archive/image';
+import { COVER_QUALITY, COVER_SIZE, readImage } from '../archive/image';
 import type { Db } from '../db';
 import { libraries, series } from '../db/schema';
 import { badGateway, badRequest, notFound } from '../tools/errors';
@@ -13,7 +13,6 @@ import { checkDraftFolder, saveDraftSettings } from './draftSettings';
 import { resolveInLibrary } from './paths';
 import { coverFile } from './scanner';
 
-const COVER_WIDTH = 400;
 export const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 // Seules les images de Wikimedia sont téléchargées (pas d'adresse arbitraire).
 const ALLOWED_IMAGE_HOSTS = ['upload.wikimedia.org'];
@@ -51,12 +50,10 @@ export const draftCoverFile = (
 const toCover = (image: Buffer, destination: string, position: CoverPosition) =>
     readImage(image)
         .resize({
-            width: COVER_WIDTH,
-            height: COVER_WIDTH * 1.5,
-            fit: 'cover',
+            ...COVER_SIZE,
             position,
         })
-        .webp({ quality: 85 })
+        .webp({ quality: COVER_QUALITY })
         .toFile(destination)
         .catch(() => {
             throw badRequest('Image illisible');

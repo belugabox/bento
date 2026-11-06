@@ -141,6 +141,21 @@ describe('LibraryScanner', () => {
 
         expect(result.updated).toBe(0);
         expect(await exists(cover)).toBe(true);
+
+        // Couverture faite à l'ancienne taille (400 px) : refaite en 600.
+        await sharp({
+            create: {
+                width: 400,
+                height: 600,
+                channels: 3,
+                background: '#888',
+            },
+        })
+            .webp()
+            .toFile(cover);
+        await ctx.scanner.scan(ctx.library.id);
+        const { width } = await sharp(await readFile(cover)).metadata();
+        expect(width).toBe(600);
     });
 
     it('sorts volumes by number, using the file name without ComicInfo', async () => {
