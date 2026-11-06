@@ -183,6 +183,7 @@ export const listInProgress = (db: Db, viewer: Viewer, limit = 12) => {
             seriesId: series.id,
             seriesName: series.name,
             number: volumes.number,
+            kind: volumes.kind,
             title: volumes.title,
             page: readProgress.page,
             pageCount: volumes.pageCount,
@@ -253,6 +254,7 @@ export const listRecentVolumes = (db: Db, viewer: Viewer, limit = 12) => {
             seriesId: series.id,
             seriesName: series.name,
             number: volumes.number,
+            kind: volumes.kind,
             title: volumes.title,
             addedAt: volumes.addedAt,
         })
@@ -280,6 +282,7 @@ export const listNextVolumes = (db: Db, viewer: Viewer, limit = 12) => {
             seriesId: series.id,
             seriesName: series.name,
             number: volumes.number,
+            kind: volumes.kind,
             title: volumes.title,
             pageCount: volumes.pageCount,
             completed: readProgress.completed,

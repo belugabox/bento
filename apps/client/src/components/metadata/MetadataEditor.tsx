@@ -39,6 +39,9 @@ import {
     SOURCE_LABELS,
     type SheetField,
     type SourceLink,
+    VOLUME_KINDS,
+    VOLUME_KIND_LABELS,
+    type VolumeKind,
     classify,
     publicationPathOf,
     sourceUrl,
@@ -98,6 +101,8 @@ import {
     seriesValue,
     setSeriesField,
     setVolumeField,
+    setVolumeKind,
+    volumeKindOf,
 } from './editing';
 import { type FoundSeries, loadFound, sitesFor } from './onlineSheets';
 
@@ -224,6 +229,11 @@ const sourcesKey = (links: SourceLink[]) =>
         .map((link) => `${link.site}:${link.id}`)
         .sort()
         .join(' ');
+
+const KIND_OPTIONS = VOLUME_KINDS.map((kind) => ({
+    value: kind,
+    label: VOLUME_KIND_LABELS[kind],
+}));
 
 const SERIES_TEXT_FIELDS: { field: SeriesField; label: string }[] = [
     { field: 'Writer', label: 'Scénario' },
@@ -1115,12 +1125,13 @@ export const MetadataEditor = ({
                 </Stack>
             </Paper>
 
-            <Table.ScrollContainer minWidth={640}>
+            <Table.ScrollContainer minWidth={760}>
                 <Table verticalSpacing="xs">
                     <Table.Thead>
                         <Table.Tr>
                             <Table.Th w={48} />
                             <Table.Th>Fichier</Table.Th>
+                            <Table.Th w={130}>Type</Table.Th>
                             <Table.Th w={90}>Numéro</Table.Th>
                             <Table.Th>Titre</Table.Th>
                             <Table.Th w={100}>Année</Table.Th>
@@ -1184,6 +1195,56 @@ export const MetadataEditor = ({
                                                     : 'Série et numéro requis'}
                                             </Text>
                                         )}
+                                    </Table.Td>
+                                    <Table.Td>
+                                        <Select
+                                            size="xs"
+                                            disabled={!!volume.error}
+                                            aria-label={`Type de ${volume.name}`}
+                                            allowDeselect={false}
+                                            data={KIND_OPTIONS}
+                                            value={volumeKindOf(info)}
+                                            onChange={(value) =>
+                                                value &&
+                                                setEdits((current) =>
+                                                    setVolumeKind(
+                                                        current,
+                                                        volume.path,
+                                                        value as VolumeKind,
+                                                    ),
+                                                )
+                                            }
+                                            {...changed(
+                                                volumeKindOf(info) !==
+                                                    volumeKindOf(
+                                                        original[volume.path] ??
+                                                            {},
+                                                    ),
+                                                {
+                                                    original:
+                                                        VOLUME_KIND_LABELS[
+                                                            volumeKindOf(
+                                                                original[
+                                                                    volume.path
+                                                                ] ?? {},
+                                                            )
+                                                        ],
+                                                    onRevert: () =>
+                                                        setEdits((current) =>
+                                                            setVolumeKind(
+                                                                current,
+                                                                volume.path,
+                                                                volumeKindOf(
+                                                                    original[
+                                                                        volume
+                                                                            .path
+                                                                    ] ?? {},
+                                                                ),
+                                                            ),
+                                                        ),
+                                                },
+                                            )}
+                                        />
                                     </Table.Td>
                                     <Table.Td>
                                         <TextInput

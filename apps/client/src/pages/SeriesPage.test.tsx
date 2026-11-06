@@ -16,9 +16,14 @@ const READER: CurrentUser = {
     preview: null,
 };
 
-const volume = (id: number, completed: boolean | null) => ({
+const volume = (
+    id: number,
+    completed: boolean | null,
+    kind: 'volume' | 'hors-serie' = 'volume',
+) => ({
     id,
     number: String(id),
+    kind,
     title: null,
     pageCount: 10,
     size: 1,
@@ -46,7 +51,7 @@ const SERIES = {
     toRead: false,
     collectionIds: [] as number[],
     library: { id: 1, name: 'Mangas', type: 'manga' },
-    volumes: [volume(1, true), volume(2, null)],
+    volumes: [volume(1, true), volume(2, null), volume(7, null, 'hors-serie')],
 };
 
 afterEach(() => {
@@ -91,11 +96,16 @@ describe('SeriesPage', () => {
         expect(await screen.findByText('Série terminée')).toBeTruthy();
         // Format, genres et thèmes.
         // Taille totale des tomes (1 octet chacun ici).
-        expect(screen.getByText('Manga · 2 o')).toBeTruthy();
+        expect(screen.getByText('Manga · 3 o')).toBeTruthy();
         // Complétude : seulement pour l'admin.
         expect(screen.queryByText(/Fiche à/)).toBeNull();
         expect(screen.getByText('Sport')).toBeTruthy();
         expect(screen.getByText('Thèmes : boxe')).toBeTruthy();
+        // Hors-séries à part, sous les tomes.
+        expect(
+            screen.getByRole('heading', { name: 'Hors-séries' }),
+        ).toBeTruthy();
+        expect(screen.getByText('Hors-série 7')).toBeTruthy();
         fireEvent.click(
             screen.getByRole('button', { name: 'Lecture de la série' }),
         );

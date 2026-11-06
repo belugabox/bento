@@ -1,0 +1,1 @@
+ALTER TABLE `volumes` ADD `kind` text DEFAULT 'volume' NOT NULL;

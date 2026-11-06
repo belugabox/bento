@@ -31,6 +31,8 @@ import {
 import { useState } from 'react';
 import { Link, useParams } from 'react-router';
 
+import { VOLUME_KINDS } from '@server/types';
+
 import { CollectionsModal } from '@/components/CollectionsModal';
 import { CompletenessBadge } from '@/components/CompletenessBadge';
 import { CoverCard } from '@/components/CoverCard';
@@ -61,6 +63,9 @@ const ACTION_LABELS = {
 };
 
 /** Fiche d'une série : informations, tomes et où en est la personne. */
+// Titre des sections de la fiche, sous les tomes.
+const KIND_SECTIONS = { 'hors-serie': 'Hors-séries', special: 'Spéciaux' };
+
 export const SeriesPage = () => {
     const seriesId = Number(useParams().id);
     const isAdmin = useCurrentUser().role === 'admin';
@@ -337,54 +342,84 @@ export const SeriesPage = () => {
                 />
             )}
 
-            <SimpleGrid cols={{ base: 3, xs: 4, sm: 5, md: 6, lg: 8 }}>
-                {series.volumes.map((volume) => {
-                    const read = volume.progress?.completed ?? false;
-                    return (
-                        <CoverCard
-                            key={volume.id}
-                            to={`/read/${volume.id}`}
-                            cover={coverUrl(volume.id, volume.version, 'small')}
-                            title={volumeLabel(volume)}
-                            caption={
-                                withTitles
-                                    ? (volumeTitleOf(volume) ?? '')
-                                    : undefined
-                            }
-                            subtitle={
-                                volume.progress && !read
-                                    ? `Page ${volume.progress.page + 1} / ${volume.pageCount}`
-                                    : `${volume.pageCount} pages`
-                            }
-                            progress={read ? undefined : progressRatio(volume)}
-                            corner={
-                                <Tooltip
-                                    label={
-                                        read
-                                            ? 'Marquer comme non lu'
-                                            : 'Marquer comme lu'
-                                    }
-                                >
-                                    <ActionIcon
-                                        radius="xl"
-                                        size="sm"
-                                        variant={read ? 'filled' : 'default'}
-                                        style={{ opacity: read ? 1 : 0.8 }}
-                                        aria-label={
-                                            read
-                                                ? `${volumeLabel(volume)} lu`
-                                                : `Marquer ${volumeLabel(volume)} comme lu`
+            {VOLUME_KINDS.map((kind) => {
+                const group = series.volumes.filter((v) => v.kind === kind);
+                if (group.length === 0) return null;
+                return (
+                    <Stack key={kind} gap="xs">
+                        {kind !== 'volume' && (
+                            <Title order={4}>{KIND_SECTIONS[kind]}</Title>
+                        )}
+                        <SimpleGrid
+                            cols={{ base: 3, xs: 4, sm: 5, md: 6, lg: 8 }}
+                        >
+                            {group.map((volume) => {
+                                const read =
+                                    volume.progress?.completed ?? false;
+                                return (
+                                    <CoverCard
+                                        key={volume.id}
+                                        to={`/read/${volume.id}`}
+                                        cover={coverUrl(
+                                            volume.id,
+                                            volume.version,
+                                            'small',
+                                        )}
+                                        title={volumeLabel(volume)}
+                                        caption={
+                                            withTitles
+                                                ? (volumeTitleOf(volume) ?? '')
+                                                : undefined
                                         }
-                                        onClick={() => void toggleRead(volume)}
-                                    >
-                                        <IconCheck size={14} />
-                                    </ActionIcon>
-                                </Tooltip>
-                            }
-                        />
-                    );
-                })}
-            </SimpleGrid>
+                                        subtitle={
+                                            volume.progress && !read
+                                                ? `Page ${volume.progress.page + 1} / ${volume.pageCount}`
+                                                : `${volume.pageCount} pages`
+                                        }
+                                        progress={
+                                            read
+                                                ? undefined
+                                                : progressRatio(volume)
+                                        }
+                                        corner={
+                                            <Tooltip
+                                                label={
+                                                    read
+                                                        ? 'Marquer comme non lu'
+                                                        : 'Marquer comme lu'
+                                                }
+                                            >
+                                                <ActionIcon
+                                                    radius="xl"
+                                                    size="sm"
+                                                    variant={
+                                                        read
+                                                            ? 'filled'
+                                                            : 'default'
+                                                    }
+                                                    style={{
+                                                        opacity: read ? 1 : 0.8,
+                                                    }}
+                                                    aria-label={
+                                                        read
+                                                            ? `${volumeLabel(volume)} lu`
+                                                            : `Marquer ${volumeLabel(volume)} comme lu`
+                                                    }
+                                                    onClick={() =>
+                                                        void toggleRead(volume)
+                                                    }
+                                                >
+                                                    <IconCheck size={14} />
+                                                </ActionIcon>
+                                            </Tooltip>
+                                        }
+                                    />
+                                );
+                            })}
+                        </SimpleGrid>
+                    </Stack>
+                );
+            })}
         </Stack>
     );
 };

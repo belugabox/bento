@@ -118,6 +118,11 @@ export const volumes = sqliteTable(
         number: text('number'),
         // Numéro en nombre, pour trier (« 12.5 » entre 12 et 13).
         sortNumber: real('sort_number'),
+        // Tome, hors-série ou spécial (`library/volumeKind.ts`) : chaque type
+        // a sa numérotation, hors-séries et spéciaux viennent après les tomes.
+        kind: text('kind', { enum: ['volume', 'hors-serie', 'special'] })
+            .notNull()
+            .default('volume'),
         title: text('title'),
         // ComicInfo.xml complet du tome ({} s'il n'en a pas).
         comicInfo: text('comic_info', { mode: 'json' })

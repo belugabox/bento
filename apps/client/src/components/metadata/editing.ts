@@ -1,14 +1,19 @@
 import {
     type ComicInfo,
     type GenreEntry,
+    KIND_FORMATS,
     METADATA_SOURCES,
     type MetadataSource,
     SHEET_FIELDS,
     type SheetField,
     type SourcePriority,
+    VOLUME_KIND_LABELS,
+    type VolumeKind,
     classify,
     genreKey,
+    kindOfWord,
     parseVolumeFileName,
+    volumeNumbering,
 } from '@server/types';
 
 import { type KnownNames, cleanNames } from './credits';
@@ -105,6 +110,34 @@ export const setVolumeField = <F extends keyof ComicInfo>(
     value: ComicInfo[F] | undefined,
 ): Edits => ({ ...edits, [path]: setField(edits[path] ?? {}, field, value) });
 
+/** Type d'un tome (tome, hors-série, spécial), d'après son ComicInfo. */
+export const volumeKindOf = (info: ComicInfo): VolumeKind =>
+    volumeNumbering(info).kind;
+
+/**
+ * Change le type d'un tome : gardé dans le champ `Format` du ComicInfo
+ * (retiré pour un tome) ; un numéro préfixé (« HS01 ») devient un nombre.
+ */
+export const setVolumeKind = (
+    edits: Edits,
+    path: string,
+    kind: VolumeKind,
+): Edits => {
+    const info = edits[path] ?? {};
+    let next = edits;
+    const { number } = volumeNumbering(info);
+    if (number && number !== info.Number?.trim()) {
+        next = setVolumeField(next, path, 'Number', number);
+    }
+    if (kind !== 'volume') {
+        return setVolumeField(next, path, 'Format', KIND_FORMATS[kind]);
+    }
+    // Un autre Format (« TPB ») n'est pas un type : gardé.
+    return kindOfWord(info.Format)
+        ? setVolumeField(next, path, 'Format', undefined)
+        : next;
+};
+
 /** Le champ peut être rempli : vide, ou remplacement demandé. */
 const fillable = (current: unknown, overwrite: boolean) =>
     overwrite || isEmpty(current);
@@ -127,10 +160,19 @@ export const fillFromFileNames = (
         if (parsed.number && fillable(info.Number, overwrite)) {
             next = setVolumeField(next, volume.path, 'Number', parsed.number);
         }
-        // Titre par défaut : « Tome N ».
-        const number = parsed.number ?? info.Number;
+        // « HS01 », « SP01 » : hors-série, spécial (type d'un tome sinon).
+        if (parsed.kind && (overwrite || !kindOfWord(info.Format))) {
+            next = setVolumeKind(next, volume.path, parsed.kind);
+        }
+        // Titre par défaut : « Tome N », « Hors-série N ».
+        const { kind, number } = volumeNumbering(next[volume.path] ?? {});
         if (number && fillable(info.Title, overwrite)) {
-            next = setVolumeField(next, volume.path, 'Title', `Tome ${number}`);
+            next = setVolumeField(
+                next,
+                volume.path,
+                'Title',
+                `${VOLUME_KIND_LABELS[kind]} ${number}`,
+            );
         }
         if (parsed.year && fillable(info.Year, overwrite)) {
             next = setVolumeField(next, volume.path, 'Year', parsed.year);

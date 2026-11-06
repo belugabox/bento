@@ -3,6 +3,7 @@ import { useLocalStorage } from '@mantine/hooks';
 import { useCallback, useEffect, useRef } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 
+import { volumeLabel } from '@/components/readingStatus';
 import {
     fetchPageSizes,
     fetchVolume,
@@ -122,7 +123,7 @@ export const ReaderPage = () => {
     const seriesUrl = `/series/${volume.seriesId}`;
     return (
         <Reader
-            title={`${volume.seriesName} — ${volume.number ? `Tome ${volume.number}` : (volume.title ?? '')}`}
+            title={`${volume.seriesName} — ${volumeLabel(volume)}`}
             pageCount={pageCount}
             pageSrc={pageSrc}
             loadSizes={loadSizes}

@@ -25,18 +25,20 @@ import {
 import { notFound } from '../tools/errors';
 import { genreCatalog } from './genres';
 import { publicationPathOf } from './paths';
-import { coverFile } from './scanner';
+import { coverFile, kindOrder } from './scanner';
 import { compareNames } from './sortName';
 import { type Viewer, visibleTo } from './visibility';
 
-// Tomes sans numéro en dernier, puis par numéro, puis par fichier.
 /**
  * Version d'un tome : la date de son fichier, qui change à chaque réécriture.
  * Dans l'adresse de ses images, elle permet au navigateur de les garder.
  */
 export const volumeVersion = sql<number>`cast(${volumes.mtimeMs} as integer)`;
 
+// Tomes, hors-séries puis spéciaux ; sans numéro en dernier, puis par
+// numéro, puis par fichier.
 export const volumeOrder = [
+    kindOrder,
     sql`${volumes.sortNumber} is null`,
     asc(volumes.sortNumber),
     asc(volumes.file),
@@ -157,8 +159,8 @@ export const listSeries = (
             // Sous-requêtes en SQL brut : Drizzle n'y préfixe pas les colonnes
             // par leur table.
             coverUpdatedAt: series.coverUpdatedAt,
-            coverVolumeId: sql<number>`(select v.id from volumes v where v.series_id = series.id order by v.sort_number is null, v.sort_number, v.file limit 1)`,
-            coverVolumeVersion: sql<number>`(select cast(v.mtime_ms as integer) from volumes v where v.series_id = series.id order by v.sort_number is null, v.sort_number, v.file limit 1)`,
+            coverVolumeId: sql<number>`(select v.id from volumes v where v.series_id = series.id order by v.kind != 'volume', v.kind, v.sort_number is null, v.sort_number, v.file limit 1)`,
+            coverVolumeVersion: sql<number>`(select cast(v.mtime_ms as integer) from volumes v where v.series_id = series.id order by v.kind != 'volume', v.kind, v.sort_number is null, v.sort_number, v.file limit 1)`,
             // Tomes lus par la personne.
             readCount: sql<number>`(select count(*) from read_progress rp join volumes v on v.id = rp.volume_id where v.series_id = series.id and rp.user_id = ${viewer.id} and rp.completed = 1)`,
             // Tomes ouverts (lus ou en cours) : série commencée.
@@ -236,6 +238,7 @@ export const getSeries = (db: Db, viewer: Viewer, id: number) => {
         .select({
             id: volumes.id,
             number: volumes.number,
+            kind: volumes.kind,
             title: volumes.title,
             pageCount: volumes.pageCount,
             version: volumeVersion,
@@ -297,6 +300,7 @@ export const getVolume = (db: Db, viewer: Viewer, id: number) => {
             seriesId: volumes.seriesId,
             seriesName: series.name,
             number: volumes.number,
+            kind: volumes.kind,
             title: volumes.title,
             pageCount: volumes.pageCount,
             version: volumeVersion,
@@ -361,7 +365,7 @@ export const seriesCoverOf = (db: Db, viewer: Viewer, id: number) => {
             coverUpdatedAt: series.coverUpdatedAt,
             firstVolumeId: sql<
                 number | null
-            >`(select v.id from volumes v where v.series_id = series.id order by v.sort_number is null, v.sort_number, v.file limit 1)`,
+            >`(select v.id from volumes v where v.series_id = series.id order by v.kind != 'volume', v.kind, v.sort_number is null, v.sort_number, v.file limit 1)`,
         })
         .from(series)
         .where(and(eq(series.id, id), visibleTo(viewer)))

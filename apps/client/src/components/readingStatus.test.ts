@@ -71,6 +71,19 @@ describe('volumeLabel', () => {
         expect(volumeLabel({ number: null, title: 'Bonus' })).toBe('Bonus');
         expect(volumeLabel({ number: null, title: null })).toBe('Hors-série');
     });
+
+    it('names hors-séries and specials', () => {
+        expect(
+            volumeLabel({ number: '1', title: null, kind: 'hors-serie' }),
+        ).toBe('Hors-série 1');
+        expect(volumeLabel({ number: '2', title: null, kind: 'special' })).toBe(
+            'Spécial 2',
+        );
+        expect(
+            volumeTitleOf({ number: '1', title: 'Hors-série 1' }),
+        ).toBeNull();
+        expect(volumeTitleOf({ number: '1', title: 'HS 01' })).toBeNull();
+    });
 });
 
 describe('volumeTitleOf', () => {

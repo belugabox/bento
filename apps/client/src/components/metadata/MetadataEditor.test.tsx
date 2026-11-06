@@ -654,6 +654,26 @@ describe('MetadataEditor', () => {
         expect(go).toHaveBeenCalledTimes(1);
     });
 
+    it('makes a volume a hors-série, published as HS01', async () => {
+        render(<Editor />);
+        fireEvent.change(numberOf(1), { target: { value: '1' } });
+        fireEvent.click(
+            screen.getByRole('textbox', {
+                name: 'Type de Gantz T01 (2017).cbz',
+            }),
+        );
+        fireEvent.click(
+            await screen.findByRole('option', { name: 'Hors-série' }),
+        );
+
+        expect(screen.getByText('→ Gantz/Gantz HS01.cbz')).toBeTruthy();
+        expect(
+            screen
+                .getByRole('textbox', { name: 'Type de Gantz T01 (2017).cbz' })
+                .getAttribute('data-changed'),
+        ).toBe('true');
+    });
+
     it('suggests the names already known', async () => {
         render(<Editor />);
         fireEvent.change(screen.getByRole('textbox', { name: 'Éditeur' }), {

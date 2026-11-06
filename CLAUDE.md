@@ -53,6 +53,7 @@ Serveur de lecture et de gestion de mangas et BD, qui remplace Kavita pour la fa
 - **Formats** : table `formats` (0016, liste de départ par 0018), `series.format_id`. La clé étrangère n'a pas `on delete set null` sur la base de dev : `deleteFormat` détache les séries lui-même.
 - **Classement** : `classification.ts` (partagé avec le client) range les genres bruts des fichiers (`series.genre` et `series.tags`, du premier tome) d'après la table `genres` (migration 0014, avec sa liste de départ), à chaque lecture : renommer un genre ne réécrit aucun fichier.
 - Le tri des séries ignore les articles (`library/sortName.ts`). Un nom de fichier « Boxer (The) » donne « The Boxer ».
+- **Hors-séries et spéciaux** (décidé le 6 novembre 2026 : trois types, à part, fichiers « HS01 » et « SP01 ») : `library/volumeKind.ts` (partagé), type dans le `Format` du ComicInfo, colonne `volumes.kind` (0020), triée avant le numéro (`kindOrder`). Un ancien numéro préfixé (« HS01 ») est lu comme hors-série 1.
 
 ## Où on en est
 

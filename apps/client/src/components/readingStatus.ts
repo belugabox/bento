@@ -1,3 +1,5 @@
+import { VOLUME_KIND_LABELS, type VolumeKind } from '@server/types';
+
 type Progress = { page: number; completed: boolean } | null;
 
 export type VolumeWithProgress = {
@@ -8,16 +10,23 @@ export type VolumeWithProgress = {
     progress: Progress;
 };
 
-/** « Tome 12 », ou le titre / « Hors-série » pour un tome sans numéro. */
+/**
+ * « Tome 12 », « Hors-série 1 », « Spécial 2 » ; le titre, ou « Hors-série »
+ * pour un tome sans numéro.
+ */
 export const volumeLabel = (volume: {
     number: string | null;
     title: string | null;
+    kind?: VolumeKind;
 }) =>
-    volume.number ? `Tome ${volume.number}` : (volume.title ?? 'Hors-série');
+    volume.number
+        ? `${VOLUME_KIND_LABELS[volume.kind ?? 'volume']} ${volume.number}`
+        : (volume.title ?? 'Hors-série');
 
 /**
  * Titre propre d'un tome, à afficher sous son libellé ; null s'il n'en a
- * pas, ou s'il répète le libellé (« Tome 3 », rempli d'après le numéro).
+ * pas, ou s'il répète le libellé (« Tome 3 », « Hors-série 1 », rempli
+ * d'après le numéro).
  */
 export const volumeTitleOf = (volume: {
     number: string | null;
@@ -29,7 +38,10 @@ export const volumeTitleOf = (volume: {
     const number = volume.number
         .replace(/^0+(?=\d)/, '')
         .replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const repeated = new RegExp(`^(tome|vol(ume)?\\.?)\\s*0*${number}$`, 'i');
+    const repeated = new RegExp(
+        `^(tome|vol(ume)?\\.?|hors[- ]s[ée]rie|hs|sp[ée]cial|sp)\\s*0*${number}$`,
+        'i',
+    );
     return repeated.test(title) ? null : title;
 };
 

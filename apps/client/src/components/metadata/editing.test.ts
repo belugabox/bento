@@ -18,9 +18,11 @@ import {
     joinSeries,
     seriesValue,
     setSeriesField,
+    setVolumeKind,
     sheetFromWikipedia,
     sheetValues,
     statusFromWikipedia,
+    volumeKindOf,
 } from './editing';
 
 const volumes: EditableVolume[] = [
@@ -99,6 +101,55 @@ describe('fillFromFileNames', () => {
             Title: 'Tome 2',
             Year: 2020,
         });
+    });
+
+    it('reads hors-séries and specials (HS01, SP01)', () => {
+        const specials: EditableVolume[] = [
+            {
+                path: '_draft/Gantz/Gantz HS01 (2010).cbz',
+                name: 'Gantz HS01 (2010).cbz',
+                comicInfo: {},
+            },
+            {
+                path: '_draft/Gantz/Gantz SP02.cbz',
+                name: 'Gantz SP02.cbz',
+                // Ancienne écriture du numéro, préfixé.
+                comicInfo: { Number: 'SP02' },
+            },
+        ];
+        const edits = fillFromFileNames(
+            initialEdits(specials),
+            specials,
+            false,
+        );
+        expect(edits[specials[0]!.path]).toEqual({
+            Series: 'Gantz',
+            Number: '1',
+            Format: 'Hors-série',
+            Title: 'Hors-série 1',
+            Year: 2010,
+        });
+        expect(edits[specials[1]!.path]).toMatchObject({
+            Number: '2',
+            Format: 'Spécial',
+            Title: 'Spécial 2',
+        });
+    });
+
+    it('changes the kind of a volume in its Format field', () => {
+        const edits = { [first]: { Number: 'HS01', Format: 'TPB' } };
+        expect(volumeKindOf(edits[first])).toBe('hors-serie');
+        const special = setVolumeKind(edits, first, 'special');
+        expect(special[first]).toEqual({ Number: '1', Format: 'Spécial' });
+        expect(setVolumeKind(special, first, 'volume')[first]).toEqual({
+            Number: '1',
+        });
+        // Un autre Format n'est pas un type : gardé.
+        expect(
+            setVolumeKind({ [first]: { Format: 'TPB' } }, first, 'volume')[
+                first
+            ],
+        ).toEqual({ Format: 'TPB' });
     });
 
     it('puts back an article written after the series name', () => {
