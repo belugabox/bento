@@ -60,10 +60,10 @@ Les étapes 1 à 3 de la feuille de route sont faites, ainsi qu'une page Réglag
 
 Prochaines étapes possibles, à faire valider par l'utilisateur :
 
-1. **Tablettes et Android** (étape 4 de SPEC) : fait le 6 novembre 2026, à faire essayer par l'utilisateur sur ses appareils. Si Chrome ne propose pas « Installer l'application », ajouter un service worker (prévu à l'étape 8 de toute façon).
+1. **Tablettes et Android** (étape 4 de SPEC) : fait le 6 novembre 2026, à faire essayer par l'utilisateur sur ses appareils. Si Chrome ne propose pas « Installer l'application », ajouter un service worker (prévu à l'étape 9 de toute façon).
 2. **Optimisations** : faites le 6 novembre 2026 (pages et couvertures gardées un an grâce à la version du tome dans l'adresse, pages d'admin chargées à la demande, tailles des pages lues dans le début des images). Un fichier `vendor` séparé a été essayé puis retiré : il alourdissait le premier chargement. Reste l'enregistrement du ComicInfo en recopiant l'archive par morceaux au lieu d'AdmZip (« on verra après »).
 3. **Pages redimensionnées selon l'écran** (étape 5).
 4. **Manga-news** (étape 6) : fait pour les séries le 6 novembre 2026 (`metadata/mangaNews.ts`, extraits de pages dans `test/fixtures/manga-news`). Les pages sont en UTF-8 ou en Windows-1252 selon la série, quel que soit l'en-tête ; le `TextDecoder('windows-1252')` de Node 22 lit en fait de l'ISO-8859-1, d'où la table maison. Reste : les pages de tome (liens `/manga/<Série>/vol-N`), pas encore examinées.
-5. **Suggestions** (étape 7) : « Dans le même genre » sur la fiche série et « Lu par la famille » sur l'accueil d'abord, puis « Pour toi ».
-6. **Classer les séries existantes** : liste des séries sans format ou sans âge (masquées aux enfants), avec un bouton Manga-news par série. Proposé le 6 novembre 2026 avant les suggestions, qui reposent sur les genres.
-7. **Hors ligne** (étape 8), **tomes manquants** (9), **bascule** (10).
+5. **Fiches à compléter** (étape 7) : complétude en % (brouillons, et fiche série si moins de 100 %), taille totale d'une série, liste des séries sans format ou sans âge avec un bouton Manga-news par série. À faire avant les suggestions, qui reposent sur les genres.
+6. **Suggestions** (étape 8) : « Dans le même genre » sur la fiche série et « Lu par la famille » sur l'accueil d'abord, puis « Pour toi ».
+7. **Hors ligne** (étape 9), **tomes manquants** (10), **bascule** (11).
