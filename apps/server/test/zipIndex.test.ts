@@ -38,6 +38,23 @@ afterEach(async () => {
 });
 
 describe('readArchive', () => {
+    it('reads only the start of an entry, stored or deflated', async () => {
+        const zip = new AdmZip();
+        const text = Array.from({ length: 2000 }, (_, i) => i).join(',');
+        zip.addFile('stored.txt', Buffer.from(text));
+        zip.getEntry('stored.txt')!.header.method = 0;
+        zip.addFile('deflated.txt', Buffer.from(text));
+        const file = path.join(dir, 'T01.cbz');
+        await writeFile(file, zip.toBuffer());
+
+        for (const entry of await readArchive(file)) {
+            expect((await entry.getStart(100)).toString()).toBe(
+                text.slice(0, 100),
+            );
+            expect((await entry.getStart(1e6)).toString()).toBe(text);
+        }
+    });
+
     it('reads stored and deflated entries, with accented names', async () => {
         const zip = new AdmZip();
         zip.addFile('Été/001.jpg', Buffer.from('a'.repeat(5000)));

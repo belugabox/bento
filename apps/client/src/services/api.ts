@@ -63,11 +63,13 @@ export type SeriesDetails = Awaited<ReturnType<typeof fetchSeries>>;
 export type Volume = Awaited<ReturnType<typeof fetchVolume>>;
 
 // Images servies telles quelles : utilisables directement dans <img>.
-// `small` : version réduite (vignettes des grilles), plus légère.
-export const coverUrl = (volumeId: number, size?: 'small') =>
-    `/api/volumes/${volumeId}/cover${size ? `?size=${size}` : ''}`;
-export const pageUrl = (volumeId: number, index: number) =>
-    `/api/volumes/${volumeId}/pages/${index}`;
+// La version du tome dans l'adresse permet au navigateur de les garder : elle
+// change quand le fichier est réécrit. `small` : version réduite (vignettes
+// des grilles), plus légère.
+export const coverUrl = (volumeId: number, version: number, size?: 'small') =>
+    `/api/volumes/${volumeId}/cover?v=${version}${size ? `&size=${size}` : ''}`;
+export const pageUrl = (volumeId: number, version: number, index: number) =>
+    `/api/volumes/${volumeId}/pages/${index}?v=${version}`;
 
 export const saveProgress = (
     volumeId: number,
@@ -295,10 +297,11 @@ export const seriesCoverUrl = (
         id: number;
         coverUpdatedAt: string | null;
         coverVolumeId?: number | null;
+        coverVolumeVersion?: number | null;
     },
     size?: 'small',
 ) =>
-    `/api/series/${series.id}/cover?v=${encodeURIComponent(series.coverUpdatedAt ?? String(series.coverVolumeId ?? ''))}${size ? `&size=${size}` : ''}`;
+    `/api/series/${series.id}/cover?v=${encodeURIComponent(series.coverUpdatedAt ?? `${series.coverVolumeId ?? ''}-${series.coverVolumeVersion ?? ''}`)}${size ? `&size=${size}` : ''}`;
 
 /** Séries en attente dans les brouillons (pastille de l'en-tête). */
 export const fetchPendingDrafts = () => json(api.drafts.pending.$get());

@@ -128,6 +128,8 @@ export type ArchiveEntry = {
     isDirectory: boolean;
     compressedSize: number;
     getData: () => Promise<Buffer>;
+    /** Premiers octets seulement (tout le contenu s'il est plus court). */
+    getStart: (bytes: number) => Promise<Buffer>;
 };
 
 /**
@@ -149,6 +151,7 @@ export const readArchive = async (
             isDirectory: entry.isDirectory,
             compressedSize: entry.compressedSize,
             getData: () => readZipEntry(fullPath, entry),
+            getStart: (bytes) => readZipEntry(fullPath, entry, bytes),
         }));
     }
     return (await openArchive(fullPath)).getEntries().map((entry) => ({
@@ -156,10 +159,21 @@ export const readArchive = async (
         isDirectory: entry.isDirectory,
         compressedSize: entry.header.compressedSize,
         getData: async () => entry.getData(),
+        getStart: async (bytes) => entry.getData().subarray(0, bytes),
     }));
 };
 
 type OpenArchive = { mtimeMs: number; pages: ArchiveEntry[] };
+
+/** Début d'une image où chercher ses dimensions (EXIF compris). */
+const HEADER_BYTES = 64 * 1024;
+
+const sizeOf = async (data: Buffer): Promise<[number, number] | undefined> => {
+    const { width, height } = await readImage(data)
+        .metadata()
+        .catch(() => ({ width: undefined, height: undefined }));
+    return width && height ? [width, height] : undefined;
+};
 
 /**
  * Lecture page par page. Le répertoire des dernières archives ouvertes
@@ -197,18 +211,17 @@ export class PageReader {
 
     /**
      * Largeur et hauteur de chaque page ([0, 0] pour une image illisible).
-     * Décompresse tout le tome : à garder en cache.
+     * Seul le début de chaque image est lu, sauf si ses dimensions n'y sont
+     * pas : à garder en cache tout de même.
      */
     sizes = async (fullPath: string): Promise<[number, number][]> => {
         const { pages } = await this.open(fullPath);
         const sizes: [number, number][] = [];
         for (const entry of pages) {
-            const { width = 0, height = 0 } = await readImage(
-                await entry.getData(),
-            )
-                .metadata()
-                .catch(() => ({ width: 0, height: 0 }));
-            sizes.push([width, height]);
+            const size =
+                (await sizeOf(await entry.getStart(HEADER_BYTES))) ??
+                (await sizeOf(await entry.getData()));
+            sizes.push(size ?? [0, 0]);
         }
         return sizes;
     };

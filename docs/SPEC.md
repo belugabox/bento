@@ -97,7 +97,7 @@ Bento est le serveur de lecture et de gestion des mangas et BD de la maison. Il 
   - les utilisateurs et les bibliothèques ;
   - les séries et les tomes ;
   - la progression, les listes et les collections.
-- **Images** : vignettes et images redimensionnées gardées dans un cache disque, générées avec sharp.
+- **Images** : vignettes et images redimensionnées gardées dans un cache disque, générées avec sharp. Le navigateur garde pages et couvertures un an : leur adresse contient la version du tome (date du fichier), qui change à chaque réécriture.
 - **Déploiement** :
   - image Docker `ghcr.io/belugabox/bento`, publiée par GitHub Actions ;
   - volume `/config` pour la config, la base et le cache, plus un volume par dossier de bibliothèque ;

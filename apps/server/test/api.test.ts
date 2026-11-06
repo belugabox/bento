@@ -135,6 +135,7 @@ describe('series', () => {
         for (const series of all) {
             const { body: details } = await get(`/series/${series.id}`);
             expect(series.coverVolumeId).toBe(details.volumes[0].id);
+            expect(series.coverVolumeVersion).toBe(details.volumes[0].version);
         }
 
         const { body } = await get(`/series/${id}`);
@@ -161,6 +162,7 @@ describe('volumes', () => {
             number: '1',
             title: null,
             pageCount: 3,
+            version: first.version,
             libraryType: 'manga',
             readingMode: 'ltr-manga',
             previousId: null,
@@ -184,6 +186,26 @@ describe('volumes', () => {
         expect((await request(`/volumes/${first.id}/pages/3`)).status).toBe(
             404,
         );
+    });
+
+    it('lets the browser keep images whose address has the version', async () => {
+        const seriesId = await library();
+        const [first] = (await get(`/series/${seriesId}`)).body.volumes;
+        // Date du fichier, en millisecondes entières.
+        expect(first.version).toBeGreaterThan(1e12);
+        const cacheOf = async (url: string) =>
+            (await request(url)).headers.get('cache-control');
+
+        for (const url of [
+            `/volumes/${first.id}/cover`,
+            `/volumes/${first.id}/pages/0`,
+            `/series/${seriesId}/cover`,
+        ]) {
+            expect(await cacheOf(url)).toBe('private, max-age=3600');
+            expect(await cacheOf(`${url}?v=${first.version}`)).toBe(
+                'private, max-age=31536000, immutable',
+            );
+        }
     });
 });
 

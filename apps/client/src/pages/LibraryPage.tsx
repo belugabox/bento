@@ -78,14 +78,17 @@ const ShelfCard = ({
     subtitle = volumeLabel(volume),
     progress,
 }: {
-    volume: Pick<NextVolume, 'volumeId' | 'seriesName' | 'number' | 'title'>;
+    volume: Pick<
+        NextVolume,
+        'volumeId' | 'version' | 'seriesName' | 'number' | 'title'
+    >;
     subtitle?: string;
     progress?: number;
 }) => (
     <Box w={SHELF_CARD_WIDTH} style={{ flexShrink: 0 }}>
         <CoverCard
             to={`/read/${volume.volumeId}`}
-            cover={coverUrl(volume.volumeId, 'small')}
+            cover={coverUrl(volume.volumeId, volume.version, 'small')}
             title={volume.seriesName}
             subtitle={subtitle}
             progress={progress}

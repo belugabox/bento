@@ -1,23 +1,47 @@
-import { AppShell, Container } from '@mantine/core';
+import { AppShell, Container, Loader } from '@mantine/core';
+import { Suspense, lazy } from 'react';
 import { Navigate, Outlet, Route, Routes } from 'react-router';
 
 import { AppHeader, PreviewBanner } from '@/components/AppHeader';
 import { RequireUser } from '@/components/RequireUser';
-import { CollectionsPage } from '@/pages/CollectionsPage';
 import { DeniedPage } from '@/pages/DeniedPage';
-import { DraftsPage } from '@/pages/DraftsPage';
 import { LibraryPage } from '@/pages/LibraryPage';
-import { SeriesEditPage } from '@/pages/SeriesEditPage';
 import { SeriesPage } from '@/pages/SeriesPage';
-import { SettingsPage } from '@/pages/SettingsPage';
-import { StatsPage } from '@/pages/StatsPage';
-import { UsersPage } from '@/pages/UsersPage';
 import { ReaderPage } from '@/reader/ReaderPage';
 import { useCurrentUser } from '@/services/auth';
 
+// Pages de l'admin : chargées à la demande, les lecteurs n'en téléchargent
+// pas le code (éditeur, recherche de métadonnées…).
+const CollectionsPage = lazy(() =>
+    import('@/pages/CollectionsPage').then((m) => ({
+        default: m.CollectionsPage,
+    })),
+);
+const DraftsPage = lazy(() =>
+    import('@/pages/DraftsPage').then((m) => ({ default: m.DraftsPage })),
+);
+const SeriesEditPage = lazy(() =>
+    import('@/pages/SeriesEditPage').then((m) => ({
+        default: m.SeriesEditPage,
+    })),
+);
+const SettingsPage = lazy(() =>
+    import('@/pages/SettingsPage').then((m) => ({ default: m.SettingsPage })),
+);
+const StatsPage = lazy(() =>
+    import('@/pages/StatsPage').then((m) => ({ default: m.StatsPage })),
+);
+const UsersPage = lazy(() =>
+    import('@/pages/UsersPage').then((m) => ({ default: m.UsersPage })),
+);
+
 /** Réservé aux admins ; les autres reviennent à l'accueil. */
 const AdminOnly = ({ children }: { children: React.ReactNode }) =>
-    useCurrentUser().role === 'admin' ? children : <Navigate to="/" replace />;
+    useCurrentUser().role === 'admin' ? (
+        <Suspense fallback={<Loader mx="auto" />}>{children}</Suspense>
+    ) : (
+        <Navigate to="/" replace />
+    );
 
 /** Mise en page des écrans de navigation (le lecteur est en plein écran). */
 const Layout = () => (

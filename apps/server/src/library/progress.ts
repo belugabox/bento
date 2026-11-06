@@ -3,7 +3,7 @@ import { and, desc, eq, sql } from 'drizzle-orm';
 import type { Db } from '../db';
 import { readProgress, series, volumes } from '../db/schema';
 import { notFound } from '../tools/errors';
-import { volumeOrder } from './catalog';
+import { volumeOrder, volumeVersion } from './catalog';
 import { type Viewer, visibleTo } from './visibility';
 
 export type Progress = { page: number; completed: boolean };
@@ -82,6 +82,7 @@ export const listInProgress = (db: Db, viewer: Viewer, limit = 12) => {
     return db
         .select({
             volumeId: volumes.id,
+            version: volumeVersion,
             seriesId: series.id,
             seriesName: series.name,
             number: volumes.number,
@@ -144,6 +145,7 @@ export const listRecentVolumes = (db: Db, viewer: Viewer, limit = 12) => {
     const rows = db
         .select({
             volumeId: volumes.id,
+            version: volumeVersion,
             seriesId: series.id,
             seriesName: series.name,
             number: volumes.number,
@@ -171,6 +173,7 @@ export const listNextVolumes = (db: Db, viewer: Viewer, limit = 12) => {
     const rows = db
         .select({
             volumeId: volumes.id,
+            version: volumeVersion,
             seriesId: series.id,
             seriesName: series.name,
             number: volumes.number,
@@ -215,8 +218,9 @@ export const listNextVolumes = (db: Db, viewer: Viewer, limit = 12) => {
     return next
         .sort((a, b) => b.lastReadAt - a.lastReadAt)
         .slice(0, limit)
-        .map(({ volumeId, seriesId, seriesName, number, title }) => ({
+        .map(({ volumeId, version, seriesId, seriesName, number, title }) => ({
             volumeId,
+            version,
             seriesId,
             seriesName,
             number,

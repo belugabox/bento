@@ -83,6 +83,13 @@ const fileQuery = z.object({ path: z.string().min(1) });
 // `?size=small` : version réduite d'une couverture (vignettes des grilles).
 const smallCover = (size?: string) => (size === 'small' ? size : undefined);
 
+/**
+ * Cache d'une image de la bibliothèque. Avec sa version dans l'adresse
+ * (`?v=`), elle ne change jamais : le navigateur la garde un an.
+ */
+const imageCache = (version?: string) =>
+    version ? 'private, max-age=31536000, immutable' : 'private, max-age=3600';
+
 const READING_MODES = ['ltr', 'ltr-manga', 'rtl', 'webtoon'] as const;
 
 const collectionBody = z.object({ name: z.string().trim().min(1).max(80) });
@@ -315,7 +322,7 @@ export const createApi = ({
             return c.body(new Uint8Array(cover), 200, {
                 'Content-Type': 'image/webp',
                 // L'adresse du client change avec la couverture (?v=).
-                'Cache-Control': 'private, max-age=3600',
+                'Cache-Control': imageCache(c.req.query('v')),
             });
         })
         .put(
@@ -480,7 +487,7 @@ export const createApi = ({
             if (!cover) throw notFound('Couverture introuvable');
             return c.body(new Uint8Array(cover), 200, {
                 'Content-Type': 'image/webp',
-                'Cache-Control': 'private, max-age=3600',
+                'Cache-Control': imageCache(c.req.query('v')),
             });
         })
         .get(
@@ -497,7 +504,7 @@ export const createApi = ({
                 );
                 return c.body(new Uint8Array(data), 200, {
                     'Content-Type': type,
-                    'Cache-Control': 'private, max-age=3600',
+                    'Cache-Control': imageCache(c.req.query('v')),
                 });
             },
         )
