@@ -89,7 +89,7 @@ Par défaut, Bento suit le mode du système (clair ou sombre) en violet ; l'admi
 - **Android (Chrome)** : menu ⋮, « Installer l'application » (ou « Ajouter à l'écran d'accueil »). Bento s'ouvre alors depuis son icône, dans sa propre fenêtre, sans barre d'adresse.
 - **iPad, iPhone (Safari)** : bouton Partager, « Sur l'écran d'accueil ».
 - **Plein écran** : dans le lecteur, le bouton à côté des réglages masque la barre du navigateur et la barre d'état ; « Plein écran à l'ouverture », dans les réglages de lecture, l'active au premier toucher. Le plein écran continue d'un tome au suivant, et s'arrête en quittant le lecteur. Safari sur iPhone ne le permet pas : installer l'appli donne alors le plus grand écran possible.
-- L'icône vient de `apps/client/public/icon.svg` ; les PNG de `public/icons/` en sont tirés (192, 512 et 180 px pour iOS).
+- L'icône de l'appli vient de `apps/client/public/icon.svg`, fond plein (Android la découpe, iOS remplace la transparence par du noir) ; les PNG de `public/icons/` en sont tirés (192, 512 et 180 px pour iOS). L'onglet du navigateur a la boîte seule, sur fond transparent (`public/favicon.svg`).
 
 ### Statistiques (admin)
 
