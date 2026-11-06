@@ -1,11 +1,15 @@
 import { and, asc, eq, inArray, notInArray, sql } from 'drizzle-orm';
-import { mkdir, readdir, rm, stat } from 'node:fs/promises';
+import { mkdir, readFile, readdir, rm, stat } from 'node:fs/promises';
 import path from 'node:path';
 
-import { pageEntries, readArchive } from '../archive/archive';
+import {
+    type ArchiveEntry,
+    pageEntries,
+    readArchive,
+} from '../archive/archive';
 import { readComicInfo } from '../archive/comicInfo';
 import { parseVolumeFileName } from '../archive/fileName';
-import { readImage } from '../archive/image';
+import { COVER_QUALITY, COVER_SIZE, readImage } from '../archive/image';
 import type { Db } from '../db';
 import { libraries, series, volumes } from '../db/schema';
 import { TaskList } from '../tasks';
@@ -27,15 +31,6 @@ type FoundArchive = {
     size: number;
     mtimeMs: number;
 };
-
-// Format d'une couverture (2:3), recadrée depuis le haut : une page très
-// haute (webtoon) ne donne pas une vignette interminable.
-const COVER_SIZE = {
-    width: 400,
-    height: 600,
-    fit: 'cover',
-    position: 'top',
-} as const;
 
 export const coverFile = (coversPath: string, volumeId: number) =>
     path.join(coversPath, `${volumeId}.webp`);
@@ -70,6 +65,17 @@ export const findArchives = async (root: string): Promise<FoundArchive[]> => {
         });
     }
     return found;
+};
+
+/** Couverture absente, illisible, ou plus petite que le format actuel. */
+const isOutdatedCover = async (file: string) => {
+    try {
+        // Lue en mémoire : sharp garderait le fichier ouvert (Windows).
+        const { width = 0 } = await readImage(await readFile(file)).metadata();
+        return width < COVER_SIZE.width;
+    } catch {
+        return true;
+    }
 };
 
 const stem = (file: string) => path.basename(file, path.extname(file));
@@ -168,6 +174,12 @@ export class LibraryScanner {
                 previous.mtimeMs === archive.mtimeMs
             ) {
                 kept.push(archive.file);
+                // Couverture ratée lors d'un scan précédent, ou faite à une
+                // taille plus petite : la refaire.
+                const cover = coverFile(this.coversPath, previous.id);
+                if (await isOutdatedCover(cover)) {
+                    await this.writeCover(previous.id, archive);
+                }
                 continue;
             }
             try {
@@ -244,11 +256,24 @@ export class LibraryScanner {
             .get();
 
         // Couverture : sans elle, le tome reste lisible.
+        await this.writeCover(volume.id, archive, pages[0]);
+    };
+
+    /** Couverture d'un tome, d'après sa première page ; un échec est noté. */
+    private writeCover = async (
+        volumeId: number,
+        archive: FoundArchive,
+        firstPage?: ArchiveEntry,
+    ) => {
         try {
-            await readImage(await pages[0]!.getData())
+            const page =
+                firstPage ??
+                pageEntries(await readArchive(archive.fullPath))[0];
+            if (!page) throw new Error('aucune image dans l’archive');
+            await readImage(await page.getData())
                 .resize(COVER_SIZE)
-                .webp({ quality: 80 })
-                .toFile(coverFile(this.coversPath, volume.id));
+                .webp({ quality: COVER_QUALITY })
+                .toFile(coverFile(this.coversPath, volumeId));
         } catch (error) {
             this.logger.warn(
                 `Scan : couverture de ${archive.file} impossible (${String(error)})`,

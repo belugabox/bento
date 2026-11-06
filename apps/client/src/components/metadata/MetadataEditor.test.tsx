@@ -395,6 +395,9 @@ describe('MetadataEditor', () => {
             });
         });
         render(<Editor />);
+        const name = () =>
+            (screen.getByLabelText('Nom') as HTMLInputElement).value;
+        const initialName = name();
 
         fireEvent.click(
             screen.getByRole('textbox', {
@@ -414,5 +417,28 @@ describe('MetadataEditor', () => {
         expect(
             await screen.findByText('1 tome(s) publié(s), le dernier : Tome 1'),
         ).toBeTruthy();
+
+        // Effacer le choix rend les champs d'avant.
+        fireEvent.click(
+            screen.getByRole('button', {
+                name: 'Ne pas ajouter à cette série',
+            }),
+        );
+        expect(name()).toBe(initialName);
+        expect(
+            (screen.getByLabelText('Scénario') as HTMLInputElement).value,
+        ).toBe('');
+
+        // « Annuler » efface aussi le choix de la série.
+        const picker = () =>
+            screen.getByRole('textbox', {
+                name: 'Ajouter à une série existante',
+            }) as HTMLInputElement;
+        fireEvent.click(picker());
+        fireEvent.click(await screen.findByText('Gantz Perfect'));
+        await waitFor(() => expect(name()).toBe('Gantz Perfect'));
+        fireEvent.click(screen.getByRole('button', { name: 'Annuler' }));
+        expect(name()).toBe(initialName);
+        expect(picker().value).toBe('');
     });
 });

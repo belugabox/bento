@@ -7,6 +7,7 @@ import { SettingsPage } from './SettingsPage';
 const DEFAULTS = {
     compression: { quality: 90, maxHeight: 2400 },
     scanIntervalMinutes: 30,
+    appearance: { colorScheme: 'auto', accent: 'violet' },
 };
 
 afterEach(() => {
@@ -14,7 +15,7 @@ afterEach(() => {
 });
 
 describe('SettingsPage', () => {
-    it('saves the compression settings', async () => {
+    it('saves the compression settings and the default theme', async () => {
         let saved = DEFAULTS;
         const puts: unknown[] = [];
         vi.spyOn(globalThis, 'fetch').mockImplementation(
@@ -50,6 +51,8 @@ describe('SettingsPage', () => {
             }),
             { target: { value: '0' } },
         );
+        fireEvent.click(screen.getByText('Sombre'));
+        fireEvent.click(screen.getByLabelText('Sarcelle'));
         await act(async () => {
             fireEvent.click(
                 screen.getByRole('button', { name: 'Enregistrer' }),
@@ -60,8 +63,13 @@ describe('SettingsPage', () => {
             {
                 compression: { quality: 90, maxHeight: null },
                 scanIntervalMinutes: 0,
+                appearance: { colorScheme: 'dark', accent: 'teal' },
             },
         ]);
+        // Appliqué tout de suite à cet appareil (sans thème à lui).
+        expect(
+            JSON.parse(localStorage.getItem('bento:theme:defaults')!),
+        ).toEqual({ colorScheme: 'dark', accent: 'teal' });
         expect(await screen.findByText('Réglages enregistrés.')).toBeTruthy();
         expect(
             screen

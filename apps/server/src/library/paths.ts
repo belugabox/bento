@@ -32,11 +32,15 @@ export const isDraft = (relative: string) =>
 
 /**
  * Groupe d'un brouillon (une future série) : son dossier, ou le fichier
- * lui-même s'il est à la racine de _draft, où chaque tome est isolé.
+ * lui-même s'il est à la racine de _draft, où chaque tome est isolé. Un
+ * .cbr y est nommé comme le .cbz qu'il deviendra : ses réglages le suivent
+ * après la conversion.
  */
 export const draftGroupOf = (relative: string) => {
     const folder = path.posix.dirname(relative);
-    return folder === DRAFT_FOLDER ? relative : folder;
+    return folder === DRAFT_FOLDER
+        ? relative.replace(/\.cbr$/i, '.cbz')
+        : folder;
 };
 
 export { publicationPathOf, volumeNumberOf } from './publication';

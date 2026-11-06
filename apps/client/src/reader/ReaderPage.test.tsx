@@ -182,19 +182,40 @@ describe('ReaderPage', () => {
         expect(location).toBe('/series/3');
     });
 
-    it('resumes where the person stopped, and saves each page reached', async () => {
+    it('resumes where the person stopped', async () => {
         await open('rtl', '/read/7', { page: 1, completed: false });
 
         expect(shownPage()).toBe('/api/volumes/7/pages/1');
         // L'adresse suit au rendu suivant.
         await vi.waitFor(() => expect(location).toBe('/read/7?page=2'));
+    });
+
+    it('saves each page reached once a few pages were read', async () => {
+        await open('rtl');
+        await vi.waitFor(() => expect(location).toBe('/read/7?page=1'));
 
         press('ArrowLeft');
+        await vi.waitFor(() => expect(location).toBe('/read/7?page=2'));
+        // Deux pages vues : le tome n'est pas encore commencé.
+        expect(saved).toEqual([]);
+
+        press('ArrowLeft');
+        press('ArrowRight');
         await vi.waitFor(
-            () => expect(saved).toEqual([{ page: 1 }, { page: 2 }]),
+            () => expect(saved).toEqual([{ page: 2 }, { page: 1 }]),
             // Marge pour une machine chargée (tests lancés pendant un build).
             { timeout: 3000 },
         );
+    });
+
+    it('does not mark a volume read when arriving on its last page', async () => {
+        await open('rtl', '/read/7?page=last');
+        await vi.waitFor(() => expect(location).toBe('/read/7?page=3'));
+
+        press('ArrowRight');
+        await vi.waitFor(() => expect(location).toBe('/read/7?page=2'));
+
+        expect(saved).toEqual([]);
     });
 
     it('starts over a volume already read', async () => {
@@ -228,6 +249,7 @@ describe('ReaderPage', () => {
         landscape();
         await open('ltr');
         expect(shownPages()).toEqual(['/api/volumes/7/pages/0']);
+        await vi.waitFor(() => expect(location).toBe('/read/7?page=1'));
 
         press('ArrowRight');
 
@@ -237,8 +259,9 @@ describe('ReaderPage', () => {
                 '/api/volumes/7/pages/2',
             ]),
         );
-        // La progression retient la dernière page affichée.
-        await vi.waitFor(() => expect(saved.at(-1)).toEqual({ page: 2 }));
+        // Les deux pages comptent : trois pages vues, la progression
+        // retient la dernière affichée.
+        await vi.waitFor(() => expect(saved).toEqual([{ page: 2 }]));
     });
 
     it('puts the first page on the right when reading right to left', async () => {

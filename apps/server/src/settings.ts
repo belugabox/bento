@@ -1,7 +1,14 @@
 import { z } from 'zod';
 
+import { ACCENTS, COLOR_SCHEMES } from './appearance';
 import type { Db } from './db';
 import { settings as settingsTable } from './db/schema';
+
+const appearanceSchema = z.object({
+    // Mode et couleur de l'appli tant que l'appareil n'a pas les siens.
+    colorScheme: z.enum(COLOR_SCHEMES),
+    accent: z.enum(ACCENTS),
+});
 
 export const settingsSchema = z.object({
     compression: z.object({
@@ -16,6 +23,7 @@ export const settingsSchema = z.object({
         .int()
         .min(0)
         .max(7 * 24 * 60),
+    appearance: appearanceSchema,
 });
 
 export type Settings = z.infer<typeof settingsSchema>;
@@ -24,6 +32,7 @@ export type Settings = z.infer<typeof settingsSchema>;
 export const settingsUpdateSchema = z.object({
     compression: settingsSchema.shape.compression.partial().optional(),
     scanIntervalMinutes: settingsSchema.shape.scanIntervalMinutes.optional(),
+    appearance: appearanceSchema.partial().optional(),
 });
 
 export type SettingsUpdate = z.infer<typeof settingsUpdateSchema>;
@@ -31,6 +40,7 @@ export type SettingsUpdate = z.infer<typeof settingsUpdateSchema>;
 export const defaultSettings = (scanIntervalMinutes = 30): Settings => ({
     compression: { quality: 90, maxHeight: 2400 },
     scanIntervalMinutes,
+    appearance: { colorScheme: 'auto', accent: 'violet' },
 });
 
 const KEY = 'settings';
@@ -57,6 +67,10 @@ export class SettingsStore {
                 ...this.defaults.compression,
                 ...saved.compression,
             },
+            appearance: {
+                ...this.defaults.appearance,
+                ...saved.appearance,
+            },
         };
         const parsed = settingsSchema.safeParse(merged);
         return parsed.success ? parsed.data : this.defaults;
@@ -68,6 +82,7 @@ export class SettingsStore {
             ...current,
             ...changes,
             compression: { ...current.compression, ...changes.compression },
+            appearance: { ...current.appearance, ...changes.appearance },
         });
         this.db
             .insert(settingsTable)

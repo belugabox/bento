@@ -226,10 +226,12 @@ describe('settings', () => {
             settings: {
                 compression: { quality: 90, maxHeight: 2400 },
                 scanIntervalMinutes: 30,
+                appearance: { colorScheme: 'auto', accent: 'violet' },
             },
             defaults: {
                 compression: { quality: 90, maxHeight: 2400 },
                 scanIntervalMinutes: 30,
+                appearance: { colorScheme: 'auto', accent: 'violet' },
             },
         });
 
@@ -242,11 +244,21 @@ describe('settings', () => {
         const changed = await put({
             compression: { quality: 70 },
             scanIntervalMinutes: 0,
+            appearance: { accent: 'teal' },
         });
         expect((await changed.json()).settings).toEqual({
             compression: { quality: 70, maxHeight: 2400 },
             scanIntervalMinutes: 0,
+            appearance: { colorScheme: 'auto', accent: 'teal' },
         });
+        // Thème par défaut, lu sans session (page de connexion).
+        expect(await (await api.request('/appearance')).json()).toEqual({
+            colorScheme: 'auto',
+            accent: 'teal',
+        });
+        expect((await put({ appearance: { accent: 'fuchsia' } })).status).toBe(
+            400,
+        );
         // Gardés en base.
         expect(new SettingsStore(ctx.db).get().compression.quality).toBe(70);
 

@@ -108,8 +108,8 @@ export const Reader = ({
     sizesKey: string;
     page: number;
     goTo: (page: number) => void;
-    /** Dernière page affichée (celle qui compte pour la progression). */
-    onShown?: (page: number) => void;
+    /** Pages affichées (la dernière compte pour la progression). */
+    onShown?: (pages: number[]) => void;
     /** Retour en arrière depuis la première page (tome précédent). */
     onBeforeFirst?: () => void;
     mode: ReadingMode;
@@ -153,7 +153,12 @@ export const Reader = ({
     const shown = spreads[spreadIndex] ?? [page];
     const lastShown = Math.max(...shown);
 
-    useEffect(() => onShown?.(lastShown), [onShown, lastShown]);
+    // Clé plutôt que tableau : un nouveau tableau à chaque rendu.
+    const shownKey = shown.join(',');
+    useEffect(
+        () => onShown?.(shownKey.split(',').map(Number)),
+        [onShown, shownKey],
+    );
 
     const goTo = useCallback(
         (next: number) => {

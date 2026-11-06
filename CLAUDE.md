@@ -48,11 +48,12 @@ Serveur de lecture et de gestion de mangas et BD, qui remplace Kavita pour la fa
 
 ## Où on en est
 
-Tout est poussé sur `feat/reading-foundation`. Les étapes 1 à 3 de la feuille de route sont faites, ainsi qu'une page Réglages pour l'admin.
+Les étapes 1 à 3 de la feuille de route sont faites, ainsi qu'une page Réglages pour l'admin. **Bento est déployé** (`https://bento.belugabox.net`) : l'utilisateur fusionne `feat/reading-foundation` dans `main` par une PR, GitHub Actions publie l'image `:main`, il redémarre le conteneur. Ne jamais publier soi-même (ni push vers `main` ou `dev`, ni tag).
 
 Prochaines étapes possibles, à faire valider par l'utilisateur :
 
-1. **Déployer** (choisi le 5 novembre 2026) : le build de production a été vérifié en local (base vide, migrations, scan, client, redirection vers Pocket ID). Docker n'est pas installé sur le poste : l'image n'a jamais été construite. C'est GitHub Actions qui la publie quand l'utilisateur fusionne dans `main` ; ne pas publier soi-même (ni push vers `main` ou `dev`, ni tag). De son côté : le client OIDC dans Pocket ID (adresse de retour `https://bento.belugabox.net/api/auth/callback`, groupes), le compose du README, le sous-domaine Cloudflare.
-2. **Manga-news** (étape 5 de SPEC) : deuxième source de métadonnées, sans API, lecture du HTML à la demande seulement. L'âge conseillé remplit la classification. Fiche testée : `https://www.manga-news.com/index.php/serie/Spy-X-Family` (titre VO, auteurs, éditeurs, genres, « Age conseillé 12+ », résumé, liens `/manga/<Série>/vol-N`). Les pages de tome n'ont pas encore été examinées.
-3. **Pages redimensionnées selon l'écran** (étape 4), puis **hors ligne** (étape 6), **tomes manquants** (7), **bascule** (8).
-4. Rédiger la description de la PR quand il le demandera (`gh` n'est pas installé : il la créera sur GitHub).
+1. **Tablettes et Android** (étape 4 de SPEC, prioritaire depuis le 6 novembre 2026) : plein écran du lecteur sur tablette, appli web installable depuis Chrome sur Android (manifeste, icônes).
+2. **Optimisations proposées** : cache navigateur long pour les pages et couvertures (version dans l'adresse), découpage du client (`React.lazy` pour l'admin), dimensions des pages lues dans l'en-tête des images, enregistrement du ComicInfo en recopiant l'archive par morceaux au lieu d'AdmZip (« on verra après »).
+3. **Pages redimensionnées selon l'écran** (étape 5).
+4. **Manga-news** (étape 6) : deuxième source de métadonnées, sans API, lecture du HTML à la demande seulement. L'âge conseillé remplit la classification. Fiche testée : `https://www.manga-news.com/index.php/serie/Spy-X-Family` (titre VO, auteurs, éditeurs, genres, « Age conseillé 12+ », résumé, liens `/manga/<Série>/vol-N`). Les pages de tome n'ont pas encore été examinées.
+5. **Hors ligne** (étape 7), **tomes manquants** (8), **bascule** (9).

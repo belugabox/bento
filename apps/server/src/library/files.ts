@@ -25,7 +25,7 @@ import {
     compressArchive,
     estimateCompression,
 } from '../archive/compress';
-import { readImage } from '../archive/image';
+import { COVER_QUALITY, COVER_SIZE, readImage } from '../archive/image';
 import { updateComicInfo } from '../archive/write';
 import type { Db } from '../db';
 import { libraries, series, volumes } from '../db/schema';
@@ -72,24 +72,9 @@ export type ComicInfoChanges = {
 
 type Failure = { path: string; reason: string };
 
-// Format d'une couverture (2:3), recadrée depuis le haut : une page très
-// haute (webtoon) ne donne pas une vignette interminable.
-const COVER_SIZE = {
-    width: 400,
-    height: 600,
-    fit: 'cover',
-    position: 'top',
-} as const;
-
 const exists = (fullPath: string) =>
     access(fullPath).then(
         () => true,
-        () => false,
-    );
-
-const isFile = (fullPath: string) =>
-    stat(fullPath).then(
-        (stats) => stats.isFile(),
         () => false,
     );
 
@@ -186,7 +171,7 @@ export class LibraryFiles {
                 await mkdir(path.dirname(cover), { recursive: true });
                 await readImage(await pages[0].getData())
                     .resize(COVER_SIZE)
-                    .webp({ quality: 80 })
+                    .webp({ quality: COVER_QUALITY })
                     .toFile(cover)
                     .catch(() => undefined);
             }
@@ -244,21 +229,9 @@ export class LibraryFiles {
         resolveInLibrary(this.library(libraryId).path, relative);
 
     /**
-     * Convertit en CBZ les .cbr des brouillons, et réécrit en ZIP les .cbz
+     * Convertit en CBZ des .cbr de brouillons, et réécrit en ZIP les .cbz
      * qui sont en réalité des archives RAR.
      */
-    private convertDrafts = async (draftRoot: string) => {
-        const entries = await readdir(draftRoot, {
-            withFileTypes: true,
-            recursive: true,
-        }).catch(() => []);
-        await this.convertFiles(
-            entries
-                .filter((entry) => entry.isFile())
-                .map((entry) => path.join(entry.parentPath, entry.name)),
-        );
-    };
-
     private convertFiles = async (fullPaths: string[]) => {
         for (const fullPath of fullPaths) {
             const name = path.basename(fullPath);
@@ -408,23 +381,32 @@ export class LibraryFiles {
             throw notFound('Dossier de brouillons introuvable');
         }
         const folder = relativeTo(library.path, dir);
-        // Un tome seul à la racine de _draft.
-        if (path.dirname(dir) === draftRoot && (await isFile(dir))) {
-            await this.convertFiles([dir]);
-            // Un .cbr converti est devenu un .cbz.
-            const converted = dir.replace(/\.cbr$/i, '.cbz');
-            return [
-                await this.infoOf(
-                    library.path,
-                    this.conversionErrors.has(dir) ? dir : converted,
-                ),
-            ];
-        }
-        await this.convertDrafts(dir);
+        // Un tome seul à la racine de _draft : son groupe porte son nom en
+        // .cbz, qu'il soit encore un .cbr ou déjà converti.
+        // Un dossier nommé « X.cbz » reste un dossier.
+        const lone =
+            path.dirname(dir) === draftRoot &&
+            /\.cb[rz]$/i.test(dir) &&
+            !(await stat(dir).then(
+                (stats) => stats.isDirectory(),
+                () => false,
+            ));
+        const group = draftGroupOf(folder);
+        const archivesOfGroup = async () =>
+            (
+                await this.archivesUnder(library.path, lone ? draftRoot : dir)
+            ).filter((archive) =>
+                lone
+                    ? archive.folder === DRAFT_FOLDER &&
+                      draftGroupOf(archive.path) === group
+                    : archive.folder === folder,
+            );
+        await this.convertFiles(
+            (await archivesOfGroup()).map((archive) => archive.fullPath),
+        );
         const files: FileInfo[] = [];
-        for (const archive of await this.archivesUnder(library.path, dir)) {
+        for (const archive of await archivesOfGroup()) {
             // Un .cbr reste listé tant que sa conversion échoue.
-            if (archive.folder !== folder) continue;
             if (
                 isCbr(archive.path) &&
                 !this.conversionErrors.has(archive.fullPath)
