@@ -44,8 +44,7 @@ import {
 } from './library/lists';
 import {
     getProgress,
-    listInProgress,
-    listNextVolumes,
+    listContinue,
     listRecentVolumes,
     markSeries,
     saveProgress,
@@ -419,14 +418,11 @@ export const createApi = ({
                 return c.json(sizes);
             },
         )
-        // Tomes commencés, pour « Reprendre la lecture ».
-        .get('/continue', (c) => c.json(listInProgress(db, c.var.user)))
-        // Accueil : derniers ajouts et suite des séries entamées.
+        // « Reprendre la lecture » : tomes en cours, ou suivants à ouvrir.
+        .get('/continue', (c) => c.json(listContinue(db, c.var.user)))
+        // Derniers ajouts (« Nouveautés », retirée de l'accueil pour l'instant).
         .get('/home', (c) =>
-            c.json({
-                recent: listRecentVolumes(db, c.var.user),
-                next: listNextVolumes(db, c.var.user),
-            }),
+            c.json({ recent: listRecentVolumes(db, c.var.user) }),
         )
         // Collections partagées : lecture pour tous, gestion par l'admin.
         .get('/collections', (c) => c.json(listCollections(db, c.var.user)))

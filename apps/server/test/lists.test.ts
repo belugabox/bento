@@ -220,32 +220,35 @@ describe('home', () => {
         ).toBe('3');
     });
 
-    it('suggests the next volume of the series being read', async () => {
+    it('offers the next volume of the series being read, to resume', async () => {
         const save = (volumeId: number, json: unknown) =>
             call(`/volumes/${volumeId}/progress`, alice, {
                 method: 'PUT',
                 json,
             });
+        const resume = async () => (await call('/continue', alice)).body;
         await save(gantz[0]!, { completed: true });
 
-        let { next } = (await call('/home', alice)).body;
-        expect(next).toEqual([
+        expect(await resume()).toEqual([
             expect.objectContaining({
                 volumeId: gantz[1],
                 seriesName: 'Gantz',
+                page: null,
+                readCount: 1,
+                volumeCount: 3,
             }),
         ]);
 
-        // Tome 2 commencé : il passe dans « Reprendre », pas dans la suite.
+        // Tome 2 commencé : c'est lui qu'on reprend, à sa page.
         await save(gantz[1]!, { page: 0 });
-        ({ next } = (await call('/home', alice)).body);
-        expect(next).toEqual([]);
+        expect(await resume()).toEqual([
+            expect.objectContaining({ volumeId: gantz[1], page: 0 }),
+        ]);
 
-        // Toute la série lue : plus de suite.
+        // Toute la série lue : plus rien à reprendre.
         await save(gantz[1]!, { completed: true });
         await save(gantz[2]!, { completed: true });
-        ({ next } = (await call('/home', alice)).body);
-        expect(next).toEqual([]);
-        expect((await call('/home', bob)).body.next).toEqual([]);
+        expect(await resume()).toEqual([]);
+        expect((await call('/continue', bob)).body).toEqual([]);
     });
 });

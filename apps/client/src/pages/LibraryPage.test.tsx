@@ -64,30 +64,20 @@ beforeEach(() => {
                     readCount: 1,
                     volumeCount: 3,
                 },
+                // Suite d'une série entamée : tome pas encore ouvert.
+                {
+                    volumeId: 51,
+                    seriesId: 1,
+                    seriesName: 'Akira',
+                    number: '4',
+                    title: null,
+                    page: null,
+                    pageCount: 20,
+                    updatedAt: '2026-03-01T00:00:00.000Z',
+                    readCount: 3,
+                    volumeCount: 6,
+                },
             ]);
-        }
-        if (url === '/api/home') {
-            return respond({
-                next: [
-                    {
-                        volumeId: 51,
-                        seriesId: 1,
-                        seriesName: 'Akira',
-                        number: '4',
-                        title: null,
-                    },
-                ],
-                recent: [
-                    {
-                        volumeId: 60,
-                        seriesId: 2,
-                        seriesName: 'Berserk',
-                        number: '41',
-                        title: null,
-                        addedAt: '2026-03-01T00:00:00.000Z',
-                    },
-                ],
-            });
         }
         if (url === '/api/collections') {
             return respond([{ id: 7, name: 'Classiques', seriesCount: 1 }]);
@@ -152,12 +142,16 @@ describe('LibraryPage', () => {
         expect(location).toBe('?sort=recent');
     });
 
-    it('suggests what comes next, without the newest volumes', async () => {
+    it('resumes with the next volume of a series, in the same row', async () => {
         show();
 
-        expect(await screen.findByText('La suite de tes séries')).toBeTruthy();
-        expect(screen.queryByText('Nouveautés')).toBeNull();
-        expect(screen.queryByText('Tome 41')).toBeNull();
+        expect(await screen.findByText('Tome 4 · 3 / 6 lus')).toBeTruthy();
+        expect(screen.queryByText('La suite de tes séries')).toBeNull();
+        expect(
+            screen
+                .getAllByLabelText('Avancement')[1]!
+                .getAttribute('aria-valuenow'),
+        ).toBe('50');
         expect(
             screen
                 .getAllByRole('link')

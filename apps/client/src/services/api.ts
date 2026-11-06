@@ -82,16 +82,12 @@ export const saveProgress = (
         }),
     );
 
+/** « Reprendre la lecture » : tomes en cours, ou suivants à ouvrir. */
 export const fetchInProgress = () => json(api.continue.$get());
 
 export type InProgressVolume = Awaited<
     ReturnType<typeof fetchInProgress>
 >[number];
-
-/** Accueil : suite des séries entamées (et derniers ajouts). */
-export const fetchHome = () => json(api.home.$get());
-
-export type NextVolume = Awaited<ReturnType<typeof fetchHome>>['next'][number];
 
 /** Liste « à lire » de la personne. */
 export const setSeriesLists = (seriesId: number, lists: { toRead?: boolean }) =>
