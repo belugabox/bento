@@ -80,15 +80,19 @@ export class SeriesCovers {
             parsed.protocol !== 'https:' ||
             !ALLOWED_IMAGE_HOSTS.includes(parsed.hostname)
         ) {
-            throw badRequest('Seules les images de Wikimedia sont acceptées');
+            throw badRequest(
+                'Seules les images de Wikimedia et de Manga-news sont acceptées',
+            );
         }
         const response = await this.fetchFn(parsed, {
             headers: { 'User-Agent': USER_AGENT },
-            // Une redirection pourrait mener hors de Wikimedia.
+            // Une redirection pourrait mener hors des sites acceptés.
             redirect: 'error',
             signal: AbortSignal.timeout(15_000),
         }).catch(() => undefined);
-        if (!response?.ok) throw badGateway('Image introuvable sur Wikimedia');
+        if (!response?.ok) {
+            throw badGateway(`Image introuvable sur ${parsed.hostname}`);
+        }
         if (!response.headers.get('content-type')?.startsWith('image/')) {
             throw badGateway('L’adresse ne renvoie pas une image');
         }

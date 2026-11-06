@@ -20,6 +20,17 @@ export const listFormats = (db: Db) =>
         .orderBy(asc(formats.id))
         .all();
 
+/** Refuse un format inconnu (null : aucun, accepté). */
+export const checkFormatId = (db: Db, id: number | null | undefined) => {
+    if (id == null) return;
+    const found = db
+        .select({ id: formats.id })
+        .from(formats)
+        .where(eq(formats.id, id))
+        .get();
+    if (!found) throw badRequest('Format inconnu');
+};
+
 /** Refuse un nom vide ou déjà pris (sans tenir compte de la casse). */
 const checkName = (db: Db, name: string, exceptId?: number) => {
     const key = genreKey(name);

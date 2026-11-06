@@ -28,6 +28,16 @@ describe('classify', () => {
             themes: ['Shōnen', 'Espionnage', 'famille'],
         });
     });
+
+    it('drops ComicInfo ratings found among the genres', () => {
+        expect(
+            classify(
+                'PG, MA15+, Kids to Adults, R18+, Sport',
+                null,
+                DEFAULT_GENRES,
+            ),
+        ).toEqual({ genres: ['Sport'], themes: [] });
+    });
 });
 
 let ctx: Awaited<ReturnType<typeof setup>>;
@@ -108,6 +118,12 @@ describe('genres', () => {
         });
         const found = await call('/series?search=espion', reader);
         expect(found.body).toHaveLength(1);
+        // Par le genre de la liste (« Humour » dans le fichier), sans accent.
+        for (const search of ['comedie', 'humour', 'thriller']) {
+            const { body } = await call(`/series?search=${search}`, reader);
+            expect(body).toHaveLength(1);
+        }
+        expect((await call('/series?search=horreur', reader)).body).toEqual([]);
     });
 
     it('is managed by the admin only', async () => {
@@ -221,9 +237,62 @@ describe('formats', () => {
             .body;
         expect(volume.readingMode).toBe('webtoon');
 
+        // Format inconnu : refusé, pour une série comme pour un brouillon.
+        expect(
+            (
+                await call(`/series/${id}/classification`, admin, {
+                    method: 'PUT',
+                    json: { formatId: 999 },
+                })
+            ).status,
+        ).toBe(400);
+        expect(
+            (
+                await call(
+                    `/libraries/${ctx.library.id}/drafts/classification`,
+                    admin,
+                    {
+                        method: 'PUT',
+                        json: { folder: '_draft/Spy', formatId: 999 },
+                    },
+                )
+            ).status,
+        ).toBe(400);
+
         // Format supprimé : la série n'en a plus.
         await call(`/formats/${webtoon}`, admin, { method: 'DELETE' });
         expect(await series()).toMatchObject({ formatId: null, format: null });
+    });
+
+    it('is required to publish a draft, unless its series has one', async () => {
+        await writeCbz(ctx.file('_draft/Solo/Solo T01.cbz'), {
+            comicInfo: '<Series>Solo</Series><Number>1</Number>',
+        });
+        const { published, failures } = await ctx.files.publish(
+            ctx.library.id,
+            ['_draft/Solo/Solo T01.cbz'],
+        );
+        expect(published).toEqual([]);
+        expect(failures).toEqual([
+            {
+                path: '_draft/Solo/Solo T01.cbz',
+                reason: 'il faut choisir le format de la série',
+            },
+        ]);
+
+        // Un tome de plus pour « Spy », qui a déjà un format.
+        const { id } = await series();
+        await call(`/series/${id}/classification`, admin, {
+            method: 'PUT',
+            json: { formatId: await formatId('Manga') },
+        });
+        await writeCbz(ctx.file('_draft/Spy/Spy T02.cbz'), {
+            comicInfo: '<Series>Spy</Series><Number>2</Number>',
+        });
+        const second = await ctx.files.publish(ctx.library.id, [
+            '_draft/Spy/Spy T02.cbz',
+        ]);
+        expect(second.failures).toEqual([]);
     });
 
     it('and age, chosen on a draft folder, are applied when it is published', async () => {

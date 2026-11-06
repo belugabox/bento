@@ -1,5 +1,6 @@
 // Format, âge, genres et thèmes d'une série, partagés avec le client
 // (sans dépendance).
+import { AGE_RATINGS } from './library/ageRating';
 
 /** Sens de lecture : BD, manga (doubles pages inversées), manga, webtoon. */
 export const READING_MODES = ['ltr', 'ltr-manga', 'rtl', 'webtoon'] as const;
@@ -102,8 +103,15 @@ const AGE_WORDS = [
 ];
 
 /** « Mature », « Mature 17+ », « 12+ »… */
+// Classifications ComicInfo (« PG », « MA15+ », « Kids to Adults »…).
+const RATING_KEYS = new Set(
+    [...Object.keys(AGE_RATINGS), 'Unknown', 'Rating Pending'].map(genreKey),
+);
+
+/** « Mature », « Mature 17+ », « 12+ », « PG », « MA15+ »… */
 const isAge = (key: string) =>
     /^\d+ ?\+$/.test(key) ||
+    RATING_KEYS.has(key) ||
     AGE_WORDS.some((word) => key === word || key.startsWith(`${word} `));
 
 export type Classification = { genres: string[]; themes: string[] };

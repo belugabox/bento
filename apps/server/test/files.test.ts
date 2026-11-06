@@ -11,6 +11,7 @@ import { publicationPathOf } from '../src/library/paths';
 import { getProgress, saveProgress } from '../src/library/progress';
 import {
     authDeps,
+    formatDrafts,
     png,
     sessionCookie,
     setup,
@@ -359,6 +360,7 @@ describe('publishing', () => {
             comicInfo: info('Gantz', '1', 2017),
         });
 
+        await formatDrafts(ctx);
         const { body } = await call(
             `/libraries/${ctx.library.id}/files/publish`,
             {
@@ -395,6 +397,7 @@ describe('publishing', () => {
             status: 'completed',
         });
 
+        await formatDrafts(ctx);
         await ctx.files.publish(ctx.library.id, [
             '_draft/Spirale.cbz',
             '_draft/Gantz.cbz',
@@ -433,6 +436,7 @@ describe('publishing', () => {
             ctx.library.id,
             draft!.folder,
         );
+        await formatDrafts(ctx);
         await ctx.files.publish(
             ctx.library.id,
             files.map((file) => file.path),
@@ -453,6 +457,7 @@ describe('publishing', () => {
             comicInfo: info('the boxer', '2'),
         });
 
+        await formatDrafts(ctx);
         const { published } = await ctx.files.publish(ctx.library.id, [
             '_draft/Boxer/T02.cbz',
         ]);
@@ -475,6 +480,7 @@ describe('publishing', () => {
         const drafts = await call(`/libraries/${ctx.library.id}/drafts`);
         expect(drafts.body[0].status).toBe('completed');
 
+        await formatDrafts(ctx);
         await ctx.files.publish(ctx.library.id, ['_draft/Gantz/T01.cbz']);
 
         expect(listSeries(ctx.db, ADMIN_VIEW)[0]?.status).toBe('completed');
@@ -530,6 +536,7 @@ describe('publishing', () => {
         expect(draftCover.status).toBe(200);
         const draftBytes = Buffer.from(await draftCover.arrayBuffer());
 
+        await formatDrafts(ctx);
         await ctx.files.publish(ctx.library.id, [
             '_draft/Boxer/T01.cbz',
             '_draft/Boxer/T02.cbz',
@@ -613,6 +620,7 @@ describe('publishing', () => {
     it('needs a series and a number', async () => {
         await writeCbz(ctx.file('_draft/T01.cbz'));
 
+        await formatDrafts(ctx);
         const { failures } = await ctx.files.publish(ctx.library.id, [
             '_draft/T01.cbz',
         ]);
@@ -635,6 +643,7 @@ describe('publishing', () => {
             pages: 4,
             comicInfo: info('Gantz', '1', 2017),
         });
+        await formatDrafts(ctx);
         await ctx.files.publish(ctx.library.id, ['_draft/Gantz T01 HD.cbz']);
 
         expect(await readdir(ctx.file('Gantz'))).toEqual([
@@ -677,6 +686,7 @@ describe('publishing', () => {
                 changes: { Series: 'Spy x Family' },
             })),
         );
+        await formatDrafts(ctx);
         const { published, failures } = await ctx.files.publish(
             ctx.library.id,
             paths,
@@ -706,6 +716,7 @@ describe('publishing', () => {
             comicInfo: info('Gantz', '1'),
         });
 
+        await formatDrafts(ctx);
         const { failures } = await ctx.files.publish(ctx.library.id, [
             'Gantz/Gantz bonus.cbz',
         ]);
@@ -722,6 +733,7 @@ describe('publishing', () => {
             comicInfo: info('../../evil', '1'),
         });
 
+        await formatDrafts(ctx);
         const { published } = await ctx.files.publish(ctx.library.id, [
             '_draft/T01.cbz',
         ]);

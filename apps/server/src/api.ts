@@ -37,6 +37,7 @@ import {
 } from './library/covers';
 import type { LibraryFiles } from './library/files';
 import {
+    checkFormatId,
     createFormat,
     deleteFormat,
     listFormats,
@@ -312,14 +313,16 @@ export const createApi = ({
             requireAdmin,
             zValidator('param', idParam),
             zValidator('json', classificationBody),
-            (c) =>
-                c.json(
+            (c) => {
+                checkFormatId(db, c.req.valid('json').formatId);
+                return c.json(
                     setSeriesClassification(
                         db,
                         c.req.valid('param').id,
                         c.req.valid('json'),
                     ),
-                ),
+                );
+            },
         )
         // Formats : lus par tous (filtres), gérés par l'admin.
         .get('/formats', (c) => c.json(listFormats(db)))
@@ -740,6 +743,7 @@ export const createApi = ({
             ),
             (c) => {
                 const { folder, ...changes } = c.req.valid('json');
+                checkFormatId(db, changes.formatId);
                 const { formatId, age } = files.setDraftSettings(
                     c.req.valid('param').id,
                     folder,

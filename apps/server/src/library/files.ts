@@ -490,10 +490,16 @@ export class LibraryFiles {
 
         for (const relative of paths) {
             try {
+                // Brouillon sans format choisi : seulement vers une série
+                // qui en a déjà un (format obligatoire).
+                const requireFormat =
+                    isDraft(relative) &&
+                    !drafts.get(draftGroupOf(relative))?.formatId;
                 const to = await this.publishOne(
                     library.path,
                     libraryId,
                     relative,
+                    requireFormat,
                 );
                 if (to) {
                     published.push({ from: relative, to });
@@ -652,10 +658,25 @@ export class LibraryFiles {
             : undefined;
     };
 
+    /**
+     * La série où arrive un tome (son dossier, sans tenir compte de la
+     * casse) existe déjà, avec un format.
+     */
+    private seriesHasFormat = (libraryId: number, publicationPath: string) => {
+        const key = publicationPath.split('/')[0]!.toLowerCase();
+        return this.db
+            .select({ key: series.key, formatId: series.formatId })
+            .from(series)
+            .where(eq(series.libraryId, libraryId))
+            .all()
+            .some((row) => row.key.toLowerCase() === key && !!row.formatId);
+    };
+
     private publishOne = async (
         libraryPath: string,
         libraryId: number,
         relative: string,
+        requireFormat = false,
     ): Promise<string | undefined> => {
         const sourcePath = resolveInLibrary(libraryPath, relative);
         const info = await this.infoOf(libraryPath, sourcePath);
@@ -663,6 +684,12 @@ export class LibraryFiles {
         const publicationPath = this.targetOf(libraryId, info);
         if (!publicationPath) {
             throw new Error('il faut au moins la série et le numéro du tome');
+        }
+        if (
+            requireFormat &&
+            !this.seriesHasFormat(libraryId, publicationPath)
+        ) {
+            throw new Error('il faut choisir le format de la série');
         }
         if (publicationPath === relative) return undefined;
 

@@ -220,10 +220,19 @@ const PreviewModal = ({
 }) => {
     const { preview } = useCurrentUser();
     const ages = useAgeSteps(opened);
-    // Âge proposé : celui de la vue en cours, sinon un enfant de 10 ans.
-    const [maxAge, setMaxAge] = useState<string>(
-        preview ? String(preview.maxAge ?? NO_LIMIT) : '10',
-    );
+    // Âge proposé : celui de la vue en cours (gardé même s'il a quitté la
+    // grille), sinon l'âge de la grille le plus proche de 10 ans.
+    const childAge = [...ages].reverse().find((age) => age <= 10) ?? ages[0];
+    const [chosen, setChosen] = useState<string>();
+    const maxAge =
+        chosen ??
+        (preview
+            ? String(preview.maxAge ?? NO_LIMIT)
+            : String(childAge ?? NO_LIMIT));
+    const options = ageLimitOptions(ages, preview?.maxAge).map((limit) => ({
+        value: String(limit.value ?? NO_LIMIT),
+        label: limit.label,
+    }));
     return (
         <Modal opened={opened} onClose={onClose} title="Voir comme un lecteur">
             <Stack>
@@ -235,11 +244,8 @@ const PreviewModal = ({
                     label="Séries visibles"
                     allowDeselect={false}
                     value={maxAge}
-                    onChange={(value) => value && setMaxAge(value)}
-                    data={ageLimitOptions(ages).map((limit) => ({
-                        value: String(limit.value ?? NO_LIMIT),
-                        label: limit.label,
-                    }))}
+                    onChange={(value) => value && setChosen(value)}
+                    data={options}
                     comboboxProps={{ withinPortal: false }}
                 />
                 <Group justify="flex-end">

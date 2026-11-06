@@ -2,7 +2,7 @@ import { and, asc, count, eq, inArray, notInArray, sql } from 'drizzle-orm';
 import { rm } from 'node:fs/promises';
 import path from 'node:path';
 
-import { type ReadingMode, classify } from '../classification';
+import { type ReadingMode, classify, genreKey } from '../classification';
 import type { LibraryConfig } from '../config';
 import type { Db } from '../db';
 import {
@@ -122,7 +122,8 @@ export const listSeries = (
     viewer: Viewer,
     { libraryId, search }: { libraryId?: number; search?: string } = {},
 ) => {
-    const text = search?.trim().toLowerCase();
+    // Sans casse ni accents : « comedie » trouve « Comédie ».
+    const text = search ? genreKey(search) : '';
     const catalog = genreCatalog(db);
     return db
         .select({
@@ -163,9 +164,6 @@ export const listSeries = (
                 libraryId === undefined
                     ? undefined
                     : eq(series.libraryId, libraryId),
-                text
-                    ? sql`(lower(${series.name}) like ${`%${text}%`} or lower(coalesce(${series.genre}, '') || ',' || coalesce(${series.tags}, '')) like ${`%${text}%`})`
-                    : undefined,
                 visibleTo(viewer),
             ),
         )
@@ -175,7 +173,18 @@ export const listSeries = (
         .map(({ genre, tags, libraryType: _type, ...row }) => ({
             ...row,
             ...classify(genre, tags, catalog),
-        }));
+            // Genres tels qu'écrits dans les fichiers (« Humour »), cherchés
+            // aussi.
+            rawGenres: `${genre ?? ''},${tags ?? ''}`,
+        }))
+        .filter(
+            (row) =>
+                !text ||
+                [row.name, row.rawGenres, ...row.genres, ...row.themes].some(
+                    (value) => genreKey(value).includes(text),
+                ),
+        )
+        .map(({ rawGenres: _raw, ...row }) => row);
 };
 
 export const getSeries = (db: Db, viewer: Viewer, id: number) => {
