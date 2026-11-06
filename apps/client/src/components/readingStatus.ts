@@ -23,6 +23,22 @@ export const volumeLabel = (volume: {
         ? `${VOLUME_KIND_LABELS[volume.kind ?? 'volume']} ${volume.number}`
         : (volume.title ?? 'Hors-série');
 
+/** Libellé court, pour une carte étroite : « T2 », « HS1 », « SP2 ». */
+export const volumeShortLabel = (volume: {
+    number: string | null;
+    title: string | null;
+    kind?: VolumeKind;
+}) =>
+    volume.number
+        ? `${SHORT_PREFIXES[volume.kind ?? 'volume']}${volume.number}`
+        : volumeLabel(volume);
+
+const SHORT_PREFIXES: Record<VolumeKind, string> = {
+    volume: 'T',
+    'hors-serie': 'HS',
+    special: 'SP',
+};
+
 /**
  * Titre propre d'un tome, à afficher sous son libellé ; null s'il n'en a
  * pas, ou s'il répète le libellé (« Tome 3 », « Hors-série 1 », rempli

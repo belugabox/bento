@@ -107,7 +107,7 @@ describe('LibraryPage', () => {
 
         expect(await screen.findByText('Reprendre la lecture')).toBeTruthy();
         // Le tome en cours, et l'avancement dans la série.
-        expect(screen.getByText('Tome 2 · 1 / 3 lus')).toBeTruthy();
+        expect(screen.getByText('T2 · 1/3 lus')).toBeTruthy();
         // Un tome lu sur trois, plus la moitié du deuxième.
         expect(
             screen
@@ -145,7 +145,7 @@ describe('LibraryPage', () => {
     it('resumes with the next volume of a series, in the same row', async () => {
         show();
 
-        expect(await screen.findByText('Tome 4 · 3 / 6 lus')).toBeTruthy();
+        expect(await screen.findByText('T4 · 3/6 lus')).toBeTruthy();
         expect(screen.queryByText('La suite de tes séries')).toBeNull();
         expect(
             screen

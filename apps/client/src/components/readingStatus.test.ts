@@ -5,6 +5,7 @@ import {
     nextToRead,
     progressRatio,
     volumeLabel,
+    volumeShortLabel,
     volumeTitleOf,
 } from './readingStatus';
 
@@ -83,6 +84,18 @@ describe('volumeLabel', () => {
             volumeTitleOf({ number: '1', title: 'Hors-série 1' }),
         ).toBeNull();
         expect(volumeTitleOf({ number: '1', title: 'HS 01' })).toBeNull();
+    });
+});
+
+describe('volumeShortLabel', () => {
+    it('fits a narrow card', () => {
+        expect(volumeShortLabel({ number: '12', title: null })).toBe('T12');
+        expect(
+            volumeShortLabel({ number: '1', title: null, kind: 'hors-serie' }),
+        ).toBe('HS1');
+        expect(volumeShortLabel({ number: null, title: 'Bonus' })).toBe(
+            'Bonus',
+        );
     });
 });
 

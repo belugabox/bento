@@ -33,7 +33,7 @@ import { useSearchParams } from 'react-router';
 
 import { SeriesCardMenu, VolumeCardMenu } from '@/components/CardMenus';
 import { CoverCard } from '@/components/CoverCard';
-import { volumeLabel } from '@/components/readingStatus';
+import { volumeLabel, volumeShortLabel } from '@/components/readingStatus';
 import {
     type ListFilter,
     READING_FILTERS,
@@ -249,7 +249,8 @@ export const LibraryPage = () => {
                         <ShelfCard
                             key={volume.volumeId}
                             volume={volume}
-                            subtitle={`${volumeLabel(volume)} · ${volume.readCount} / ${volume.volumeCount} lus`}
+                            // Court : tient sur une ligne de la carte.
+                            subtitle={`${volumeShortLabel(volume)} · ${volume.readCount}/${volume.volumeCount} lus`}
                             progress={seriesProgress(volume)}
                             onChanged={reloadHome}
                         />
