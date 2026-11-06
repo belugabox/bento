@@ -293,24 +293,29 @@ describe('MetadataEditor', () => {
 
         fireEvent.change(name, { target: { value: 'Gantz:G' } });
         expect(name.getAttribute('data-changed')).toBe('true');
+        // Au toucher (tablette) : la valeur s'affiche, puis on y revient.
         fireEvent.click(
-            screen.getByRole('button', {
-                name: 'Revenir à la valeur d’origine : Gantz',
-            }),
+            screen.getByRole('button', { name: 'Voir la valeur d’origine' }),
+        );
+        expect(await screen.findByText('Gantz')).toBeTruthy();
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Revenir à cette valeur' }),
         );
 
         expect(name.value).toBe('Gantz');
         expect(name.getAttribute('data-changed')).toBeNull();
         expect(
-            screen.queryByRole('button', { name: /valeur d’origine/ }),
+            screen.queryByRole('button', { name: 'Voir la valeur d’origine' }),
         ).toBeNull();
 
         // Un champ vide à l'origine.
         fireEvent.change(numberOf(1), { target: { value: '7' } });
         fireEvent.click(
-            screen.getByRole('button', {
-                name: 'Revenir à la valeur d’origine : (vide)',
-            }),
+            screen.getByRole('button', { name: 'Voir la valeur d’origine' }),
+        );
+        expect(await screen.findByText('(vide)')).toBeTruthy();
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Revenir à cette valeur' }),
         );
         expect(numberOf(1).value).toBe('');
     });

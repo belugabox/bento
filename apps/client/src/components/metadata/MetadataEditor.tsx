@@ -8,6 +8,7 @@ import {
     Image,
     NumberInput,
     Paper,
+    Popover,
     Select,
     Stack,
     Table,
@@ -105,27 +106,61 @@ const ORIGINAL_PREVIEW = 300;
 
 /** Bouton dans un champ modifié : montre sa valeur d'origine, et y revient. */
 const RevertButton = ({ original, onRevert }: Revert) => {
+    const [opened, { toggle, close }] = useDisclosure(false);
     const shown =
         original.length > ORIGINAL_PREVIEW
             ? `${original.slice(0, ORIGINAL_PREVIEW)}…`
             : original || '(vide)';
+    // Ouvert au clic, pas au survol : utilisable sur tablette.
     return (
-        <Tooltip
-            label={`Valeur d’origine : ${shown}`}
-            multiline
-            maw={320}
-            withinPortal
+        <Popover
+            opened={opened}
+            onChange={(value) => !value && close()}
+            position="bottom-end"
+            withArrow
+            shadow="md"
+            width={300}
         >
-            <ActionIcon
-                variant="subtle"
-                color="orange"
-                size="sm"
-                aria-label={`Revenir à la valeur d’origine : ${shown}`}
-                onClick={onRevert}
-            >
-                <IconArrowBackUp size={14} />
-            </ActionIcon>
-        </Tooltip>
+            <Popover.Target>
+                <ActionIcon
+                    variant="subtle"
+                    color="orange"
+                    size="sm"
+                    aria-label="Voir la valeur d’origine"
+                    onClick={toggle}
+                >
+                    <IconArrowBackUp size={14} />
+                </ActionIcon>
+            </Popover.Target>
+            <Popover.Dropdown>
+                <Stack gap="xs">
+                    <Text size="xs" c="dimmed">
+                        Valeur d’origine
+                    </Text>
+                    <Text
+                        size="sm"
+                        style={{
+                            whiteSpace: 'pre-wrap',
+                            wordBreak: 'break-word',
+                        }}
+                    >
+                        {shown}
+                    </Text>
+                    <Button
+                        size="xs"
+                        variant="light"
+                        color="orange"
+                        leftSection={<IconArrowBackUp size={14} />}
+                        onClick={() => {
+                            close();
+                            onRevert();
+                        }}
+                    >
+                        Revenir à cette valeur
+                    </Button>
+                </Stack>
+            </Popover.Dropdown>
+        </Popover>
     );
 };
 
