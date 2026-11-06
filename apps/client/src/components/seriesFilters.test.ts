@@ -71,7 +71,6 @@ describe('list, genre and status filters', () => {
             ...series('Akira', 0, null),
             genre: 'Science-fiction, Action',
             status: 'completed',
-            favorite: true,
             collectionIds: [4],
         },
         {
@@ -85,9 +84,8 @@ describe('list, genre and status filters', () => {
     const kept = (options: Partial<Parameters<typeof filterSeries>[1]>) =>
         names(filterSeries(items, { filter: 'all', sort: 'name', ...options }));
 
-    it('keeps a personal list or a collection', () => {
-        expect(kept({ list: 'favorite' })).toEqual(['Akira']);
-        expect(kept({ list: 'toread' })).toEqual(['Berserk']);
+    it('keeps the to-read list or a collection', () => {
+        expect(kept({ filter: 'toread' })).toEqual(['Berserk']);
         expect(kept({ list: 'collection:4' })).toEqual(['Akira']);
         expect(kept({ list: 'collection:5' })).toEqual([]);
     });

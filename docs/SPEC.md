@@ -60,7 +60,7 @@ Bento est le serveur de lecture et de gestion des mangas et BD de la maison. Il 
 ### E. Suivi de lecture (tous)
 - **Progression** par tome et par personne : page atteinte, tome lu ou en cours. Elle est synchronisée entre les appareils.
 - **Listes** :
-  - une liste « à lire » et des favoris personnels ;
+  - une liste « à lire » personnelle (les favoris, trop proches, ont été retirés) ;
   - des collections partagées créées par l'admin, par exemple « Pour les enfants ».
 
 ### F. Gestion (admin)
@@ -109,7 +109,7 @@ Bento est le serveur de lecture et de gestion des mangas et BD de la maison. Il 
 
 1. **Socle de lecture** — fait : dépôt, connexion Pocket ID, bibliothèques, scan (à la demande, toutes les 30 min, après publication), grille et fiche série, lecteur, progression.
 2. **Gestion** — fait : brouillons, métadonnées, Wikipédia, publication, réparations, couvertures, statut et mode de lecture dès les brouillons, aperçu de lecture, compression des images.
-3. **Famille** — fait : contrôle parental, vue lecteur pour l'admin, thèmes, statistiques, série lue / non lue, favoris et liste « à lire », collections partagées, filtres par liste, genre et statut, « La suite de tes séries » sur l'accueil (« Nouveautés » retirée pour l'instant, à revoir).
+3. **Famille** — fait : contrôle parental, vue lecteur pour l'admin, thèmes, statistiques, série lue / non lue, liste « à lire », collections partagées, filtres par liste, genre et statut, « La suite de tes séries » sur l'accueil (« Nouveautés » retirée pour l'instant, à revoir).
 4. **Tablettes et Android** — fait, à essayer sur les appareils :
    - **plein écran du lecteur** : bouton dans la barre du lecteur, et option « Plein écran à l'ouverture » (au premier toucher, le navigateur l'exige) ; il continue d'un tome au suivant ;
    - **appli web installable** : manifeste et icônes (boîte à bento violette), pour « Installer l'application » dans Chrome sur Android et « Sur l'écran d'accueil » sur iPad. Pas encore de service worker : le hors ligne reste pour l'étape 7.

@@ -103,11 +103,6 @@ const seriesProgress = (volume: InProgressVolume) =>
           volume.volumeCount
         : 0;
 
-const LIST_LABELS: Record<string, string> = {
-    favorite: 'Mes favoris',
-    toread: 'À lire',
-};
-
 /**
  * Accueil : reprendre la lecture, suite des séries entamées, puis toutes
  * les séries (recherche, filtres et tri).
@@ -120,7 +115,11 @@ export const LibraryPage = () => {
     const [debouncedSearch] = useDebouncedValue(search, 250);
     const filter = (params.get('filter') as ReadingFilter | null) ?? 'all';
     const sort = (params.get('sort') as SeriesSort | null) ?? 'name';
-    const list = (params.get('list') as ListFilter | null) ?? 'all';
+    // Seulement une collection (les anciens « favoris » sont ignorés).
+    const rawList = params.get('list');
+    const list: ListFilter = rawList?.startsWith('collection:')
+        ? (rawList as ListFilter)
+        : 'all';
     const genre = params.get('genre');
     const status = (params.get('status') as StatusFilter | null) ?? 'all';
 
@@ -174,9 +173,9 @@ export const LibraryPage = () => {
         status,
     });
     // Filtres du bouton « Filtres », affichés aussi en pastilles.
-    const listLabel =
-        LIST_LABELS[list] ??
-        collections.data?.find((c) => `collection:${c.id}` === list)?.name;
+    const listLabel = collections.data?.find(
+        (c) => `collection:${c.id}` === list,
+    )?.name;
     const active = [
         list !== 'all' && {
             key: 'list',
@@ -304,9 +303,10 @@ export const LibraryPage = () => {
                             <Popover.Dropdown>
                                 <Stack gap="sm">
                                     <Select
-                                        label="Liste"
+                                        label="Collection"
                                         size="xs"
                                         allowDeselect={false}
+                                        disabled={!collections.data?.length}
                                         value={list}
                                         onChange={(value) =>
                                             update({ list: value ?? '' }, 'all')
@@ -316,14 +316,6 @@ export const LibraryPage = () => {
                                             {
                                                 value: 'all',
                                                 label: 'Toutes les séries',
-                                            },
-                                            {
-                                                value: 'favorite',
-                                                label: 'Mes favoris',
-                                            },
-                                            {
-                                                value: 'toread',
-                                                label: 'À lire',
                                             },
                                             ...(collections.data ?? []).map(
                                                 (c) => ({
