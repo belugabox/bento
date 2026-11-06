@@ -110,9 +110,9 @@ Bento est le serveur de lecture et de gestion des mangas et BD de la maison. Il 
 1. **Socle de lecture** — fait : dépôt, connexion Pocket ID, bibliothèques, scan (à la demande, toutes les 30 min, après publication), grille et fiche série, lecteur, progression.
 2. **Gestion** — fait : brouillons, métadonnées, Wikipédia, publication, réparations, couvertures, statut et mode de lecture dès les brouillons, aperçu de lecture, compression des images.
 3. **Famille** — fait : contrôle parental, vue lecteur pour l'admin, thèmes, statistiques, série lue / non lue, favoris et liste « à lire », collections partagées, filtres par liste, genre et statut, « La suite de tes séries » sur l'accueil (« Nouveautés » retirée pour l'instant, à revoir).
-4. **Tablettes et Android** — **prioritaire** :
-   - **plein écran sur tablette** : le lecteur occupe tout l'écran, sans barre du navigateur ni barre d'état, avec un bouton pour entrer et sortir du plein écran ;
-   - **appli web pour Chrome sur Android** : manifeste et icônes pour que Chrome propose « Installer l'application ». Bento s'ouvre alors depuis l'écran d'accueil, dans sa propre fenêtre, sans barre d'adresse. Le hors ligne reste pour l'étape 7.
+4. **Tablettes et Android** — fait, à essayer sur les appareils :
+   - **plein écran du lecteur** : bouton dans la barre du lecteur, et option « Plein écran à l'ouverture » (au premier toucher, le navigateur l'exige) ; il continue d'un tome au suivant ;
+   - **appli web installable** : manifeste et icônes (boîte à bento violette), pour « Installer l'application » dans Chrome sur Android et « Sur l'écran d'accueil » sur iPad. Pas encore de service worker : le hors ligne reste pour l'étape 7.
 5. **Lecteur avancé** — fait : double page, modes BD / manga / webtoon, gestes tactiles, zoom. Reste : images redimensionnées selon l'écran (les pages sont servies en taille d'origine).
 6. **Manga-news** : deuxième source de métadonnées pour les mangas (voir F).
 7. **Hors ligne** : téléchargements, lecture sans réseau, synchronisation de la progression.

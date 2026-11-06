@@ -52,7 +52,7 @@ Les étapes 1 à 3 de la feuille de route sont faites, ainsi qu'une page Réglag
 
 Prochaines étapes possibles, à faire valider par l'utilisateur :
 
-1. **Tablettes et Android** (étape 4 de SPEC, prioritaire depuis le 6 novembre 2026) : plein écran du lecteur sur tablette, appli web installable depuis Chrome sur Android (manifeste, icônes).
+1. **Tablettes et Android** (étape 4 de SPEC) : fait le 6 novembre 2026, à faire essayer par l'utilisateur sur ses appareils. Si Chrome ne propose pas « Installer l'application », ajouter un service worker (prévu à l'étape 7 de toute façon).
 2. **Optimisations proposées** : cache navigateur long pour les pages et couvertures (version dans l'adresse), découpage du client (`React.lazy` pour l'admin), dimensions des pages lues dans l'en-tête des images, enregistrement du ComicInfo en recopiant l'archive par morceaux au lieu d'AdmZip (« on verra après »).
 3. **Pages redimensionnées selon l'écran** (étape 5).
 4. **Manga-news** (étape 6) : deuxième source de métadonnées, sans API, lecture du HTML à la demande seulement. L'âge conseillé remplit la classification. Fiche testée : `https://www.manga-news.com/index.php/serie/Spy-X-Family` (titre VO, auteurs, éditeurs, genres, « Age conseillé 12+ », résumé, liens `/manga/<Série>/vol-N`). Les pages de tome n'ont pas encore été examinées.

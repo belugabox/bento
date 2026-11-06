@@ -12,6 +12,7 @@ import {
 import { useQuery } from '@/services/useQuery';
 
 import { Reader } from './Reader';
+import { exitFullscreen } from './fullscreen';
 import { type ReadingMode, clampPage } from './navigation';
 
 // `?page=last` : dernière page (en revenant du tome suivant).
@@ -57,6 +58,9 @@ export const ReaderPage = () => {
             setParams({ page: String(next + 1) }, { replace: true }),
         [setParams],
     );
+
+    // Quitter le lecteur quitte le plein écran (pas le tome suivant).
+    useEffect(() => () => void exitFullscreen(), []);
 
     // L'adresse garde toujours un numéro de page (reprise après rechargement).
     useEffect(() => {
