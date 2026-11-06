@@ -383,7 +383,14 @@ export class LibraryFiles {
         const folder = relativeTo(library.path, dir);
         // Un tome seul à la racine de _draft : son groupe porte son nom en
         // .cbz, qu'il soit encore un .cbr ou déjà converti.
-        const lone = path.dirname(dir) === draftRoot && /\.cb[rz]$/i.test(dir);
+        // Un dossier nommé « X.cbz » reste un dossier.
+        const lone =
+            path.dirname(dir) === draftRoot &&
+            /\.cb[rz]$/i.test(dir) &&
+            !(await stat(dir).then(
+                (stats) => stats.isDirectory(),
+                () => false,
+            ));
         const group = draftGroupOf(folder);
         const archivesOfGroup = async () =>
             (

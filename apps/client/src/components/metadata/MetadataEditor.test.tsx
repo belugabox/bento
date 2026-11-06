@@ -428,5 +428,17 @@ describe('MetadataEditor', () => {
         expect(
             (screen.getByLabelText('Scénario') as HTMLInputElement).value,
         ).toBe('');
+
+        // « Annuler » efface aussi le choix de la série.
+        const picker = () =>
+            screen.getByRole('textbox', {
+                name: 'Ajouter à une série existante',
+            }) as HTMLInputElement;
+        fireEvent.click(picker());
+        fireEvent.click(await screen.findByText('Gantz Perfect'));
+        await waitFor(() => expect(name()).toBe('Gantz Perfect'));
+        fireEvent.click(screen.getByRole('button', { name: 'Annuler' }));
+        expect(name()).toBe(initialName);
+        expect(picker().value).toBe('');
     });
 });

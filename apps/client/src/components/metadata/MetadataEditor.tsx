@@ -150,6 +150,7 @@ export const MetadataEditor = ({
     const [edits, setEdits] = useState<Edits>(() => initialEdits(readable));
     // Modifications d'avant le choix d'une série existante (pour l'annuler).
     const beforeJoin = useRef<Edits>(undefined);
+    const [pickerKey, setPickerKey] = useState(0);
     const [overwrite, setOverwrite] = useState(false);
     // Après Wikipédia, compléter numéros, titres et années des tomes.
     const [alsoFileNames, setAlsoFileNames] = useState(true);
@@ -182,8 +183,12 @@ export const MetadataEditor = ({
         !!volume && !volume.error && !!volume.pageCount;
     const firstPreviewable = volumes.find(canPreview);
 
-    // Nouvelles données (après enregistrement) : repartir de celles-ci.
-    useEffect(() => setEdits(initialEdits(readable)), [readable]);
+    // Nouvelles données (après enregistrement) : repartir de celles-ci. Le
+    // choix d'une série existante est alors acquis : plus rien à annuler.
+    useEffect(() => {
+        setEdits(initialEdits(readable));
+        beforeJoin.current = undefined;
+    }, [readable]);
     const original = useMemo(() => initialEdits(readable), [readable]);
     const seriesChanged = (field: SeriesField) =>
         isSeriesFieldChanged(original, edits, paths, field);
@@ -312,6 +317,9 @@ export const MetadataEditor = ({
                         disabled={changes.length === 0 && !settingsChanged}
                         onClick={() => {
                             setEdits(initialEdits(readable));
+                            beforeJoin.current = undefined;
+                            // Le choix d'une série existante est effacé.
+                            setPickerKey((key) => key + 1);
                             setStatus(savedStatus);
                             setModeValue(savedMode);
                         }}
@@ -373,6 +381,7 @@ export const MetadataEditor = ({
                     {mode === 'drafts' && (
                         <SimpleGrid cols={{ base: 1, sm: 3 }}>
                             <ExistingSeriesPicker
+                                key={pickerKey}
                                 libraryId={libraryId}
                                 onJoin={(name, source) =>
                                     // Toujours depuis l'état d'avant le

@@ -400,6 +400,19 @@ describe('publishing', () => {
         expect(statuses).toEqual({ Gantz: null, Spirale: 'completed' });
     });
 
+    it('reads a draft folder whose name ends with .cbz as a folder', async () => {
+        await writeCbz(ctx.file('_draft/Gantz.cbz/Gantz T01.cbz'));
+
+        const files = await ctx.files.draftFolder(
+            ctx.library.id,
+            '_draft/Gantz.cbz',
+        );
+
+        expect(files.map((file) => file.path)).toEqual([
+            '_draft/Gantz.cbz/Gantz T01.cbz',
+        ]);
+    });
+
     it('keeps the settings of a lone .cbr once converted', async () => {
         // Un .cbr qui est en fait un ZIP : converti à l'ouverture.
         await writeCbz(ctx.file('_draft/Seul.cbr'), {
