@@ -129,6 +129,20 @@ describe('LibraryScanner', () => {
         ).toBe(true);
     });
 
+    it('remakes a missing cover of an unchanged volume', async () => {
+        await writeCbz(ctx.file('Ikigami/Ikigami #01.cbz'));
+        await ctx.scanner.scan(ctx.library.id);
+        const [series] = listSeries(ctx.db, NO_USER);
+        const cover = coverFile(ctx.coversPath, series!.coverVolumeId);
+        // Couverture ratée lors du premier scan.
+        await rm(cover);
+
+        const result = await ctx.scanner.scan(ctx.library.id);
+
+        expect(result.updated).toBe(0);
+        expect(await exists(cover)).toBe(true);
+    });
+
     it('sorts volumes by number, using the file name without ComicInfo', async () => {
         for (const name of ['T10', 'T2', 'T2.5', 'Bonus']) {
             await writeCbz(ctx.file(`Gantz/Gantz ${name}.cbz`));

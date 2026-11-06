@@ -2,7 +2,11 @@ import { and, asc, eq, inArray, notInArray, sql } from 'drizzle-orm';
 import { mkdir, readdir, rm, stat } from 'node:fs/promises';
 import path from 'node:path';
 
-import { pageEntries, readArchive } from '../archive/archive';
+import {
+    type ArchiveEntry,
+    pageEntries,
+    readArchive,
+} from '../archive/archive';
 import { readComicInfo } from '../archive/comicInfo';
 import { parseVolumeFileName } from '../archive/fileName';
 import { readImage } from '../archive/image';
@@ -168,6 +172,11 @@ export class LibraryScanner {
                 previous.mtimeMs === archive.mtimeMs
             ) {
                 kept.push(archive.file);
+                // Couverture ratée lors d'un scan précédent : la refaire.
+                const cover = coverFile(this.coversPath, previous.id);
+                if (!(await stat(cover).catch(() => undefined))) {
+                    await this.writeCover(previous.id, archive);
+                }
                 continue;
             }
             try {
@@ -244,11 +253,24 @@ export class LibraryScanner {
             .get();
 
         // Couverture : sans elle, le tome reste lisible.
+        await this.writeCover(volume.id, archive, pages[0]);
+    };
+
+    /** Couverture d'un tome, d'après sa première page ; un échec est noté. */
+    private writeCover = async (
+        volumeId: number,
+        archive: FoundArchive,
+        firstPage?: ArchiveEntry,
+    ) => {
         try {
-            await readImage(await pages[0]!.getData())
+            const page =
+                firstPage ??
+                pageEntries(await readArchive(archive.fullPath))[0];
+            if (!page) throw new Error('aucune image dans l’archive');
+            await readImage(await page.getData())
                 .resize(COVER_SIZE)
                 .webp({ quality: 80 })
-                .toFile(coverFile(this.coversPath, volume.id));
+                .toFile(coverFile(this.coversPath, volumeId));
         } catch (error) {
             this.logger.warn(
                 `Scan : couverture de ${archive.file} impossible (${String(error)})`,
