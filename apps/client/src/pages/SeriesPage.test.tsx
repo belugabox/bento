@@ -106,6 +106,7 @@ describe('SeriesPage', () => {
             screen.getByRole('heading', { name: 'Hors-séries' }),
         ).toBeTruthy();
         expect(screen.getByText('Hors-série 7')).toBeTruthy();
+        expect(screen.getByText('2 tomes · 1 hors-série')).toBeTruthy();
         fireEvent.click(
             screen.getByRole('button', { name: 'Lecture de la série' }),
         );

@@ -1,4 +1,4 @@
-import { and, asc, count, eq, inArray, notInArray, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, notInArray, sql } from 'drizzle-orm';
 import { rm } from 'node:fs/promises';
 import path from 'node:path';
 
@@ -34,6 +34,16 @@ import { type Viewer, visibleTo } from './visibility';
  * Dans l'adresse de ses images, elle permet au navigateur de les garder.
  */
 export const volumeVersion = sql<number>`cast(${volumes.mtimeMs} as integer)`;
+
+/**
+ * Tome compté d'une série (« 12 tomes », « 3 / 12 lus », série lue) : un
+ * tome, pas un hors-série ni un spécial ; tous si la série n'a que ceux-là.
+ * `alias` : nom de la table des tomes dans la requête.
+ */
+export const countedVolume = (alias: string) =>
+    sql.raw(
+        `(${alias}.kind = 'volume' or not exists (select 1 from volumes w where w.series_id = ${alias}.series_id and w.kind = 'volume'))`,
+    );
 
 // Tomes, hors-séries puis spéciaux ; sans numéro en dernier, puis par
 // numéro, puis par fichier.
@@ -150,7 +160,7 @@ export const listSeries = (
             format: formats.name,
             age: seriesAgeSql,
             status: series.status,
-            volumeCount: count(volumes.id),
+            volumeCount: sql<number>`(select count(*) from volumes v where v.series_id = series.id and ${countedVolume('v')})`,
             // Dernier tome ajouté (tri « ajouts récents »).
             lastAddedAt: sql<number>`max(${volumes.addedAt})`.mapWith(
                 (value: number) => new Date(value * 1000),
@@ -162,7 +172,7 @@ export const listSeries = (
             coverVolumeId: sql<number>`(select v.id from volumes v where v.series_id = series.id order by v.kind != 'volume', v.kind, v.sort_number is null, v.sort_number, v.file limit 1)`,
             coverVolumeVersion: sql<number>`(select cast(v.mtime_ms as integer) from volumes v where v.series_id = series.id order by v.kind != 'volume', v.kind, v.sort_number is null, v.sort_number, v.file limit 1)`,
             // Tomes lus par la personne.
-            readCount: sql<number>`(select count(*) from read_progress rp join volumes v on v.id = rp.volume_id where v.series_id = series.id and rp.user_id = ${viewer.id} and rp.completed = 1)`,
+            readCount: sql<number>`(select count(*) from read_progress rp join volumes v on v.id = rp.volume_id where v.series_id = series.id and rp.user_id = ${viewer.id} and rp.completed = 1 and ${countedVolume('v')})`,
             // Tomes ouverts (lus ou en cours) : série commencée.
             startedCount: sql<number>`(select count(*) from read_progress rp join volumes v on v.id = rp.volume_id where v.series_id = series.id and rp.user_id = ${viewer.id})`,
             ...listsOf(viewer),

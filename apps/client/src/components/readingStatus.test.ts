@@ -4,6 +4,7 @@ import {
     type VolumeWithProgress,
     nextToRead,
     progressRatio,
+    volumeCountLabel,
     volumeLabel,
     volumeShortLabel,
     volumeTitleOf,
@@ -84,6 +85,26 @@ describe('volumeLabel', () => {
             volumeTitleOf({ number: '1', title: 'Hors-série 1' }),
         ).toBeNull();
         expect(volumeTitleOf({ number: '1', title: 'HS 01' })).toBeNull();
+    });
+});
+
+describe('volumeCountLabel', () => {
+    it('counts each kind apart', () => {
+        expect(
+            volumeCountLabel([
+                ...Array.from({ length: 12 }, () => ({
+                    kind: 'volume' as const,
+                })),
+                { kind: 'special' },
+            ]),
+        ).toBe('12 tomes · 1 spécial');
+        expect(
+            volumeCountLabel([
+                {},
+                { kind: 'hors-serie' },
+                { kind: 'hors-serie' },
+            ]),
+        ).toBe('1 tome · 2 hors-séries');
     });
 });
 

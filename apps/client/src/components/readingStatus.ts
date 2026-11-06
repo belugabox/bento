@@ -1,4 +1,8 @@
-import { VOLUME_KIND_LABELS, type VolumeKind } from '@server/types';
+import {
+    VOLUME_KINDS,
+    VOLUME_KIND_LABELS,
+    type VolumeKind,
+} from '@server/types';
 
 type Progress = { page: number; completed: boolean } | null;
 
@@ -38,6 +42,23 @@ const SHORT_PREFIXES: Record<VolumeKind, string> = {
     'hors-serie': 'HS',
     special: 'SP',
 };
+
+const KIND_COUNTS: Record<VolumeKind, [string, string]> = {
+    volume: ['tome', 'tomes'],
+    'hors-serie': ['hors-série', 'hors-séries'],
+    special: ['spécial', 'spéciaux'],
+};
+
+/** « 12 tomes · 1 spécial » : chaque type compté à part. */
+export const volumeCountLabel = (volumes: { kind?: VolumeKind }[]) =>
+    VOLUME_KINDS.flatMap((kind) => {
+        const count = volumes.filter(
+            (v) => (v.kind ?? 'volume') === kind,
+        ).length;
+        return count
+            ? [`${count} ${KIND_COUNTS[kind][count > 1 ? 1 : 0]}`]
+            : [];
+    }).join(' · ') || '0 tome';
 
 /**
  * Titre propre d'un tome, à afficher sous son libellé ; null s'il n'en a

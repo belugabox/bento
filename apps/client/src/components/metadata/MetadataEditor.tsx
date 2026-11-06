@@ -57,6 +57,7 @@ import {
 } from '@/components/ageLimits';
 import { completenessOf } from '@/components/completeness';
 import { formatSize } from '@/components/format';
+import { volumeCountLabel } from '@/components/readingStatus';
 import { ReaderPreview } from '@/reader/ReaderPreview';
 import {
     READING_MODES,
@@ -826,8 +827,13 @@ export const MetadataEditor = ({
                     <Group gap="sm">
                         <CompletenessBadge completeness={completeness} />
                         <Text size="xs" c="dimmed">
-                            {volumes.length} tome
-                            {volumes.length > 1 ? 's' : ''}
+                            {volumeCountLabel(
+                                volumes.map((v) => ({
+                                    kind: volumeKindOf(
+                                        edits[v.path] ?? v.comicInfo,
+                                    ),
+                                })),
+                            )}
                             {totalSize > 0 && ` · ${formatSize(totalSize)}`}
                         </Text>
                         {sourcesValue.length > 0 && (

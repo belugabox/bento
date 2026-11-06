@@ -109,5 +109,16 @@ describe('scanning special volumes', () => {
             ['hors-serie', '1'],
             ['special', '1'],
         ]);
+        // « 2 tomes » : hors-série et spécial à part.
+        expect(gantz).toMatchObject({ volumeCount: 2, readCount: 0 });
+
+        // Une série de spéciaux seulement : ils sont comptés.
+        await writeCbz(ctx.file('Guides/Guides SP01.cbz'), {
+            comicInfo: '<Series>Guides</Series><Number>SP01</Number>',
+        });
+        await ctx.scanner.scan(ctx.library.id);
+        expect(
+            listSeries(ctx.db, viewer).find((s) => s.name === 'Guides'),
+        ).toMatchObject({ volumeCount: 1 });
     });
 });

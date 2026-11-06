@@ -42,6 +42,7 @@ import { formatSize } from '@/components/format';
 import {
     nextToRead,
     progressRatio,
+    volumeCountLabel,
     volumeLabel,
     volumeTitleOf,
 } from '@/components/readingStatus';
@@ -182,8 +183,7 @@ export const SeriesPage = () => {
                     )}
                     <Group gap="xs">
                         <Badge variant="light">
-                            {series.volumes.length} tome
-                            {series.volumes.length > 1 ? 's' : ''}
+                            {volumeCountLabel(series.volumes)}
                         </Badge>
                         {series.status && (
                             <Badge
