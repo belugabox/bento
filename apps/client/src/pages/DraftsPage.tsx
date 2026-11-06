@@ -221,6 +221,7 @@ export const DraftsPage = () => {
                                             comicInfo: file.comicInfo,
                                             error: file.error,
                                             pageCount: file.pageCount,
+                                            size: file.size,
                                             cover: file.error
                                                 ? null
                                                 : fileCoverUrl(

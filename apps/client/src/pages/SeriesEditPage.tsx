@@ -1,7 +1,7 @@
 import { Alert, Anchor, Group, Loader, Stack, Title } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { IconArrowLeft } from '@tabler/icons-react';
-import { Link, useNavigate, useParams } from 'react-router';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 
 import { CoverPicker } from '@/components/metadata/CoverPicker';
 import { MetadataEditor } from '@/components/metadata/MetadataEditor';
@@ -22,6 +22,7 @@ import { useQuery } from '@/services/useQuery';
 /** Métadonnées et couverture d'une série publiée (admin). */
 export const SeriesEditPage = () => {
     const seriesId = Number(useParams().id);
+    const [params] = useSearchParams();
     const navigate = useNavigate();
     const {
         data: series,
@@ -78,6 +79,8 @@ export const SeriesEditPage = () => {
                         setSeriesClassification(series.id, changes),
                 }}
                 cover={{ src: currentCover, onEdit: cover.open }}
+                // Depuis « Séries à classer » : recherche Manga-news ouverte.
+                autoFill={params.get('fill') === 'online'}
                 readingMode={{
                     value: series.readingMode,
                     defaultMode: series.defaultReadingMode,
@@ -92,6 +95,7 @@ export const SeriesEditPage = () => {
                                   comicInfo: volume.admin.comicInfo,
                                   cover: coverUrl(volume.id, volume.version),
                                   pageCount: volume.pageCount,
+                                  size: volume.size,
                               },
                           ]
                         : [],

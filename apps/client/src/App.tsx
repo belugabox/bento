@@ -31,6 +31,11 @@ const SettingsPage = lazy(() =>
 const StatsPage = lazy(() =>
     import('@/pages/StatsPage').then((m) => ({ default: m.StatsPage })),
 );
+const ToClassifyPage = lazy(() =>
+    import('@/pages/ToClassifyPage').then((m) => ({
+        default: m.ToClassifyPage,
+    })),
+);
 const UsersPage = lazy(() =>
     import('@/pages/UsersPage').then((m) => ({ default: m.UsersPage })),
 );
@@ -87,6 +92,14 @@ export const App = () => (
                     element={
                         <AdminOnly>
                             <SeriesEditPage />
+                        </AdminOnly>
+                    }
+                />
+                <Route
+                    path="to-classify"
+                    element={
+                        <AdminOnly>
+                            <ToClassifyPage />
                         </AdminOnly>
                     }
                 />

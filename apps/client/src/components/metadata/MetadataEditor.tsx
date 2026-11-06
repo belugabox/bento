@@ -35,6 +35,7 @@ import {
     publicationPathOf,
 } from '@server/types';
 
+import { CompletenessBadge } from '@/components/CompletenessBadge';
 import {
     ageLabel,
     ageOfRating,
@@ -42,6 +43,8 @@ import {
     ratingForAge,
     useAgeSteps,
 } from '@/components/ageLimits';
+import { completenessOf } from '@/components/completeness';
+import { formatSize } from '@/components/format';
 import { ReaderPreview } from '@/reader/ReaderPreview';
 import {
     READING_MODES,
@@ -88,6 +91,8 @@ export type EditorVolume = EditableVolume & {
     error?: string | null;
     /** Nombre de pages (aperçu de lecture). */
     pageCount?: number;
+    /** Taille du fichier, en octets (taille totale de la série). */
+    size?: number;
 };
 
 type Report = { color: string; lines: string[] };
@@ -178,6 +183,7 @@ export const MetadataEditor = ({
     readingMode: seriesMode,
     classification,
     cover,
+    autoFill = false,
 }: {
     libraryId: number;
     kind: 'manga' | 'comics';
@@ -211,6 +217,8 @@ export const MetadataEditor = ({
     };
     /** Couverture de la série, et son choix. */
     cover?: { src?: string; disabled?: boolean; onEdit: () => void };
+    /** Ouvrir « Remplir », recherche lancée (série à classer). */
+    autoFill?: boolean;
 }) => {
     // Contenu des données reçues : le parent peut recréer la liste à chaque
     // rendu, seule une vraie nouveauté (enregistrement) doit tout reprendre.
@@ -266,7 +274,7 @@ export const MetadataEditor = ({
     // Action en cours : roue de chargement sur son seul bouton.
     const [busy, setBusy] = useState<'save' | 'publish'>();
     const [report, setReport] = useState<Report>();
-    const [finderOpened, finder] = useDisclosure(false);
+    const [finderOpened, finder] = useDisclosure(autoFill);
     const [compressionOpened, compression] = useDisclosure(false);
     // Tome ouvert en aperçu de lecture.
     const [preview, setPreview] = useState<EditorVolume>();
@@ -380,6 +388,30 @@ export const MetadataEditor = ({
                   ),
         );
     };
+
+    // Complétude de la fiche, avec ce qui est saisi (pas encore enregistré).
+    const completeness = completenessOf({
+        name: String(series('Series')),
+        hasFormat: !classification || !!formatValue,
+        hasAge:
+            ageValue !== UNKNOWN ||
+            ageOfRating(String(series('AgeRating'))) !== null,
+        hasStatus: !seriesStatus || status !== UNKNOWN,
+        genreCount: classify(
+            String(series('Genre')),
+            String(series('Tags')),
+            catalog,
+        ).genres.length,
+        writer: String(series('Writer')),
+        penciller: String(series('Penciller')),
+        publisher: String(series('Publisher')),
+        summary: first ? edits[first]?.Summary : '',
+        volumes: readable.map((v) => ({
+            number: edits[v.path]?.Number,
+            year: edits[v.path]?.Year,
+        })),
+    });
+    const totalSize = volumes.reduce((sum, v) => sum + (v.size ?? 0), 0);
 
     const save = async () => {
         setBusy('save');
@@ -565,6 +597,14 @@ export const MetadataEditor = ({
 
             <Paper withBorder p="md" radius="md">
                 <Stack gap="md">
+                    <Group gap="sm">
+                        <CompletenessBadge completeness={completeness} />
+                        <Text size="xs" c="dimmed">
+                            {volumes.length} tome
+                            {volumes.length > 1 ? 's' : ''}
+                            {totalSize > 0 && ` · ${formatSize(totalSize)}`}
+                        </Text>
+                    </Group>
                     {mode === 'drafts' && (
                         <ExistingSeriesPicker
                             key={pickerKey}
@@ -1011,6 +1051,7 @@ export const MetadataEditor = ({
                 opened={finderOpened}
                 onClose={finder.close}
                 kind={kind}
+                autoSearch={autoFill}
                 initialQuery={String(series('Series'))}
                 onPick={({ sheet }) => {
                     // Genres et thèmes rangés d'après la liste des genres

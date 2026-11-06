@@ -108,6 +108,7 @@ export const SeriesSearch = ({
     actionLabel = 'Utiliser cette fiche',
     onPick,
     footer,
+    autoSearch = false,
 }: {
     opened: boolean;
     onClose: () => void;
@@ -117,6 +118,8 @@ export const SeriesSearch = ({
     onPick: (found: FoundSeries) => void;
     /** Options et actions en bas de la fenêtre. */
     footer?: ReactNode;
+    /** Lancer la recherche dès l'ouverture (série à classer). */
+    autoSearch?: boolean;
 }) => {
     // Manga-news ne connaît que les mangas (et manhwas…).
     const defaultSource: MetadataSource =
@@ -136,7 +139,10 @@ export const SeriesSearch = ({
         setResults(undefined);
         setPreview(undefined);
         setError(undefined);
-    }, [opened, initialQuery, defaultSource]);
+        if (autoSearch) void searchIn(defaultSource, initialQuery);
+        // `searchIn` change à chaque rendu : seule l'ouverture compte.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [opened, initialQuery, defaultSource, autoSearch]);
 
     const run = async <T,>(task: () => Promise<T>) => {
         setLoading(true);
@@ -150,8 +156,8 @@ export const SeriesSearch = ({
         }
     };
 
-    const searchIn = async (from: MetadataSource) => {
-        const text = query.trim();
+    const searchIn = async (from: MetadataSource, wanted = query) => {
+        const text = wanted.trim();
         if (!text) return;
         setPreview(undefined);
         setResults(

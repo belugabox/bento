@@ -116,8 +116,8 @@ Bento est le serveur de lecture et de gestion des mangas et BD de la maison. Il 
    - **appli web installable** : manifeste et icônes (boîte à bento violette), pour « Installer l'application » dans Chrome sur Android et « Sur l'écran d'accueil » sur iPad. Pas encore de service worker : le hors ligne reste pour l'étape 9.
 5. **Lecteur avancé** — fait : double page, modes BD / manga / webtoon, gestes tactiles, zoom. Reste : images redimensionnées selon l'écran (les pages sont servies en taille d'origine).
 6. **Manga-news** — fait pour les séries (voir F), avec le classement par format, genres gérés et thèmes. Reste : les fiches des tomes.
-7. **Fiches à compléter** :
-   - **Complétude d'une série**, en pourcentage : part des informations remplies (nom, format, âge, statut, genres, scénario, dessin, éditeur, résumé, couverture choisie ou trouvée, numéro et année de chaque tome). Affichée dans les brouillons, et sur la fiche série tant qu'elle n'est pas à 100 %, avec la liste de ce qui manque.
+7. **Fiches à compléter** — fait :
+   - **Complétude d'une série**, en pourcentage : part des informations remplies (nom, format, âge, statut, genres, scénario, dessin, éditeur, résumé, numéro et année de chaque tome au prorata). La couverture n'y compte pas : chaque série en a une, celle de son premier tome. Affichée dans l'éditeur (brouillons et séries, mise à jour pendant la saisie), et sur la fiche série pour l'admin tant qu'elle n'est pas à 100 %, avec la liste de ce qui manque.
    - **Taille totale d'une série** : somme des fichiers de ses tomes, sur la fiche série et dans les brouillons.
    - **Séries à classer** : liste des séries sans format ou sans âge (masquées aux comptes limités), avec un lien vers leur éditeur et un bouton Manga-news par série (sur clic, jamais en masse).
 8. **Suggestions** : proposer des séries à lire, d'après les genres, les thèmes et les lectures de la famille, sans service extérieur. Elles marchent d'autant mieux que les séries sont classées.

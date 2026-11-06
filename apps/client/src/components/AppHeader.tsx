@@ -29,6 +29,7 @@ import {
     IconLogout,
     IconPalette,
     IconSettings,
+    IconTags,
     IconUsers,
 } from '@tabler/icons-react';
 import { useEffect, useState } from 'react';
@@ -305,6 +306,15 @@ const UserMenu = () => {
                             leftSection={<IconChartBar size={14} />}
                         >
                             Statistiques
+                        </Menu.Item>
+                    )}
+                    {isAdmin && (
+                        <Menu.Item
+                            component={Link}
+                            to="/to-classify"
+                            leftSection={<IconTags size={14} />}
+                        >
+                            Séries à classer
                         </Menu.Item>
                     )}
                     {isAdmin && (
