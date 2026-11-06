@@ -203,40 +203,17 @@ export const LibraryPage = () => {
 
     return (
         <Stack gap="xl">
-            <Group justify="space-between" gap="sm">
-                {libraries.data && libraries.data.length > 1 ? (
-                    <SegmentedControl
-                        value={String(libraryId)}
-                        onChange={(value) => update({ library: value })}
-                        data={libraries.data.map((library) => ({
-                            value: String(library.id),
-                            label: library.name,
-                        }))}
-                    />
-                ) : (
-                    <Title order={2}>{libraries.data?.[0]?.name}</Title>
-                )}
-                <TextInput
-                    w={{ base: '100%', xs: 320 }}
-                    size="md"
-                    radius="xl"
-                    placeholder="Rechercher une série"
-                    aria-label="Rechercher une série"
-                    leftSection={<IconSearch size={18} />}
-                    rightSection={
-                        search && (
-                            <CloseButton
-                                aria-label="Effacer la recherche"
-                                onClick={() => setSearchText('')}
-                            />
-                        )
-                    }
-                    value={search}
-                    onChange={(event) =>
-                        setSearchText(event.currentTarget.value)
-                    }
+            {libraries.data && libraries.data.length > 1 && (
+                <SegmentedControl
+                    style={{ alignSelf: 'flex-start' }}
+                    value={String(libraryId)}
+                    onChange={(value) => update({ library: value })}
+                    data={libraries.data.map((library) => ({
+                        value: String(library.id),
+                        label: library.name,
+                    }))}
                 />
-            </Group>
+            )}
 
             {resume.length > 0 && (
                 <Shelf title="Reprendre la lecture">
@@ -269,6 +246,27 @@ export const LibraryPage = () => {
                         )}
                     </Group>
                     <Group gap="xs">
+                        <TextInput
+                            w={{ base: '100%', xs: 240 }}
+                            size="xs"
+                            radius="xl"
+                            placeholder="Rechercher une série"
+                            aria-label="Rechercher une série"
+                            leftSection={<IconSearch size={14} />}
+                            rightSection={
+                                search && (
+                                    <CloseButton
+                                        size="sm"
+                                        aria-label="Effacer la recherche"
+                                        onClick={() => setSearchText('')}
+                                    />
+                                )
+                            }
+                            value={search}
+                            onChange={(event) =>
+                                setSearchText(event.currentTarget.value)
+                            }
+                        />
                         <SegmentedControl
                             size="xs"
                             radius="xl"
