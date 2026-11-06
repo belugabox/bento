@@ -17,6 +17,11 @@ import { type ReadingMode, clampPage } from './navigation';
 // `?page=last` : dernière page (en revenant du tome suivant).
 const LAST_PAGE = 'last';
 
+// Pages à voir avant d'enregistrer quoi que ce soit : ouvrir un tome, ou
+// arriver sur sa dernière page depuis le suivant, ne le commence ni ne le
+// termine.
+const PAGES_BEFORE_SAVE = 3;
+
 /** Lecteur plein écran d'un tome de la bibliothèque. */
 export const ReaderPage = () => {
     const volumeId = Number(useParams().id);
@@ -58,12 +63,21 @@ export const ReaderPage = () => {
         if (volume && (rawPage === LAST_PAGE || rawPage === null)) goTo(page);
     }, [volume, rawPage, page, goTo]);
 
-    // Enregistrer chaque page atteinte (une fois l'adresse fixée).
+    // Enregistrer chaque page atteinte (une fois l'adresse fixée), après
+    // quelques pages vues dans ce tome.
     const savedPage = useRef<string>(undefined);
+    const seen = useRef({ volumeId: 0, pages: new Set<number>() });
     const urlReady = !!volume && rawPage !== null && rawPage !== LAST_PAGE;
     const onShown = useCallback(
-        (lastShown: number) => {
+        (shown: number[]) => {
             if (!volume || !urlReady) return;
+            if (seen.current.volumeId !== volume.id) {
+                seen.current = { volumeId: volume.id, pages: new Set() };
+            }
+            for (const page of shown) seen.current.pages.add(page);
+            const lastShown = Math.max(...shown);
+            const needed = Math.min(PAGES_BEFORE_SAVE, volume.pageCount);
+            if (seen.current.pages.size < needed) return;
             const key = `${volume.id}:${lastShown}`;
             if (savedPage.current === key) return;
             savedPage.current = key;
