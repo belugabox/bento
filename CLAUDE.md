@@ -52,7 +52,8 @@ Les étapes 1 à 3 de la feuille de route sont faites, ainsi qu'une page Réglag
 
 Prochaines étapes possibles, à faire valider par l'utilisateur :
 
-1. **Optimisations proposées** (6 novembre 2026) : cache navigateur long pour les pages et couvertures (version dans l'adresse), découpage du client (`React.lazy` pour l'admin), dimensions des pages lues dans l'en-tête des images, enregistrement du ComicInfo en recopiant l'archive par morceaux au lieu d'AdmZip (« on verra après »).
-2. **Pages redimensionnées selon l'écran** (étape 4).
-3. **Manga-news** (étape 5 de SPEC) : deuxième source de métadonnées, sans API, lecture du HTML à la demande seulement. L'âge conseillé remplit la classification. Fiche testée : `https://www.manga-news.com/index.php/serie/Spy-X-Family` (titre VO, auteurs, éditeurs, genres, « Age conseillé 12+ », résumé, liens `/manga/<Série>/vol-N`). Les pages de tome n'ont pas encore été examinées.
-4. **Hors ligne** (étape 6), **tomes manquants** (7), **bascule** (8).
+1. **Tablettes et Android** (étape 4 de SPEC, prioritaire depuis le 6 novembre 2026) : plein écran du lecteur sur tablette, appli web installable depuis Chrome sur Android (manifeste, icônes).
+2. **Optimisations proposées** : cache navigateur long pour les pages et couvertures (version dans l'adresse), découpage du client (`React.lazy` pour l'admin), dimensions des pages lues dans l'en-tête des images, enregistrement du ComicInfo en recopiant l'archive par morceaux au lieu d'AdmZip (« on verra après »).
+3. **Pages redimensionnées selon l'écran** (étape 5).
+4. **Manga-news** (étape 6) : deuxième source de métadonnées, sans API, lecture du HTML à la demande seulement. L'âge conseillé remplit la classification. Fiche testée : `https://www.manga-news.com/index.php/serie/Spy-X-Family` (titre VO, auteurs, éditeurs, genres, « Age conseillé 12+ », résumé, liens `/manga/<Série>/vol-N`). Les pages de tome n'ont pas encore été examinées.
+5. **Hors ligne** (étape 7), **tomes manquants** (8), **bascule** (9).

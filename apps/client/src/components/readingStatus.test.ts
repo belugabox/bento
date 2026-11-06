@@ -80,6 +80,8 @@ describe('volumeTitleOf', () => {
         );
         expect(volumeTitleOf({ number: '3', title: 'Tome 3' })).toBeNull();
         expect(volumeTitleOf({ number: '3', title: 'Vol. 03' })).toBeNull();
+        expect(volumeTitleOf({ number: '03', title: 'Tome 3' })).toBeNull();
+        expect(volumeTitleOf({ number: '01.5', title: 'Tome 1.5' })).toBeNull();
         expect(
             volumeTitleOf({ number: '12.5', title: 'Tome 12.5' }),
         ).toBeNull();

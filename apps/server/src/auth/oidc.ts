@@ -33,6 +33,16 @@ const TIMEOUT_MS = 10_000;
  * Raison d'un échec, pour les logs : erreur réseau, ou code HTTP et erreur
  * OAuth renvoyée par Pocket ID (`invalid_client`…, jamais de secret).
  */
+/**
+ * Erreur de Pocket ID : message générique, et détail (réponse du serveur)
+ * dans `cause`, pour le journal seulement.
+ */
+const pocketIdFailure = async (message: string, response: Response | Error) => {
+    const error = badGateway(message);
+    error.cause = await failureOf(response);
+    return error;
+};
+
 const failureOf = async (response: Response | Error) => {
     if (response instanceof Error) {
         const cause = (response.cause as Error | undefined)?.message;
@@ -135,8 +145,9 @@ export class OidcClient {
             signal: AbortSignal.timeout(TIMEOUT_MS),
         }).catch((error: Error) => error);
         if (tokenResponse instanceof Error || !tokenResponse.ok) {
-            throw badGateway(
-                `Pocket ID a refusé la connexion (${await failureOf(tokenResponse)})`,
+            throw await pocketIdFailure(
+                'Pocket ID a refusé la connexion',
+                tokenResponse,
             );
         }
         const { access_token } = (await tokenResponse.json()) as {
@@ -149,8 +160,9 @@ export class OidcClient {
             signal: AbortSignal.timeout(TIMEOUT_MS),
         }).catch((error: Error) => error);
         if (infoResponse instanceof Error || !infoResponse.ok) {
-            throw badGateway(
-                `Pocket ID : identité illisible (${await failureOf(infoResponse)})`,
+            throw await pocketIdFailure(
+                'Pocket ID : identité illisible',
+                infoResponse,
             );
         }
         const info = (await infoResponse.json()) as Record<string, unknown>;

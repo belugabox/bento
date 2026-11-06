@@ -79,7 +79,7 @@ export const saveProgress = (
  * seul par série, avec l'avancement dans la série (tomes lus sur le total).
  */
 export const listInProgress = (db: Db, viewer: Viewer, limit = 12) => {
-    const rows = db
+    return db
         .select({
             volumeId: volumes.id,
             seriesId: series.id,
@@ -101,14 +101,14 @@ export const listInProgress = (db: Db, viewer: Viewer, limit = 12) => {
                 eq(readProgress.userId, viewer.id),
                 eq(readProgress.completed, false),
                 visibleTo(viewer),
+                // Seul le tome en cours le plus récent de sa série : les
+                // comptes ci-dessus ne sont faits que pour les lignes gardées.
+                sql`not exists (select 1 from read_progress rp join volumes v on v.id = rp.volume_id where v.series_id = series.id and rp.user_id = ${viewer.id} and rp.completed = 0 and (rp.updated_at > read_progress.updated_at or (rp.updated_at = read_progress.updated_at and rp.volume_id > read_progress.volume_id)))`,
             ),
         )
         .orderBy(desc(readProgress.updatedAt))
+        .limit(limit)
         .all();
-    const seen = new Set<number>();
-    return rows
-        .filter((row) => !seen.has(row.seriesId) && seen.add(row.seriesId))
-        .slice(0, limit);
 };
 
 /**

@@ -171,7 +171,8 @@ describe('drafts', () => {
                 coverUpdatedAt: null,
             },
             {
-                folder: '_draft/Spirale.cbr',
+                // Nommé comme le .cbz qu'il deviendra.
+                folder: '_draft/Spirale.cbz',
                 files: [
                     {
                         path: '_draft/Spirale.cbr',
@@ -397,6 +398,31 @@ describe('publishing', () => {
             listSeries(ctx.db, ADMIN_VIEW).map((s) => [s.name, s.status]),
         );
         expect(statuses).toEqual({ Gantz: null, Spirale: 'completed' });
+    });
+
+    it('keeps the settings of a lone .cbr once converted', async () => {
+        // Un .cbr qui est en fait un ZIP : converti à l'ouverture.
+        await writeCbz(ctx.file('_draft/Seul.cbr'), {
+            comicInfo: info('Seul', '1'),
+        });
+        const [draft] = await ctx.files.drafts(ctx.library.id);
+        ctx.files.setDraftSettings(ctx.library.id, draft!.folder, {
+            status: 'completed',
+        });
+
+        const files = await ctx.files.draftFolder(
+            ctx.library.id,
+            draft!.folder,
+        );
+        await ctx.files.publish(
+            ctx.library.id,
+            files.map((file) => file.path),
+        );
+
+        expect(files.map((file) => file.path)).toEqual(['_draft/Seul.cbz']);
+        expect(listSeries(ctx.db, ADMIN_VIEW)).toEqual([
+            expect.objectContaining({ name: 'Seul', status: 'completed' }),
+        ]);
     });
 
     it('adds drafts to a published series whose folder is named otherwise', async () => {

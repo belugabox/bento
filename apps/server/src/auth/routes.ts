@@ -120,7 +120,11 @@ export const createAuthRoutes = ({
             try {
                 user = await oidc.userFromCode(code, flow.verifier);
             } catch (err) {
-                logger.warn(`Connexion impossible : ${String(err)}`);
+                const cause = err instanceof Error ? err.cause : undefined;
+                logger.warn(
+                    `Connexion impossible : ${String(err)}` +
+                        (cause ? ` (${String(cause)})` : ''),
+                );
                 return c.redirect(denied('failed'));
             }
             const role = roleFromGroups(user.groups, {

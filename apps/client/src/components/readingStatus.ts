@@ -25,7 +25,10 @@ export const volumeTitleOf = (volume: {
 }) => {
     const title = volume.title?.trim();
     if (!title || !volume.number) return null;
-    const number = volume.number.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    // « 03 » comme « 3 » : les zéros initiaux sont facultatifs dans le titre.
+    const number = volume.number
+        .replace(/^0+(?=\d)/, '')
+        .replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const repeated = new RegExp(`^(tome|vol(ume)?\\.?)\\s*0*${number}$`, 'i');
     return repeated.test(title) ? null : title;
 };

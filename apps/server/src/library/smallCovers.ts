@@ -35,14 +35,20 @@ export const readCover = async (
 ): Promise<Buffer | undefined> => {
     const source = await stat(file).catch(() => undefined);
     if (!source) return undefined;
-    if (size !== 'small') return readFile(file);
+    // Fichier supprimé entre-temps (scan, nouvelle couverture) : absent.
+    if (size !== 'small') return readFile(file).catch(() => undefined);
 
     const small = smallCoverFile(file);
     const cached = await stat(small).catch(() => undefined);
-    if (cached && cached.mtimeMs >= source.mtimeMs) return readFile(small);
+    if (cached && cached.mtimeMs >= source.mtimeMs) {
+        const data = await readFile(small).catch(() => undefined);
+        if (data) return data;
+    }
 
     // Lue en mémoire : sharp garderait le fichier ouvert (Windows).
-    const data = await readImage(await readFile(file))
+    const original = await readFile(file).catch(() => undefined);
+    if (!original) return undefined;
+    const data = await readImage(original)
         .resize({ width: SMALL_WIDTH, withoutEnlargement: true })
         .webp({ quality: 80 })
         .toBuffer();

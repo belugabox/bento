@@ -24,7 +24,7 @@ import {
     IconUpload,
     IconWand,
 } from '@tabler/icons-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { type ComicInfo, publicationPathOf } from '@server/types';
 
@@ -148,6 +148,8 @@ export const MetadataEditor = ({
     const readable = useMemo(() => volumes.filter((v) => !v.error), [dataKey]);
     const paths = readable.map((v) => v.path);
     const [edits, setEdits] = useState<Edits>(() => initialEdits(readable));
+    // Modifications d'avant le choix d'une série existante (pour l'annuler).
+    const beforeJoin = useRef<Edits>(undefined);
     const [overwrite, setOverwrite] = useState(false);
     // Après Wikipédia, compléter numéros, titres et années des tomes.
     const [alsoFileNames, setAlsoFileNames] = useState(true);
@@ -373,10 +375,24 @@ export const MetadataEditor = ({
                             <ExistingSeriesPicker
                                 libraryId={libraryId}
                                 onJoin={(name, source) =>
-                                    setEdits((current) =>
-                                        joinSeries(current, name, source),
-                                    )
+                                    // Toujours depuis l'état d'avant le
+                                    // premier choix : une autre série ne
+                                    // garde rien de la précédente.
+                                    setEdits((current) => {
+                                        beforeJoin.current ??= current;
+                                        return joinSeries(
+                                            beforeJoin.current,
+                                            name,
+                                            source,
+                                        );
+                                    })
                                 }
+                                onLeave={() => {
+                                    if (beforeJoin.current) {
+                                        setEdits(beforeJoin.current);
+                                    }
+                                    beforeJoin.current = undefined;
+                                }}
                             />
                         </SimpleGrid>
                     )}
