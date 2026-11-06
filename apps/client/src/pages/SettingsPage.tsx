@@ -13,6 +13,7 @@ import {
 } from '@mantine/core';
 import { useEffect, useState } from 'react';
 
+import { GenresSettings } from '@/components/GenresSettings';
 import { AccentPicker, ColorSchemeControl } from '@/components/ThemePickers';
 import { useDefaultAppearance } from '@/components/theme';
 import {
@@ -224,6 +225,7 @@ export const SettingsPage = () => {
         <Stack maw={640}>
             <Title order={2}>Réglages</Title>
             <SettingsForm saved={current} onSaved={setSaved} />
+            <GenresSettings />
         </Stack>
     );
 };

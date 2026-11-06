@@ -31,6 +31,14 @@ import {
 import { type ReactNode, useState } from 'react';
 import { useSearchParams } from 'react-router';
 
+import {
+    AUDIENCES,
+    AUDIENCE_LABELS,
+    type Audience,
+    FORMAT_LABELS,
+    type Format,
+} from '@server/types';
+
 import { CoverCard } from '@/components/CoverCard';
 import { volumeLabel } from '@/components/readingStatus';
 import {
@@ -41,6 +49,8 @@ import {
     STATUS_FILTERS,
     type SeriesSort,
     type StatusFilter,
+    allAudiences,
+    allFormats,
     allGenres,
     filterSeries,
     readingStateOf,
@@ -125,6 +135,8 @@ export const LibraryPage = () => {
         ? (rawList as ListFilter)
         : 'all';
     const genre = params.get('genre');
+    const format = params.get('format') as Format | null;
+    const audience = params.get('audience') as Audience | null;
     const status = (params.get('status') as StatusFilter | null) ?? 'all';
 
     const libraries = useQuery(fetchLibraries, []);
@@ -173,6 +185,8 @@ export const LibraryPage = () => {
         sort,
         list,
         genre,
+        format,
+        audience,
         status,
     });
     // Filtres du bouton « Filtres », affichés aussi en pastilles.
@@ -184,6 +198,16 @@ export const LibraryPage = () => {
             key: 'list',
             label: listLabel ?? 'Collection',
             clear: () => update({ list: '' }),
+        },
+        !!format && {
+            key: 'format',
+            label: FORMAT_LABELS[format] ?? format,
+            clear: () => update({ format: '' }),
+        },
+        !!audience && {
+            key: 'audience',
+            label: AUDIENCE_LABELS[audience] ?? audience,
+            clear: () => update({ audience: '' }),
         },
         !!genre && {
             key: 'genre',
@@ -200,6 +224,8 @@ export const LibraryPage = () => {
     // Pendant une recherche : seulement les séries.
     const resume = debouncedSearch ? [] : (inProgress.data ?? []);
     const genres = allGenres(series.data ?? []);
+    const formats = allFormats(series.data ?? []);
+    const audiences = allAudiences(series.data ?? []);
     const sortLabel = SERIES_SORTS.find((s) => s.value === sort)?.label;
 
     return (
@@ -321,6 +347,40 @@ export const LibraryPage = () => {
                                         ]}
                                     />
                                     <Select
+                                        label="Format"
+                                        size="xs"
+                                        clearable
+                                        disabled={formats.length < 2 && !format}
+                                        placeholder="Tous les formats"
+                                        value={format}
+                                        onChange={(value) =>
+                                            update({ format: value ?? '' })
+                                        }
+                                        comboboxProps={{ withinPortal: false }}
+                                        data={formats.map((value) => ({
+                                            value,
+                                            label: FORMAT_LABELS[value],
+                                        }))}
+                                    />
+                                    <Select
+                                        label="Public"
+                                        size="xs"
+                                        clearable
+                                        disabled={audiences.length === 0}
+                                        placeholder="Tous les publics"
+                                        value={audience}
+                                        onChange={(value) =>
+                                            update({ audience: value ?? '' })
+                                        }
+                                        comboboxProps={{ withinPortal: false }}
+                                        data={AUDIENCES.filter((value) =>
+                                            audiences.includes(value),
+                                        ).map((value) => ({
+                                            value,
+                                            label: AUDIENCE_LABELS[value],
+                                        }))}
+                                    />
+                                    <Select
                                         label="Genre"
                                         size="xs"
                                         clearable
@@ -355,6 +415,8 @@ export const LibraryPage = () => {
                                         onClick={() =>
                                             update({
                                                 list: '',
+                                                format: '',
+                                                audience: '',
                                                 genre: '',
                                                 status: '',
                                             })

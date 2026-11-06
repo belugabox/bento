@@ -26,7 +26,17 @@ import {
 } from '@tabler/icons-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
-import { type ComicInfo, publicationPathOf } from '@server/types';
+import {
+    AUDIENCES,
+    AUDIENCE_LABELS,
+    type Audience,
+    type ComicInfo,
+    FORMATS,
+    FORMAT_LABELS,
+    type Format,
+    classify,
+    publicationPathOf,
+} from '@server/types';
 
 import { AGE_RATING_OPTIONS, canonicalRating } from '@/components/ageLimits';
 import { ReaderPreview } from '@/reader/ReaderPreview';
@@ -36,14 +46,18 @@ import {
     readingModeLabel,
 } from '@/reader/navigation';
 import {
+    type ClassificationChanges,
     fetchFilePageSizes,
+    fetchGenres,
     filePageUrl,
     publishFiles,
     saveComicInfo,
 } from '@/services/api';
+import { useQuery } from '@/services/useQuery';
 
 import { CompressionModal } from './CompressionModal';
 import { ExistingSeriesPicker } from './ExistingSeriesPicker';
+import { GenreFields } from './GenreFields';
 import { WikipediaSearch } from './WikipediaSearch';
 import {
     type EditableVolume,
@@ -98,7 +112,6 @@ const STATUS_OPTIONS = [
 ];
 
 const SERIES_TEXT_FIELDS: { field: SeriesField; label: string }[] = [
-    { field: 'Genre', label: 'Genre' },
     { field: 'Writer', label: 'Scénario' },
     { field: 'Penciller', label: 'Dessin' },
     { field: 'Publisher', label: 'Éditeur' },
@@ -116,6 +129,7 @@ export const MetadataEditor = ({
     onChanged,
     status: seriesStatus,
     readingMode: seriesMode,
+    classification,
 }: {
     libraryId: number;
     kind: 'manga' | 'comics';
@@ -137,6 +151,16 @@ export const MetadataEditor = ({
         value: ReadingMode | null;
         defaultMode: ReadingMode;
         save: (mode: ReadingMode | null) => Promise<unknown>;
+    };
+    /**
+     * Format et public de la série, réglés dans Bento (null : format de la
+     * bibliothèque, public inconnu ou trouvé parmi les genres).
+     */
+    classification?: {
+        format: Format | null;
+        defaultFormat: Format;
+        audience: Audience | null;
+        save: (changes: ClassificationChanges) => Promise<unknown>;
     };
 }) => {
     // Contenu des données reçues : le parent peut recréer la liste à chaque
@@ -164,8 +188,20 @@ export const MetadataEditor = ({
     const [modeValue, setModeValue] = useState<string>(savedMode);
     useEffect(() => setModeValue(savedMode), [savedMode]);
     const modeChanged = !!seriesMode && modeValue !== savedMode;
+    // Format (« default » : celui de la bibliothèque) et public (« unknown »).
+    const savedFormat = classification?.format ?? DEFAULT_MODE;
+    const [formatValue, setFormatValue] = useState<string>(savedFormat);
+    useEffect(() => setFormatValue(savedFormat), [savedFormat]);
+    const formatChanged = !!classification && formatValue !== savedFormat;
+    const savedAudience = classification?.audience ?? UNKNOWN;
+    const [audienceValue, setAudienceValue] = useState<string>(savedAudience);
+    useEffect(() => setAudienceValue(savedAudience), [savedAudience]);
+    const audienceChanged = !!classification && audienceValue !== savedAudience;
     // Réglages de la série modifiés (enregistrés avec les tomes).
-    const settingsChanged = statusChanged || modeChanged;
+    const settingsChanged =
+        statusChanged || modeChanged || formatChanged || audienceChanged;
+    const genres = useQuery(fetchGenres, []);
+    const catalog = genres.data ?? [];
     // Action en cours : roue de chargement sur son seul bouton.
     const [busy, setBusy] = useState<'save' | 'publish'>();
     const [report, setReport] = useState<Report>();
@@ -190,6 +226,12 @@ export const MetadataEditor = ({
         beforeJoin.current = undefined;
     }, [readable]);
     const original = useMemo(() => initialEdits(readable), [readable]);
+    // Public écrit parmi les genres d'un ancien fichier : proposé par défaut.
+    const foundAudience = classify(
+        String(seriesValue(original, paths, 'Genre') ?? ''),
+        null,
+        catalog,
+    ).audience;
     const seriesChanged = (field: SeriesField) =>
         isSeriesFieldChanged(original, edits, paths, field);
     const volumeChanged = (path: string, field: keyof ComicInfo) =>
@@ -241,6 +283,23 @@ export const MetadataEditor = ({
                     status === UNKNOWN ? null : (status as SeriesStatus),
                 );
                 lines.push('Statut de la série enregistré.');
+            }
+            if (classification && (formatChanged || audienceChanged)) {
+                await classification.save({
+                    ...(formatChanged && {
+                        format:
+                            formatValue === DEFAULT_MODE
+                                ? null
+                                : (formatValue as Format),
+                    }),
+                    ...(audienceChanged && {
+                        audience:
+                            audienceValue === UNKNOWN
+                                ? null
+                                : (audienceValue as Audience),
+                    }),
+                });
+                lines.push('Format et public enregistrés.');
             }
             if (seriesMode && modeChanged) {
                 await seriesMode.save(
@@ -322,6 +381,8 @@ export const MetadataEditor = ({
                             setPickerKey((key) => key + 1);
                             setStatus(savedStatus);
                             setModeValue(savedMode);
+                            setFormatValue(savedFormat);
+                            setAudienceValue(savedAudience);
                         }}
                     >
                         Annuler
@@ -477,6 +538,74 @@ export const MetadataEditor = ({
                                 setSeries('AgeRating', value ?? undefined)
                             }
                             data={AGE_RATING_OPTIONS}
+                        />
+                        {classification && (
+                            <Select
+                                label="Format"
+                                allowDeselect={false}
+                                value={formatValue}
+                                onChange={(value) =>
+                                    value && setFormatValue(value)
+                                }
+                                data={[
+                                    {
+                                        value: DEFAULT_MODE,
+                                        label: `Par défaut : ${FORMAT_LABELS[classification.defaultFormat]}`,
+                                    },
+                                    ...FORMATS.map((value) => ({
+                                        value,
+                                        label: FORMAT_LABELS[value],
+                                    })),
+                                ]}
+                                {...changed(formatChanged)}
+                            />
+                        )}
+                        {classification && (
+                            <Select
+                                label="Public"
+                                allowDeselect={false}
+                                value={audienceValue}
+                                onChange={(value) =>
+                                    value && setAudienceValue(value)
+                                }
+                                data={[
+                                    ...AUDIENCES.map((value) => ({
+                                        value,
+                                        label: AUDIENCE_LABELS[value],
+                                    })),
+                                    {
+                                        value: UNKNOWN,
+                                        label: foundAudience
+                                            ? `Par défaut : ${AUDIENCE_LABELS[foundAudience]} (genres du fichier)`
+                                            : 'Inconnu',
+                                    },
+                                ]}
+                                {...changed(audienceChanged)}
+                            />
+                        )}
+                        <GenreFields
+                            genre={String(series('Genre'))}
+                            tags={String(series('Tags'))}
+                            catalog={catalog}
+                            genreProps={changed(seriesChanged('Genre'))}
+                            tagsProps={changed(seriesChanged('Tags'))}
+                            onChange={(genre, tags) => {
+                                // Un public parmi les anciens genres disparaît
+                                // du fichier : le garder dans Bento.
+                                if (
+                                    foundAudience &&
+                                    audienceValue === UNKNOWN
+                                ) {
+                                    setAudienceValue(foundAudience);
+                                }
+                                setEdits((current) =>
+                                    setSeriesField(
+                                        setSeriesField(current, 'Genre', genre),
+                                        'Tags',
+                                        tags,
+                                    ),
+                                );
+                            }}
                         />
                         {SERIES_TEXT_FIELDS.map(({ field, label }) => (
                             <TextInput

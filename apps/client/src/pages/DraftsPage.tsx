@@ -16,6 +16,8 @@ import { useDisclosure } from '@mantine/hooks';
 import { IconFile, IconFolder, IconPhoto } from '@tabler/icons-react';
 import { useState } from 'react';
 
+import { defaultFormat } from '@server/types';
+
 import { CoverPicker } from '@/components/metadata/CoverPicker';
 import { MetadataEditor } from '@/components/metadata/MetadataEditor';
 import {
@@ -25,6 +27,7 @@ import {
     fetchLibraries,
     fileCoverUrl,
     filePageUrl,
+    setDraftClassification,
     setDraftCover,
     setDraftReadingMode,
     setDraftStatus,
@@ -211,6 +214,19 @@ export const DraftsPage = () => {
                                                     libraryId,
                                                     selected,
                                                     status,
+                                                ),
+                                        }}
+                                        classification={{
+                                            format: draft?.format ?? null,
+                                            defaultFormat: defaultFormat(
+                                                library.type,
+                                            ),
+                                            audience: draft?.audience ?? null,
+                                            save: (changes) =>
+                                                setDraftClassification(
+                                                    libraryId,
+                                                    selected,
+                                                    changes,
                                                 ),
                                         }}
                                         readingMode={{

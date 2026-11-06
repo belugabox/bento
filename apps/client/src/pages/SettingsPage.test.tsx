@@ -19,7 +19,13 @@ describe('SettingsPage', () => {
         let saved = DEFAULTS;
         const puts: unknown[] = [];
         vi.spyOn(globalThis, 'fetch').mockImplementation(
-            async (_input, init) => {
+            async (input, init) => {
+                // Liste des genres : vide, testée à part.
+                if (String(input) === '/api/genres') {
+                    return new Response('[]', {
+                        headers: { 'Content-Type': 'application/json' },
+                    });
+                }
                 if (init?.method === 'PUT') {
                     const body = JSON.parse(String(init.body));
                     puts.push(body);

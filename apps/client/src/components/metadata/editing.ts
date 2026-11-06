@@ -4,6 +4,7 @@ import { type ComicInfo, parseVolumeFileName } from '@server/types';
 export const SERIES_FIELDS = [
     'Series',
     'Genre',
+    'Tags',
     'Writer',
     'Penciller',
     'Publisher',

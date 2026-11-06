@@ -26,6 +26,8 @@ export type ComicInfo = {
     Publisher?: string;
     Imprint?: string;
     Genre?: string;
+    // Thèmes (ComicInfo 2.1).
+    Tags?: string;
     Web?: string;
     PageCount?: number;
     LanguageISO?: string;
@@ -81,6 +83,7 @@ const STRING_FIELDS = [
     'Publisher',
     'Imprint',
     'Genre',
+    'Tags',
     'Web',
     'LanguageISO',
     'Format',

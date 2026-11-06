@@ -8,7 +8,25 @@ import {
 } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import { DEFAULT_GENRES } from '@server/types';
+
 import { type EditorVolume, MetadataEditor } from './MetadataEditor';
+
+// Liste des genres : celle de départ, sans passer par le serveur.
+vi.mock('@/services/api', async (original) => ({
+    ...(await original<typeof import('@/services/api')>()),
+    fetchGenres: async () =>
+        DEFAULT_GENRES.map((genre, id) => ({ id, ...genre, seriesCount: 0 })),
+}));
+
+/** Pastilles d'un champ à valeurs multiples (genres, thèmes). */
+const pillsOf = (label: string) =>
+    [
+        ...(screen
+            .getByRole('textbox', { name: label })
+            .closest('.mantine-InputWrapper-root')
+            ?.querySelectorAll('.mantine-Pill-label') ?? []),
+    ].map((pill) => pill.textContent);
 
 const volumes = (): EditorVolume[] => [
     {
@@ -107,7 +125,9 @@ describe('MetadataEditor', () => {
             ).value,
         ).toBe('Tome 1');
         expect(
-            screen.getByLabelText('Genre').getAttribute('data-changed'),
+            screen
+                .getByRole('textbox', { name: 'Genres' })
+                .getAttribute('data-changed'),
         ).toBeNull();
 
         await act(async () => {
@@ -198,6 +218,68 @@ describe('MetadataEditor', () => {
         expect((publish as HTMLButtonElement).disabled).toBe(true);
     });
 
+    it('sorts the genres of old files, and keeps their audience in Bento', async () => {
+        mockServer();
+        const save = vi.fn().mockResolvedValue({});
+        render(
+            <MantineProvider>
+                <MetadataEditor
+                    libraryId={1}
+                    kind="manga"
+                    mode="drafts"
+                    volumes={volumes().map((volume) => ({
+                        ...volume,
+                        comicInfo: {
+                            ...volume.comicInfo,
+                            Genre: 'Shonen, Humour, Mature, Espions',
+                        },
+                    }))}
+                    classification={{
+                        format: null,
+                        defaultFormat: 'manga',
+                        audience: null,
+                        save,
+                    }}
+                    onChanged={() => {}}
+                />
+            </MantineProvider>,
+        );
+
+        await waitFor(() => expect(pillsOf('Genres')).toEqual(['Comédie']));
+        expect(pillsOf('Thèmes')).toEqual(['Espions']);
+        expect(
+            (
+                screen.getByRole('textbox', {
+                    name: 'Public',
+                }) as HTMLInputElement
+            ).value,
+        ).toBe('Par défaut : Shonen (genres du fichier)');
+
+        const themes = screen.getByRole('textbox', { name: 'Thèmes' });
+        fireEvent.change(themes, { target: { value: 'famille' } });
+        fireEvent.keyDown(themes, { key: 'Enter' });
+        fireEvent.click(screen.getByRole('textbox', { name: 'Format' }));
+        fireEvent.click(await screen.findByText('Manhwa'));
+        await act(async () => {
+            fireEvent.click(
+                screen.getByRole('button', { name: /Enregistrer/ }),
+            );
+        });
+
+        // Le public et l'âge quittent les genres du fichier.
+        expect(requests[0]?.[2]).toEqual({
+            updates: volumes().map((volume) => ({
+                path: volume.path,
+                changes: { Genre: 'Comédie', Tags: 'Espions, famille' },
+            })),
+        });
+        expect(save).toHaveBeenCalledWith({
+            format: 'manhwa',
+            audience: 'shonen',
+        });
+        expect(screen.getByText('Format et public enregistrés.')).toBeTruthy();
+    });
+
     it('saves the series status alone, with its own message', async () => {
         const save = vi.fn().mockResolvedValue({});
         render(
@@ -272,9 +354,7 @@ describe('MetadataEditor', () => {
             await screen.findByRole('button', { name: 'Utiliser cette fiche' }),
         );
 
-        expect((screen.getByLabelText('Genre') as HTMLInputElement).value).toBe(
-            'Science-fiction',
-        );
+        expect(pillsOf('Genres')).toEqual(['Science-fiction']);
         // Puis les noms de fichiers : numéros, titres, années.
         expect(numberOf(2).value).toBe('2');
         expect(

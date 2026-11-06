@@ -10,6 +10,7 @@ import {
 } from 'drizzle-orm/sqlite-core';
 
 import type { ComicInfo } from '../archive/comicInfo';
+import { AUDIENCES, FORMATS } from '../classification';
 
 /** Compte Bento, créé à la première connexion via Pocket ID. */
 export const users = sqliteTable('users', {
@@ -49,7 +50,10 @@ export const series = sqliteTable(
         name: text('name').notNull(),
         // Métadonnées reprises du premier tome.
         summary: text('summary'),
+        // Genres et thèmes bruts du premier tome (`Genre` et `Tags`), rangés
+        // à la lecture d'après la liste des genres.
         genre: text('genre'),
+        tags: text('tags'),
         ageRating: text('age_rating'),
         // Âge minimal pour la lire, déduit de la classification ; null = inconnu.
         minAge: integer('min_age'),
@@ -65,6 +69,10 @@ export const series = sqliteTable(
         readingMode: text('reading_mode', {
             enum: ['ltr', 'ltr-manga', 'rtl', 'webtoon'],
         }),
+        // Format et public, réglés dans Bento ; null = format de la
+        // bibliothèque, public inconnu (ou trouvé parmi les genres).
+        format: text('format', { enum: FORMATS }),
+        audience: text('audience', { enum: AUDIENCES }),
         writer: text('writer'),
         publisher: text('publisher'),
         createdAt: integer('created_at', { mode: 'timestamp' })
@@ -170,6 +178,8 @@ export const draftSettings = sqliteTable(
         readingMode: text('reading_mode', {
             enum: ['ltr', 'ltr-manga', 'rtl', 'webtoon'],
         }),
+        format: text('format', { enum: FORMATS }),
+        audience: text('audience', { enum: AUDIENCES }),
         // Couverture choisie (fichier covers/drafts/…) ; null = aucune.
         coverUpdatedAt: integer('cover_updated_at', { mode: 'timestamp_ms' }),
     },
@@ -228,6 +238,19 @@ export const collectionSeries = sqliteTable(
         index('collection_series_series').on(t.seriesId),
     ],
 );
+
+/**
+ * Liste des genres, gérée par l'admin. Les alias sont les autres noms
+ * reconnus dans les fichiers (« Humour » pour « Comédie »).
+ */
+export const genres = sqliteTable('genres', {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    name: text('name').notNull().unique(),
+    aliases: text('aliases', { mode: 'json' })
+        .$type<string[]>()
+        .notNull()
+        .default(sql`'[]'`),
+});
 
 /** Réglages de l'admin (clé → valeur JSON). */
 export const settings = sqliteTable('settings', {

@@ -1,6 +1,6 @@
 import { hc } from 'hono/client';
 
-import type { ApiType } from '@server/types';
+import type { ApiType, Audience, Format } from '@server/types';
 
 /** Client typé de l'API (`/api`, servie par le même domaine). */
 export const api = hc<ApiType>('/api');
@@ -362,5 +362,56 @@ export const setSeriesReadingMode = (
         api.series[':id']['reading-mode'].$put({
             ...id(seriesId),
             json: { readingMode },
+        }),
+    );
+
+/** Format et public d'une série ou d'un dossier de brouillons (null : par défaut). */
+export type ClassificationChanges = {
+    format?: Format | null;
+    audience?: Audience | null;
+};
+
+export const setSeriesClassification = (
+    seriesId: number,
+    changes: ClassificationChanges,
+) =>
+    json(
+        api.series[':id'].classification.$put({
+            ...id(seriesId),
+            json: changes,
+        }),
+    );
+
+export const setDraftClassification = (
+    library: number,
+    folder: string,
+    changes: ClassificationChanges,
+) =>
+    json(
+        api.libraries[':id'].drafts.classification.$put({
+            ...libraryId(library),
+            json: { folder, ...changes },
+        }),
+    );
+
+/** Liste des genres, gérée par l'admin. */
+export const fetchGenres = () => json(api.genres.$get());
+
+export type Genre = Awaited<ReturnType<typeof fetchGenres>>[number];
+
+export const createGenre = (name: string, aliases: string[] = []) =>
+    json(api.genres.$post({ json: { name, aliases } }));
+
+export const updateGenre = (
+    genreId: number,
+    changes: { name?: string; aliases?: string[] },
+) => json(api.genres[':id'].$patch({ ...id(genreId), json: changes }));
+
+/** Supprime un genre, ou le fusionne dans `into`. */
+export const deleteGenre = (genreId: number, into?: number) =>
+    json(
+        api.genres[':id'].$delete({
+            ...id(genreId),
+            query: { into: into === undefined ? undefined : String(into) },
         }),
     );

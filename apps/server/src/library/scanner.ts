@@ -353,6 +353,7 @@ export class LibraryScanner {
                     name: info.Series ?? row.key,
                     summary: info.Summary ?? null,
                     genre: info.Genre ?? null,
+                    tags: info.Tags ?? null,
                     ...seriesAge(infos.map((i) => i.AgeRating)),
                     year: info.Year ?? null,
                     count: info.Count ?? null,

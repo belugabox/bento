@@ -57,7 +57,7 @@ describe('LibraryScanner', () => {
         const details = getSeries(ctx.db, NO_USER, series!.id);
         expect(details).toMatchObject({
             summary: 'Un espion.',
-            genre: 'Comédie',
+            genres: ['Comédie'],
             ageRating: 'Everyone 10+',
             year: 2019,
             library: { type: 'manga' },

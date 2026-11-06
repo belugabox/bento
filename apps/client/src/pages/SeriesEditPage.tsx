@@ -21,6 +21,7 @@ import {
     fetchVolume,
     pageUrl,
     seriesCoverUrl,
+    setSeriesClassification,
     setSeriesCover,
     setSeriesReadingMode,
     setSeriesStatus,
@@ -99,6 +100,13 @@ export const SeriesEditPage = () => {
                 status={{
                     value: series.status,
                     save: (status) => setSeriesStatus(series.id, status),
+                }}
+                classification={{
+                    format: series.format,
+                    defaultFormat: series.defaultFormat,
+                    audience: series.audience,
+                    save: (changes) =>
+                        setSeriesClassification(series.id, changes),
                 }}
                 readingMode={{
                     value: series.readingMode,

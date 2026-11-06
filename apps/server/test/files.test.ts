@@ -157,6 +157,8 @@ describe('drafts', () => {
                 ],
                 status: null,
                 readingMode: null,
+                format: null,
+                audience: null,
                 coverUpdatedAt: null,
             },
             {
@@ -168,6 +170,8 @@ describe('drafts', () => {
                 ],
                 status: null,
                 readingMode: null,
+                format: null,
+                audience: null,
                 coverUpdatedAt: null,
             },
             {
@@ -182,6 +186,8 @@ describe('drafts', () => {
                 ],
                 status: null,
                 readingMode: null,
+                format: null,
+                audience: null,
                 coverUpdatedAt: null,
             },
         ]);
@@ -480,7 +486,13 @@ describe('publishing', () => {
             ctx.files.setDraftSettings(ctx.library.id, '_draft/Gantz', {
                 status: null,
             }),
-        ).toEqual({ status: null, readingMode: null, coverUpdatedAt: null });
+        ).toEqual({
+            status: null,
+            readingMode: null,
+            format: null,
+            audience: null,
+            coverUpdatedAt: null,
+        });
     });
 
     it('applies the reading mode and cover chosen on the draft folder', async () => {

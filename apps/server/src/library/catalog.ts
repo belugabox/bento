@@ -2,10 +2,18 @@ import { and, asc, count, eq, inArray, notInArray, sql } from 'drizzle-orm';
 import { rm } from 'node:fs/promises';
 import path from 'node:path';
 
+import {
+    type Audience,
+    type Format,
+    type GenreEntry,
+    classify,
+    defaultFormat,
+} from '../classification';
 import type { LibraryConfig } from '../config';
 import type { Db } from '../db';
 import { libraries, readProgress, series, volumes } from '../db/schema';
 import { notFound } from '../tools/errors';
+import { genreCatalog } from './genres';
 import { publicationPathOf } from './paths';
 import { coverFile } from './scanner';
 import { compareNames } from './sortName';
@@ -97,20 +105,54 @@ export const listLibraries = (db: Db) =>
             defaultReadingMode: defaultReadingMode(library.type),
         }));
 
-/** Séries, filtrées par bibliothèque et par nom (sans tenir compte de la casse). */
+/**
+ * Format, public, genres et thèmes d'une série, d'après ses réglages et
+ * les genres bruts de ses fichiers rangés par la liste des genres.
+ */
+const classified = (
+    row: {
+        genre: string | null;
+        tags: string | null;
+        format: Format | null;
+        audience: Audience | null;
+    },
+    libraryType: 'manga' | 'comics',
+    catalog: GenreEntry[],
+) => {
+    const { genres, themes, audience } = classify(row.genre, row.tags, catalog);
+    return {
+        format: row.format,
+        defaultFormat: defaultFormat(libraryType),
+        audience: row.audience,
+        // Public trouvé parmi les genres d'un ancien fichier.
+        defaultAudience: audience,
+        genres,
+        themes,
+    };
+};
+
+/**
+ * Séries, filtrées par bibliothèque et par texte (nom, genres et thèmes,
+ * sans tenir compte de la casse).
+ */
 export const listSeries = (
     db: Db,
     viewer: Viewer,
     { libraryId, search }: { libraryId?: number; search?: string } = {},
 ) => {
     const text = search?.trim().toLowerCase();
+    const catalog = genreCatalog(db);
     return db
         .select({
             id: series.id,
             libraryId: series.libraryId,
+            libraryType: libraries.type,
             name: series.name,
             year: series.year,
             genre: series.genre,
+            tags: series.tags,
+            format: series.format,
+            audience: series.audience,
             status: series.status,
             volumeCount: count(volumes.id),
             // Dernier tome ajouté (tri « ajouts récents »).
@@ -130,6 +172,7 @@ export const listSeries = (
             ...listsOf(viewer),
         })
         .from(series)
+        .innerJoin(libraries, eq(libraries.id, series.libraryId))
         .leftJoin(volumes, eq(volumes.seriesId, series.id))
         .where(
             and(
@@ -137,14 +180,29 @@ export const listSeries = (
                     ? undefined
                     : eq(series.libraryId, libraryId),
                 text
-                    ? sql`lower(${series.name}) like ${`%${text}%`}`
+                    ? sql`(lower(${series.name}) like ${`%${text}%`} or lower(coalesce(${series.genre}, '') || ',' || coalesce(${series.tags}, '')) like ${`%${text}%`})`
                     : undefined,
                 visibleTo(viewer),
             ),
         )
         .groupBy(series.id)
         .all()
-        .sort((a, b) => compareNames(a.name, b.name));
+        .sort((a, b) => compareNames(a.name, b.name))
+        .map(({ genre, tags, format, audience, libraryType, ...row }) => {
+            const found = classified(
+                { genre, tags, format, audience },
+                libraryType,
+                catalog,
+            );
+            return {
+                ...row,
+                // Réglages de la série, sinon ses valeurs par défaut.
+                format: found.format ?? found.defaultFormat,
+                audience: found.audience ?? found.defaultAudience,
+                genres: found.genres,
+                themes: found.themes,
+            };
+        });
 };
 
 export const getSeries = (db: Db, viewer: Viewer, id: number) => {
@@ -154,6 +212,9 @@ export const getSeries = (db: Db, viewer: Viewer, id: number) => {
             name: series.name,
             summary: series.summary,
             genre: series.genre,
+            tags: series.tags,
+            format: series.format,
+            audience: series.audience,
             ageRating: series.ageRating,
             minAge: series.minAge,
             coverUpdatedAt: series.coverUpdatedAt,
@@ -202,9 +263,15 @@ export const getSeries = (db: Db, viewer: Viewer, id: number) => {
         .where(eq(volumes.seriesId, id))
         .orderBy(...volumeOrder)
         .all();
+    const { genre, tags, ...details } = row;
+    const classification = classified(row, row.library.type, genreCatalog(db));
     return {
-        ...row,
-        defaultReadingMode: defaultReadingMode(row.library.type),
+        ...details,
+        ...classification,
+        defaultReadingMode: defaultReadingMode(
+            row.library.type,
+            classification.format ?? classification.defaultFormat,
+        ),
         volumes: items.map(({ file, comicInfo, ...volume }) => ({
             ...volume,
             // Gestion des métadonnées : seulement pour un admin.
@@ -239,6 +306,7 @@ export const getVolume = (db: Db, viewer: Viewer, id: number) => {
             libraryPath: libraries.path,
             libraryType: libraries.type,
             seriesReadingMode: series.readingMode,
+            seriesFormat: series.format,
         })
         .from(volumes)
         .innerJoin(series, eq(series.id, volumes.seriesId))
@@ -254,11 +322,18 @@ export const getVolume = (db: Db, viewer: Viewer, id: number) => {
         .all()
         .map((v) => v.id);
     const index = siblings.indexOf(row.id);
-    const { file, libraryPath, seriesReadingMode: _mode, ...volume } = row;
+    const {
+        file,
+        libraryPath,
+        seriesReadingMode: _mode,
+        seriesFormat: _format,
+        ...volume
+    } = row;
     return {
         ...volume,
         readingMode:
-            row.seriesReadingMode ?? defaultReadingMode(row.libraryType),
+            row.seriesReadingMode ??
+            defaultReadingMode(row.libraryType, row.seriesFormat),
         previousId: siblings[index - 1] ?? null,
         nextId: siblings[index + 1] ?? null,
         fullPath: path.join(libraryPath, ...file.split('/')),
@@ -316,12 +391,34 @@ export const setSeriesStatus = (
 export type ReadingMode = 'ltr' | 'ltr-manga' | 'rtl' | 'webtoon';
 
 /**
- * Mode de lecture par défaut : manga de gauche à droite (doubles pages
- * inversées) pour une bibliothèque de mangas, BD sinon.
+ * Mode de lecture par défaut : défilement pour un webtoon, manga de gauche
+ * à droite (doubles pages inversées) pour un manga, BD sinon. Sans format
+ * choisi, celui de la bibliothèque.
  */
 export const defaultReadingMode = (
     libraryType: 'manga' | 'comics',
-): ReadingMode => (libraryType === 'manga' ? 'ltr-manga' : 'ltr');
+    format?: Format | null,
+): ReadingMode => {
+    const effective = format ?? defaultFormat(libraryType);
+    if (effective === 'webtoon') return 'webtoon';
+    return effective === 'manga' ? 'ltr-manga' : 'ltr';
+};
+
+/** Format et public d'une série (null : par défaut, inconnu). */
+export const setSeriesClassification = (
+    db: Db,
+    id: number,
+    changes: { format?: Format | null; audience?: Audience | null },
+) => {
+    const updated = db
+        .update(series)
+        .set(changes)
+        .where(eq(series.id, id))
+        .returning({ format: series.format, audience: series.audience })
+        .get();
+    if (!updated) throw notFound('Série introuvable');
+    return updated;
+};
 
 /** Mode de lecture d'une série (null : celui de la bibliothèque). */
 export const setSeriesReadingMode = (

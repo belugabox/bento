@@ -1,0 +1,180 @@
+// Format, public, genres et thèmes d'une série, partagés avec le client
+// (sans dépendance).
+
+/** Format d'une série : son origine et sa forme. */
+export const FORMATS = [
+    'manga',
+    'manhwa',
+    'manhua',
+    'webtoon',
+    'bd',
+    'comics',
+] as const;
+
+export type Format = (typeof FORMATS)[number];
+
+export const FORMAT_LABELS: Record<Format, string> = {
+    manga: 'Manga',
+    manhwa: 'Manhwa',
+    manhua: 'Manhua',
+    webtoon: 'Webtoon',
+    bd: 'BD',
+    comics: 'Comics',
+};
+
+/** Public visé, au sens japonais (shonen : jeunes garçons…). */
+export const AUDIENCES = [
+    'kodomo',
+    'shonen',
+    'shojo',
+    'seinen',
+    'josei',
+] as const;
+
+export type Audience = (typeof AUDIENCES)[number];
+
+export const AUDIENCE_LABELS: Record<Audience, string> = {
+    kodomo: 'Jeunesse',
+    shonen: 'Shonen',
+    shojo: 'Shojo',
+    seinen: 'Seinen',
+    josei: 'Josei',
+};
+
+/** Format d'une série sans format choisi : celui de sa bibliothèque. */
+export const defaultFormat = (libraryType: 'manga' | 'comics'): Format =>
+    libraryType === 'manga' ? 'manga' : 'bd';
+
+/** Genre de la liste gérée par l'admin, avec les autres noms qu'il reconnaît. */
+export type GenreEntry = { name: string; aliases: string[] };
+
+/**
+ * Liste de départ : les genres de Manga-news, doublons fusionnés (humour
+ * avec comédie, suspense avec thriller…). Les alias rangent les genres de
+ * Wikipédia, de Manga-news et des anciens fichiers.
+ */
+export const DEFAULT_GENRES: GenreEntry[] = [
+    { name: 'Action', aliases: [] },
+    { name: 'Aventure', aliases: ['Adventure'] },
+    { name: 'Comédie', aliases: ['Humour', 'Parodie', 'Comedy'] },
+    { name: 'Drame', aliases: ['Emotion', 'Tragique', 'Tragédie', 'Drama'] },
+    { name: 'Fantastique', aliases: ['Surnaturel', 'Supernatural'] },
+    {
+        name: 'Fantasy',
+        aliases: ['Heroic fantasy', 'Dark fantasy', 'Fantasy épique'],
+    },
+    { name: 'Horreur', aliases: ['Horror', 'Gore', 'Épouvante'] },
+    {
+        name: 'Thriller',
+        aliases: ['Suspense', 'Techno-thriller', 'Thriller psychologique'],
+    },
+    { name: 'Policier', aliases: ['Polar', 'Enquête', 'Crime', 'Détective'] },
+    { name: 'Mystère', aliases: ['Mystery'] },
+    { name: 'Romance', aliases: ['Romantique', 'Romance'] },
+    {
+        name: 'Science-fiction',
+        aliases: ['SF', 'Sci-fi', 'Mecha', 'Cyberpunk', 'Space opera'],
+    },
+    { name: 'Sport', aliases: ['Sports'] },
+    { name: 'Tranche de vie', aliases: ['Slice of life'] },
+    { name: 'Historique', aliases: ['Histoire', 'Historical'] },
+    { name: 'Arts martiaux', aliases: ['Martial arts'] },
+    { name: 'Psychologique', aliases: ['Psychological', 'Philosophique'] },
+    { name: 'Gastronomie', aliases: ['Cuisine', 'Culinaire', 'Cooking'] },
+    { name: 'Musique', aliases: ['Music'] },
+    { name: 'École', aliases: ['School life', 'Scolaire', 'School'] },
+];
+
+/** Clé de comparaison : sans accents, casse ni ponctuation (« Shōnen » = « shonen »). */
+export const genreKey = (value: string) =>
+    value
+        .normalize('NFD')
+        .replace(/\p{M}/gu, '')
+        .toLowerCase()
+        .replace(/[^a-z0-9+]+/g, ' ')
+        .trim();
+
+/** Valeurs d'une liste ComicInfo (« Action, Drame ; Sport »). */
+export const splitList = (value: string | null | undefined) =>
+    (value ?? '')
+        .split(/[,;]/)
+        .map((item) => item.trim())
+        .filter(Boolean);
+
+// Mots de public dans les genres d'anciens fichiers.
+const AUDIENCE_WORDS: Record<string, Audience> = {
+    kodomo: 'kodomo',
+    shonen: 'shonen',
+    shounen: 'shonen',
+    shojo: 'shojo',
+    shoujo: 'shojo',
+    seinen: 'seinen',
+    josei: 'josei',
+};
+
+// Classifications d'âge rangées parmi les genres : la classification
+// (`AgeRating`) en tient lieu.
+const AGE_WORDS = [
+    'mature',
+    'adulte',
+    'adultes',
+    'adult',
+    'adults only',
+    'everyone',
+    'teen',
+    'tout public',
+];
+
+/** « Mature », « Mature 17+ », « 12+ »… */
+const isAge = (key: string) =>
+    /^\d+ ?\+$/.test(key) ||
+    AGE_WORDS.some((word) => key === word || key.startsWith(`${word} `));
+
+export type Classification = {
+    genres: string[];
+    themes: string[];
+    /** Public trouvé parmi les genres d'un ancien fichier. */
+    audience: Audience | null;
+};
+
+/**
+ * Range les genres et les thèmes (`Genre` et `Tags` du ComicInfo) d'après
+ * la liste gérée : un genre reconnu prend son nom de la liste, un mot de
+ * public est mis à part, un âge est retiré, le reste devient un thème.
+ */
+export const classify = (
+    genre: string | null | undefined,
+    tags: string | null | undefined,
+    catalog: GenreEntry[],
+): Classification => {
+    const names = new Map<string, string>();
+    for (const entry of catalog) {
+        for (const alias of entry.aliases)
+            names.set(genreKey(alias), entry.name);
+    }
+    // Le nom l'emporte sur l'alias d'un autre genre.
+    for (const entry of catalog) names.set(genreKey(entry.name), entry.name);
+
+    const genres: string[] = [];
+    const themes: string[] = [];
+    const seenThemes = new Set<string>();
+    let audience: Audience | null = null;
+    const place = (value: string, isTag: boolean) => {
+        const key = genreKey(value);
+        if (!key) return;
+        const name = names.get(key);
+        if (name) {
+            if (!genres.includes(name)) genres.push(name);
+        } else if (!isTag && AUDIENCE_WORDS[key]) {
+            audience ??= AUDIENCE_WORDS[key];
+        } else if (!isTag && isAge(key)) {
+            // Retiré : la classification en tient lieu.
+        } else if (!seenThemes.has(key)) {
+            seenThemes.add(key);
+            themes.push(value);
+        }
+    };
+    for (const value of splitList(genre)) place(value, false);
+    for (const value of splitList(tags)) place(value, true);
+    return { genres, themes, audience };
+};

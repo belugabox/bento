@@ -9,6 +9,7 @@ Serveur de lecture et de gestion de mangas et BD, qui remplace Kavita pour la fa
 - **Branche de travail : `feat/reading-foundation`** (poussée, pas encore de PR). Commit et push sur cette branche à la fin de chaque demande terminée et testée : c'est acquis. Ne pas fusionner dans `main`, ne pas ouvrir de PR sans qu'il le demande.
 - Le déploiement est reporté (« on déploiera plus tard »).
 - Il a refusé un nom de tri modifiable par série (« oublie »).
+- Classement décidé le 6 novembre 2026 : format, public, genres, thèmes. La liste des genres est gérée par l'admin (Réglages) ; format et public restent dans Bento (pas dans le ComicInfo, pas même dans `Genre` pour Kavita).
 - Favoris retirés le 6 novembre 2026 (« À lire » seul, en filtre de la barre « Séries »). Les collections restent telles quelles, mises de côté. Changer de fournisseur de connexion (TinyAuth, Authelia) : « oublie pour le moment ».
 
 ## Règles impératives
@@ -46,6 +47,7 @@ Serveur de lecture et de gestion de mangas et BD, qui remplace Kavita pour la fa
 - Les réglages de l'admin sont dans `settings.ts` (table `settings`, migration 0013) : compression (qualité 90, 2400 px par défaut) et intervalle du scan.
 - Les réglages d'un brouillon (statut, mode de lecture, couverture) sont dans la table `draft_statuses` (son nom d'origine est gardé) et sont appliqués à la publication. Quand une publication renomme une série, ses listes, ses collections et son mode de lecture la suivent.
 - **Cache des images** : la version d'un tome est la date de son fichier (`volumeVersion`, `cast(mtime_ms as integer)`). Avec `?v=` dans l'adresse, pages et couvertures sont servies `immutable` pour un an : toute réécriture du fichier doit changer sa date. Une couverture refaite sans toucher au fichier (nouvelle taille `COVER_SIZE`) garderait l'ancienne en cache : changer alors aussi le format de la version.
+- **Classement** : `classification.ts` (partagé avec le client) range les genres bruts des fichiers (`series.genre` et `series.tags`, du premier tome) d'après la table `genres` (migration 0014, avec sa liste de départ), à chaque lecture : renommer un genre ne réécrit aucun fichier.
 - Le tri des séries ignore les articles (`library/sortName.ts`). Un nom de fichier « Boxer (The) » donne « The Boxer ».
 
 ## Où on en est

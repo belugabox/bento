@@ -354,15 +354,22 @@ export class LibraryFiles {
             files,
             status: settings.get(folder)?.status ?? null,
             readingMode: settings.get(folder)?.readingMode ?? null,
+            format: settings.get(folder)?.format ?? null,
+            audience: settings.get(folder)?.audience ?? null,
             coverUpdatedAt: settings.get(folder)?.coverUpdatedAt ?? null,
         }));
     };
 
-    /** Statut ou mode de lecture de la future série d'un dossier de brouillons. */
+    /** Réglages de la future série d'un dossier de brouillons. */
     setDraftSettings = (
         libraryId: number,
         folder: string,
-        changes: Partial<Pick<DraftSettings, 'status' | 'readingMode'>>,
+        changes: Partial<
+            Pick<
+                DraftSettings,
+                'status' | 'readingMode' | 'format' | 'audience'
+            >
+        >,
     ) => {
         this.library(libraryId);
         return saveDraftSettings(this.db, libraryId, folder, changes);
@@ -466,6 +473,8 @@ export class LibraryFiles {
                     seriesId: series.id,
                     status: series.status,
                     readingMode: series.readingMode,
+                    format: series.format,
+                    audience: series.audience,
                 })
                 .from(volumes)
                 .innerJoin(series, eq(series.id, volumes.seriesId))
@@ -535,6 +544,9 @@ export class LibraryFiles {
                     ...(!draft?.status && old.status && { status: old.status }),
                     ...(!draft?.readingMode &&
                         old.readingMode && { readingMode: old.readingMode }),
+                    ...(!draft?.format && old.format && { format: old.format }),
+                    ...(!draft?.audience &&
+                        old.audience && { audience: old.audience }),
                 };
                 for (const [field, value] of Object.entries(carried)) {
                     this.db
@@ -576,6 +588,8 @@ export class LibraryFiles {
         // Un choix fait sur le brouillon l'emporte.
         if (draft.status) changes.status = draft.status;
         if (draft.readingMode) changes.readingMode = draft.readingMode;
+        if (draft.format) changes.format = draft.format;
+        if (draft.audience) changes.audience = draft.audience;
         if (draft.coverUpdatedAt) {
             const copied = await copyFile(
                 draftCoverFile(this.coversPath, libraryId, folder),

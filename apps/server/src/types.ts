@@ -8,6 +8,21 @@ export {
     COLOR_SCHEMES,
     type ColorScheme,
 } from './appearance';
+export {
+    AUDIENCE_LABELS,
+    AUDIENCES,
+    type Audience,
+    classify,
+    type Classification,
+    DEFAULT_GENRES,
+    defaultFormat,
+    type Format,
+    FORMAT_LABELS,
+    FORMATS,
+    type GenreEntry,
+    genreKey,
+    splitList,
+} from './classification';
 export { parseVolumeFileName } from './archive/fileName';
 export type { ComicInfo } from './archive/comicInfo';
 export { publicationPathOf } from './library/publication';

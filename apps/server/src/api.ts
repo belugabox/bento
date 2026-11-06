@@ -15,6 +15,7 @@ import {
     requireUser,
 } from './auth/routes';
 import { listUsers, setUserMaxAge } from './auth/users';
+import { AUDIENCES, FORMATS } from './classification';
 import type { Db } from './db';
 import {
     getSeries,
@@ -23,6 +24,7 @@ import {
     listSeries,
     savePageSizes,
     seriesCoverOf,
+    setSeriesClassification,
     setSeriesReadingMode,
     setSeriesStatus,
 } from './library/catalog';
@@ -34,6 +36,12 @@ import {
     seriesCoverFile,
 } from './library/covers';
 import type { LibraryFiles } from './library/files';
+import {
+    createGenre,
+    deleteGenre,
+    listGenres,
+    updateGenre,
+} from './library/genres';
 import {
     createCollection,
     deleteCollection,
@@ -92,6 +100,17 @@ const imageCache = (version?: string) =>
 const READING_MODES = ['ltr', 'ltr-manga', 'rtl', 'webtoon'] as const;
 
 const collectionBody = z.object({ name: z.string().trim().min(1).max(80) });
+
+// Format et public d'une série : null pour revenir à « par défaut ».
+const classificationBody = z.object({
+    format: z.enum(FORMATS).nullable().optional(),
+    audience: z.enum(AUDIENCES).nullable().optional(),
+});
+
+const genreBody = z.object({
+    name: z.string().trim().min(1).max(60),
+    aliases: z.array(z.string().trim().max(60)).max(50).default([]),
+});
 
 // Couverture choisie, et partie gardée de l'image recadrée en 2:3.
 const position = z.enum(['top', 'center', 'bottom']).optional();
@@ -270,6 +289,59 @@ export const createApi = ({
                         db,
                         c.req.valid('param').id,
                         c.req.valid('json').readingMode,
+                    ),
+                ),
+        )
+        .put(
+            '/series/:id/classification',
+            requireAdmin,
+            zValidator('param', idParam),
+            zValidator('json', classificationBody),
+            (c) =>
+                c.json(
+                    setSeriesClassification(
+                        db,
+                        c.req.valid('param').id,
+                        c.req.valid('json'),
+                    ),
+                ),
+        )
+        // Liste des genres : lue par tous (filtres), gérée par l'admin.
+        .get('/genres', (c) => c.json(listGenres(db)))
+        .post('/genres', requireAdmin, zValidator('json', genreBody), (c) =>
+            c.json(createGenre(db, c.req.valid('json'))),
+        )
+        .patch(
+            '/genres/:id',
+            requireAdmin,
+            zValidator('param', idParam),
+            zValidator('json', genreBody.partial()),
+            (c) =>
+                c.json(
+                    updateGenre(
+                        db,
+                        c.req.valid('param').id,
+                        c.req.valid('json'),
+                    ),
+                ),
+        )
+        .delete(
+            '/genres/:id',
+            requireAdmin,
+            zValidator('param', idParam),
+            // Genre dans lequel le fusionner.
+            zValidator(
+                'query',
+                z.object({
+                    into: z.coerce.number().int().positive().optional(),
+                }),
+            ),
+            (c) =>
+                c.json(
+                    deleteGenre(
+                        db,
+                        c.req.valid('param').id,
+                        c.req.valid('query').into,
                     ),
                 ),
         )
@@ -563,6 +635,24 @@ export const createApi = ({
                     { readingMode },
                 );
                 return c.json({ readingMode: saved.readingMode });
+            },
+        )
+        .put(
+            '/libraries/:id/drafts/classification',
+            requireAdmin,
+            zValidator('param', idParam),
+            zValidator(
+                'json',
+                classificationBody.extend({ folder: z.string().min(1) }),
+            ),
+            (c) => {
+                const { folder, ...changes } = c.req.valid('json');
+                const { format, audience } = files.setDraftSettings(
+                    c.req.valid('param').id,
+                    folder,
+                    changes,
+                );
+                return c.json({ format, audience });
             },
         )
         .get(
