@@ -118,6 +118,31 @@ describe('MangaNews', () => {
         });
     });
 
+    it('tells a rate limit or an outage apart from an anti-bot check', async () => {
+        await expect(
+            new MangaNews(fakeFetch(429, '')).search('spy'),
+        ).rejects.toMatchObject({
+            status: 502,
+            message: expect.stringMatching(/limite les requêtes/),
+        });
+        await expect(
+            new MangaNews(fakeFetch(503, 'maintenance')).search('spy'),
+        ).rejects.toMatchObject({
+            message: 'Manga-news indisponible (503) : réessaie dans un instant',
+        });
+        // Contrôle signalé par l'en-tête de Cloudflare.
+        const challenged = new MangaNews(
+            (async () =>
+                new Response('', {
+                    status: 403,
+                    headers: { 'cf-mitigated': 'challenge' },
+                })) as unknown as typeof fetch,
+        );
+        await expect(challenged.search('spy')).rejects.toMatchObject({
+            message: expect.stringMatching(/anti-robot, 403/),
+        });
+    });
+
     it('reads a normal page, with the script Cloudflare adds to all', async () => {
         const site = new MangaNews(
             fakeFetch(
