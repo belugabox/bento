@@ -140,6 +140,41 @@ describe('updateComicInfo without copying the archive', () => {
         ).toBe(50_000);
     });
 
+    it('saves simultaneous changes one after the other', async () => {
+        const file = path.join(dir, 'T01.cbz');
+        const zip = new AdmZip();
+        zip.addFile('page001.jpg', Buffer.alloc(50_000, 1));
+        await writeFile(file, zip.toBuffer());
+
+        await Promise.all([
+            updateComicInfo(file, { Series: 'Gantz' }),
+            updateComicInfo(file, { Number: '1' }),
+            updateComicInfo(file, { Year: 2000 }),
+        ]);
+
+        expect(await comicInfoOf(file)).toEqual({
+            Series: 'Gantz',
+            Number: '1',
+            Year: 2000,
+        });
+        expect(pages(file)).toHaveLength(1);
+    });
+
+    it('keeps the comment of the archive', async () => {
+        const file = path.join(dir, 'T01.cbz');
+        const zip = new AdmZip();
+        zip.addFile('page001.jpg', Buffer.alloc(1000, 1));
+        zip.addZipComment('Scan maison');
+        await writeFile(file, zip.toBuffer());
+
+        await updateComicInfo(file, { Series: 'Gantz' });
+
+        expect(new AdmZip(await readFile(file)).getZipComment()).toBe(
+            'Scan maison',
+        );
+        expect((await comicInfoOf(file)).Series).toBe('Gantz');
+    });
+
     it('still rewrites a damaged archive, repairing it', async () => {
         const file = path.join(dir, 'T14.cbz');
         await writeFile(file, DAMAGED_ZIP);

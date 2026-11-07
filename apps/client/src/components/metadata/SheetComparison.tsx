@@ -77,8 +77,10 @@ export const SheetComparison = ({
     footer?: ReactNode;
     onApply: (values: SheetValues) => void;
 }) => {
-    // Listes encore en chargement : recréées à chaque rendu par l'éditeur,
-    // elles comptent par leur taille (et l'ordre des sites par son texte).
+    // Listes recréées à chaque rendu par l'éditeur : elles comptent par leur
+    // contenu (de même pour l'ordre des sites).
+    const catalogKey = JSON.stringify(catalog);
+    const formatsKey = JSON.stringify(formats);
     const sheets = useMemo(
         () =>
             [...(found ?? [])]
@@ -91,7 +93,7 @@ export const SheetComparison = ({
                     values: sheetValues(f.sheet, catalog, formats, known),
                 })),
         // eslint-disable-next-line react-hooks/exhaustive-deps
-        [found, catalog.length, formats.length, known, order.join()],
+        [found, catalogKey, formatsKey, known, order.join()],
     );
     // Lignes calculées à l'arrivée des fiches, et refaites si genres, formats,
     // noms connus ou priorités arrivent après : les choix déjà faits restent.

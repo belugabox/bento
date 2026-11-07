@@ -2,6 +2,7 @@ import AdmZip from 'adm-zip';
 import { readFile, writeFile } from 'node:fs/promises';
 
 import { type ComicInfo, readComicInfo } from './comicInfo';
+import { withFileLock } from './fileLock';
 import {
     UnsupportedZipError,
     appendEntry,
@@ -109,8 +110,10 @@ export const writeZipFile = async (zip: AdmZip, fullPath: string) => {
 };
 
 /** Réécrit une archive touchée par la perte des descripteurs. */
-export const repairDescriptorFlags = async (fullPath: string) =>
-    writeZipFile(new AdmZip(await readFile(fullPath)), fullPath);
+export const repairDescriptorFlags = (fullPath: string) =>
+    withFileLock(fullPath, async () =>
+        writeZipFile(new AdmZip(await readFile(fullPath)), fullPath),
+    );
 
 /** ComicInfo modifié : un champ `null` ou vide est retiré. */
 const mergeChanges = (
@@ -135,8 +138,15 @@ const mergeChanges = (
  * Le nouveau ComicInfo est ajouté en fin d'archive (`appendEntry`), sans
  * recopier les pages : quelques millisecondes, même pour un tome de 1 Go.
  * Une archive Zip64 ou abîmée passe par AdmZip, qui la réécrit en entier.
+ * Les écritures d'un même fichier passent l'une après l'autre.
  */
-export const updateComicInfo = async (
+export const updateComicInfo = (
+    fullPath: string,
+    changes: { [K in keyof ComicInfo]?: ComicInfo[K] | null },
+): Promise<ComicInfo> =>
+    withFileLock(fullPath, () => writeComicInfo(fullPath, changes));
+
+const writeComicInfo = async (
     fullPath: string,
     changes: { [K in keyof ComicInfo]?: ComicInfo[K] | null },
 ): Promise<ComicInfo> => {

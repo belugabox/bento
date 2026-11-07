@@ -3,6 +3,7 @@ import { stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
 import { openArchive, pageEntries, readArchive } from './archive';
+import { withFileLock } from './fileLock';
 import { readImage } from './image';
 import { clearDescriptorFlags } from './write';
 
@@ -92,9 +93,16 @@ export const estimateCompression = async (
 
 /**
  * Recompresse les pages d'un tome. Le fichier n'est réécrit que s'il y
- * gagne ; le ComicInfo et les autres fichiers sont gardés.
+ * gagne ; le ComicInfo et les autres fichiers sont gardés. Un enregistrement
+ * du ComicInfo pendant ce temps attend la fin (il serait effacé).
  */
-export const compressArchive = async (
+export const compressArchive = (
+    fullPath: string,
+    options: CompressionOptions,
+): Promise<CompressionResult> =>
+    withFileLock(fullPath, () => compressPages(fullPath, options));
+
+const compressPages = async (
     fullPath: string,
     options: CompressionOptions,
 ): Promise<CompressionResult> => {

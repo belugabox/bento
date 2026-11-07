@@ -99,6 +99,7 @@ import {
     isSeriesFieldChanged,
     joinSeries,
     revertSeriesField,
+    searchNameOf,
     seriesValue,
     setSeriesField,
     setVolumeField,
@@ -1364,7 +1365,7 @@ export const MetadataEditor = ({
                 onClose={finder.close}
                 kind={kind}
                 autoSearch={autoFill}
-                initialQuery={String(series('Series'))}
+                initialQuery={searchNameOf(String(series('Series')), readable)}
                 onCompare={setComparing}
                 footer={
                     <Group justify="flex-end">

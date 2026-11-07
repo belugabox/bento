@@ -313,7 +313,14 @@ export const appendEntry = async (
         central.writeUInt16LE(nameBytes.length, 28);
         central.writeUInt32LE(fileSize, 42);
         const newDirectory = Buffer.concat([...kept, central, nameBytes]);
-        const endRecord = Buffer.alloc(END_SIZE);
+        // Le commentaire de l'archive est gardé.
+        const comment = tail.subarray(
+            end + END_SIZE,
+            end + END_SIZE + tail.readUInt16LE(end + 20),
+        );
+        const endRecord = Buffer.alloc(END_SIZE + comment.length);
+        comment.copy(endRecord, END_SIZE);
+        endRecord.writeUInt16LE(comment.length, 20);
         endRecord.writeUInt32LE(END_OF_CENTRAL_DIRECTORY, 0);
         endRecord.writeUInt16LE(entryCount, 8);
         endRecord.writeUInt16LE(entryCount, 10);
