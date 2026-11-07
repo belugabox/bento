@@ -4,6 +4,7 @@ import {
     Anchor,
     Avatar,
     Button,
+    CloseButton,
     Group,
     Image,
     Indicator,
@@ -15,6 +16,7 @@ import {
     Select,
     Stack,
     Text,
+    TextInput,
     Title,
     Tooltip,
     UnstyledButton,
@@ -27,12 +29,13 @@ import {
     IconInbox,
     IconLogout,
     IconPalette,
+    IconSearch,
     IconSettings,
     IconTags,
     IconUsers,
 } from '@tabler/icons-react';
 import { useEffect, useState } from 'react';
-import { Link, useLocation } from 'react-router';
+import { Link, useLocation, useNavigate } from 'react-router';
 
 import logo from '@/assets/logo.svg';
 import { AppearanceModal } from '@/components/AppearanceModal';
@@ -373,15 +376,67 @@ const UserMenu = () => {
     );
 };
 
-/** En-tête : logo, tâches et brouillons (admin), menu du compte. */
+/**
+ * Recherche de séries (nom, genre, auteur), depuis n'importe quelle page :
+ * elle s'affiche sur l'accueil, dans l'adresse (`?q=`).
+ */
+const HeaderSearch = () => {
+    const location = useLocation();
+    const navigate = useNavigate();
+    const onHome = location.pathname === '/';
+    const query = onHome
+        ? (new URLSearchParams(location.search).get('q') ?? '')
+        : '';
+    const [value, setValue] = useState(query);
+    // Retour arrière, ou page quittée : le champ suit l'adresse.
+    useEffect(() => setValue(query), [query]);
+
+    const change = (text: string) => {
+        setValue(text);
+        const params = new URLSearchParams(onHome ? location.search : '');
+        if (text) params.set('q', text);
+        else params.delete('q');
+        const search = params.toString();
+        // Une seule entrée d'historique pour toute la saisie.
+        navigate(
+            { pathname: '/', search: search && `?${search}` },
+            { replace: onHome },
+        );
+    };
+
+    return (
+        <TextInput
+            style={{ flex: 1, maxWidth: 360 }}
+            size="sm"
+            radius="xl"
+            placeholder="Série, genre, auteur…"
+            aria-label="Rechercher une série"
+            leftSection={<IconSearch size={16} />}
+            rightSection={
+                value && (
+                    <CloseButton
+                        size="sm"
+                        aria-label="Effacer la recherche"
+                        onClick={() => change('')}
+                    />
+                )
+            }
+            value={value}
+            onChange={(event) => change(event.currentTarget.value)}
+        />
+    );
+};
+
+/** En-tête : logo, recherche, tâches et brouillons (admin), compte. */
 export const AppHeader = () => {
     const user = useCurrentUser();
     return (
-        <Group h="100%" justify="space-between">
+        <Group h="100%" justify="space-between" gap="sm" wrap="nowrap">
             <Anchor component={Link} to="/" underline="never" c="inherit">
                 <Group gap={10} wrap="nowrap">
                     <Image src={logo} alt="" w={30} h={30} />
                     <Title
+                        visibleFrom="xs"
                         order={1}
                         fz={22}
                         fw={800}
@@ -392,7 +447,8 @@ export const AppHeader = () => {
                     </Title>
                 </Group>
             </Anchor>
-            <Group gap="sm">
+            <HeaderSearch />
+            <Group gap="sm" wrap="nowrap">
                 {user.role === 'admin' && <TasksIndicator />}
                 {user.role === 'admin' && <DraftsIndicator />}
                 <UserMenu />

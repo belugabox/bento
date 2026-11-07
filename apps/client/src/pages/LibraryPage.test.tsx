@@ -24,6 +24,8 @@ const SERIES = [
     coverUpdatedAt: null,
     coverVolumeId: index + 10,
     toRead: index === 1,
+    format: index === 0 ? 'BD' : 'Manga',
+    genres: index === 2 ? ['Sport'] : ['Action'],
     ...s,
 }));
 
@@ -87,6 +89,12 @@ afterEach(() => {
     vi.restoreAllMocks();
 });
 
+/** Choisit un état de lecture dans son menu. */
+const readingFilter = async (label: string) => {
+    fireEvent.click(screen.getByRole('button', { name: 'État de lecture' }));
+    fireEvent.click(await screen.findByRole('menuitem', { name: label }));
+};
+
 const show = () =>
     render(
         <MantineProvider>
@@ -125,11 +133,11 @@ describe('LibraryPage', () => {
         await screen.findByTestId('series-grid');
         await vi.waitFor(() => expect(titles()).toHaveLength(3));
 
-        fireEvent.click(screen.getByText('En cours'));
-        expect(titles()).toEqual(['/series/3']);
+        await readingFilter('En cours');
+        await vi.waitFor(() => expect(titles()).toEqual(['/series/3']));
         expect(location).toBe('?filter=started');
 
-        fireEvent.click(screen.getByText('Toutes'));
+        await readingFilter('Toutes');
         fireEvent.click(
             screen.getByRole('button', { name: 'Trier les séries' }),
         );
@@ -160,11 +168,52 @@ describe('LibraryPage', () => {
         await screen.findByTestId('series-grid');
         await vi.waitFor(() => expect(titles()).toHaveLength(3));
 
-        fireEvent.click(screen.getByText('À lire'));
-        expect(titles()).toEqual(['/series/2']);
+        await readingFilter('À lire');
+        await vi.waitFor(() => expect(titles()).toEqual(['/series/2']));
         expect(location).toBe('?filter=toread');
-        fireEvent.click(screen.getByText('Toutes'));
-        expect(titles()).toHaveLength(3);
+        await readingFilter('Toutes');
+        await vi.waitFor(() => expect(titles()).toHaveLength(3));
         expect(location).toBe('');
+    });
+
+    it('filters by format and genre with chips, the most frequent genre first', async () => {
+        show();
+        await screen.findByTestId('series-grid');
+        await vi.waitFor(() => expect(titles()).toHaveLength(3));
+
+        const genres = within(screen.getByLabelText('Genres'))
+            .getAllByRole('button')
+            .map((button) => button.textContent);
+        expect(genres).toEqual(['Action', 'Sport']);
+
+        fireEvent.click(screen.getByRole('button', { name: 'Manga' }));
+        await vi.waitFor(() =>
+            expect(titles()).toEqual(['/series/2', '/series/3']),
+        );
+        fireEvent.click(screen.getByRole('button', { name: 'Sport' }));
+        await vi.waitFor(() => expect(titles()).toEqual(['/series/3']));
+        expect(location).toBe('?format=Manga&genre=Sport');
+        // Un second clic retire le filtre.
+        fireEvent.click(screen.getByRole('button', { name: 'Sport' }));
+        await vi.waitFor(() => expect(location).toBe('?format=Manga'));
+    });
+
+    it('keeps the release status in the sort menu', async () => {
+        show();
+        await screen.findByTestId('series-grid');
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Trier les séries' }),
+        );
+        fireEvent.click(
+            await screen.findByRole('menuitem', { name: 'Terminées' }),
+        );
+        await vi.waitFor(() => expect(location).toBe('?status=completed'));
+        expect(
+            await screen.findByText('Aucune série dans ce filtre.'),
+        ).toBeTruthy();
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Effacer les filtres' }),
+        );
+        await vi.waitFor(() => expect(titles()).toHaveLength(3));
     });
 });

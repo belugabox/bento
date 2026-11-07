@@ -132,7 +132,7 @@ export const seriesAgeSql = sql<
 
 /**
  * Séries, filtrées par bibliothèque et par texte (nom, genres et thèmes,
- * sans tenir compte de la casse).
+ * auteurs, sans tenir compte de la casse).
  */
 export const listSeries = (
     db: Db,
@@ -171,6 +171,12 @@ export const listSeries = (
             // Tomes ouverts (lus ou en cours) : série commencée.
             startedCount: sql<number>`(select count(*) from read_progress rp join volumes v on v.id = rp.volume_id where v.series_id = series.id and rp.user_id = ${viewer.id})`,
             ...listsOf(viewer),
+            // Auteurs des tomes (scénario, dessin), seulement pour chercher.
+            authors: text
+                ? sql<
+                      string | null
+                  >`(select group_concat(coalesce(json_extract(v.comic_info, '$.Writer'), '') || ',' || coalesce(json_extract(v.comic_info, '$.Penciller'), ''), ',') from volumes v where v.series_id = series.id)`
+                : sql<string | null>`null`,
         })
         .from(series)
         .innerJoin(libraries, eq(libraries.id, series.libraryId))
@@ -197,11 +203,15 @@ export const listSeries = (
         .filter(
             (row) =>
                 !text ||
-                [row.name, row.rawGenres, ...row.genres, ...row.themes].some(
-                    (value) => genreKey(value).includes(text),
-                ),
+                [
+                    row.name,
+                    row.rawGenres,
+                    row.authors ?? '',
+                    ...row.genres,
+                    ...row.themes,
+                ].some((value) => genreKey(value).includes(text)),
         )
-        .map(({ rawGenres: _raw, ...row }) => row);
+        .map(({ rawGenres: _raw, authors: _authors, ...row }) => row);
 };
 
 export const getSeries = (db: Db, viewer: Viewer, id: number) => {

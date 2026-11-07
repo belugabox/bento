@@ -81,8 +81,9 @@ L'admin fixe le mode de chaque série dans « Modifier les métadonnées » (par
   - sur une série : lire, reprendre ou relire ; marquer comme lue, lue jusqu'à un tome, ou non lue (après confirmation) ; ajouter à « À lire » ou l'en retirer ; modifier la série (admin) ;
   - sur un tome de « Reprendre la lecture » : le marquer comme lu, le retirer de « Reprendre » (progression effacée), voir la série.
   - Chaque action affiche un message avec « Annuler » pendant quelques secondes : la progression revient exactement comme avant, ordre de « Reprendre » compris.
-- **Filtres** : état de lecture (toutes, à lire, non lues, en cours, lues) ; le bouton « Filtres » pour le format, le genre et le statut de parution, affichés ensuite en pastilles qu'on retire d'un clic ; et le tri par nom ou par ajouts récents. Tout reste dans l'adresse.
-- **« À lire »** : le marque-page de la fiche série, propre à chacun ; « À lire » dans la barre « Séries » n'affiche que ces séries. (Les favoris ont été retirés.)
+- **Recherche** : dans l'en-tête, depuis n'importe quelle page ; elle trouve les séries par nom, genre, thème ou auteur (scénario, dessin), sans casse ni accents, et s'affiche sur l'accueil.
+- **Filtres** : une barre qui reste en haut pendant le défilement. Le menu « Lecture » (toutes, à lire, non lues, en cours, lues), le menu de tri (nom, ajouts récents) qui contient aussi le statut de parution, puis des pastilles : les formats sur la même ligne, les genres en dessous (les plus fréquents d'abord, les autres dans « Plus »). Un clic choisit une pastille, un second la retire. Tout reste dans l'adresse.
+- **« À lire »** : le marque-page de la fiche série, propre à chacun ; « À lire » dans le menu « Lecture » n'affiche que ces séries. (Les favoris ont été retirés.)
 - La liste « à lire » suit une série renommée à la publication. (Les collections partagées ont été retirées.)
 
 ### Réglages (admin)

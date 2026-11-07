@@ -35,7 +35,7 @@ export const SERIES_SORTS: { value: SeriesSort; label: string }[] = [
 ];
 
 export const STATUS_FILTERS: { value: StatusFilter; label: string }[] = [
-    { value: 'all', label: 'Tous les statuts' },
+    { value: 'all', label: 'Toutes' },
     { value: 'ongoing', label: 'En cours de parution' },
     { value: 'completed', label: 'Terminées' },
 ];
@@ -53,11 +53,16 @@ export const readingStateOf = (
 /** Valeurs présentes dans la liste (genres, formats…), une seule fois. */
 const present = <V>(values: V[]) => [...new Set(values)];
 
-/** Genres présents dans la liste, par ordre alphabétique. */
-export const allGenres = (series: Pick<ListedSeries, 'genres'>[]) =>
-    present(series.flatMap((s) => s.genres ?? [])).sort((a, b) =>
-        a.localeCompare(b, 'fr'),
+/** Genres présents dans la liste, les plus fréquents d'abord. */
+export const genresByCount = (series: Pick<ListedSeries, 'genres'>[]) => {
+    const counts = new Map<string, number>();
+    for (const genre of series.flatMap((s) => s.genres ?? [])) {
+        counts.set(genre, (counts.get(genre) ?? 0) + 1);
+    }
+    return [...counts.keys()].sort(
+        (a, b) => counts.get(b)! - counts.get(a)! || a.localeCompare(b, 'fr'),
     );
+};
 
 /** Formats présents dans la liste. */
 export const allFormats = (series: Pick<ListedSeries, 'format'>[]) =>

@@ -3,8 +3,8 @@ import { describe, expect, it } from 'vitest';
 import {
     type ListedSeries,
     allFormats,
-    allGenres,
     filterSeries,
+    genresByCount,
     readingStateOf,
 } from './seriesFilters';
 
@@ -110,8 +110,8 @@ describe('list, format, genre and status filters', () => {
         expect(kept({ status: 'completed' })).toEqual(['Akira']);
     });
 
-    it('lists the genres once each', () => {
-        expect(allGenres(items)).toEqual([
+    it('lists the genres once each, the most frequent first', () => {
+        expect(genresByCount(items)).toEqual([
             'Action',
             'Fantasy',
             'Science-fiction',
