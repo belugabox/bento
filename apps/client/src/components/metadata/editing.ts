@@ -185,6 +185,28 @@ export const fillFromFileNames = (
     return next;
 };
 
+/**
+ * Nom à chercher en ligne : la série saisie, sinon celle lue dans un nom de
+ * fichier, sinon le nom du dossier (hors dossier des brouillons).
+ */
+export const searchNameOf = (
+    series: string,
+    volumes: Pick<EditableVolume, 'name' | 'path'>[],
+): string => {
+    if (series.trim()) return series.trim();
+    for (const volume of volumes) {
+        const parsed = parseVolumeFileName(
+            volume.name.replace(/\.cb[zr]$/i, ''),
+        );
+        if (parsed.series?.trim()) return parsed.series.trim();
+    }
+    for (const volume of volumes) {
+        const folder = volume.path.split('/').slice(0, -1).pop();
+        if (folder && folder !== '_draft') return folder;
+    }
+    return '';
+};
+
 /** Fiche Wikipédia, telle que renvoyée par le serveur. */
 export type WikipediaSeries = {
     title: string;

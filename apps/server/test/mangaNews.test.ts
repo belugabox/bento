@@ -109,18 +109,49 @@ describe('ratingForAge', () => {
 
 describe('MangaNews', () => {
     it('gives up on an anti-bot check, without working around it', async () => {
+        let calls = 0;
         const site = new MangaNews(
-            fakeFetch(403, '<title>Just a moment...</title>'),
+            fakeSite(() => {
+                calls++;
+                return new Response('<title>Just a moment...</title>', {
+                    status: 403,
+                });
+            }),
+            { retryDelayMs: 0 },
         );
         await expect(site.search('spy')).rejects.toMatchObject({
             status: 502,
             message: expect.stringMatching(/anti-robot/),
         });
+        // Une seule nouvelle tentative, la même requête.
+        expect(calls).toBe(2);
+    });
+
+    it('tries once more after a one-off refusal, then keeps the page', async () => {
+        let calls = 0;
+        const site = new MangaNews(
+            fakeSite(() => {
+                calls++;
+                return calls === 1
+                    ? new Response('', {
+                          status: 403,
+                          headers: { 'cf-mitigated': 'challenge' },
+                      })
+                    : new Response(page('spy-x-family.html'));
+            }),
+            { retryDelayMs: 0 },
+        );
+        expect((await site.series('Spy-X-Family')).title).toBe('Spy X Family');
+        // Relue ensuite (« Mettre à jour ») : gardée, pas redemandée.
+        expect((await site.series('Spy-X-Family')).title).toBe('Spy X Family');
+        expect(calls).toBe(2);
     });
 
     it('tells a rate limit or an outage apart from an anti-bot check', async () => {
         await expect(
-            new MangaNews(fakeFetch(429, '')).search('spy'),
+            new MangaNews(fakeFetch(429, ''), { retryDelayMs: 0 }).search(
+                'spy',
+            ),
         ).rejects.toMatchObject({
             status: 502,
             message: expect.stringMatching(/limite les requêtes/),
@@ -137,6 +168,7 @@ describe('MangaNews', () => {
                     status: 403,
                     headers: { 'cf-mitigated': 'challenge' },
                 })) as unknown as typeof fetch,
+            { retryDelayMs: 0 },
         );
         await expect(challenged.search('spy')).rejects.toMatchObject({
             message: expect.stringMatching(/anti-robot, 403/),

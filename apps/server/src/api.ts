@@ -117,7 +117,14 @@ const sourceLink = z
 const classificationBody = z.object({
     formatId: z.number().int().positive().nullable().optional(),
     age: z.number().int().min(0).max(99).nullable().optional(),
-    sources: z.array(sourceLink).max(METADATA_SOURCES.length).optional(),
+    sources: z
+        .array(sourceLink)
+        .max(METADATA_SOURCES.length)
+        .refine(
+            (links) => new Set(links.map((l) => l.site)).size === links.length,
+            'Une seule fiche par site',
+        )
+        .optional(),
 });
 
 const formatBody = z.object({

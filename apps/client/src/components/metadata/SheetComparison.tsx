@@ -8,7 +8,7 @@ import {
     Table,
     Text,
 } from '@mantine/core';
-import { type ReactNode, useEffect, useMemo, useState } from 'react';
+import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 
 import {
     type GenreEntry,
@@ -77,6 +77,10 @@ export const SheetComparison = ({
     footer?: ReactNode;
     onApply: (values: SheetValues) => void;
 }) => {
+    // Listes recréées à chaque rendu par l'éditeur : elles comptent par leur
+    // contenu (de même pour l'ordre des sites).
+    const catalogKey = JSON.stringify(catalog);
+    const formatsKey = JSON.stringify(formats);
     const sheets = useMemo(
         () =>
             [...(found ?? [])]
@@ -88,25 +92,40 @@ export const SheetComparison = ({
                     site: f.source,
                     values: sheetValues(f.sheet, catalog, formats, known),
                 })),
-        [found, catalog, formats, known, order],
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        [found, catalogKey, formatsKey, known, order.join()],
     );
-    // Lignes calculées à l'ouverture : la saisie derrière ne bouge pas.
+    // Lignes calculées à l'arrivée des fiches, et refaites si genres, formats,
+    // noms connus ou priorités arrivent après : les choix déjà faits restent.
     const [rows, setRows] = useState<ReturnType<typeof comparisonRows>>([]);
     const [choices, setChoices] = useState<
         Partial<Record<SheetField, SheetChoice>>
     >({});
+    const shown = useRef<FoundSeries[]>(undefined);
     useEffect(() => {
         if (!found) return;
+        const fresh = shown.current !== found;
+        shown.current = found;
         const next = comparisonRows(current, sheets);
         setRows(next);
-        setChoices(
+        setChoices((previous) =>
             Object.fromEntries(
-                next.map((row) => [row.field, defaultChoice(row, priority)]),
+                next.map((row) => {
+                    const kept = fresh ? undefined : previous[row.field];
+                    const usable =
+                        kept === 'current' ||
+                        (kept !== undefined && !!row.found[kept]);
+                    return [
+                        row.field,
+                        usable ? kept : defaultChoice(row, priority),
+                    ];
+                }),
             ),
         );
-        // Seule l'arrivée de nouvelles fiches compte.
+        // La saisie derrière la fenêtre ne bouge pas : `current` n'est lu
+        // qu'avec de nouvelles fiches ou des listes complétées.
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [found]);
+    }, [sheets, priority]);
 
     const chooseColumn = (choice: SheetChoice) =>
         setChoices(

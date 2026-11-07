@@ -16,6 +16,7 @@ import {
     isMixed,
     isSeriesFieldChanged,
     joinSeries,
+    searchNameOf,
     seriesValue,
     setSeriesField,
     setVolumeKind,
@@ -83,6 +84,19 @@ describe('joinSeries', () => {
         });
         // Le numéro de chaque tome ne change pas.
         expect(edits[first]?.Number).toBe('1');
+    });
+});
+
+describe('searchNameOf', () => {
+    it('uses the series, else a file name, else the folder', () => {
+        expect(searchNameOf(' Gantz ', volumes)).toBe('Gantz');
+        expect(searchNameOf('', volumes)).toBe('Spy x Family');
+        const numbered = [
+            { path: '_draft/Dr Stone/01.cbz', name: '01.cbz' },
+            { path: '_draft/02.cbz', name: '02.cbz' },
+        ];
+        expect(searchNameOf('', numbered)).toBe('Dr Stone');
+        expect(searchNameOf('', numbered.slice(1))).toBe('');
     });
 });
 

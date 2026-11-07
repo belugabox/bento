@@ -37,6 +37,7 @@ import { ageLabel, seriesAgeOf } from '@/components/ageLimits';
 import { completenessOf } from '@/components/completeness';
 import { formatSize } from '@/components/format';
 import {
+    countedVolumes,
     nextToRead,
     progressRatio,
     volumeCountLabel,
@@ -80,9 +81,11 @@ export const SeriesPage = () => {
 
     const first = series.volumes[0];
     const next = nextToRead(series.volumes);
-    const readCount = series.volumes.filter(
+    // « N lus » : comme sur la carte, sans hors-séries ni spéciaux.
+    const readCount = countedVolumes(series.volumes).filter(
         (v) => v.progress?.completed,
     ).length;
+    const allRead = series.volumes.every((v) => v.progress?.completed);
     // Titre de chaque tome sous son numéro, si l'un d'eux en a un.
     const withTitles = series.volumes.some((v) => volumeTitleOf(v));
     const age = seriesAgeOf(series);
@@ -298,9 +301,7 @@ export const SeriesPage = () => {
                             <Menu.Dropdown>
                                 <Menu.Item
                                     leftSection={<IconChecks size={14} />}
-                                    disabled={
-                                        readCount === series.volumes.length
-                                    }
+                                    disabled={allRead}
                                     onClick={() => void markAll(true)}
                                 >
                                     Marquer toute la série comme lue

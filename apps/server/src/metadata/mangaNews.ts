@@ -12,6 +12,11 @@ const BASE_URL = 'https://www.manga-news.com/index.php';
 const USER_AGENT = 'bento/1.0 (https://github.com/belugabox/bento)';
 const TIMEOUT_MS = 15_000;
 const MAX_RESULTS = 15;
+// Nouvel essai après un refus ponctuel, une seule fois.
+const RETRY_DELAY_MS = 2_000;
+// Pages lues gardées 10 minutes, 50 au plus.
+const CACHE_MS = 10 * 60_000;
+const MAX_CACHED = 50;
 
 export type MangaNewsResult = {
     /** Fin de l'adresse de la fiche (`/serie/<id>`). */
@@ -212,10 +217,24 @@ export const parseSearchPage = (html: string): MangaNewsResult[] => {
     return results.slice(0, MAX_RESULTS);
 };
 
-export class MangaNews {
-    constructor(private readonly fetchFn: typeof fetch = fetch) {}
+/** Réponse lue, avant d'être jugée (`MangaNews.get`). */
+type Page = { status: number; challenged: boolean; html: string };
 
-    private get = async (url: string) => {
+export class MangaNews {
+    // Pages déjà lues, gardées un moment : la recherche, puis la fiche
+    // ouverte, puis « Mettre à jour » ne redemandent pas la même page.
+    private cache = new Map<string, { html: string; until: number }>();
+
+    constructor(
+        private readonly fetchFn: typeof fetch = fetch,
+        private readonly options: {
+            /** Pause avant le nouvel essai, après un refus ponctuel. */
+            retryDelayMs?: number;
+            cacheMs?: number;
+        } = {},
+    ) {}
+
+    private fetchPage = async (url: string): Promise<Page> => {
         let response: Response;
         try {
             response = await this.fetchFn(url, {
@@ -231,30 +250,68 @@ export class MangaNews {
             throw badGateway(`Manga-news injoignable : ${reason}`);
         }
         const html = decodePage(await response.arrayBuffer());
-        // Contrôle anti-robot : jamais contourné. Cloudflare le signale par
-        // `cf-mitigated: challenge` ou une page « Just a moment » (le script
-        // « challenge-platform » de toutes les pages ne compte pas). Il peut
-        // être ponctuel : un nouvel essai passe parfois.
-        if (
-            response.headers.get('cf-mitigated') === 'challenge' ||
-            /<title>\s*(Just a moment|Attention Required)/i.test(html)
-        ) {
+        return {
+            status: response.status,
+            // Contrôle anti-robot : Cloudflare le signale par
+            // `cf-mitigated: challenge` ou une page « Just a moment » (le
+            // script « challenge-platform » de toutes les pages ne compte pas).
+            challenged:
+                response.headers.get('cf-mitigated') === 'challenge' ||
+                /<title>\s*(Just a moment|Attention Required)/i.test(html),
+            html,
+        };
+    };
+
+    private get = async (url: string) => {
+        const cached = this.cache.get(url);
+        if (cached && cached.until > Date.now()) return cached.html;
+
+        let page = await this.fetchPage(url);
+        // Refus ponctuel (contrôle anti-robot, trop de requêtes) : la même
+        // requête, refaite une seule fois après une pause, passe souvent.
+        // Le contrôle n'est jamais contourné (ni résolu, ni déguisé).
+        if (page.challenged || page.status === 429) {
+            await new Promise((resolve) =>
+                setTimeout(
+                    resolve,
+                    this.options.retryDelayMs ?? RETRY_DELAY_MS,
+                ),
+            );
+            page = await this.fetchPage(url);
+        }
+        if (page.challenged) {
             throw badGateway(
-                `Manga-news refuse la requête (protection anti-robot, ${response.status}) : réessaie plus tard ou utilise Wikipédia`,
+                `Manga-news refuse la requête (protection anti-robot, ${page.status}) : réessaie plus tard ou utilise Wikipédia`,
             );
         }
-        if (response.status === 429) {
+        if (page.status === 429) {
             throw badGateway(
                 'Manga-news limite les requêtes : réessaie dans quelques secondes',
             );
         }
-        if (response.status === 404) return undefined;
-        if (!response.ok) {
+        if (page.status === 404) return undefined;
+        if (page.status < 200 || page.status >= 300) {
             throw badGateway(
-                `Manga-news indisponible (${response.status}) : réessaie dans un instant`,
+                `Manga-news indisponible (${page.status}) : réessaie dans un instant`,
             );
         }
-        return html;
+        this.remember(url, page.html);
+        return page.html;
+    };
+
+    private remember = (url: string, html: string) => {
+        const now = Date.now();
+        for (const [key, entry] of this.cache) {
+            if (entry.until <= now) this.cache.delete(key);
+        }
+        // Les plus anciennes d'abord (ordre d'insertion).
+        while (this.cache.size >= MAX_CACHED) {
+            this.cache.delete(this.cache.keys().next().value!);
+        }
+        this.cache.set(url, {
+            html,
+            until: now + (this.options.cacheMs ?? CACHE_MS),
+        });
     };
 
     /** Séries dont le titre correspond au texte. */

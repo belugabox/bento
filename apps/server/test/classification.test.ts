@@ -386,6 +386,30 @@ describe('online sheets', () => {
             ).toBe(400);
         }
 
+        // Deux fiches du même site : refusé.
+        expect(
+            (
+                await call(`/series/${id}/classification`, admin, {
+                    method: 'PUT',
+                    json: {
+                        sources: [
+                            links[1],
+                            { site: 'manga-news', id: 'Gantz' },
+                        ],
+                    },
+                })
+            ).status,
+        ).toBe(400);
+
+        // Un « : » dans l'identifiant Manga-news est gardé.
+        await call(`/series/${id}/classification`, admin, {
+            method: 'PUT',
+            json: { sources: [{ site: 'manga-news', id: 'Re:Zero' }] },
+        });
+        expect((await call(`/series/${id}`, admin)).body.sources).toEqual([
+            { site: 'manga-news', id: 'Re:Zero' },
+        ]);
+
         // Liste vide : plus de fiche.
         await call(`/series/${id}/classification`, admin, {
             method: 'PUT',
