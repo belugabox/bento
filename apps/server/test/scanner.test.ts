@@ -10,9 +10,10 @@ import {
 import sharp from 'sharp';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+import { readProgress, users, volumes } from '../src/db/schema';
 import { getSeries, listSeries } from '../src/library/catalog';
 import { coverFile, seriesKeyOf } from '../src/library/scanner';
-import { setup, writeCbz } from './helpers';
+import { sessionCookie, setup, writeCbz } from './helpers';
 
 // Les listes dépendent de la personne : ici un admin sans compte, qui voit tout.
 const NO_USER = { id: 0, role: 'admin' as const, maxAge: null };
@@ -246,6 +247,37 @@ describe('LibraryScanner', () => {
                 reason: "Archive illisible : ce n'est pas une archive ZIP",
             },
         ]);
+    });
+
+    it('keeps a known volume, and its progress, when it cannot be reread', async () => {
+        await writeCbz(ctx.file('Gantz/Gantz T01.cbz'));
+        await ctx.scanner.scan(ctx.library.id);
+        const [gantz] = listSeries(ctx.db, NO_USER);
+        const [volume] = getSeries(ctx.db, NO_USER, gantz!.id).volumes;
+        sessionCookie(ctx.db, 'reader');
+        const [reader] = ctx.db.select().from(users).all();
+        ctx.db
+            .insert(readProgress)
+            .values({
+                userId: reader!.id,
+                volumeId: volume!.id,
+                page: 3,
+                completed: false,
+                updatedAt: new Date(),
+            })
+            .run();
+        // À relire (comme après la migration 0021), mais illisible.
+        await writeFile(ctx.file('Gantz/Gantz T01.cbz'), 'not a zip');
+        ctx.db.update(volumes).set({ mtimeMs: 0 }).run();
+
+        const result = await ctx.scanner.scan(ctx.library.id);
+
+        expect(result).toMatchObject({ removed: 0 });
+        expect(result.errors).toHaveLength(1);
+        expect(getSeries(ctx.db, NO_USER, gantz!.id).volumes[0]?.id).toBe(
+            volume!.id,
+        );
+        expect(ctx.db.select().from(readProgress).all()).toHaveLength(1);
     });
 
     it('runs one scan at a time per library', async () => {

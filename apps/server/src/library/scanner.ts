@@ -196,6 +196,10 @@ export class LibraryScanner {
                     error instanceof Error ? error.message : String(error);
                 result.errors.push({ file: archive.file, reason });
                 this.logger.warn(`Scan : ${archive.file} ignoré (${reason})`);
+                // Tome déjà connu, toujours là mais illisible cette fois : il
+                // garde sa fiche et la progression de chacun (relu au scan
+                // suivant). Seul un fichier disparu retire un tome.
+                if (previous) kept.push(archive.file);
             }
         }
 

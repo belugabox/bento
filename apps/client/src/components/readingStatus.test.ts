@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
     type VolumeWithProgress,
+    countedVolumes,
     nextToRead,
     progressRatio,
     volumeCountLabel,
@@ -85,6 +86,21 @@ describe('volumeLabel', () => {
             volumeTitleOf({ number: '1', title: 'Hors-série 1' }),
         ).toBeNull();
         expect(volumeTitleOf({ number: '1', title: 'HS 01' })).toBeNull();
+        // Sans numéro ni titre : le nom de son type.
+        expect(
+            volumeLabel({ number: null, title: null, kind: 'special' }),
+        ).toBe('Spécial');
+    });
+});
+
+describe('countedVolumes', () => {
+    it('leaves out hors-séries and specials, unless there are only those', () => {
+        expect(
+            countedVolumes([{ kind: 'volume' }, { kind: 'special' }]),
+        ).toEqual([{ kind: 'volume' }]);
+        expect(countedVolumes([{ kind: 'special' }])).toEqual([
+            { kind: 'special' },
+        ]);
     });
 });
 

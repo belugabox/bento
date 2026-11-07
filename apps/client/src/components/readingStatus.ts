@@ -15,8 +15,8 @@ export type VolumeWithProgress = {
 };
 
 /**
- * « Tome 12 », « Hors-série 1 », « Spécial 2 » ; le titre, ou « Hors-série »
- * pour un tome sans numéro.
+ * « Tome 12 », « Hors-série 1 », « Spécial 2 » ; sans numéro, le titre, ou
+ * « Spécial » pour un spécial et « Hors-série » sinon.
  */
 export const volumeLabel = (volume: {
     number: string | null;
@@ -25,7 +25,8 @@ export const volumeLabel = (volume: {
 }) =>
     volume.number
         ? `${VOLUME_KIND_LABELS[volume.kind ?? 'volume']} ${volume.number}`
-        : (volume.title ?? 'Hors-série');
+        : (volume.title ??
+          (volume.kind === 'special' ? 'Spécial' : 'Hors-série'));
 
 /** Libellé court, pour une carte étroite : « T2 », « HS1 », « SP2 ». */
 export const volumeShortLabel = (volume: {
@@ -47,6 +48,17 @@ const KIND_COUNTS: Record<VolumeKind, [string, string]> = {
     volume: ['tome', 'tomes'],
     'hors-serie': ['hors-série', 'hors-séries'],
     special: ['spécial', 'spéciaux'],
+};
+
+/**
+ * Tomes comptés (« 3 lus » sur 12) : sans hors-séries ni spéciaux, sauf
+ * pour une série qui n'a que ceux-là (comme `countedVolume` du serveur).
+ */
+export const countedVolumes = <T extends { kind?: VolumeKind }>(
+    volumes: T[],
+) => {
+    const regular = volumes.filter((v) => (v.kind ?? 'volume') === 'volume');
+    return regular.length > 0 ? regular : volumes;
 };
 
 /** « 12 tomes · 1 spécial » : chaque type compté à part. */
