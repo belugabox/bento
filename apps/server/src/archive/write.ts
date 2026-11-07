@@ -2,6 +2,13 @@ import AdmZip from 'adm-zip';
 import { readFile, writeFile } from 'node:fs/promises';
 
 import { type ComicInfo, readComicInfo } from './comicInfo';
+import {
+    UnsupportedZipError,
+    appendEntry,
+    descriptorsLost,
+    readZipEntries,
+    readZipEntry,
+} from './zipIndex';
 
 // Ordre des champs dans ComicInfo.xml (schéma Anansi).
 export const COMIC_INFO_FIELDS: (keyof ComicInfo)[] = [
@@ -105,19 +112,12 @@ export const writeZipFile = async (zip: AdmZip, fullPath: string) => {
 export const repairDescriptorFlags = async (fullPath: string) =>
     writeZipFile(new AdmZip(await readFile(fullPath)), fullPath);
 
-/**
- * Modifie le ComicInfo d'une archive : les champs donnés remplacent les
- * existants, un champ `null` ou vide est retiré. Renvoie le ComicInfo final.
- */
-export const updateComicInfo = async (
-    fullPath: string,
+/** ComicInfo modifié : un champ `null` ou vide est retiré. */
+const mergeChanges = (
+    current: ComicInfo,
     changes: { [K in keyof ComicInfo]?: ComicInfo[K] | null },
-): Promise<ComicInfo> => {
-    // Lu sans bloquer : AdmZip lirait le fichier en synchrone.
-    const zip = new AdmZip(await readFile(fullPath));
-    const merged: Record<string, unknown> = {
-        ...(await readComicInfo(zip.getEntries())),
-    };
+): ComicInfo => {
+    const merged: Record<string, unknown> = { ...current };
     for (const [field, value] of Object.entries(changes)) {
         if (value === null || value === undefined || value === '') {
             delete merged[field];
@@ -125,7 +125,60 @@ export const updateComicInfo = async (
             merged[field] = value;
         }
     }
-    const comicInfo = merged as ComicInfo;
+    return merged as ComicInfo;
+};
+
+/**
+ * Modifie le ComicInfo d'une archive : les champs donnés remplacent les
+ * existants, un champ `null` ou vide est retiré. Renvoie le ComicInfo final.
+ *
+ * Le nouveau ComicInfo est ajouté en fin d'archive (`appendEntry`), sans
+ * recopier les pages : quelques millisecondes, même pour un tome de 1 Go.
+ * Une archive Zip64 ou abîmée passe par AdmZip, qui la réécrit en entier.
+ */
+export const updateComicInfo = async (
+    fullPath: string,
+    changes: { [K in keyof ComicInfo]?: ComicInfo[K] | null },
+): Promise<ComicInfo> => {
+    const entries = await readZipEntries(fullPath).catch(() => undefined);
+    if (
+        entries &&
+        !(await descriptorsLost(fullPath, entries).catch(() => true))
+    ) {
+        const comicInfo = mergeChanges(
+            await readComicInfo(
+                entries.map((entry) => ({
+                    entryName: entry.entryName,
+                    getData: () => readZipEntry(fullPath, entry),
+                })),
+            ),
+            changes,
+        );
+        try {
+            await appendEntry(
+                fullPath,
+                'ComicInfo.xml',
+                buildComicInfoXml(comicInfo),
+            );
+            return comicInfo;
+        } catch (error) {
+            if (!(error instanceof UnsupportedZipError)) throw error;
+        }
+    }
+    return rewriteComicInfo(fullPath, changes);
+};
+
+/** Réécrit toute l'archive avec AdmZip (voir `updateComicInfo`). */
+const rewriteComicInfo = async (
+    fullPath: string,
+    changes: { [K in keyof ComicInfo]?: ComicInfo[K] | null },
+): Promise<ComicInfo> => {
+    // Lu sans bloquer : AdmZip lirait le fichier en synchrone.
+    const zip = new AdmZip(await readFile(fullPath));
+    const comicInfo = mergeChanges(
+        await readComicInfo(zip.getEntries()),
+        changes,
+    );
 
     // Remplacer l'ancienne entrée, quelle que soit la casse de son nom.
     for (const entry of zip.getEntries()) {

@@ -1,10 +1,10 @@
 import AdmZip from 'adm-zip';
-import { mkdtemp, readdir, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { openArchive } from '../src/archive/archive';
+import { openArchive, readArchive } from '../src/archive/archive';
 import { convertCbrToCbz, isCbr, isRarArchive } from '../src/archive/cbr';
 import { readComicInfo } from '../src/archive/comicInfo';
 import { buildComicInfoXml, updateComicInfo } from '../src/archive/write';
@@ -94,6 +94,60 @@ describe('updateComicInfo', () => {
         await updateComicInfo(file, { Series: 'Spy x Family' });
 
         expect(pages(file)).toEqual(['image1', 'image2']);
+    });
+});
+
+describe('updateComicInfo without copying the archive', () => {
+    it('adds the ComicInfo at the end, leaving the pages where they are', async () => {
+        const file = path.join(dir, 'T01.cbz');
+        const zip = new AdmZip();
+        zip.addFile('page001.jpg', Buffer.alloc(50_000, 1));
+        zip.addFile('page002.jpg', Buffer.alloc(50_000, 2));
+        zip.addFile('ComicInfo.xml', buildComicInfoXml({ Series: 'Old' }));
+        const original = zip.toBuffer();
+        await writeFile(file, original);
+        const pagesEnd = new AdmZip(original)
+            .getEntries()
+            .find((e) => e.entryName === 'ComicInfo.xml')!.header.offset;
+
+        await updateComicInfo(file, { Series: 'Gantz' });
+        await updateComicInfo(file, { Number: '1' });
+
+        const saved = await readFile(file);
+        // Pages : mêmes octets, à la même place ; le fichier n'a fait que
+        // grandir de quelques centaines d'octets.
+        expect(saved.subarray(0, pagesEnd)).toEqual(
+            original.subarray(0, pagesEnd),
+        );
+        expect(saved.length - original.length).toBeLessThan(1000);
+        // Relu par AdmZip comme par Bento : une seule entrée ComicInfo.
+        expect(await comicInfoOf(file)).toEqual({
+            Series: 'Gantz',
+            Number: '1',
+        });
+        const entries = await readArchive(file);
+        expect(entries.map((e) => e.entryName).sort()).toEqual([
+            'ComicInfo.xml',
+            'page001.jpg',
+            'page002.jpg',
+        ]);
+        expect(
+            (
+                await entries
+                    .find((e) => e.entryName === 'page002.jpg')!
+                    .getData()
+            ).length,
+        ).toBe(50_000);
+    });
+
+    it('still rewrites a damaged archive, repairing it', async () => {
+        const file = path.join(dir, 'T14.cbz');
+        await writeFile(file, DAMAGED_ZIP);
+
+        await updateComicInfo(file, { Series: 'Spy x Family' });
+
+        expect(pages(file)).toEqual(['image1', 'image2']);
+        expect((await comicInfoOf(file)).Series).toBe('Spy x Family');
     });
 });
 

@@ -1,6 +1,6 @@
 import { type FileHandle, open } from 'node:fs/promises';
 import { promisify } from 'node:util';
-import { constants, inflateRaw } from 'node:zlib';
+import { constants, crc32, deflateRawSync, inflateRaw } from 'node:zlib';
 
 const inflate = promisify(inflateRaw);
 
@@ -212,6 +212,137 @@ export const descriptorsLost = async (
         const end = (await dataOffsetOf(file, marked)) + marked.compressedSize;
         const signature = (await readAt(file, end, 4)).readUInt32LE(0);
         return signature === LOCAL_HEADER || signature === CENTRAL_HEADER;
+    } finally {
+        await file.close();
+    }
+};
+
+/** Archive que `appendEntry` ne sait pas modifier (Zip64, plus de 4 Go). */
+export class UnsupportedZipError extends Error {}
+
+const MAX_32 = 0xffffffff;
+
+/**
+ * Remplace une entrée (« ComicInfo.xml », quelle que soit la casse) sans
+ * recopier l'archive : la nouvelle entrée et un nouveau répertoire central
+ * sont ajoutés à la fin du fichier, en une écriture. L'ancienne entrée et
+ * l'ancien répertoire restent dans le fichier, inutilisés (quelques Ko, que
+ * la compression retire). Le temps ne dépend pas de la taille du tome.
+ * Si l'écriture échoue, le fichier est remis à sa taille d'origine.
+ */
+export const appendEntry = async (
+    fullPath: string,
+    name: string,
+    content: Buffer,
+) => {
+    const file = await open(fullPath, 'r+');
+    try {
+        const { size: fileSize } = await file.stat();
+        const tailSize = Math.min(fileSize, MAX_TAIL);
+        const tail = await readAt(file, fileSize - tailSize, tailSize);
+        let end = -1;
+        for (let i = tail.length - END_SIZE; i >= 0; i--) {
+            if (tail.readUInt32LE(i) === END_OF_CENTRAL_DIRECTORY) {
+                end = i;
+                break;
+            }
+        }
+        if (end < 0) throw new Error('fin du répertoire ZIP introuvable');
+        const locator = end - 20;
+        if (locator >= 0 && tail.readUInt32LE(locator) === ZIP64_LOCATOR) {
+            throw new UnsupportedZipError('archive Zip64');
+        }
+        const count = tail.readUInt16LE(end + 10);
+        const size = tail.readUInt32LE(end + 12);
+        const offset = tail.readUInt32LE(end + 16);
+        if (offset + size > fileSize) throw new Error('archive ZIP tronquée');
+        const directory = await readAt(file, offset, size);
+
+        // Répertoire gardé tel quel, sans l'ancienne entrée.
+        const kept: Buffer[] = [];
+        let i = 0;
+        for (let n = 0; n < count; n++) {
+            if (directory.readUInt32LE(i) !== CENTRAL_HEADER) {
+                throw new Error('répertoire ZIP invalide');
+            }
+            const nameLength = directory.readUInt16LE(i + 28);
+            const next =
+                i +
+                46 +
+                nameLength +
+                directory.readUInt16LE(i + 30) +
+                directory.readUInt16LE(i + 32);
+            const entryName = directory.toString(
+                'utf8',
+                i + 46,
+                i + 46 + nameLength,
+            );
+            if (entryName.toLowerCase() !== name.toLowerCase()) {
+                kept.push(directory.subarray(i, next));
+            }
+            i = next;
+        }
+
+        const nameBytes = Buffer.from(name, 'utf8');
+        const data = deflateRawSync(content);
+        const crc = crc32(content);
+        const entryCount = kept.length + 1;
+        const directoryOffset = fileSize + 30 + nameBytes.length + data.length;
+        if (entryCount > 0xffff || directoryOffset >= MAX_32) {
+            throw new UnsupportedZipError('archive trop grande');
+        }
+        // En-tête local : version 2.0, noms en UTF-8 (bit 11), deflate.
+        const local = Buffer.alloc(30);
+        local.writeUInt32LE(LOCAL_HEADER, 0);
+        local.writeUInt16LE(20, 4);
+        local.writeUInt16LE(0x0800, 6);
+        local.writeUInt16LE(DEFLATED, 8);
+        local.writeUInt32LE(crc, 14);
+        local.writeUInt32LE(data.length, 18);
+        local.writeUInt32LE(content.length, 22);
+        local.writeUInt16LE(nameBytes.length, 26);
+        const central = Buffer.alloc(46);
+        central.writeUInt32LE(CENTRAL_HEADER, 0);
+        central.writeUInt16LE(20, 4);
+        central.writeUInt16LE(20, 6);
+        central.writeUInt16LE(0x0800, 8);
+        central.writeUInt16LE(DEFLATED, 10);
+        central.writeUInt32LE(crc, 16);
+        central.writeUInt32LE(data.length, 20);
+        central.writeUInt32LE(content.length, 24);
+        central.writeUInt16LE(nameBytes.length, 28);
+        central.writeUInt32LE(fileSize, 42);
+        const newDirectory = Buffer.concat([...kept, central, nameBytes]);
+        const endRecord = Buffer.alloc(END_SIZE);
+        endRecord.writeUInt32LE(END_OF_CENTRAL_DIRECTORY, 0);
+        endRecord.writeUInt16LE(entryCount, 8);
+        endRecord.writeUInt16LE(entryCount, 10);
+        endRecord.writeUInt32LE(newDirectory.length, 12);
+        endRecord.writeUInt32LE(directoryOffset, 16);
+
+        const appended = Buffer.concat([
+            local,
+            nameBytes,
+            data,
+            newDirectory,
+            endRecord,
+        ]);
+        try {
+            const { bytesWritten } = await file.write(
+                appended,
+                0,
+                appended.length,
+                fileSize,
+            );
+            if (bytesWritten < appended.length) {
+                throw new Error('écriture incomplète');
+            }
+            await file.sync();
+        } catch (error) {
+            // L'ancienne fin de l'archive redevient la dernière.
+            await file.truncate(fileSize).catch(() => {});
+            throw error;
+        }
     } finally {
         await file.close();
     }
