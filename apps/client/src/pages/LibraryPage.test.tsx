@@ -217,6 +217,25 @@ describe('LibraryPage', () => {
         await vi.waitFor(() => expect(location).toBe(''));
     });
 
+    it('offers every genre in one menu on narrow screens', async () => {
+        show();
+        await vi.waitFor(() => expect(titles()).toHaveLength(3));
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Choisir un genre' }),
+        );
+        fireEvent.click(
+            await screen.findByRole('menuitem', { name: /^Sport/ }),
+        );
+        await vi.waitFor(() => expect(location).toBe('?genre=Sport'));
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Choisir un genre' }),
+        );
+        fireEvent.click(
+            await screen.findByRole('menuitem', { name: 'Tous les genres' }),
+        );
+        await vi.waitFor(() => expect(location).toBe(''));
+    });
+
     it('removes a genre chip with a second click', async () => {
         show();
         await vi.waitFor(() => expect(titles()).toHaveLength(3));

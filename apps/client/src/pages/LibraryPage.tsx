@@ -7,6 +7,7 @@ import {
     Group,
     Indicator,
     Loader,
+    type MantineBreakpoint,
     Menu,
     ScrollArea,
     SegmentedControl,
@@ -124,12 +125,15 @@ const FilterChip = ({
 /** Rangée de pastilles, qui défile au doigt sans retour à la ligne. */
 const ChipRow = ({
     label,
+    visibleFrom,
     children,
 }: {
     label: string;
+    visibleFrom?: MantineBreakpoint;
     children: ReactNode;
 }) => (
     <Box
+        visibleFrom={visibleFrom}
         aria-label={label}
         role="group"
         style={{
@@ -468,7 +472,7 @@ export const LibraryPage = () => {
                             <Divider orientation="vertical" />
                         )}
                         {genres.length > 0 && (
-                            <ChipRow label="Genres">
+                            <ChipRow label="Genres" visibleFrom="sm">
                                 {shownGenres.map((name) => (
                                     <FilterChip
                                         key={name}
@@ -530,6 +534,65 @@ export const LibraryPage = () => {
                                     </Menu>
                                 )}
                             </ChipRow>
+                        )}
+                        {/* Écran étroit : un seul bouton pour tous les genres. */}
+                        {genres.length > 0 && (
+                            <Menu position="top-end">
+                                <Menu.Target>
+                                    <Button
+                                        hiddenFrom="sm"
+                                        size="compact-sm"
+                                        radius="xl"
+                                        fw={500}
+                                        variant={genre ? 'filled' : 'default'}
+                                        aria-label="Choisir un genre"
+                                        rightSection={
+                                            <IconChevronDown size={12} />
+                                        }
+                                        style={{ flexShrink: 1, minWidth: 0 }}
+                                    >
+                                        {genre ?? 'Genre'}
+                                    </Button>
+                                </Menu.Target>
+                                <Menu.Dropdown>
+                                    <ScrollArea.Autosize mah={320}>
+                                        <Menu.Item
+                                            rightSection={
+                                                !genre && (
+                                                    <IconCheck size={14} />
+                                                )
+                                            }
+                                            onClick={() =>
+                                                update({ genre: '' })
+                                            }
+                                        >
+                                            Tous les genres
+                                        </Menu.Item>
+                                        {genres.map(({ name, count }) => (
+                                            <Menu.Item
+                                                key={name}
+                                                rightSection={
+                                                    name === genre ? (
+                                                        <IconCheck size={14} />
+                                                    ) : (
+                                                        <Text
+                                                            size="xs"
+                                                            c="dimmed"
+                                                        >
+                                                            {count}
+                                                        </Text>
+                                                    )
+                                                }
+                                                onClick={() =>
+                                                    update({ genre: name })
+                                                }
+                                            >
+                                                {name}
+                                            </Menu.Item>
+                                        ))}
+                                    </ScrollArea.Autosize>
+                                </Menu.Dropdown>
+                            </Menu>
                         )}
                     </Group>
                 </Container>
