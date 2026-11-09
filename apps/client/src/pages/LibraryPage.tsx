@@ -2,6 +2,7 @@ import {
     Alert,
     Box,
     Button,
+    Divider,
     Group,
     Indicator,
     Loader,
@@ -144,7 +145,11 @@ const ChipRow = ({
     label: string;
     children: ReactNode;
 }) => (
-    <ScrollArea type="never" aria-label={label}>
+    <ScrollArea
+        type="never"
+        aria-label={label}
+        style={{ flex: 1, minWidth: 0 }}
+    >
         <Group gap={6} wrap="nowrap">
             {children}
         </Group>
@@ -266,10 +271,12 @@ export const LibraryPage = () => {
                     )}
                 </Group>
 
-                {/* Reste visible sous l'en-tête pendant le défilement. */}
-                <Stack
-                    gap={6}
+                {/* Une seule ligne, qui reste visible sous l'en-tête pendant
+                    le défilement : lecture et tri, puis les genres. */}
+                <Group
+                    gap="lg"
                     py={6}
+                    wrap="nowrap"
                     style={{
                         position: 'sticky',
                         top: 'var(--app-shell-header-offset, 56px)',
@@ -277,7 +284,7 @@ export const LibraryPage = () => {
                         background: 'var(--mantine-color-body)',
                     }}
                 >
-                    <Group gap={6} wrap="nowrap">
+                    <Group gap={6} wrap="nowrap" style={{ flexShrink: 0 }}>
                         <Menu position="bottom-start">
                             <Menu.Target>
                                 <Button
@@ -383,6 +390,7 @@ export const LibraryPage = () => {
                             </Menu.Dropdown>
                         </Menu>
                     </Group>
+                    {genres.length > 0 && <Divider orientation="vertical" />}
                     {genres.length > 0 && (
                         <ChipRow label="Genres">
                             {shownGenres.map((name) => (
@@ -444,7 +452,7 @@ export const LibraryPage = () => {
                             )}
                         </ChipRow>
                     )}
-                </Stack>
+                </Group>
 
                 {series.error && (
                     <Alert color="red">{series.error.message}</Alert>
