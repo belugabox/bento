@@ -50,30 +50,28 @@ export const readingStateOf = (
           ? 'started'
           : 'unread';
 
-/** Valeurs présentes dans la liste (genres, formats…), une seule fois. */
-const present = <V>(values: V[]) => [...new Set(values)];
-
-/** Genres présents dans la liste, les plus fréquents d'abord. */
+/**
+ * Genres présents dans la liste, avec leur nombre de séries : les plus
+ * fréquents d'abord.
+ */
 export const genresByCount = (series: Pick<ListedSeries, 'genres'>[]) => {
     const counts = new Map<string, number>();
     for (const genre of series.flatMap((s) => s.genres ?? [])) {
         counts.set(genre, (counts.get(genre) ?? 0) + 1);
     }
-    return [...counts.keys()].sort(
-        (a, b) => counts.get(b)! - counts.get(a)! || a.localeCompare(b, 'fr'),
-    );
+    return [...counts]
+        .map(([name, count]) => ({ name, count }))
+        .sort(
+            (a, b) => b.count - a.count || a.name.localeCompare(b.name, 'fr'),
+        );
 };
-
-/** Formats présents dans la liste. */
-export const allFormats = (series: Pick<ListedSeries, 'format'>[]) =>
-    present(series.flatMap((s) => (s.format ? [s.format] : [])));
 
 const matchesReading = (s: ListedSeries, filter: ReadingFilter) =>
     filter === 'all' ||
     (filter === 'toread' ? !!s.toRead : readingStateOf(s) === filter);
 
 /**
- * Séries à afficher, filtrées (lecture, format, genre, statut) puis
+ * Séries à afficher, filtrées (lecture, genre, statut) puis
  * triées.
  */
 export const filterSeries = <T extends ListedSeries>(
@@ -82,13 +80,11 @@ export const filterSeries = <T extends ListedSeries>(
         filter,
         sort,
         genre = null,
-        format = null,
         status = 'all',
     }: {
         filter: ReadingFilter;
         sort: SeriesSort;
         genre?: string | null;
-        format?: string | null;
         status?: StatusFilter;
     },
 ): T[] => {
@@ -96,7 +92,6 @@ export const filterSeries = <T extends ListedSeries>(
         (s) =>
             matchesReading(s, filter) &&
             (!genre || (s.genres ?? []).includes(genre)) &&
-            (!format || s.format === format) &&
             (status === 'all' || s.status === status),
     );
     return sort === 'recent'

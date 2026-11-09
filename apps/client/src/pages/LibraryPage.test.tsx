@@ -24,8 +24,11 @@ const SERIES = [
     coverUpdatedAt: null,
     coverVolumeId: index + 10,
     toRead: index === 1,
-    format: index === 0 ? 'BD' : 'Manga',
-    genres: index === 2 ? ['Sport'] : ['Action'],
+    genres: [
+        ['Action', 'Aventure', 'Comédie', 'Drame', 'Fantasy', 'Horreur'],
+        ['Action', 'Horreur'],
+        ['Sport'],
+    ][index],
     ...s,
 }));
 
@@ -176,26 +179,48 @@ describe('LibraryPage', () => {
         expect(location).toBe('');
     });
 
-    it('filters by format and genre with chips, the most frequent genre first', async () => {
+    it('filters by genre with chips, the most frequent first', async () => {
         show();
         await screen.findByTestId('series-grid');
         await vi.waitFor(() => expect(titles()).toHaveLength(3));
 
+        // Cinq pastilles, les genres aux plus de séries d'abord ; les autres
+        // dans « Plus », avec leur nombre de séries.
         const genres = within(screen.getByLabelText('Genres'))
             .getAllByRole('button')
             .map((button) => button.textContent);
-        expect(genres).toEqual(['Action', 'Sport']);
+        expect(genres).toEqual([
+            'Action',
+            'Horreur',
+            'Aventure',
+            'Comédie',
+            'Drame',
+            'Plus',
+        ]);
 
-        fireEvent.click(screen.getByRole('button', { name: 'Manga' }));
-        await vi.waitFor(() =>
-            expect(titles()).toEqual(['/series/2', '/series/3']),
-        );
-        fireEvent.click(screen.getByRole('button', { name: 'Sport' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Plus' }));
+        const more = await screen.findAllByRole('menuitem');
+        expect(more.map((item) => item.textContent)).toEqual([
+            'Fantasy1',
+            'Sport1',
+        ]);
+        fireEvent.click(more[1]!);
         await vi.waitFor(() => expect(titles()).toEqual(['/series/3']));
-        expect(location).toBe('?format=Manga&genre=Sport');
-        // Un second clic retire le filtre.
+        expect(location).toBe('?genre=Sport');
+        // Genre choisi dans « Plus » : montré en pastille, qui le retire.
         fireEvent.click(screen.getByRole('button', { name: 'Sport' }));
-        await vi.waitFor(() => expect(location).toBe('?format=Manga'));
+        await vi.waitFor(() => expect(location).toBe(''));
+    });
+
+    it('removes a genre chip with a second click', async () => {
+        show();
+        await vi.waitFor(() => expect(titles()).toHaveLength(3));
+        fireEvent.click(screen.getByRole('button', { name: 'Horreur' }));
+        await vi.waitFor(() =>
+            expect(titles()).toEqual(['/series/1', '/series/2']),
+        );
+        fireEvent.click(screen.getByRole('button', { name: 'Horreur' }));
+        await vi.waitFor(() => expect(location).toBe(''));
     });
 
     it('keeps the release status in the sort menu', async () => {

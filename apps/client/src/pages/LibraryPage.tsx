@@ -34,7 +34,6 @@ import {
     STATUS_FILTERS,
     type SeriesSort,
     type StatusFilter,
-    allFormats,
     filterSeries,
     genresByCount,
     readingStateOf,
@@ -112,7 +111,7 @@ const seriesProgress = (volume: InProgressVolume) =>
         : 0;
 
 /** Genres montrés en pastilles ; les autres sont dans « Plus ». */
-const GENRE_CHIPS = 8;
+const GENRE_CHIPS = 5;
 
 /** Pastille d'un filtre : un clic la choisit, un autre la retire. */
 const FilterChip = ({
@@ -165,7 +164,6 @@ export const LibraryPage = () => {
     const filter = (params.get('filter') as ReadingFilter | null) ?? 'all';
     const sort = (params.get('sort') as SeriesSort | null) ?? 'name';
     const genre = params.get('genre');
-    const format = params.get('format');
     const status = (params.get('status') as StatusFilter | null) ?? 'all';
 
     const isAdmin = useContext(UserContext)?.role === 'admin';
@@ -213,19 +211,19 @@ export const LibraryPage = () => {
         filter,
         sort,
         genre,
-        format,
         status,
     });
-    const filtered =
-        filter !== 'all' || !!format || !!genre || status !== 'all';
+    const filtered = filter !== 'all' || !!genre || status !== 'all';
     // Pendant une recherche : seulement les séries.
     const resume = debouncedSearch ? [] : (inProgress.data ?? []);
-    const formats = allFormats(series.data ?? []);
     // Pastilles : les genres les plus fréquents, et celui choisi.
     const genres = genresByCount(series.data ?? []);
-    const shownGenres = genres.slice(0, GENRE_CHIPS);
+    const shownGenres = genres.slice(0, GENRE_CHIPS).map((g) => g.name);
     if (genre && !shownGenres.includes(genre)) shownGenres.unshift(genre);
-    const moreGenres = genres.filter((g) => !shownGenres.includes(g));
+    // Les autres, par ordre alphabétique, avec leur nombre de séries.
+    const moreGenres = genres
+        .filter((g) => !shownGenres.includes(g.name))
+        .sort((a, b) => a.name.localeCompare(b.name, 'fr'));
     const sortLabel = SERIES_SORTS.find((s) => s.value === sort)?.label;
     const readingLabel = READING_FILTERS.find((f) => f.value === filter)?.label;
 
@@ -384,30 +382,6 @@ export const LibraryPage = () => {
                                 ))}
                             </Menu.Dropdown>
                         </Menu>
-                        {formats.length > 1 && (
-                            <ChipRow label="Formats">
-                                <FilterChip
-                                    active={!format}
-                                    onClick={() => update({ format: '' })}
-                                >
-                                    Tous
-                                </FilterChip>
-                                {formats.map((name) => (
-                                    <FilterChip
-                                        key={name}
-                                        active={format === name}
-                                        onClick={() =>
-                                            update({
-                                                format:
-                                                    format === name ? '' : name,
-                                            })
-                                        }
-                                    >
-                                        {name}
-                                    </FilterChip>
-                                ))}
-                            </ChipRow>
-                        )}
                     </Group>
                     {genres.length > 0 && (
                         <ChipRow label="Genres">
@@ -442,13 +416,18 @@ export const LibraryPage = () => {
                                     </Menu.Target>
                                     <Menu.Dropdown>
                                         <ScrollArea.Autosize mah={320}>
-                                            {[...moreGenres]
-                                                .sort((a, b) =>
-                                                    a.localeCompare(b, 'fr'),
-                                                )
-                                                .map((name) => (
+                                            {moreGenres.map(
+                                                ({ name, count }) => (
                                                     <Menu.Item
                                                         key={name}
+                                                        rightSection={
+                                                            <Text
+                                                                size="xs"
+                                                                c="dimmed"
+                                                            >
+                                                                {count}
+                                                            </Text>
+                                                        }
                                                         onClick={() =>
                                                             update({
                                                                 genre: name,
@@ -457,7 +436,8 @@ export const LibraryPage = () => {
                                                     >
                                                         {name}
                                                     </Menu.Item>
-                                                ))}
+                                                ),
+                                            )}
                                         </ScrollArea.Autosize>
                                     </Menu.Dropdown>
                                 </Menu>
@@ -486,7 +466,6 @@ export const LibraryPage = () => {
                                 onClick={() =>
                                     update({
                                         filter: '',
-                                        format: '',
                                         genre: '',
                                         status: '',
                                     })

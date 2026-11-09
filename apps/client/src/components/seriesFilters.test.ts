@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 
 import {
     type ListedSeries,
-    allFormats,
     filterSeries,
     genresByCount,
     readingStateOf,
@@ -100,11 +99,6 @@ describe('list, format, genre and status filters', () => {
         expect(kept({ genre: 'Fantasy' })).toEqual(['Berserk']);
     });
 
-    it('keeps a format', () => {
-        expect(kept({ format: 'manhwa' })).toEqual(['Solo Leveling']);
-        expect(allFormats(items)).toEqual(['manga', 'manhwa']);
-    });
-
     it('keeps a status', () => {
         expect(kept({ status: 'ongoing' })).toEqual(['Berserk']);
         expect(kept({ status: 'completed' })).toEqual(['Akira']);
@@ -112,9 +106,9 @@ describe('list, format, genre and status filters', () => {
 
     it('lists the genres once each, the most frequent first', () => {
         expect(genresByCount(items)).toEqual([
-            'Action',
-            'Fantasy',
-            'Science-fiction',
+            { name: 'Action', count: 2 },
+            { name: 'Fantasy', count: 1 },
+            { name: 'Science-fiction', count: 1 },
         ]);
     });
 });
