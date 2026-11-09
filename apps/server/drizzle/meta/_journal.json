@@ -169,6 +169,13 @@
       "when": 1794225698250,
       "tag": "0023_drop_oidc_subject",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "6",
+      "when": 1794232590185,
+      "tag": "0024_invitation_username",
+      "breakpoints": true
     }
   ]
 }

@@ -2,6 +2,14 @@ import { eq } from 'drizzle-orm';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { createApi } from '../src/api';
+import { avatarChoice, clayDefinition } from '../src/auth/avatar';
+import {
+    AVATAR_BODY_COLORS,
+    AVATAR_VARIANTS,
+    formatAvatar,
+    parseAvatar,
+    randomAvatar,
+} from '../src/auth/avatarParts';
 import { adminLink, recoveryLink } from '../src/auth/links';
 import { LoginLimiter } from '../src/auth/loginLimiter';
 import { hashPassword, verifyPassword } from '../src/auth/passwords';
@@ -184,6 +192,44 @@ describe('invitations', () => {
         expect(
             await (await call('/invitations', { session: admin })).json(),
         ).toEqual([]);
+    });
+});
+
+describe('invitation with an identifier', () => {
+    const inviteAs = (username: string) =>
+        call('/invitations', {
+            method: 'POST',
+            session: admin,
+            body: { role: 'reader', maxAge: 12, username },
+        });
+
+    it('proposes the identifier chosen by the admin, still editable', async () => {
+        const response = await inviteAs('Léa');
+        const { token } = (await response.json()) as { token: string };
+
+        expect(await (await call(`/auth/links/${token}`)).json()).toMatchObject(
+            { kind: 'invite', username: 'Léa' },
+        );
+        expect(
+            await (await call('/invitations', { session: admin })).json(),
+        ).toMatchObject([{ username: 'Léa' }]);
+        expect(
+            (await join(token, { username: 'Lea2', password: 'abcdefgh' }))
+                .status,
+        ).toBe(200);
+        expect((await login('lea2', 'abcdefgh')).status).toBe(200);
+    });
+
+    it('refuses an invalid or taken identifier', async () => {
+        expect((await inviteAs('a b')).status).toBe(400);
+        expect((await inviteAs('ADMIN')).status).toBe(409);
+        // Vide : pas d'identifiant proposé.
+        const { token } = (await (await inviteAs(' ')).json()) as {
+            token: string;
+        };
+        expect(await (await call(`/auth/links/${token}`)).json()).toMatchObject(
+            { username: null },
+        );
     });
 });
 
@@ -496,6 +542,48 @@ describe('avatars', () => {
         expect(response.headers.get('Cache-Control')).toMatch(/immutable/);
         expect(await response.text()).toMatch(/^<svg/);
         expect((await call('/avatars/a%20b')).status).toBe(400);
+    });
+
+    it('knows every part of the Clay style', () => {
+        const clay = clayDefinition();
+        for (const [part, variants] of Object.entries(AVATAR_VARIANTS)) {
+            expect(Object.keys(clay.components[part]!.variants)).toEqual(
+                variants,
+            );
+        }
+        expect(clay.colors.body!.values).toEqual(
+            AVATAR_BODY_COLORS.map((color) => `#${color}`),
+        );
+    });
+
+    it('draws a composed avatar and reads it back', async () => {
+        const choice = {
+            ...randomAvatar(),
+            top: null,
+            pattern: 'spiral' as const,
+            motion: 'slow' as const,
+        };
+        const value = formatAvatar(choice);
+        expect(parseAvatar(value)).toEqual(choice);
+        expect(parseAvatar('c1_pear')).toBeUndefined();
+        expect(parseAvatar(value.replace('spiral', 'nope'))).toBeUndefined();
+
+        const svg = await (await call(`/avatars/${value}`)).text();
+        expect(svg).toMatch(/^<svg/);
+        expect(svg).toMatch(new RegExp(choice.bodyColor, 'i'));
+        expect(svg).toMatch(/dbcl-slow/);
+        expect(await (await call(`/avatars/${value}/choice`)).json()).toEqual(
+            choice,
+        );
+    });
+
+    it('finds the parts drawn by a seed, to edit them', async () => {
+        const choice = avatarChoice('abc');
+        expect(parseAvatar(formatAvatar(choice))).toEqual(choice);
+        // Même dessin, sauf la place du motif.
+        const seedSvg = await (await call('/avatars/abc')).text();
+        expect(seedSvg).toMatch(new RegExp(choice.bodyColor, 'i'));
+        expect(seedSvg).toMatch(new RegExp(choice.background, 'i'));
     });
 });
 

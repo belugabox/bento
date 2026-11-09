@@ -171,6 +171,8 @@ export const invitations = sqliteTable('invitations', {
         .notNull()
         .default('reader'),
     maxAge: integer('max_age'),
+    // Identifiant proposé par l'admin (tel que tapé), modifiable à l'inscription.
+    username: text('username'),
     createdAt: integer('created_at', { mode: 'timestamp' })
         .notNull()
         .default(sql`(unixepoch())`),

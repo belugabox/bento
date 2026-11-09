@@ -8,6 +8,16 @@ export {
     safeRedirect,
 } from './auth/rules';
 export {
+    AVATAR_BACKGROUNDS,
+    AVATAR_BODY_COLORS,
+    AVATAR_MOTIONS,
+    AVATAR_VARIANTS,
+    type AvatarChoice,
+    formatAvatar,
+    parseAvatar,
+    randomAvatar,
+} from './auth/avatarParts';
+export {
     AGE_RATINGS,
     type AgeRating,
     minAgeOf,

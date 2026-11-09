@@ -1,6 +1,12 @@
 import { hc } from 'hono/client';
 
-import type { ApiType, ReadingMode, SourceLink } from '@server/types';
+import {
+    type ApiType,
+    type ReadingMode,
+    type SourceLink,
+    formatAvatar,
+    randomAvatar,
+} from '@server/types';
 
 /** Client typé de l'API (`/api`, servie par le même domaine). */
 export const api = hc<ApiType>('/api');
@@ -123,13 +129,16 @@ export const updateMe = (changes: {
     currentPassword?: string;
 }) => json(api.me.$patch({ json: changes }));
 
-/** Avatar DiceBear « Clay » d'une graine. */
+/** Avatar DiceBear « Clay » : graine au hasard ou avatar composé. */
 export const avatarUrl = (seed: string) =>
     `/api/avatars/${encodeURIComponent(seed)}`;
 
-/** Graine d'avatar au hasard. */
-export const randomAvatarSeed = () =>
-    Math.random().toString(36).slice(2, 12).padEnd(10, '0');
+/** Avatar composé au hasard. */
+export const randomAvatarSeed = () => formatAvatar(randomAvatar());
+
+/** Parties d'un avatar, pour le modifier (aussi celles d'une graine). */
+export const fetchAvatarChoice = (seed: string) =>
+    json(api.avatars[':seed'].choice.$get({ param: { seed } }));
 
 /** Adresse complète d'un lien d'invitation, d'activation… */
 export const joinUrl = (token: string) =>
@@ -158,6 +167,7 @@ export type Invitation = Awaited<ReturnType<typeof fetchInvitations>>[number];
 export const createInvitation = (invitation: {
     role: 'admin' | 'reader';
     maxAge: number | null;
+    username?: string | null;
 }) => json(api.invitations.$post({ json: invitation }));
 
 export const deleteInvitation = (invitationId: number) =>

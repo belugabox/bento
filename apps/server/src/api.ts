@@ -6,7 +6,7 @@ import { z } from 'zod';
 import type { PageReader } from './archive/archive';
 import { NUMBER_FIELDS } from './archive/comicInfo';
 import { COMIC_INFO_FIELDS } from './archive/write';
-import { avatarSvg } from './auth/avatar';
+import { avatarChoice, avatarSvg } from './auth/avatar';
 import {
     createInvitation,
     createUserLink,
@@ -253,6 +253,13 @@ export const createApi = ({
             c.header('Content-Type', 'image/svg+xml');
             c.header('Cache-Control', 'public, max-age=31536000, immutable');
             return c.body(avatarSvg(seed));
+        })
+        // Public : parties d'un avatar, pour le modifier.
+        .get('/avatars/:seed/choice', (c) => {
+            const seed = c.req.param('seed');
+            if (!isAvatarSeed(seed)) throw badRequest('Avatar invalide');
+            c.header('Cache-Control', 'public, max-age=31536000, immutable');
+            return c.json(avatarChoice(seed));
         })
         // Tout ce qui suit exige une session.
         .use('*', requireUser(db))
@@ -1054,6 +1061,7 @@ export const createApi = ({
                 z.object({
                     role: z.enum(['admin', 'reader']),
                     maxAge: z.number().int().min(0).max(18).nullable(),
+                    username: z.string().max(100).nullable().optional(),
                 }),
             ),
             (c) => {

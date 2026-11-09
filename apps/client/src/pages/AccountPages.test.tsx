@@ -153,6 +153,24 @@ describe('JoinPage', () => {
         });
     });
 
+    it('fills in the identifier proposed by the admin', async () => {
+        responses['GET /api/auth/links/tok'] = {
+            body: {
+                kind: 'invite',
+                username: 'Léa',
+                email: null,
+                avatarSeed: null,
+            },
+        };
+        show('/join/tok');
+
+        await screen.findByText('Bienvenue !');
+        expect(
+            (screen.getAllByLabelText(/Identifiant/)[0] as HTMLInputElement)
+                .value,
+        ).toBe('Léa');
+    });
+
     it('only asks for a password on a reset link', async () => {
         responses['GET /api/auth/links/tok'] = {
             body: {
@@ -230,7 +248,7 @@ describe('UsersPage', () => {
         expect(requests).toContainEqual([
             'POST',
             '/api/invitations',
-            { role: 'reader', maxAge: null },
+            { role: 'reader', maxAge: null, username: null },
         ]);
         expect((screen.getByLabelText('Lien') as HTMLInputElement).value).toBe(
             'http://localhost:3000/join/tok',
@@ -245,6 +263,29 @@ describe('UsersPage', () => {
         expect(
             screen.getByRole('link', { name: /E-mail/ }).getAttribute('href'),
         ).toMatch(/^mailto:/);
+    });
+
+    it('proposes an identifier with the invitation', async () => {
+        responses['POST /api/invitations'] = {
+            body: { id: 1, token: 'tok', expiresAt: '2026-11-16' },
+        };
+        show('/users');
+
+        fireEvent.click(await screen.findByRole('button', { name: 'Inviter' }));
+        const create = await screen.findByRole('button', {
+            name: 'Créer le lien',
+        });
+        type(/Identifiant/, 'a b');
+        expect((create as HTMLButtonElement).disabled).toBe(true);
+        type(/Identifiant/, 'Léa');
+        fireEvent.click(create);
+
+        expect(await screen.findByText('Invitation prête')).toBeTruthy();
+        expect(requests).toContainEqual([
+            'POST',
+            '/api/invitations',
+            { role: 'reader', maxAge: null, username: 'Léa' },
+        ]);
     });
 
     it('marks accounts to activate and gives their link', async () => {

@@ -8,9 +8,12 @@ export const USERNAME_RULE =
 
 export const PASSWORD_MIN_LENGTH = 8;
 
-/** Graine d'avatar valable : courte, lisible dans une adresse. */
+/**
+ * Avatar valable (graine au hasard ou avatar composé, voir `avatarParts.ts`) :
+ * court, lisible dans une adresse.
+ */
 export const isAvatarSeed = (seed: string) =>
-    /^[A-Za-z0-9_-]{1,64}$/.test(seed);
+    /^[A-Za-z0-9_-]{1,100}$/.test(seed);
 
 /** Page interne où revenir après la connexion ; tout le reste mène à l'accueil. */
 export const safeRedirect = (value: string | null | undefined) =>

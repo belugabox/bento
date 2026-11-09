@@ -26,7 +26,12 @@ export type LinkKind = 'invite' | 'activate' | 'reset';
 
 const insertLink = (
     db: Db,
-    values: { userId?: number; role?: Role; maxAge?: number | null },
+    values: {
+        userId?: number;
+        role?: Role;
+        maxAge?: number | null;
+        username?: string | null;
+    },
 ) => {
     // Au passage, oublier les liens expirés.
     db.delete(invitations).where(lt(invitations.expiresAt, new Date())).run();
@@ -40,11 +45,30 @@ const insertLink = (
     return { id, token, expiresAt };
 };
 
-/** Invitation à créer un compte de ce rôle et de cet âge maximal. */
+/**
+ * Invitation à créer un compte de ce rôle et de cet âge maximal, avec
+ * peut-être un identifiant proposé (libre au moment de la création).
+ */
 export const createInvitation = (
     db: Db,
-    { role, maxAge }: { role: Role; maxAge: number | null },
-) => insertLink(db, { role, maxAge: role === 'admin' ? null : maxAge });
+    {
+        role,
+        maxAge,
+        username: rawUsername,
+    }: { role: Role; maxAge: number | null; username?: string | null },
+) => {
+    let username: string | null = null;
+    if (rawUsername?.trim()) {
+        const parsed = parseUsername(rawUsername);
+        checkUsernameFree(db, parsed.username);
+        username = parsed.name;
+    }
+    return insertLink(db, {
+        role,
+        maxAge: role === 'admin' ? null : maxAge,
+        username,
+    });
+};
 
 /**
  * Lien d'activation (compte sans mot de passe) ou de nouveau mot de passe
@@ -68,6 +92,7 @@ export const listInvitations = (db: Db) =>
             id: invitations.id,
             role: invitations.role,
             maxAge: invitations.maxAge,
+            username: invitations.username,
             createdAt: invitations.createdAt,
             expiresAt: invitations.expiresAt,
         })
@@ -98,6 +123,7 @@ const findLink = (db: Db, token: string) => {
             id: invitations.id,
             role: invitations.role,
             maxAge: invitations.maxAge,
+            username: invitations.username,
             user: {
                 id: users.id,
                 name: users.name,
@@ -127,15 +153,16 @@ const findLink = (db: Db, token: string) => {
 
 /** Ce qu'affiche la page d'un lien (page publique). */
 export const linkInfo = (db: Db, token: string) => {
-    const { kind, user } = findLink(db, token);
+    const { kind, user, username } = findLink(db, token);
     return {
         kind,
-        // Compte existant : identifiant proposé, e-mail et avatar actuels.
+        // Compte existant : identifiant proposé, e-mail et avatar actuels ;
+        // invitation : identifiant proposé par l'admin.
         username: user
             ? user.username
                 ? user.name
                 : suggestUsername(db, user.name)
-            : null,
+            : username,
         email: user?.email ?? null,
         avatarSeed: user?.avatarSeed ?? null,
     };

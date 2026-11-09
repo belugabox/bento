@@ -12,6 +12,7 @@ import {
     Stack,
     Table,
     Text,
+    TextInput,
     Title,
 } from '@mantine/core';
 import {
@@ -25,6 +26,7 @@ import { useState } from 'react';
 
 import { ShareLink } from '@/components/accounts/ShareLink';
 import { UserAvatar } from '@/components/accounts/UserAvatar';
+import { usernameError } from '@/components/accounts/accountRules';
 import {
     ACTIVATE_MESSAGE,
     INVITE_MESSAGE,
@@ -96,7 +98,10 @@ const AgeSelect = ({
 /** Lien à envoyer : invitation, activation ou nouveau mot de passe. */
 type SharedLink = { title: string; url: string; message: string };
 
-/** Nouvelle invitation : rôle et âge maximal, puis le lien à envoyer. */
+/**
+ * Nouvelle invitation : rôle, âge maximal et peut-être l'identifiant, puis le
+ * lien à envoyer.
+ */
 const InviteModal = ({
     opened,
     onClose,
@@ -108,6 +113,7 @@ const InviteModal = ({
 }) => {
     const [role, setRole] = useState<Role>('reader');
     const [maxAge, setMaxAge] = useState<number | null>(null);
+    const [username, setUsername] = useState('');
     const [error, setError] = useState<string>();
     const [busy, setBusy] = useState(false);
 
@@ -115,7 +121,12 @@ const InviteModal = ({
         setBusy(true);
         setError(undefined);
         try {
-            const { token } = await createInvitation({ role, maxAge });
+            const { token } = await createInvitation({
+                role,
+                maxAge,
+                username: username.trim() || null,
+            });
+            setUsername('');
             onCreated({
                 title: 'Invitation prête',
                 url: joinUrl(token),
@@ -132,9 +143,20 @@ const InviteModal = ({
         <Modal opened={opened} onClose={onClose} title="Inviter quelqu’un">
             <Stack>
                 <Text size="sm" c="dimmed">
-                    La personne choisira son identifiant, son mot de passe et
-                    son avatar.
+                    La personne choisira son mot de passe et son avatar, et
+                    pourra changer l’identifiant proposé.
                 </Text>
+                <TextInput
+                    label="Identifiant"
+                    description="Facultatif : déjà rempli sur sa page d’inscription"
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    value={username}
+                    error={
+                        username.trim() ? usernameError(username) : undefined
+                    }
+                    onChange={(event) => setUsername(event.currentTarget.value)}
+                />
                 <SegmentedControl
                     value={role}
                     onChange={(value) => setRole(value as Role)}
@@ -153,6 +175,9 @@ const InviteModal = ({
                     <Button
                         leftSection={<IconLink size={16} />}
                         loading={busy}
+                        disabled={Boolean(
+                            username.trim() && usernameError(username),
+                        )}
                         onClick={() => void create()}
                     >
                         Créer le lien
@@ -364,6 +389,11 @@ export const UsersPage = () => {
                     {invitations.data.map((invitation) => (
                         <Group key={invitation.id} justify="space-between">
                             <Text size="sm">
+                                {invitation.username && (
+                                    <Text span fw={600}>
+                                        {invitation.username} ·{' '}
+                                    </Text>
+                                )}
                                 {invitation.role === 'admin'
                                     ? 'Admin'
                                     : `Lecteur · ${ageLimitLabel(invitation.maxAge).toLowerCase()}`}
