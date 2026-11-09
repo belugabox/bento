@@ -26,6 +26,11 @@ const Picker = ({ start }: { start: string }) => {
     return <AvatarPicker value={value} onChange={setValue} />;
 };
 
+const edit = async () => {
+    fireEvent.click(screen.getByRole('button', { name: 'Personnaliser' }));
+    await screen.findByRole('tab', { name: 'Corps' });
+};
+
 const show = (start = START) =>
     render(
         <MantineProvider>
@@ -38,8 +43,16 @@ afterEach(() => {
 });
 
 describe('AvatarPicker', () => {
-    it('changes one part, keeping the others', () => {
+    it('hides the editing until asked', async () => {
         show();
+
+        expect(screen.queryByRole('tab', { name: 'Corps' })).toBeNull();
+        await edit();
+    });
+
+    it('changes one part, keeping the others', async () => {
+        show();
+        await edit();
 
         fireEvent.click(screen.getByRole('tab', { name: 'Yeux' }));
         fireEvent.click(screen.getByRole('button', { name: 'Yeux 12' }));
@@ -54,8 +67,9 @@ describe('AvatarPicker', () => {
         expect(parseAvatar(current)).toMatchObject({ top: null, eyes: 'wink' });
     });
 
-    it('changes colors', () => {
+    it('changes colors', async () => {
         show();
+        await edit();
 
         fireEvent.click(screen.getByRole('tab', { name: 'Couleurs' }));
         fireEvent.click(screen.getByRole('button', { name: 'Fond : #ffd5dc' }));
@@ -68,17 +82,11 @@ describe('AvatarPicker', () => {
         });
     });
 
-    it('goes from tab to tab with « Suivant »', () => {
+    it('goes from tab to tab with « Suivant »', async () => {
         show();
+        await edit();
 
-        for (const name of [
-            'Corps',
-            'Tête',
-            'Motif',
-            'Yeux',
-            'Bouche',
-            'Couleurs',
-        ]) {
+        for (const name of ['Tête', 'Motif', 'Yeux', 'Bouche', 'Couleurs']) {
             fireEvent.click(screen.getByRole('button', { name: 'Suivant' }));
             expect(
                 screen.getByRole('tab', { name }).getAttribute('aria-selected'),
@@ -95,11 +103,12 @@ describe('AvatarPicker', () => {
         );
         show('abc');
 
-        const mouth = screen.getByRole('tab', { name: 'Bouche' });
+        const open = screen.getByRole('button', { name: 'Personnaliser' });
         await vi.waitFor(() =>
-            expect(mouth.hasAttribute('disabled')).toBe(false),
+            expect(open.hasAttribute('disabled')).toBe(false),
         );
-        fireEvent.click(mouth);
+        await edit();
+        fireEvent.click(screen.getByRole('tab', { name: 'Bouche' }));
         fireEvent.click(screen.getByRole('button', { name: 'Bouche 16' }));
         expect(parseAvatar(current)).toMatchObject({
             body: 'pear',

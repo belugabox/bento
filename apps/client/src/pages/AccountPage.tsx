@@ -125,7 +125,7 @@ const AvatarSection = () => {
     const [seed, setSeed] = useState(user.avatarSeed ?? randomAvatarSeed());
     return (
         <Section title="Avatar">
-            <AvatarPicker value={seed} onChange={setSeed} />
+            <AvatarPicker label={null} value={seed} onChange={setSeed} />
             {error && <Alert color="red">{error}</Alert>}
             <Group>
                 <Button

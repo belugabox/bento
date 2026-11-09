@@ -1,16 +1,22 @@
 import {
+    Accordion,
     Avatar,
     Button,
     CheckIcon,
     ColorSwatch,
     Group,
     Input,
+    SimpleGrid,
     Stack,
     Tabs,
     Text,
     UnstyledButton,
 } from '@mantine/core';
-import { IconArrowRight, IconDice5 } from '@tabler/icons-react';
+import {
+    IconAdjustments,
+    IconArrowRight,
+    IconDice5,
+} from '@tabler/icons-react';
 import { type ReactNode, useEffect, useState } from 'react';
 
 import {
@@ -24,7 +30,11 @@ import {
 
 import { avatarUrl, fetchAvatarChoice, randomAvatarSeed } from '@/services/api';
 
-const IDEAS = 12;
+// Idées à côté de l'avatar : deux lignes de trois.
+const IDEAS = 6;
+const IDEA_SIZE = 40;
+// Propositions de « Personnaliser » : trois par ligne sur un téléphone.
+const PART_SIZE = 46;
 
 const ideas = () => Array.from({ length: IDEAS }, () => randomAvatarSeed());
 
@@ -39,9 +49,8 @@ const PARTS: { part: Part; label: string; optional?: boolean }[] = [
     { part: 'mouth', label: 'Bouche' },
 ];
 
-/** Onglets, de haut en bas. */
+/** Onglets de « Personnaliser », de haut en bas. */
 const TABS: { value: string; label: string }[] = [
-    { value: 'ideas', label: 'Idées' },
     ...PARTS.map(({ part, label }) => ({ value: part, label })),
     { value: 'colors', label: 'Couleurs' },
 ];
@@ -52,11 +61,13 @@ const Choice = ({
     label,
     selected,
     onPick,
+    size = 52,
 }: {
     seed: string;
     label: string;
     selected: boolean;
     onPick: () => void;
+    size?: number;
 }) => (
     <UnstyledButton
         aria-label={label}
@@ -70,13 +81,13 @@ const Choice = ({
             outlineOffset: 2,
         }}
     >
-        <Avatar src={avatarUrl(seed)} size={52} radius="xl" alt="" />
+        <Avatar src={avatarUrl(seed)} size={size} radius="xl" alt="" />
     </UnstyledButton>
 );
 
 /** Propositions, autant par ligne que la largeur le permet. */
 const Grid = ({ children }: { children: ReactNode }) => (
-    <Group gap={10}>{children}</Group>
+    <Group gap={8}>{children}</Group>
 );
 
 const Swatches = ({
@@ -115,20 +126,23 @@ const Swatches = ({
 );
 
 /**
- * Choix de l'avatar Clay : l'avatar en grand, puis des onglets de haut en
- * bas (idées au hasard, une partie par onglet, couleurs) avec le choix à
- * droite, chaque proposition montrée sur l'avatar lui-même, et « Suivant »
- * pour passer à l'onglet d'après.
+ * Choix de l'avatar Clay : l'avatar en grand, à côté des idées à prendre
+ * d'un clic, puis « Personnaliser », fermé au départ : un onglet par partie
+ * et les couleurs, de haut en bas, le choix à droite, chaque proposition
+ * montrée sur l'avatar lui-même, et « Suivant » pour l'onglet d'après.
  */
 export const AvatarPicker = ({
     value,
     onChange,
+    label = 'Avatar',
 }: {
     value: string;
     onChange: (seed: string) => void;
+    /** Sans titre quand la section en a déjà un (« Mon compte »). */
+    label?: string | null;
 }) => {
     const [suggestions, setSuggestions] = useState(ideas);
-    const [tab, setTab] = useState<string | null>('ideas');
+    const [tab, setTab] = useState<string | null>(TABS[0]!.value);
     // Parties tirées par une graine (comptes d'avant), lues par le serveur.
     const [seedChoice, setSeedChoice] = useState<{
         seed: string;
@@ -167,171 +181,200 @@ export const AvatarPicker = ({
         const following = TABS[TABS.findIndex((t) => t.value === current) + 1];
         return (
             following && (
-                <Button
-                    size="compact-sm"
-                    variant="light"
-                    rightSection={<IconArrowRight size={14} />}
-                    disabled={!choice}
-                    onClick={() => setTab(following.value)}
-                >
-                    Suivant
-                </Button>
+                <Group justify="flex-end">
+                    <Button
+                        size="compact-sm"
+                        variant="light"
+                        rightSection={<IconArrowRight size={14} />}
+                        onClick={() => setTab(following.value)}
+                    >
+                        Suivant
+                    </Button>
+                </Group>
             )
         );
     };
 
     return (
-        <Input.Wrapper label="Avatar">
+        <Input.Wrapper label={label}>
             <Stack gap="sm" mt={4}>
-                <Group align="center" gap="md">
+                <Group align="center" gap="lg" wrap="nowrap">
                     <Avatar
                         src={avatarUrl(value)}
                         size={112}
                         radius={56}
                         alt="Avatar choisi"
+                        style={{ flexShrink: 0 }}
                     />
-                    <Stack gap={6} align="flex-start">
-                        <Button
-                            variant="light"
-                            leftSection={<IconDice5 size={16} />}
-                            onClick={() => onChange(randomAvatarSeed())}
-                        >
-                            Au hasard
-                        </Button>
-                        <Text size="xs" c="dimmed" maw={220}>
-                            Pars d’une idée, puis change ce que tu veux dans les
-                            onglets.
+                    <Stack gap={8} style={{ minWidth: 0 }}>
+                        <Text size="xs" c="dimmed">
+                            Des idées ? Touche celle qui te plaît.
                         </Text>
+                        <SimpleGrid
+                            cols={IDEAS / 2}
+                            spacing={8}
+                            verticalSpacing={8}
+                            w={(IDEAS / 2) * IDEA_SIZE + (IDEAS / 2 - 1) * 8}
+                        >
+                            {suggestions.map((seed, index) => (
+                                <Choice
+                                    key={seed}
+                                    seed={seed}
+                                    size={IDEA_SIZE}
+                                    label={`Idée ${index + 1}`}
+                                    selected={seed === value}
+                                    onPick={() => onChange(seed)}
+                                />
+                            ))}
+                        </SimpleGrid>
+                        <Group>
+                            <Button
+                                size="compact-sm"
+                                variant="subtle"
+                                leftSection={<IconDice5 size={14} />}
+                                onClick={() => setSuggestions(ideas())}
+                            >
+                                Autres idées
+                            </Button>
+                        </Group>
                     </Stack>
                 </Group>
 
-                <Tabs
-                    value={tab}
-                    onChange={setTab}
-                    variant="pills"
-                    orientation="vertical"
+                <Accordion
+                    variant="contained"
+                    radius="md"
+                    styles={{
+                        content: { padding: 'var(--mantine-spacing-xs)' },
+                    }}
                 >
-                    <Tabs.List>
-                        {TABS.map((item) => (
-                            <Tabs.Tab
-                                key={item.value}
-                                value={item.value}
-                                disabled={item.value !== 'ideas' && !choice}
-                            >
-                                {item.label}
-                            </Tabs.Tab>
-                        ))}
-                    </Tabs.List>
-
-                    <Tabs.Panel value="ideas" pl="sm">
-                        <Stack gap="sm">
-                            <Grid>
-                                {suggestions.map((seed, index) => (
-                                    <Choice
-                                        key={seed}
-                                        seed={seed}
-                                        label={`Idée ${index + 1}`}
-                                        selected={seed === value}
-                                        onPick={() => onChange(seed)}
-                                    />
-                                ))}
-                            </Grid>
-                            <Group justify="space-between" gap="xs">
-                                <Button
-                                    size="compact-sm"
-                                    variant="subtle"
-                                    leftSection={<IconDice5 size={14} />}
-                                    onClick={() => setSuggestions(ideas())}
+                    <Accordion.Item value="edit">
+                        <Accordion.Control
+                            icon={<IconAdjustments size={18} />}
+                            disabled={!choice}
+                        >
+                            Personnaliser
+                        </Accordion.Control>
+                        <Accordion.Panel>
+                            {choice && (
+                                <Tabs
+                                    value={tab}
+                                    onChange={setTab}
+                                    variant="pills"
+                                    orientation="vertical"
                                 >
-                                    Autres idées
-                                </Button>
-                                {next('ideas')}
-                            </Group>
-                        </Stack>
-                    </Tabs.Panel>
+                                    <Tabs.List>
+                                        {TABS.map((item) => (
+                                            <Tabs.Tab
+                                                key={item.value}
+                                                value={item.value}
+                                            >
+                                                {item.label}
+                                            </Tabs.Tab>
+                                        ))}
+                                    </Tabs.List>
 
-                    {choice &&
-                        PARTS.map(({ part, label, optional }) => (
-                            <Tabs.Panel key={part} value={part} pl="sm">
-                                <Stack gap="sm">
-                                    <Grid>
-                                        {optional && (
-                                            <Choice
-                                                seed={variant(choice, {
-                                                    [part]: null,
-                                                })}
-                                                label={`${label} : sans`}
-                                                selected={choice[part] === null}
-                                                onPick={() =>
-                                                    change({ [part]: null })
+                                    {PARTS.map(({ part, label, optional }) => (
+                                        <Tabs.Panel
+                                            key={part}
+                                            value={part}
+                                            pl="sm"
+                                        >
+                                            <Stack gap="sm">
+                                                <Grid>
+                                                    {optional && (
+                                                        <Choice
+                                                            seed={variant(
+                                                                choice,
+                                                                {
+                                                                    [part]: null,
+                                                                },
+                                                            )}
+                                                            size={PART_SIZE}
+                                                            label={`${label} : sans`}
+                                                            selected={
+                                                                choice[part] ===
+                                                                null
+                                                            }
+                                                            onPick={() =>
+                                                                change({
+                                                                    [part]: null,
+                                                                })
+                                                            }
+                                                        />
+                                                    )}
+                                                    {AVATAR_VARIANTS[part].map(
+                                                        (name, index) => (
+                                                            <Choice
+                                                                key={name}
+                                                                seed={variant(
+                                                                    choice,
+                                                                    {
+                                                                        [part]: name,
+                                                                    },
+                                                                )}
+                                                                size={PART_SIZE}
+                                                                label={`${label} ${index + 1}`}
+                                                                selected={
+                                                                    choice[
+                                                                        part
+                                                                    ] === name
+                                                                }
+                                                                onPick={() =>
+                                                                    change({
+                                                                        [part]: name,
+                                                                    })
+                                                                }
+                                                            />
+                                                        ),
+                                                    )}
+                                                </Grid>
+                                                {next(part)}
+                                            </Stack>
+                                        </Tabs.Panel>
+                                    ))}
+
+                                    <Tabs.Panel value="colors" pl="sm">
+                                        <Stack gap="md">
+                                            <Swatches
+                                                label="Corps"
+                                                colors={AVATAR_BODY_COLORS}
+                                                value={choice.bodyColor}
+                                                onPick={(color) =>
+                                                    change({
+                                                        bodyColor:
+                                                            color as AvatarChoice['bodyColor'],
+                                                    })
                                                 }
                                             />
-                                        )}
-                                        {AVATAR_VARIANTS[part].map(
-                                            (name, index) => (
-                                                <Choice
-                                                    key={name}
-                                                    seed={variant(choice, {
-                                                        [part]: name,
-                                                    })}
-                                                    label={`${label} ${index + 1}`}
-                                                    selected={
-                                                        choice[part] === name
-                                                    }
-                                                    onPick={() =>
-                                                        change({ [part]: name })
-                                                    }
-                                                />
-                                            ),
-                                        )}
-                                    </Grid>
-                                    <Group justify="flex-end">
-                                        {next(part)}
-                                    </Group>
-                                </Stack>
-                            </Tabs.Panel>
-                        ))}
-
-                    {choice && (
-                        <Tabs.Panel value="colors" pl="sm">
-                            <Stack gap="md">
-                                <Swatches
-                                    label="Corps"
-                                    colors={AVATAR_BODY_COLORS}
-                                    value={choice.bodyColor}
-                                    onPick={(color) =>
-                                        change({
-                                            bodyColor:
-                                                color as AvatarChoice['bodyColor'],
-                                        })
-                                    }
-                                />
-                                <Swatches
-                                    label="Détails"
-                                    colors={AVATAR_BODY_COLORS}
-                                    value={choice.accentColor}
-                                    onPick={(color) =>
-                                        change({
-                                            accentColor:
-                                                color as AvatarChoice['accentColor'],
-                                        })
-                                    }
-                                />
-                                <Swatches
-                                    label="Fond"
-                                    colors={AVATAR_BACKGROUNDS}
-                                    value={choice.background}
-                                    onPick={(color) =>
-                                        change({
-                                            background:
-                                                color as AvatarChoice['background'],
-                                        })
-                                    }
-                                />
-                            </Stack>
-                        </Tabs.Panel>
-                    )}
-                </Tabs>
+                                            <Swatches
+                                                label="Détails"
+                                                colors={AVATAR_BODY_COLORS}
+                                                value={choice.accentColor}
+                                                onPick={(color) =>
+                                                    change({
+                                                        accentColor:
+                                                            color as AvatarChoice['accentColor'],
+                                                    })
+                                                }
+                                            />
+                                            <Swatches
+                                                label="Fond"
+                                                colors={AVATAR_BACKGROUNDS}
+                                                value={choice.background}
+                                                onPick={(color) =>
+                                                    change({
+                                                        background:
+                                                            color as AvatarChoice['background'],
+                                                    })
+                                                }
+                                            />
+                                        </Stack>
+                                    </Tabs.Panel>
+                                </Tabs>
+                            )}
+                        </Accordion.Panel>
+                    </Accordion.Item>
+                </Accordion>
             </Stack>
         </Input.Wrapper>
     );
