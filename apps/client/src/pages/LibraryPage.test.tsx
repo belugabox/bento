@@ -120,6 +120,8 @@ describe('LibraryPage', () => {
             expect(titles()).toEqual(['/read/42', '/read/51', '/series/2']),
         );
         expect(screen.queryByText('Reprendre la lecture')).toBeNull();
+        // Tomes à reprendre : marqués d'un ▶ (et d'un contour).
+        expect(screen.getAllByLabelText('Tome à reprendre')).toHaveLength(2);
         expect(screen.queryByText('Séries')).toBeNull();
         // Série entièrement lue : marquée, à la fin et grisée.
         const read = screen.getByLabelText('Série lue');

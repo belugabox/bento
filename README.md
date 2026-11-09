@@ -76,7 +76,7 @@ L'admin fixe le mode de chaque série dans « Modifier les métadonnées » (par
 
 ### Accueil et listes
 
-- **Accueil** : une seule grille, sans titre. D'abord les tomes à reprendre (pour chaque série entamée, le tome commencé ou, à défaut, le premier pas encore ouvert, avec l'avancement dans la série ; la plus récemment lue d'abord), qui ouvrent le lecteur ; puis les séries de ta liste « À lire », les autres, et enfin les séries déjà lues, grisées. Les filtres et la recherche s'appliquent à tout. Les vignettes utilisent une version réduite des couvertures, créée à la première demande.
+- **Accueil** : une seule grille, sans titre. D'abord les tomes à reprendre (pour chaque série entamée, le tome commencé ou, à défaut, le premier pas encore ouvert, avec l'avancement dans la série ; la plus récemment lue d'abord), qui ouvrent le lecteur (contour de couleur et ▶ sur la couverture) ; puis les séries de ta liste « À lire », les autres, et enfin les séries déjà lues, grisées. Les filtres et la recherche s'appliquent à tout. Les vignettes utilisent une version réduite des couvertures, créée à la première demande.
 - **Menu ⋮ des cartes** (en bas à droite) :
   - sur une série : lire, reprendre ou relire ; marquer comme lue, lue jusqu'à un tome, ou non lue (après confirmation) ; ajouter à « À lire » ou l'en retirer ; modifier la série (admin) ;
   - sur un tome à reprendre : le marquer comme lu, le retirer de « Reprendre » (progression effacée), voir la série.

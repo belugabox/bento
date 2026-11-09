@@ -21,6 +21,7 @@ import {
     IconArrowsSort,
     IconCheck,
     IconChevronDown,
+    IconPlayerPlayFilled,
 } from '@tabler/icons-react';
 import { type ReactNode, useContext } from 'react';
 import { useSearchParams } from 'react-router';
@@ -77,6 +78,13 @@ const ResumeCard = ({
         subtitle={subtitle}
         progress={progress}
         menu={<VolumeCardMenu volume={volume} onChanged={onChanged} />}
+        // Contour et ▶ : la carte ouvre le lecteur, pas la fiche.
+        highlighted
+        corner={
+            <ThemeIcon size="sm" radius="xl" aria-label="Tome à reprendre">
+                <IconPlayerPlayFilled size={10} />
+            </ThemeIcon>
+        }
     />
 );
 
