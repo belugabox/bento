@@ -92,12 +92,6 @@ afterEach(() => {
     vi.restoreAllMocks();
 });
 
-/** Choisit un état de lecture dans son menu. */
-const readingFilter = async (label: string) => {
-    fireEvent.click(screen.getByRole('button', { name: 'État de lecture' }));
-    fireEvent.click(await screen.findByRole('menuitem', { name: label }));
-};
-
 const show = () =>
     render(
         <MantineProvider>
@@ -127,31 +121,28 @@ describe('LibraryPage', () => {
         );
         expect(screen.queryByText('Reprendre la lecture')).toBeNull();
         expect(screen.queryByText('Séries')).toBeNull();
-        // Série entièrement lue : marquée.
-        expect(screen.getByLabelText('Série lue')).toBeTruthy();
+        // Série entièrement lue : marquée, à la fin et grisée.
+        const read = screen.getByLabelText('Série lue');
+        expect(read.closest('[style*="opacity"]')).toBeTruthy();
         // Le scan n'est plus sur l'accueil.
         expect(screen.queryByRole('button', { name: /scanner/i })).toBeNull();
     });
 
-    it('filters by reading state and sorts by recent additions, in the address', async () => {
+    it('sorts by recent additions, in the address', async () => {
         show();
         await screen.findByTestId('series-grid');
         await vi.waitFor(() => expect(titles()).toHaveLength(3));
 
-        // Les tomes à reprendre suivent aussi les filtres.
-        await readingFilter('En cours');
-        await vi.waitFor(() => expect(titles()).toEqual(['/read/42']));
-        expect(location).toBe('?filter=started');
-
-        await readingFilter('Toutes');
         fireEvent.click(
             screen.getByRole('button', { name: 'Trier les séries' }),
         );
         fireEvent.click(await screen.findByText('Ajouts récents'));
-        await vi.waitFor(() =>
-            expect(titles()).toEqual(['/read/42', '/read/51', '/series/2']),
-        );
-        expect(location).toBe('?sort=recent');
+        await vi.waitFor(() => expect(location).toBe('?sort=recent'));
+        expect(titles()).toEqual(['/read/42', '/read/51', '/series/2']);
+        // Plus de menu « Lecture ».
+        expect(
+            screen.queryByRole('button', { name: 'État de lecture' }),
+        ).toBeNull();
     });
 
     it('resumes with the next volume of a series, in the same row', async () => {
@@ -169,19 +160,6 @@ describe('LibraryPage', () => {
                 .getAllByRole('link')
                 .some((link) => link.getAttribute('href') === '/read/51'),
         ).toBe(true);
-    });
-
-    it('keeps the to-read list in the address', async () => {
-        show();
-        await screen.findByTestId('series-grid');
-        await vi.waitFor(() => expect(titles()).toHaveLength(3));
-
-        await readingFilter('À lire');
-        await vi.waitFor(() => expect(titles()).toEqual(['/series/2']));
-        expect(location).toBe('?filter=toread');
-        await readingFilter('Toutes');
-        await vi.waitFor(() => expect(titles()).toHaveLength(3));
-        expect(location).toBe('');
     });
 
     it('filters by genre with chips, the most frequent first', async () => {

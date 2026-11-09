@@ -16,18 +16,10 @@ export type ListedSeries = {
     toRead?: boolean;
 };
 
-/** État de lecture, ou la liste « à lire » de la personne. */
-export type ReadingFilter = 'all' | 'toread' | 'unread' | 'started' | 'read';
+/** État de lecture d'une série pour la personne. */
+export type ReadingState = 'unread' | 'started' | 'read';
 export type SeriesSort = 'name' | 'recent';
 export type StatusFilter = 'all' | 'ongoing' | 'completed';
-
-export const READING_FILTERS: { value: ReadingFilter; label: string }[] = [
-    { value: 'all', label: 'Toutes' },
-    { value: 'toread', label: 'À lire' },
-    { value: 'unread', label: 'Non lues' },
-    { value: 'started', label: 'En cours' },
-    { value: 'read', label: 'Lues' },
-];
 
 export const SERIES_SORTS: { value: SeriesSort; label: string }[] = [
     { value: 'name', label: 'Nom' },
@@ -41,9 +33,7 @@ export const STATUS_FILTERS: { value: StatusFilter; label: string }[] = [
 ];
 
 /** État de lecture d'une série pour la personne. */
-export const readingStateOf = (
-    s: ListedSeries,
-): Exclude<ReadingFilter, 'all' | 'toread'> =>
+export const readingStateOf = (s: ListedSeries): ReadingState =>
     s.readCount >= s.volumeCount
         ? 'read'
         : s.startedCount > 0
@@ -66,23 +56,25 @@ export const genresByCount = (series: Pick<ListedSeries, 'genres'>[]) => {
         );
 };
 
-const matchesReading = (s: ListedSeries, filter: ReadingFilter) =>
-    filter === 'all' ||
-    (filter === 'toread' ? !!s.toRead : readingStateOf(s) === filter);
+/**
+ * Rang d'une série sur l'accueil : celles de la liste « à lire » d'abord,
+ * les séries entièrement lues à la fin.
+ */
+const readingRank = (s: ListedSeries) =>
+    readingStateOf(s) === 'read' ? 2 : s.toRead ? 0 : 1;
 
 /**
- * Séries à afficher, filtrées (lecture, genre, statut) puis
- * triées.
+ * Séries à afficher, filtrées (genre, statut) puis triées : « à lire »
+ * d'abord, puis les autres, les séries lues à la fin ; dans chaque groupe,
+ * par nom ou par ajouts récents.
  */
 export const filterSeries = <T extends ListedSeries>(
     series: T[],
     {
-        filter,
         sort,
         genre = null,
         status = 'all',
     }: {
-        filter: ReadingFilter;
         sort: SeriesSort;
         genre?: string | null;
         status?: StatusFilter;
@@ -90,15 +82,16 @@ export const filterSeries = <T extends ListedSeries>(
 ): T[] => {
     const kept = series.filter(
         (s) =>
-            matchesReading(s, filter) &&
             (!genre || (s.genres ?? []).includes(genre)) &&
             (status === 'all' || s.status === status),
     );
-    return sort === 'recent'
-        ? kept.sort(
-              (a, b) =>
-                  (b.lastAddedAt ?? '').localeCompare(a.lastAddedAt ?? '') ||
-                  compareNames(a.name, b.name),
-          )
-        : kept;
+    // Tri stable : l'ordre par nom du serveur est gardé dans chaque groupe.
+    return kept.sort(
+        (a, b) =>
+            readingRank(a) - readingRank(b) ||
+            (sort === 'recent'
+                ? (b.lastAddedAt ?? '').localeCompare(a.lastAddedAt ?? '') ||
+                  compareNames(a.name, b.name)
+                : 0),
+    );
 };

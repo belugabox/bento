@@ -19,7 +19,6 @@ import {
 import { useDebouncedValue } from '@mantine/hooks';
 import {
     IconArrowsSort,
-    IconBook2,
     IconCheck,
     IconChevronDown,
 } from '@tabler/icons-react';
@@ -30,8 +29,6 @@ import { SeriesCardMenu, VolumeCardMenu } from '@/components/CardMenus';
 import { CoverCard } from '@/components/CoverCard';
 import { volumeLabel, volumeShortLabel } from '@/components/readingStatus';
 import {
-    READING_FILTERS,
-    type ReadingFilter,
     SERIES_SORTS,
     STATUS_FILTERS,
     type SeriesSort,
@@ -161,7 +158,6 @@ export const LibraryPage = () => {
     // arrière les garde.
     const [params, setParams] = useSearchParams();
     const [debouncedSearch] = useDebouncedValue(params.get('q') ?? '', 250);
-    const filter = (params.get('filter') as ReadingFilter | null) ?? 'all';
     const sort = (params.get('sort') as SeriesSort | null) ?? 'name';
     const genre = params.get('genre');
     const status = (params.get('status') as StatusFilter | null) ?? 'all';
@@ -208,12 +204,11 @@ export const LibraryPage = () => {
     }
 
     const visible = filterSeries(series.data ?? [], {
-        filter,
         sort,
         genre,
         status,
     });
-    const filtered = filter !== 'all' || !!genre || status !== 'all';
+    const filtered = !!genre || status !== 'all';
     // Tomes à reprendre en tête, si leur série passe les filtres et la
     // recherche ; puis les autres séries.
     const visibleIds = new Set(visible.map((s) => s.id));
@@ -231,7 +226,6 @@ export const LibraryPage = () => {
         .filter((g) => !shownGenres.includes(g.name))
         .sort((a, b) => a.name.localeCompare(b.name, 'fr'));
     const sortLabel = SERIES_SORTS.find((s) => s.value === sort)?.label;
-    const readingLabel = READING_FILTERS.find((f) => f.value === filter)?.label;
 
     return (
         // Marge du bas : la dernière rangée passe au-dessus des filtres.
@@ -268,7 +262,6 @@ export const LibraryPage = () => {
                                 variant="subtle"
                                 onClick={() =>
                                     update({
-                                        filter: '',
                                         genre: '',
                                         status: '',
                                     })
@@ -308,6 +301,8 @@ export const LibraryPage = () => {
                                     />
                                 }
                                 cover={seriesCoverUrl(item, 'small')}
+                                // Déjà lue : à la fin, grisée.
+                                dimmed={state === 'read'}
                                 title={item.name}
                                 subtitle={
                                     state === 'started'
@@ -359,50 +354,6 @@ export const LibraryPage = () => {
                         preventGrowOverflow={false}
                     >
                         <Group gap={6} wrap="nowrap" style={{ flexShrink: 0 }}>
-                            <Menu position="top-start">
-                                <Menu.Target>
-                                    <Button
-                                        size="compact-sm"
-                                        radius="xl"
-                                        fw={500}
-                                        variant={
-                                            filter === 'all'
-                                                ? 'default'
-                                                : 'light'
-                                        }
-                                        aria-label="État de lecture"
-                                        leftSection={<IconBook2 size={14} />}
-                                        rightSection={
-                                            <IconChevronDown size={12} />
-                                        }
-                                        style={{ flexShrink: 0 }}
-                                    >
-                                        {filter === 'all'
-                                            ? 'Lecture'
-                                            : readingLabel}
-                                    </Button>
-                                </Menu.Target>
-                                <Menu.Dropdown>
-                                    {READING_FILTERS.map((option) => (
-                                        <Menu.Item
-                                            key={option.value}
-                                            rightSection={
-                                                option.value === filter && (
-                                                    <IconCheck size={14} />
-                                                )
-                                            }
-                                            onClick={() =>
-                                                update(
-                                                    { filter: option.value },
-                                                    'all',
-                                                )
-                                            }
-                                        >
-                                            {option.label}
-                                        </Menu.Item>
-                                    ))}
-                                </Menu.Dropdown>
-                            </Menu>
                             <Menu position="top-start">
                                 <Menu.Target>
                                     <Indicator

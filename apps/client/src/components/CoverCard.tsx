@@ -21,6 +21,7 @@ export const CoverCard = ({
     progress,
     corner,
     menu,
+    dimmed = false,
 }: {
     to: string;
     /** Adresse de l'image de couverture. */
@@ -38,9 +39,11 @@ export const CoverCard = ({
     corner?: ReactNode;
     /** Menu d'actions (⋮), en bas à droite, à côté du titre. */
     menu?: ReactNode;
+    /** Grisée (série déjà lue). */
+    dimmed?: boolean;
 }) => (
     // Le coin est hors du lien : un bouton ne peut pas être dans un lien.
-    <Box pos="relative">
+    <Box pos="relative" style={dimmed ? { opacity: 0.5 } : undefined}>
         <Card component={Link} to={to} padding={0} radius="md" withBorder>
             <Box pos="relative">
                 <AspectRatio ratio={2 / 3}>
