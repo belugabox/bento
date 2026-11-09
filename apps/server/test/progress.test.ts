@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { createApi } from '../src/api';
+import { SettingsStore } from '../src/settings';
 import { authDeps, sessionCookie, setup, silent, writeCbz } from './helpers';
 
 let ctx: Awaited<ReturnType<typeof setup>>;
@@ -271,5 +272,33 @@ describe('reading progress', () => {
         expect(await resume()).toEqual(before);
         // Les tomes d'une autre personne ne sont pas touchés.
         expect(await progressOf(gantz[1]!, bob)).toBeNull();
+    });
+});
+
+describe('series readers', () => {
+    const readers = async (cookie: string) =>
+        (await call(`/series/${gantzSeries}/readers`, cookie)).body as {
+            name: string;
+            percent: number;
+            avatarSeed: string | null;
+        }[];
+
+    it('lists the others who read enough of the series', async () => {
+        // Alice : T01 fini et 2 pages du T02, soit 5 pages sur 9.
+        await save(gantz[0]!, { page: 2 });
+        await save(gantz[1]!, { page: 1 });
+        // Bob : 1 page sur 9.
+        await save(gantz[0]!, { page: 0 }, bob);
+
+        expect(await readers(bob)).toEqual([
+            expect.objectContaining({ percent: 55 }),
+        ]);
+        // Jamais soi-même ; Bob reste sous le seuil (50 %).
+        expect(await readers(alice)).toEqual([]);
+
+        new SettingsStore(ctx.db).update({ readByPercent: 10 });
+        expect(await readers(alice)).toEqual([
+            expect.objectContaining({ percent: 11 }),
+        ]);
     });
 });

@@ -60,6 +60,10 @@ export const fetchSeriesList = ({
 export const fetchSeries = (seriesId: number) =>
     json(api.series[':id'].$get(id(seriesId)));
 
+/** Les autres comptes qui ont lu la série (« Lu par »). */
+export const fetchSeriesReaders = (seriesId: number) =>
+    json(api.series[':id'].readers.$get(id(seriesId)));
+
 export const fetchVolume = (volumeId: number) =>
     json(api.volumes[':id'].$get(id(volumeId)));
 
@@ -268,6 +272,7 @@ export const saveSettings = (changes: {
     appearance?: Partial<Settings['appearance']>;
     ages?: number[];
     sourcePriority?: Partial<Settings['sourcePriority']>;
+    readByPercent?: number;
 }) => json(api.settings.$put({ json: changes }));
 
 /** Thème par défaut choisi par l'admin (lisible sans session). */

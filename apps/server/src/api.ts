@@ -68,6 +68,7 @@ import {
     saveProgress,
     snapshotProgress,
 } from './library/progress';
+import { seriesReaders } from './library/readers';
 import { type LibraryScanner, coverFile } from './library/scanner';
 import { readCover } from './library/smallCovers';
 import { getStats } from './library/stats';
@@ -330,6 +331,17 @@ export const createApi = ({
         )
         .get('/series/:id', zValidator('param', idParam), (c) =>
             c.json(getSeries(db, c.var.user, c.req.valid('param').id)),
+        )
+        // Les autres comptes qui ont lu la série (seuil dans les réglages).
+        .get('/series/:id/readers', zValidator('param', idParam), (c) =>
+            c.json(
+                seriesReaders(
+                    db,
+                    c.var.user,
+                    c.req.valid('param').id,
+                    settings.get().readByPercent,
+                ),
+            ),
         )
         .put(
             '/series/:id/status',

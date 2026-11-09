@@ -55,17 +55,19 @@ const QUALITY_MARKS = [
 /** Réglages de l'onglet « Général » (la grille d'âges est à part). */
 type GeneralSettings = Pick<
     Settings,
-    'compression' | 'scanIntervalMinutes' | 'appearance'
+    'compression' | 'scanIntervalMinutes' | 'appearance' | 'readByPercent'
 >;
 
 const generalOf = ({
     compression,
     scanIntervalMinutes,
     appearance,
+    readByPercent,
 }: Settings): GeneralSettings => ({
     compression,
     scanIntervalMinutes,
     appearance,
+    readByPercent,
 });
 
 /** Section de réglages : titre, explication, puis les champs. */
@@ -200,6 +202,28 @@ const SettingsForm = ({
                         setValues((current) => ({
                             ...current,
                             scanIntervalMinutes: Number(value) || 0,
+                        }))
+                    }
+                />
+            </Section>
+
+            <Section
+                title="Lu par"
+                description="Sur la fiche d’une série, les avatars des autres comptes qui en ont lu assez."
+            >
+                <NumberInput
+                    label="Afficher à partir de"
+                    description="Part des pages de la série déjà lues."
+                    suffix=" %"
+                    min={1}
+                    max={100}
+                    clampBehavior="strict"
+                    allowDecimal={false}
+                    value={values.readByPercent}
+                    onChange={(value) =>
+                        setValues((current) => ({
+                            ...current,
+                            readByPercent: Number(value) || 1,
                         }))
                     }
                 />

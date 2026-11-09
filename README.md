@@ -79,6 +79,7 @@ L'admin fixe le mode de chaque série dans « Modifier les métadonnées » (par
   - Chaque action affiche un message avec « Annuler » pendant quelques secondes : la progression revient exactement comme avant, ordre de « Reprendre » compris.
 - **Recherche** : dans l'en-tête, depuis n'importe quelle page ; elle trouve les séries par nom, genre, thème ou auteur (scénario, dessin), sans casse ni accents, et s'affiche sur l'accueil.
 - **Filtres** : sur une seule ligne, collée en bas de l'écran. Elle commence par le choix Grille / Liste (le même que dans « Apparence… »). Le menu de tri (nom, ajouts récents) qui contient aussi le statut de parution, puis les genres en pastilles (les 5 qui ont le plus de séries, les autres dans « Plus » avec leur nombre de séries). Un clic choisit une pastille, un second la retire. Sur un écran étroit, un seul bouton « Genre » ouvre la liste de tous les genres. Tout reste dans l'adresse.
+- **« Lu par »** : sur la fiche série, les avatars des autres comptes qui en ont lu assez (part des pages de la série, 50 % par défaut, réglable dans Réglages, onglet Général), les plus avancés d'abord ; au survol, le nom et l'avancement.
 - **« À lire »** : le marque-page de la fiche série, propre à chacun ; ces séries remontent en tête de l'accueil, après les tomes à reprendre. (Les favoris ont été retirés.)
 - La liste « à lire » suit une série renommée à la publication. (Les collections partagées ont été retirées.)
 

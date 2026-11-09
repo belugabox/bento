@@ -33,6 +33,7 @@ import { VOLUME_KINDS } from '@server/types';
 
 import { CompletenessBadge } from '@/components/CompletenessBadge';
 import { CoverCard } from '@/components/CoverCard';
+import { SeriesReaders } from '@/components/SeriesReaders';
 import { ageLabel, seriesAgeOf } from '@/components/ageLimits';
 import { completenessOf } from '@/components/completeness';
 import { formatSize } from '@/components/format';
@@ -221,6 +222,7 @@ export const SeriesPage = () => {
                             Thèmes : {series.themes.join(', ')}
                         </Text>
                     )}
+                    <SeriesReaders seriesId={series.id} />
                     {completeness && completeness.percent < 100 && (
                         <div>
                             <CompletenessBadge
