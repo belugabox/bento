@@ -5,6 +5,7 @@ import {
     filterSeries,
     genresByCount,
     readingStateOf,
+    seriesDetails,
 } from './seriesFilters';
 
 const series = (
@@ -111,5 +112,21 @@ describe('list, format, genre and status filters', () => {
             { name: 'Fantasy', count: 1 },
             { name: 'Science-fiction', count: 1 },
         ]);
+    });
+});
+
+describe('seriesDetails', () => {
+    it('gives format, year, age and status, then the genres', () => {
+        expect(
+            seriesDetails({
+                ...series('Akira', 0, null),
+                format: 'Manga',
+                year: 1984,
+                age: 14,
+                status: 'completed',
+                genres: ['Action', 'Science-fiction'],
+            }),
+        ).toEqual(['Manga · 1984 · 14+ · Terminée', 'Action, Science-fiction']);
+        expect(seriesDetails(series('Akira', 0, null))).toEqual([]);
     });
 });

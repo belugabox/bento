@@ -1,4 +1,4 @@
-import { compareNames } from '@server/types';
+import { ageLabel, compareNames } from '@server/types';
 
 /** Ce dont les filtres ont besoin pour une série de la liste. */
 export type ListedSeries = {
@@ -14,6 +14,9 @@ export type ListedSeries = {
     format?: string | null;
     status?: 'ongoing' | 'completed' | null;
     toRead?: boolean;
+    year?: number | null;
+    // Âge minimal : choisi dans Bento, sinon déduit des tomes.
+    age?: number | null;
 };
 
 /** État de lecture d'une série pour la personne. */
@@ -31,6 +34,28 @@ export const STATUS_FILTERS: { value: StatusFilter; label: string }[] = [
     { value: 'ongoing', label: 'En cours de parution' },
     { value: 'completed', label: 'Terminées' },
 ];
+
+const STATUS_LABELS = {
+    ongoing: 'En cours de parution',
+    completed: 'Terminée',
+} as const;
+
+/**
+ * Infos d'une série pour le mode liste : format, année, âge et parution,
+ * puis ses genres (une ligne chacun ; vide s'il n'y a rien).
+ */
+export const seriesDetails = (s: ListedSeries): string[] =>
+    [
+        [
+            s.format,
+            s.year,
+            s.age !== null && s.age !== undefined ? ageLabel(s.age) : null,
+            s.status ? STATUS_LABELS[s.status] : null,
+        ]
+            .filter((value) => value !== null && value !== undefined)
+            .join(' · '),
+        (s.genres ?? []).join(', '),
+    ].filter(Boolean);
 
 /** État de lecture d'une série pour la personne. */
 export const readingStateOf = (s: ListedSeries): ReadingState =>

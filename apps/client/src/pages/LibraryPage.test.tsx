@@ -153,6 +153,8 @@ describe('LibraryPage', () => {
         show();
         await vi.waitFor(() => expect(titles()).toHaveLength(3));
         expect(screen.getByText('Berserk')).toBeTruthy();
+        // Infos en plus : les genres de chaque série.
+        expect(screen.getByText('Action, Horreur')).toBeTruthy();
     });
 
     it('sorts by recent additions, in the address', async () => {

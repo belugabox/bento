@@ -56,6 +56,7 @@ export const CoverCard = ({
     dimmed = false,
     layout = 'card',
     coversOnly = false,
+    details = [],
 }: {
     to: string;
     /** Adresse de l'image de couverture. */
@@ -83,6 +84,8 @@ export const CoverCard = ({
     layout?: 'card' | 'row';
     /** Sans titre ni légende sous la couverture (grille). */
     coversOnly?: boolean;
+    /** Lignes d'infos en plus, en mode liste (format, genres…). */
+    details?: string[];
 }) => {
     const shown = progress !== undefined && progress > 0;
     if (layout === 'row') {
@@ -96,7 +99,10 @@ export const CoverCard = ({
                     withBorder
                 >
                     <Group gap="sm" wrap="nowrap" pr={menu ? 32 : 0}>
-                        <Box w={44} style={{ flexShrink: 0 }}>
+                        <Box
+                            w={details.length ? 56 : 44}
+                            style={{ flexShrink: 0 }}
+                        >
                             <Cover cover={cover} title={title} iconSize={20} />
                         </Box>
                         <Stack gap={2} style={{ flex: 1, minWidth: 0 }}>
@@ -113,6 +119,17 @@ export const CoverCard = ({
                                     {subtitle}
                                 </Text>
                             )}
+                            {details.map((line) => (
+                                <Text
+                                    key={line}
+                                    size="xs"
+                                    c="dimmed"
+                                    lineClamp={1}
+                                    title={line}
+                                >
+                                    {line}
+                                </Text>
+                            ))}
                             {shown && (
                                 <Progress
                                     value={progress * 100}

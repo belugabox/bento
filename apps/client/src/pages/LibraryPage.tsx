@@ -44,6 +44,7 @@ import {
     filterSeries,
     genresByCount,
     readingStateOf,
+    seriesDetails,
 } from '@/components/seriesFilters';
 import {
     type InProgressVolume,
@@ -63,6 +64,7 @@ const ResumeCard = ({
     progress,
     onChanged,
     display,
+    details,
 }: {
     volume: Pick<
         InProgressVolume,
@@ -79,6 +81,8 @@ const ResumeCard = ({
     /** Après une action du menu (recharger l'accueil). */
     onChanged: () => void;
     display: LibraryDisplay;
+    /** Infos de la série, en mode liste. */
+    details?: string[];
 }) => (
     <CoverCard
         to={`/read/${volume.volumeId}`}
@@ -89,6 +93,7 @@ const ResumeCard = ({
         menu={<VolumeCardMenu volume={volume} onChanged={onChanged} />}
         layout={display.layout === 'list' ? 'row' : 'card'}
         coversOnly={display.coversOnly}
+        details={details}
         // ▶ en couleur : la carte ouvre le lecteur, pas la fiche.
         badge={
             <ThemeIcon size="sm" radius="xl" aria-label="Tome à reprendre">
@@ -321,6 +326,15 @@ export const LibraryPage = () => {
                             progress={seriesProgress(volume)}
                             onChanged={reloadHome}
                             display={display}
+                            details={
+                                display.layout === 'list'
+                                    ? seriesDetails(
+                                          visible.find(
+                                              (s) => s.id === volume.seriesId,
+                                          )!,
+                                      )
+                                    : undefined
+                            }
                         />
                     ))}
                     {others.map((item) => {
@@ -355,6 +369,11 @@ export const LibraryPage = () => {
                                     display.layout === 'list' ? 'row' : 'card'
                                 }
                                 coversOnly={display.coversOnly}
+                                details={
+                                    display.layout === 'list'
+                                        ? seriesDetails(item)
+                                        : undefined
+                                }
                             />
                         );
                     })}
