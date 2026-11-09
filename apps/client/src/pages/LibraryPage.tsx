@@ -147,7 +147,7 @@ const FilterChip = ({
     children: ReactNode;
 }) => (
     <Button
-        size="compact-sm"
+        size="compact-md"
         radius="xl"
         fw={500}
         variant={active ? 'filled' : 'default'}
@@ -270,7 +270,7 @@ export const LibraryPage = () => {
 
     return (
         // Marge du bas : la dernière rangée passe au-dessus des filtres.
-        <Stack gap="xl" pb={64}>
+        <Stack gap="xl" pb={88}>
             {libraries.data && libraries.data.length > 1 && (
                 <SegmentedControl
                     style={{ alignSelf: 'flex-start' }}
@@ -402,7 +402,7 @@ export const LibraryPage = () => {
                     {/* Centrée ; seuls les genres rétrécissent (et défilent). */}
                     <Group
                         gap="lg"
-                        py={6}
+                        py={12}
                         wrap="nowrap"
                         justify="center"
                         preventGrowOverflow={false}
@@ -410,7 +410,7 @@ export const LibraryPage = () => {
                         <Group gap={6} wrap="nowrap" style={{ flexShrink: 0 }}>
                             {/* Même réglage que dans « Apparence… ». */}
                             <SegmentedControl
-                                size="xs"
+                                size="sm"
                                 radius="xl"
                                 aria-label="Affichage"
                                 value={display.layout}
@@ -424,7 +424,7 @@ export const LibraryPage = () => {
                                         value: 'grid',
                                         label: (
                                             <Center>
-                                                <IconLayoutGrid size={14} />
+                                                <IconLayoutGrid size={16} />
                                                 <VisuallyHidden>
                                                     Grille
                                                 </VisuallyHidden>
@@ -435,7 +435,7 @@ export const LibraryPage = () => {
                                         value: 'list',
                                         label: (
                                             <Center>
-                                                <IconList size={14} />
+                                                <IconList size={16} />
                                                 <VisuallyHidden>
                                                     Liste
                                                 </VisuallyHidden>
@@ -452,13 +452,13 @@ export const LibraryPage = () => {
                                         disabled={status === 'all'}
                                     >
                                         <Button
-                                            size="compact-sm"
+                                            size="compact-md"
                                             radius="xl"
                                             fw={500}
                                             variant="default"
                                             aria-label="Trier les séries"
                                             leftSection={
-                                                <IconArrowsSort size={14} />
+                                                <IconArrowsSort size={16} />
                                             }
                                             style={{ flexShrink: 0 }}
                                         >
@@ -532,7 +532,7 @@ export const LibraryPage = () => {
                                     <Menu position="top-end">
                                         <Menu.Target>
                                             <Button
-                                                size="compact-sm"
+                                                size="compact-md"
                                                 radius="xl"
                                                 fw={500}
                                                 variant="subtle"
@@ -582,7 +582,7 @@ export const LibraryPage = () => {
                                 <Menu.Target>
                                     <Button
                                         hiddenFrom="sm"
-                                        size="compact-sm"
+                                        size="compact-md"
                                         radius="xl"
                                         fw={500}
                                         variant={genre ? 'filled' : 'default'}

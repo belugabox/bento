@@ -129,9 +129,15 @@ export const updateMe = (changes: {
     currentPassword?: string;
 }) => json(api.me.$patch({ json: changes }));
 
+/**
+ * Version du dessin des avatars (gardés un an par le navigateur) : à changer
+ * quand le serveur les dessine autrement (`auth/avatar.ts`).
+ */
+const AVATAR_VERSION = 2;
+
 /** Avatar DiceBear « Clay » : graine au hasard ou avatar composé. */
 export const avatarUrl = (seed: string) =>
-    `/api/avatars/${encodeURIComponent(seed)}`;
+    `/api/avatars/${encodeURIComponent(seed)}?v=${AVATAR_VERSION}`;
 
 /** Avatar composé au hasard. */
 export const randomAvatarSeed = () => formatAvatar(randomAvatar());

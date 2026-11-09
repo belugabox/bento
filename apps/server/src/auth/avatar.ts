@@ -4,7 +4,6 @@ import { createRequire } from 'node:module';
 import {
     AVATAR_BACKGROUNDS,
     AVATAR_BODY_COLORS,
-    AVATAR_MOTIONS,
     type AvatarChoice,
     parseAvatar,
     randomAvatar,
@@ -35,10 +34,18 @@ const SEED_BACKGROUNDS = AVATAR_BACKGROUNDS.slice(0, 5);
 // change une autre partie.
 const COMPOSED_SEED = 'bento';
 
+/**
+ * Réglages de tous les avatars : mouvement « normal » (sauf si l'appareil
+ * réduit les animations), et dessin remonté de 8 % dans son fond. Les
+ * changer change le dessin d'adresses gardées un an : changer aussi
+ * `AVATAR_VERSION` côté client (`services/api.ts`).
+ */
+const COMMON = { animationVariant: 'medium', translateY: -8 };
+
 const render = (options: Record<string, unknown>) => {
     const { Avatar, Style } = dicebear();
     style ??= new Style(clayDefinition());
-    return new Avatar(style, options);
+    return new Avatar(style, { ...COMMON, ...options });
 };
 
 const composedOptions = (choice: AvatarChoice) => ({
@@ -54,7 +61,6 @@ const composedOptions = (choice: AvatarChoice) => ({
     bodyColor: `#${choice.bodyColor}`,
     accentColor: `#${choice.accentColor}`,
     backgroundColor: choice.background,
-    animationVariant: choice.motion,
 });
 
 /** Avatar Clay en SVG : avatar composé, ou graine au hasard. */
@@ -105,6 +111,5 @@ export const avatarChoice = (value: string): AvatarChoice => {
         background:
             member(AVATAR_BACKGROUNDS, hex(options.backgroundColor)) ??
             fallback.background,
-        motion: member(AVATAR_MOTIONS, options.animationVariant) ?? 'none',
     };
 };

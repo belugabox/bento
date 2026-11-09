@@ -561,7 +561,6 @@ describe('avatars', () => {
             ...randomAvatar(),
             top: null,
             pattern: 'spiral' as const,
-            motion: 'slow' as const,
         };
         const value = formatAvatar(choice);
         expect(parseAvatar(value)).toEqual(choice);
@@ -571,7 +570,10 @@ describe('avatars', () => {
         const svg = await (await call(`/avatars/${value}`)).text();
         expect(svg).toMatch(/^<svg/);
         expect(svg).toMatch(new RegExp(choice.bodyColor, 'i'));
-        expect(svg).toMatch(/dbcl-slow/);
+        // Tous les avatars bougent au rythme « normal ».
+        expect(svg).toMatch(/dbcl-medium/);
+        // Ancien format, avec le mouvement : lu sans lui.
+        expect(parseAvatar(`${value}_fast`)).toEqual(choice);
         expect(await (await call(`/avatars/${value}/choice`)).json()).toEqual(
             choice,
         );

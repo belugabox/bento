@@ -16,7 +16,6 @@ const START = formatAvatar({
     bodyColor: 'c4795c',
     accentColor: '8ba06b',
     background: 'b6e3f4',
-    motion: 'none',
 });
 
 let current = '';
@@ -55,17 +54,37 @@ describe('AvatarPicker', () => {
         expect(parseAvatar(current)).toMatchObject({ top: null, eyes: 'wink' });
     });
 
-    it('changes colors and motion', () => {
+    it('changes colors', () => {
         show();
 
         fireEvent.click(screen.getByRole('tab', { name: 'Couleurs' }));
         fireEvent.click(screen.getByRole('button', { name: 'Fond : #ffd5dc' }));
-        fireEvent.click(screen.getByRole('tab', { name: 'Mouvement' }));
-        fireEvent.click(screen.getByLabelText('Lent'));
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Détails : #c4795c' }),
+        );
         expect(parseAvatar(current)).toMatchObject({
             background: 'ffd5dc',
-            motion: 'slow',
+            accentColor: 'c4795c',
         });
+    });
+
+    it('goes from tab to tab with « Suivant »', () => {
+        show();
+
+        for (const name of [
+            'Corps',
+            'Tête',
+            'Motif',
+            'Yeux',
+            'Bouche',
+            'Couleurs',
+        ]) {
+            fireEvent.click(screen.getByRole('button', { name: 'Suivant' }));
+            expect(
+                screen.getByRole('tab', { name }).getAttribute('aria-selected'),
+            ).toBe('true');
+        }
+        expect(screen.queryByRole('button', { name: 'Suivant' })).toBeNull();
     });
 
     it('edits an avatar drawn from a seed, from its parts', async () => {

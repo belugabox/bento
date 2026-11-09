@@ -10,7 +10,6 @@ export {
 export {
     AVATAR_BACKGROUNDS,
     AVATAR_BODY_COLORS,
-    AVATAR_MOTIONS,
     AVATAR_VARIANTS,
     type AvatarChoice,
     formatAvatar,

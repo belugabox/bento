@@ -1,7 +1,8 @@
 // Avatar DiceBear « Clay » composé à la main, partagé avec le client (sans
 // Node). Un avatar est soit une graine au hasard (comptes d'avant), soit un
 // avatar composé, écrit dans la même colonne et la même adresse :
-// « c1_corps_sommet_motif_yeux_bouche_couleur_détails_fond_mouvement ».
+// « c1_corps_sommet_motif_yeux_bouche_couleur_détails_fond ». Le mouvement
+// n'est plus choisi : tous les avatars bougent au rythme « normal ».
 
 /** Variantes du style Clay (`@dicebear/styles` 10.6, vérifiées par un test). */
 export const AVATAR_VARIANTS = {
@@ -119,9 +120,6 @@ export const AVATAR_BACKGROUNDS = [
     '3f3f46',
 ] as const;
 
-/** Mouvement (respecte « réduire les animations » du système). */
-export const AVATAR_MOTIONS = ['none', 'slow', 'medium', 'fast'] as const;
-
 type Of<T extends readonly string[]> = T[number];
 
 export type AvatarChoice = {
@@ -133,7 +131,6 @@ export type AvatarChoice = {
     bodyColor: Of<typeof AVATAR_BODY_COLORS>;
     accentColor: Of<typeof AVATAR_BODY_COLORS>;
     background: Of<typeof AVATAR_BACKGROUNDS>;
-    motion: Of<typeof AVATAR_MOTIONS>;
 };
 
 const PREFIX = 'c1';
@@ -151,7 +148,6 @@ export const formatAvatar = (choice: AvatarChoice) =>
         choice.bodyColor,
         choice.accentColor,
         choice.background,
-        choice.motion,
     ].join('_');
 
 const pick = <T extends string>(
@@ -167,9 +163,10 @@ const optional = <T extends string>(
 /** Avatar composé lu ; `undefined` pour une graine ou un texte invalide. */
 export const parseAvatar = (value: string): AvatarChoice | undefined => {
     const parts = value.split('_');
-    if (parts.length !== 10 || parts[0] !== PREFIX) return undefined;
-    const [, body, top, pattern, eyes, mouth, bodyColor, accent, bg, motion] =
-        parts;
+    // Un dixième morceau (mouvement, choisi un temps) est ignoré.
+    if (parts.length < 9 || parts.length > 10 || parts[0] !== PREFIX)
+        return undefined;
+    const [, body, top, pattern, eyes, mouth, bodyColor, accent, bg] = parts;
     const choice = {
         body: pick(AVATAR_VARIANTS.body, body),
         top: optional(AVATAR_VARIANTS.top, top),
@@ -179,7 +176,6 @@ export const parseAvatar = (value: string): AvatarChoice | undefined => {
         bodyColor: pick(AVATAR_BODY_COLORS, bodyColor),
         accentColor: pick(AVATAR_BODY_COLORS, accent),
         background: pick(AVATAR_BACKGROUNDS, bg),
-        motion: pick(AVATAR_MOTIONS, motion),
     };
     return Object.values(choice).some((part) => part === undefined)
         ? undefined
@@ -190,7 +186,7 @@ const any = <T>(list: readonly T[], random: () => number) =>
     list[Math.floor(random() * list.length)]!;
 
 /**
- * Avatar composé au hasard, immobile, avec ou sans sommet et motif comme le
+ * Avatar composé au hasard, avec ou sans sommet et motif comme le
  * style Clay (75 % et 55 % des cas), sur un fond pastel.
  */
 export const randomAvatar = (random = Math.random): AvatarChoice => {
@@ -207,6 +203,5 @@ export const randomAvatar = (random = Math.random): AvatarChoice => {
             random,
         ),
         background: any(AVATAR_BACKGROUNDS.slice(0, 5), random),
-        motion: 'none',
     };
 };

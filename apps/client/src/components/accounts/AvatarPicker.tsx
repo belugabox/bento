@@ -5,20 +5,17 @@ import {
     ColorSwatch,
     Group,
     Input,
-    SegmentedControl,
-    SimpleGrid,
     Stack,
     Tabs,
     Text,
     UnstyledButton,
 } from '@mantine/core';
-import { IconDice5 } from '@tabler/icons-react';
+import { IconArrowRight, IconDice5 } from '@tabler/icons-react';
 import { type ReactNode, useEffect, useState } from 'react';
 
 import {
     AVATAR_BACKGROUNDS,
     AVATAR_BODY_COLORS,
-    AVATAR_MOTIONS,
     AVATAR_VARIANTS,
     type AvatarChoice,
     formatAvatar,
@@ -42,12 +39,12 @@ const PARTS: { part: Part; label: string; optional?: boolean }[] = [
     { part: 'mouth', label: 'Bouche' },
 ];
 
-const MOTION_LABELS: Record<AvatarChoice['motion'], string> = {
-    none: 'Immobile',
-    slow: 'Lent',
-    medium: 'Normal',
-    fast: 'Rapide',
-};
+/** Onglets, de haut en bas. */
+const TABS: { value: string; label: string }[] = [
+    { value: 'ideas', label: 'Idées' },
+    ...PARTS.map(({ part, label }) => ({ value: part, label })),
+    { value: 'colors', label: 'Couleurs' },
+];
 
 /** Avatar à prendre d'un clic, entouré quand c'est le choix actuel. */
 const Choice = ({
@@ -67,7 +64,6 @@ const Choice = ({
         onClick={onPick}
         style={{
             borderRadius: '50%',
-            justifySelf: 'center',
             outline: selected
                 ? '3px solid var(--mantine-primary-color-filled)'
                 : undefined,
@@ -78,10 +74,9 @@ const Choice = ({
     </UnstyledButton>
 );
 
+/** Propositions, autant par ligne que la largeur le permet. */
 const Grid = ({ children }: { children: ReactNode }) => (
-    <SimpleGrid cols={{ base: 5, xs: 6 }} spacing={8} verticalSpacing={10}>
-        {children}
-    </SimpleGrid>
+    <Group gap={10}>{children}</Group>
 );
 
 const Swatches = ({
@@ -120,9 +115,10 @@ const Swatches = ({
 );
 
 /**
- * Choix de l'avatar Clay : l'avatar en grand, des idées au hasard, et un
- * onglet par partie (corps, tête, motif, yeux, bouche), couleurs et
- * mouvement, chaque choix montré sur l'avatar lui-même.
+ * Choix de l'avatar Clay : l'avatar en grand, puis des onglets de haut en
+ * bas (idées au hasard, une partie par onglet, couleurs) avec le choix à
+ * droite, chaque proposition montrée sur l'avatar lui-même, et « Suivant »
+ * pour passer à l'onglet d'après.
  */
 export const AvatarPicker = ({
     value,
@@ -163,9 +159,26 @@ export const AvatarPicker = ({
     const change = (changes: Partial<AvatarChoice>) => {
         if (choice) onChange(formatAvatar({ ...choice, ...changes }));
     };
-    // Vignettes immobiles : seul l'onglet Mouvement fait bouger.
-    const still = (changes: Partial<AvatarChoice>) =>
-        choice && formatAvatar({ ...choice, motion: 'none', ...changes });
+    const variant = (current: AvatarChoice, changes: Partial<AvatarChoice>) =>
+        formatAvatar({ ...current, ...changes });
+
+    /** « Suivant » : l'onglet d'après, s'il y en a un. */
+    const next = (current: string) => {
+        const following = TABS[TABS.findIndex((t) => t.value === current) + 1];
+        return (
+            following && (
+                <Button
+                    size="compact-sm"
+                    variant="light"
+                    rightSection={<IconArrowRight size={14} />}
+                    disabled={!choice}
+                    onClick={() => setTab(following.value)}
+                >
+                    Suivant
+                </Button>
+            )
+        );
+    };
 
     return (
         <Input.Wrapper label="Avatar">
@@ -192,28 +205,26 @@ export const AvatarPicker = ({
                     </Stack>
                 </Group>
 
-                <Tabs value={tab} onChange={setTab} variant="pills">
-                    <Tabs.List mb="sm">
-                        <Tabs.Tab value="ideas">Idées</Tabs.Tab>
-                        {PARTS.map(({ part, label }) => (
+                <Tabs
+                    value={tab}
+                    onChange={setTab}
+                    variant="pills"
+                    orientation="vertical"
+                >
+                    <Tabs.List>
+                        {TABS.map((item) => (
                             <Tabs.Tab
-                                key={part}
-                                value={part}
-                                disabled={!choice}
+                                key={item.value}
+                                value={item.value}
+                                disabled={item.value !== 'ideas' && !choice}
                             >
-                                {label}
+                                {item.label}
                             </Tabs.Tab>
                         ))}
-                        <Tabs.Tab value="colors" disabled={!choice}>
-                            Couleurs
-                        </Tabs.Tab>
-                        <Tabs.Tab value="motion" disabled={!choice}>
-                            Mouvement
-                        </Tabs.Tab>
                     </Tabs.List>
 
-                    <Tabs.Panel value="ideas">
-                        <Stack gap="xs">
+                    <Tabs.Panel value="ideas" pl="sm">
+                        <Stack gap="sm">
                             <Grid>
                                 {suggestions.map((seed, index) => (
                                     <Choice
@@ -225,7 +236,7 @@ export const AvatarPicker = ({
                                     />
                                 ))}
                             </Grid>
-                            <Group>
+                            <Group justify="space-between" gap="xs">
                                 <Button
                                     size="compact-sm"
                                     variant="subtle"
@@ -234,47 +245,55 @@ export const AvatarPicker = ({
                                 >
                                     Autres idées
                                 </Button>
+                                {next('ideas')}
                             </Group>
                         </Stack>
                     </Tabs.Panel>
 
                     {choice &&
                         PARTS.map(({ part, label, optional }) => (
-                            <Tabs.Panel key={part} value={part}>
-                                <Grid>
-                                    {optional && (
-                                        <Choice
-                                            seed={still({ [part]: null })!}
-                                            label={`${label} : sans`}
-                                            selected={choice[part] === null}
-                                            onPick={() =>
-                                                change({ [part]: null })
-                                            }
-                                        />
-                                    )}
-                                    {AVATAR_VARIANTS[part].map(
-                                        (variant, index) => (
+                            <Tabs.Panel key={part} value={part} pl="sm">
+                                <Stack gap="sm">
+                                    <Grid>
+                                        {optional && (
                                             <Choice
-                                                key={variant}
-                                                seed={still({
-                                                    [part]: variant,
-                                                })!}
-                                                label={`${label} ${index + 1}`}
-                                                selected={
-                                                    choice[part] === variant
-                                                }
+                                                seed={variant(choice, {
+                                                    [part]: null,
+                                                })}
+                                                label={`${label} : sans`}
+                                                selected={choice[part] === null}
                                                 onPick={() =>
-                                                    change({ [part]: variant })
+                                                    change({ [part]: null })
                                                 }
                                             />
-                                        ),
-                                    )}
-                                </Grid>
+                                        )}
+                                        {AVATAR_VARIANTS[part].map(
+                                            (name, index) => (
+                                                <Choice
+                                                    key={name}
+                                                    seed={variant(choice, {
+                                                        [part]: name,
+                                                    })}
+                                                    label={`${label} ${index + 1}`}
+                                                    selected={
+                                                        choice[part] === name
+                                                    }
+                                                    onPick={() =>
+                                                        change({ [part]: name })
+                                                    }
+                                                />
+                                            ),
+                                        )}
+                                    </Grid>
+                                    <Group justify="flex-end">
+                                        {next(part)}
+                                    </Group>
+                                </Stack>
                             </Tabs.Panel>
                         ))}
 
                     {choice && (
-                        <Tabs.Panel value="colors">
+                        <Tabs.Panel value="colors" pl="sm">
                             <Stack gap="md">
                                 <Swatches
                                     label="Corps"
@@ -288,7 +307,7 @@ export const AvatarPicker = ({
                                     }
                                 />
                                 <Swatches
-                                    label="Tête et motif"
+                                    label="Détails"
                                     colors={AVATAR_BODY_COLORS}
                                     value={choice.accentColor}
                                     onPick={(color) =>
@@ -309,31 +328,6 @@ export const AvatarPicker = ({
                                         })
                                     }
                                 />
-                            </Stack>
-                        </Tabs.Panel>
-                    )}
-
-                    {choice && (
-                        <Tabs.Panel value="motion">
-                            <Stack gap="xs">
-                                <SegmentedControl
-                                    aria-label="Mouvement"
-                                    value={choice.motion}
-                                    onChange={(motion) =>
-                                        change({
-                                            motion: motion as AvatarChoice['motion'],
-                                        })
-                                    }
-                                    data={AVATAR_MOTIONS.map((motion) => ({
-                                        value: motion,
-                                        label: MOTION_LABELS[motion],
-                                    }))}
-                                />
-                                <Text size="xs" c="dimmed">
-                                    L’avatar se dandine partout dans Bento, sauf
-                                    sur les appareils réglés pour réduire les
-                                    animations.
-                                </Text>
                             </Stack>
                         </Tabs.Panel>
                     )}
