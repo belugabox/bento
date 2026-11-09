@@ -11,7 +11,7 @@ Bento est le serveur de lecture et de gestion des mangas et BD de la maison. Il 
   - compression.
 - **beluga-box** garde la seedbox et continue de synchroniser les tomes téléchargés dans le dossier `_draft` de la bibliothèque manga. Ce dossier est le seul lien entre les deux applis.
 - **Connexion** gérée par Bento (identifiant et mot de passe, comptes créés sur invitation). Pocket ID a servi jusqu'en novembre 2026.
-- **Kavita** : on repart de zéro, sans reprendre la progression de lecture.
+- **Kavita** : migration depuis sa base (comptes, progression, « à lire », dates d'ajout, temps de lecture), dans Réglages ; décidé le 9 novembre 2026 (on devait d'abord repartir de zéro).
 
 ## Périmètre
 

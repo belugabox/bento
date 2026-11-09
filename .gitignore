@@ -22,3 +22,6 @@ apps/server/library
 !.vscode/extensions.json
 .idea
 .DS_Store
+
+# Copie de la base de Kavita (comptes, progression) : jamais dans Git.
+kavita/

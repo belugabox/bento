@@ -19,7 +19,12 @@ import { useState } from 'react';
 import { Link } from 'react-router';
 
 import { ageLabel, ageLimitLabel } from '@/components/ageLimits';
-import { formatNumber, formatRelative, formatSize } from '@/components/format';
+import {
+    formatDuration,
+    formatNumber,
+    formatRelative,
+    formatSize,
+} from '@/components/format';
 import { fetchStats, scanLibrary } from '@/services/api';
 import { useQuery } from '@/services/useQuery';
 
@@ -90,6 +95,10 @@ export const StatsPage = () => {
     const readers = stats.readers.filter((r) => r.role === 'reader');
     const read = stats.readers.reduce((n, r) => n + r.completed, 0);
     const inProgress = stats.readers.reduce((n, r) => n + r.inProgress, 0);
+    const readingSeconds = stats.readers.reduce(
+        (n, r) => n + r.readingSeconds,
+        0,
+    );
 
     // Séries par tranche d'âge, dans l'ordre des âges, puis sans classification.
     const ratingRows = [
@@ -152,7 +161,7 @@ export const StatsPage = () => {
             </SimpleGrid>
 
             <Section title="Lecture">
-                <SimpleGrid cols={{ base: 2, sm: 3 }}>
+                <SimpleGrid cols={{ base: 2, sm: 4 }}>
                     <StatTile label="Tomes lus" value={formatNumber(read)} />
                     <StatTile
                         label="Tomes en cours"
@@ -161,6 +170,10 @@ export const StatsPage = () => {
                     <StatTile
                         label="Lecteurs"
                         value={formatNumber(readers.length)}
+                    />
+                    <StatTile
+                        label="Temps de lecture"
+                        value={formatDuration(readingSeconds)}
                     />
                 </SimpleGrid>
                 <Table.ScrollContainer minWidth={520}>
@@ -171,6 +184,7 @@ export const StatsPage = () => {
                                 <Table.Th>Séries visibles</Table.Th>
                                 <Table.Th ta="right">Lus</Table.Th>
                                 <Table.Th ta="right">En cours</Table.Th>
+                                <Table.Th ta="right">Temps</Table.Th>
                                 <Table.Th>Dernière lecture</Table.Th>
                             </Table.Tr>
                         </Table.Thead>
@@ -188,6 +202,9 @@ export const StatsPage = () => {
                                     </Table.Td>
                                     <Table.Td ta="right">
                                         {r.inProgress}
+                                    </Table.Td>
+                                    <Table.Td ta="right">
+                                        {formatDuration(r.readingSeconds)}
                                     </Table.Td>
                                     <Table.Td>
                                         <Text size="sm" c="dimmed">

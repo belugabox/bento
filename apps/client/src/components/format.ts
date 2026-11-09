@@ -35,3 +35,13 @@ export const formatRelative = (iso: string | null, now = Date.now()) => {
     }
     return 'à l’instant';
 };
+
+/** Durée lisible : « 0 min », « 35 min », « 2,5 h », « 246 h ». */
+export const formatDuration = (seconds: number) => {
+    const minutes = Math.round(seconds / 60);
+    if (minutes < 60) return `${minutes} min`;
+    const hours = seconds / 3600;
+    return `${hours.toLocaleString('fr-FR', {
+        maximumFractionDigits: hours < 10 ? 1 : 0,
+    })} h`;
+};
