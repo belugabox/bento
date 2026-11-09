@@ -5,6 +5,7 @@ import {
     Input,
     Modal,
     SegmentedControl,
+    Slider,
     Stack,
     Switch,
     Text,
@@ -12,10 +13,9 @@ import {
 
 import { AccentPicker, ColorSchemeControl } from './ThemePickers';
 import {
-    type CardSize,
+    CARD_SIZES,
     LAYOUT_OPTIONS,
     type LibraryLayout,
-    SIZE_OPTIONS,
     useLibraryDisplay,
 } from './libraryDisplay';
 import { useAppearance } from './theme';
@@ -73,15 +73,20 @@ export const AppearanceModal = ({
                         data={LAYOUT_OPTIONS}
                     />
                 </Input.Wrapper>
-                <Input.Wrapper label="Taille des cartes">
-                    <SegmentedControl
-                        fullWidth
+                <Input.Wrapper label="Taille des cartes" pb="md">
+                    <Slider
+                        min={0}
+                        max={CARD_SIZES.length - 1}
+                        step={1}
                         disabled={list}
                         value={display.size}
-                        onChange={(value) =>
-                            display.set({ size: value as CardSize })
-                        }
-                        data={SIZE_OPTIONS}
+                        onChange={(size) => display.set({ size })}
+                        label={(size) => CARD_SIZES[size]?.label}
+                        marks={[
+                            { value: 0, label: 'Petites' },
+                            { value: CARD_SIZES.length - 1, label: 'Grandes' },
+                        ]}
+                        thumbLabel="Taille des cartes"
                     />
                 </Input.Wrapper>
                 <Switch

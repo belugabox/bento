@@ -36,7 +36,7 @@ import { CoverCard } from '@/components/CoverCard';
 import { ageLabel, seriesAgeOf } from '@/components/ageLimits';
 import { completenessOf } from '@/components/completeness';
 import { formatSize } from '@/components/format';
-import { GRID_COLUMNS, useLibraryDisplay } from '@/components/libraryDisplay';
+import { gridColumns, useLibraryDisplay } from '@/components/libraryDisplay';
 import {
     countedVolumes,
     nextToRead,
@@ -331,7 +331,7 @@ export const SeriesPage = () => {
                         {kind !== 'volume' && (
                             <Title order={4}>{KIND_SECTIONS[kind]}</Title>
                         )}
-                        <SimpleGrid cols={GRID_COLUMNS[size]}>
+                        <SimpleGrid cols={gridColumns(size)}>
                             {group.map((volume) => {
                                 const read =
                                     volume.progress?.completed ?? false;

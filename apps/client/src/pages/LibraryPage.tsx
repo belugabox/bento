@@ -30,9 +30,9 @@ import { useSearchParams } from 'react-router';
 import { SeriesCardMenu, VolumeCardMenu } from '@/components/CardMenus';
 import { CoverCard } from '@/components/CoverCard';
 import {
-    GRID_COLUMNS,
     LIST_COLUMNS,
     type LibraryDisplay,
+    gridColumns,
     useLibraryDisplay,
 } from '@/components/libraryDisplay';
 import { volumeLabel, volumeShortLabel } from '@/components/readingStatus';
@@ -312,7 +312,7 @@ export const LibraryPage = () => {
                     cols={
                         display.layout === 'list'
                             ? LIST_COLUMNS
-                            : GRID_COLUMNS[display.size]
+                            : gridColumns(display.size)
                     }
                     spacing="sm"
                     data-testid="series-grid"

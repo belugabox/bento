@@ -73,11 +73,12 @@ describe('AppearanceModal', () => {
         show();
 
         await act(async () => {
-            fireEvent.click(screen.getByText('Petites'));
+            // Un cran vers les petites cartes, au clavier.
+            fireEvent.keyDown(screen.getByRole('slider'), { key: 'ArrowLeft' });
             fireEvent.click(screen.getByRole('switch'));
         });
         expect(JSON.parse(localStorage.getItem('bento:display')!)).toEqual({
-            size: 'small',
+            size: 1,
             coversOnly: true,
         });
 
