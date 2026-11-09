@@ -1,7 +1,9 @@
+import { eq } from 'drizzle-orm';
 import { writeFile } from 'node:fs/promises';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { createApi } from '../src/api';
+import { users } from '../src/db/schema';
 import { authDeps, sessionCookie, setup, silent, writeCbz } from './helpers';
 
 let ctx: Awaited<ReturnType<typeof setup>>;
@@ -149,5 +151,115 @@ describe('GET /drafts/pending', () => {
         });
         const reader = sessionCookie(ctx.db, 'reader');
         expect((await call('/drafts/pending', reader)).status).toBe(403);
+    });
+});
+
+describe('simulating an account', () => {
+    let lea: string;
+    let leaId: number;
+    let previewing: string;
+
+    beforeEach(async () => {
+        lea = sessionCookie(ctx.db, 'reader', 'lea');
+        leaId = ctx.db
+            .select()
+            .from(users)
+            .all()
+            .find((u) => u.username === 'lea')!.id;
+        ctx.db
+            .update(users)
+            .set({ name: 'Léa', maxAge: 10 })
+            .where(eq(users.id, leaId))
+            .run();
+        const set = await call('/preview', admin, {
+            method: 'PUT',
+            json: { userId: leaId },
+        });
+        expect(set.body).toEqual({
+            preview: { maxAge: 10, user: { id: leaId, name: 'Léa' } },
+        });
+        previewing = `${admin}; ${set.cookie}`;
+    });
+
+    it('lists the reader accounts to the admin only', async () => {
+        expect((await call('/preview/accounts', admin)).body).toEqual([
+            { id: leaId, name: 'Léa', avatarSeed: null, maxAge: 10 },
+        ]);
+        expect((await call('/preview/accounts', previewing)).status).toBe(200);
+        expect((await call('/preview/accounts', lea)).status).toBe(403);
+    });
+
+    it('sees the app as that account', async () => {
+        const series = (await call('/series', lea)).body;
+        const kids = series.find((s: { name: string }) => s.name === 'Kids');
+        const volume = (await call(`/series/${kids.id}`, lea)).body.volumes[0];
+        await call(`/volumes/${volume.id}/progress`, lea, {
+            method: 'PUT',
+            json: { page: 0 },
+        });
+
+        expect((await call('/me', previewing)).body).toMatchObject({
+            id: leaId,
+            name: 'Léa',
+            role: 'reader',
+            preview: { user: { id: leaId, name: 'Léa' } },
+        });
+        expect(await names(previewing)).toEqual(['Kids']);
+        expect(
+            (await call(`/volumes/${volume.id}`, previewing)).body.progress,
+        ).toMatchObject({ page: 0 });
+    });
+
+    it('changes nothing, but can leave the view', async () => {
+        const series = (await call('/series', previewing)).body;
+        const refused = await call(
+            `/series/${series[0].id}/lists`,
+            previewing,
+            {
+                method: 'PUT',
+                json: { toRead: true },
+            },
+        );
+        expect(refused.status).toBe(403);
+        expect(refused.body.message).toMatch(/Vue de Léa : lecture seule/);
+
+        // Autre compte ou autre âge, puis retour à la vue admin.
+        expect(
+            (
+                await call('/preview', previewing, {
+                    method: 'PUT',
+                    json: { maxAge: 12 },
+                })
+            ).status,
+        ).toBe(200);
+        const back = await call('/preview', previewing, { method: 'DELETE' });
+        expect(back.status).toBe(200);
+    });
+
+    it('never simulates an admin or oneself', async () => {
+        const adminId = ctx.db
+            .select()
+            .from(users)
+            .all()
+            .find((u) => u.role === 'admin')!.id;
+        for (const userId of [adminId, 9999]) {
+            expect(
+                (
+                    await call('/preview', admin, {
+                        method: 'PUT',
+                        json: { userId },
+                    })
+                ).status,
+            ).toBe(400);
+        }
+        // Simulation refusée à un lecteur.
+        expect(
+            (
+                await call('/preview', lea, {
+                    method: 'PUT',
+                    json: { userId: leaId },
+                })
+            ).status,
+        ).toBe(403);
     });
 });

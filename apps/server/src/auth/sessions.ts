@@ -49,6 +49,27 @@ export const createSession = (db: Db, userId: number) => {
 };
 
 /** Personne connectée pour ce jeton, ou `undefined` (absent ou expiré). */
+const userFields = {
+    id: users.id,
+    name: users.name,
+    username: users.username,
+    email: users.email,
+    avatarSeed: users.avatarSeed,
+    hasPassword: sql<boolean>`${users.passwordHash} is not null`,
+    role: users.role,
+    maxAge: users.maxAge,
+};
+
+/** Compte par son numéro, tel qu'une session le donnerait. */
+export const userById = (db: Db, id: number): SessionUser | undefined => {
+    const user = db
+        .select(userFields)
+        .from(users)
+        .where(eq(users.id, id))
+        .get();
+    return user && { ...user, hasPassword: Boolean(user.hasPassword) };
+};
+
 export const userForSession = (
     db: Db,
     token: string,
@@ -56,16 +77,7 @@ export const userForSession = (
     const row = db
         .select({
             expiresAt: sessions.expiresAt,
-            user: {
-                id: users.id,
-                name: users.name,
-                username: users.username,
-                email: users.email,
-                avatarSeed: users.avatarSeed,
-                hasPassword: sql<boolean>`${users.passwordHash} is not null`,
-                role: users.role,
-                maxAge: users.maxAge,
-            },
+            user: userFields,
         })
         .from(sessions)
         .innerJoin(users, eq(users.id, sessions.userId))

@@ -54,7 +54,7 @@ import {
     seriesCoverUrl,
     setSeriesLists,
 } from '@/services/api';
-import { useCurrentUser } from '@/services/auth';
+import { useCurrentUser, useReadOnly } from '@/services/auth';
 import { useQuery } from '@/services/useQuery';
 
 const ACTION_LABELS = {
@@ -70,6 +70,7 @@ const KIND_SECTIONS = { 'hors-serie': 'Hors-séries', special: 'Spéciaux' };
 export const SeriesPage = () => {
     const seriesId = Number(useParams().id);
     const isAdmin = useCurrentUser().role === 'admin';
+    const readOnly = useReadOnly();
     const { size } = useLibraryDisplay();
     const {
         data: series,
@@ -285,6 +286,7 @@ export const SeriesPage = () => {
                                     size="lg"
                                     aria-label="À lire"
                                     aria-pressed={series.toRead}
+                                    disabled={readOnly}
                                     loading={savingList}
                                     onClick={() => void toggleToRead()}
                                 >
@@ -301,6 +303,7 @@ export const SeriesPage = () => {
                                         variant="default"
                                         size="lg"
                                         aria-label="Lecture de la série"
+                                        disabled={readOnly}
                                     >
                                         <IconDots size={18} />
                                     </ActionIcon>
@@ -393,6 +396,7 @@ export const SeriesPage = () => {
                                                             ? `${volumeLabel(volume)} lu`
                                                             : `Marquer ${volumeLabel(volume)} comme lu`
                                                     }
+                                                    disabled={readOnly}
                                                     onClick={() =>
                                                         void toggleRead(volume)
                                                     }

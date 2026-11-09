@@ -380,6 +380,13 @@ export type Task = Awaited<ReturnType<typeof fetchTasks>>[number];
 export const startPreview = (maxAge: number | null) =>
     json(api.preview.$put({ json: { maxAge } }));
 
+/** Vue lecteur d'un admin : un compte simulé, en lecture seule. */
+export const startSimulation = (userId: number) =>
+    json(api.preview.$put({ json: { userId } }));
+
+/** Comptes que l'admin peut simuler (les lecteurs). */
+export const fetchSimulableAccounts = () => json(api.preview.accounts.$get());
+
 export const stopPreview = () => json(api.preview.$delete());
 
 export const setSeriesStatus = (

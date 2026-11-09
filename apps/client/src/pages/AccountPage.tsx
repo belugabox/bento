@@ -270,7 +270,12 @@ export const AccountPage = () => {
     return (
         <Stack maw={560}>
             <Title order={2}>Mon compte</Title>
-            {user.hasPassword ? (
+            {user.preview?.user ? (
+                <Alert color="orange" variant="light">
+                    Vue de {user.preview.user.name} : son compte ne se modifie
+                    pas depuis la simulation.
+                </Alert>
+            ) : user.hasPassword ? (
                 <>
                     <AvatarSection />
                     <IdentitySection />

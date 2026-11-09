@@ -33,6 +33,7 @@ import {
     saveProgress,
     setSeriesLists,
 } from '@/services/api';
+import { useReadOnly } from '@/services/auth';
 import { useQuery } from '@/services/useQuery';
 
 /** Durée du message « Annuler » après une action. */
@@ -182,6 +183,7 @@ export const SeriesCardMenu = ({
     onChanged: () => void;
 }) => {
     const navigate = useNavigate();
+    const readOnly = useReadOnly();
     const [upToOpened, setUpToOpened] = useState(false);
     const allRead = series.readCount >= series.volumeCount;
     const started = series.startedCount > 0;
@@ -246,6 +248,7 @@ export const SeriesCardMenu = ({
                     {!allRead && (
                         <Menu.Item
                             leftSection={<IconChecks size={14} />}
+                            disabled={readOnly}
                             onClick={() => mark(true)}
                         >
                             Marquer comme lue
@@ -254,6 +257,7 @@ export const SeriesCardMenu = ({
                     {series.volumeCount > 1 && (
                         <Menu.Item
                             leftSection={<IconCheck size={14} />}
+                            disabled={readOnly}
                             onClick={() => setUpToOpened(true)}
                         >
                             Marquer lue jusqu’au tome…
@@ -262,6 +266,7 @@ export const SeriesCardMenu = ({
                     {started && (
                         <Menu.Item
                             leftSection={<IconRotate size={14} />}
+                            disabled={readOnly}
                             onClick={() => mark(false)}
                         >
                             Marquer comme non lue
@@ -271,6 +276,7 @@ export const SeriesCardMenu = ({
                     {series.toRead ? (
                         <Menu.Item
                             leftSection={<IconBookmarkOff size={14} />}
+                            disabled={readOnly}
                             onClick={() => toggleToRead(false)}
                         >
                             Retirer de « À lire »
@@ -278,6 +284,7 @@ export const SeriesCardMenu = ({
                     ) : (
                         <Menu.Item
                             leftSection={<IconBookmark size={14} />}
+                            disabled={readOnly}
                             onClick={() => toggleToRead(true)}
                         >
                             Ajouter à « À lire »
@@ -327,6 +334,7 @@ export const VolumeCardMenu = ({
     onChanged: () => void;
 }) => {
     const navigate = useNavigate();
+    const readOnly = useReadOnly();
     const label = volumeLabel(volume).toLowerCase();
 
     const save = (completed: boolean, message: string) =>
@@ -345,6 +353,7 @@ export const VolumeCardMenu = ({
             <Menu.Dropdown>
                 <Menu.Item
                     leftSection={<IconCheck size={14} />}
+                    disabled={readOnly}
                     onClick={() =>
                         save(
                             true,
@@ -357,6 +366,7 @@ export const VolumeCardMenu = ({
                 {volume.page !== null && (
                     <Menu.Item
                         leftSection={<IconX size={14} />}
+                        disabled={readOnly}
                         onClick={() =>
                             save(
                                 false,

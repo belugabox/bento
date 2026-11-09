@@ -296,7 +296,7 @@ export const createApi = ({
         // Vue lecteur d'un admin (âge choisi), et retour à la vue admin.
         .route(
             '/preview',
-            createPreviewRoutes(auth.publicUrl.startsWith('https://')),
+            createPreviewRoutes(db, auth.publicUrl.startsWith('https://')),
         )
         .get('/libraries', (c) =>
             c.json(

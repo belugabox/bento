@@ -22,6 +22,13 @@ export const RefreshUserContext = createContext<() => Promise<void>>(
 export const useRefreshUser = () => useContext(RefreshUserContext);
 
 /** Personne connectée (disponible sous `RequireUser`). */
+/**
+ * Simulation d'un compte par l'admin : tout est en lecture seule (le
+ * serveur refuse les modifications). Faux hors session.
+ */
+export const useReadOnly = () =>
+    Boolean(useContext(UserContext)?.preview?.user);
+
 export const useCurrentUser = () => {
     const user = useContext(UserContext);
     if (!user) throw new Error('useCurrentUser hors de RequireUser');

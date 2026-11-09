@@ -109,7 +109,7 @@ Depuis le menu de l'avatar : chiffres de la bibliothèque, lecture par personne,
 - **Âge maximal** : l'admin le règle pour chaque personne dans « Comptes », depuis le menu de l'avatar, parmi les âges de la grille.
 - **Âge d'une série** : celui choisi dans l'éditeur (grille des réglages), sinon la classification la plus restrictive de ses tomes (`AgeRating` du ComicInfo).
 - **Comptes limités** : ils ne voient que les séries classées sous leur limite. Une série sans classification leur est masquée, partout : liste, fiche, tomes, pages, couvertures, « Reprendre la lecture ».
-- **Admins** : ils voient tout. « Voir comme un lecteur… », dans le menu de l'avatar, leur permet de **voir l'appli comme un lecteur** d'un âge donné, pour vérifier ce qu'un enfant verra ; un bandeau permet de revenir à la vue admin.
+- **Admins** : ils voient tout. « Voir comme un lecteur… », dans le menu de l'avatar, leur permet de **voir l'appli comme un compte lecteur** (ses séries, ses lectures, sa liste « À lire », en lecture seule : rien n'est enregistré, les boutons qui modifient sont grisés) ou comme un lecteur fictif d'un âge donné ; un bandeau permet de revenir à la vue admin.
 - **Classifications** : les variantes du ComicInfo sont regroupées par âge (« 10 ans et + » regroupe « Everyone 10+ » et « PG », par exemple).
 
 ### Comptes et connexion

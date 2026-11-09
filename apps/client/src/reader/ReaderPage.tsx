@@ -10,6 +10,7 @@ import {
     pageUrl,
     saveProgress,
 } from '@/services/api';
+import { useReadOnly } from '@/services/auth';
 import { useQuery } from '@/services/useQuery';
 
 import { Reader } from './Reader';
@@ -27,6 +28,7 @@ const PAGES_BEFORE_SAVE = 3;
 /** Lecteur plein écran d'un tome de la bibliothèque. */
 export const ReaderPage = () => {
     const volumeId = Number(useParams().id);
+    const readOnly = useReadOnly();
     const navigate = useNavigate();
     const [params, setParams] = useSearchParams();
     const { data, error } = useQuery(() => fetchVolume(volumeId), [volumeId]);
@@ -86,12 +88,14 @@ export const ReaderPage = () => {
             const key = `${volume.id}:${lastShown}`;
             if (savedPage.current === key) return;
             savedPage.current = key;
+            // Simulation d'un compte : rien n'est enregistré.
+            if (readOnly) return;
             saveProgress(volume.id, { page: lastShown }).catch(() => {
                 // Sans réseau, la lecture continue ; la page suivante réessaiera.
                 savedPage.current = undefined;
             });
         },
-        [volume, urlReady],
+        [volume, urlReady, readOnly],
     );
 
     const pageSrc = useCallback(
