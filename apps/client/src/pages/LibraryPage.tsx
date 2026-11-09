@@ -19,6 +19,7 @@ import {
 import { useDebouncedValue } from '@mantine/hooks';
 import {
     IconArrowsSort,
+    IconBookmarkFilled,
     IconCheck,
     IconChevronDown,
     IconPlayerPlayFilled,
@@ -28,6 +29,12 @@ import { useSearchParams } from 'react-router';
 
 import { SeriesCardMenu, VolumeCardMenu } from '@/components/CardMenus';
 import { CoverCard } from '@/components/CoverCard';
+import {
+    GRID_COLUMNS,
+    LIST_COLUMNS,
+    type LibraryDisplay,
+    useLibraryDisplay,
+} from '@/components/libraryDisplay';
 import { volumeLabel, volumeShortLabel } from '@/components/readingStatus';
 import {
     SERIES_SORTS,
@@ -55,6 +62,7 @@ const ResumeCard = ({
     subtitle = volumeLabel(volume),
     progress,
     onChanged,
+    display,
 }: {
     volume: Pick<
         InProgressVolume,
@@ -70,6 +78,7 @@ const ResumeCard = ({
     progress?: number;
     /** Après une action du menu (recharger l'accueil). */
     onChanged: () => void;
+    display: LibraryDisplay;
 }) => (
     <CoverCard
         to={`/read/${volume.volumeId}`}
@@ -78,15 +87,28 @@ const ResumeCard = ({
         subtitle={subtitle}
         progress={progress}
         menu={<VolumeCardMenu volume={volume} onChanged={onChanged} />}
-        // Contour et ▶ : la carte ouvre le lecteur, pas la fiche.
-        highlighted
-        corner={
+        layout={display.layout === 'list' ? 'row' : 'card'}
+        coversOnly={display.coversOnly}
+        // ▶ en couleur : la carte ouvre le lecteur, pas la fiche.
+        badge={
             <ThemeIcon size="sm" radius="xl" aria-label="Tome à reprendre">
                 <IconPlayerPlayFilled size={10} />
             </ThemeIcon>
         }
     />
 );
+
+/** Icône grise d'une série : lue, ou dans la liste « à lire ». */
+const seriesBadge = (state: string, toRead: boolean) =>
+    state === 'read' ? (
+        <ThemeIcon size="sm" radius="xl" color="gray" aria-label="Série lue">
+            <IconCheck size={12} />
+        </ThemeIcon>
+    ) : toRead ? (
+        <ThemeIcon size="sm" radius="xl" color="gray" aria-label="À lire">
+            <IconBookmarkFilled size={11} />
+        </ThemeIcon>
+    ) : undefined;
 
 /**
  * Avancement dans la série : tomes lus, plus la part lue du tome en cours
@@ -171,6 +193,7 @@ export const LibraryPage = () => {
     const status = (params.get('status') as StatusFilter | null) ?? 'all';
 
     const isAdmin = useContext(UserContext)?.role === 'admin';
+    const display = useLibraryDisplay();
     const libraries = useQuery(fetchLibraries, []);
     const inProgress = useQuery(fetchInProgress, []);
     const libraryId =
@@ -281,7 +304,11 @@ export const LibraryPage = () => {
                     </Stack>
                 )}
                 <SimpleGrid
-                    cols={{ base: 3, xs: 4, sm: 5, md: 6, lg: 7 }}
+                    cols={
+                        display.layout === 'list'
+                            ? LIST_COLUMNS
+                            : GRID_COLUMNS[display.size]
+                    }
                     spacing="sm"
                     data-testid="series-grid"
                 >
@@ -293,6 +320,7 @@ export const LibraryPage = () => {
                             subtitle={`${volumeShortLabel(volume)} · ${volume.readCount}/${volume.volumeCount} lus`}
                             progress={seriesProgress(volume)}
                             onChanged={reloadHome}
+                            display={display}
                         />
                     ))}
                     {others.map((item) => {
@@ -322,17 +350,11 @@ export const LibraryPage = () => {
                                         ? item.readCount / item.volumeCount
                                         : undefined
                                 }
-                                corner={
-                                    state === 'read' && (
-                                        <ThemeIcon
-                                            size="sm"
-                                            radius="xl"
-                                            aria-label="Série lue"
-                                        >
-                                            <IconCheck size={12} />
-                                        </ThemeIcon>
-                                    )
+                                badge={seriesBadge(state, !!item.toRead)}
+                                layout={
+                                    display.layout === 'list' ? 'row' : 'card'
                                 }
+                                coversOnly={display.coversOnly}
                             />
                         );
                     })}

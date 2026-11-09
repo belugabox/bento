@@ -49,6 +49,7 @@ const titles = () =>
         .map((link) => link.getAttribute('href'));
 
 beforeEach(() => {
+    localStorage.clear();
     vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
         const url = String(input);
         if (url === '/api/libraries') {
@@ -123,11 +124,35 @@ describe('LibraryPage', () => {
         // Tomes à reprendre : marqués d'un ▶ (et d'un contour).
         expect(screen.getAllByLabelText('Tome à reprendre')).toHaveLength(2);
         expect(screen.queryByText('Séries')).toBeNull();
+        // Les icônes sont dans le lien de la carte : un clic l'ouvre.
+        expect(
+            screen.getAllByLabelText('Tome à reprendre')[0]!.closest('a'),
+        ).toBeTruthy();
         // Série entièrement lue : marquée, à la fin et grisée.
         const read = screen.getByLabelText('Série lue');
         expect(read.closest('[style*="opacity"]')).toBeTruthy();
         // Le scan n'est plus sur l'accueil.
         expect(screen.queryByRole('button', { name: /scanner/i })).toBeNull();
+    });
+
+    it('shows covers only, or a list, as chosen in Appearance', async () => {
+        localStorage.setItem(
+            'bento:display',
+            JSON.stringify({ coversOnly: true }),
+        );
+        const { unmount } = show();
+        await vi.waitFor(() => expect(titles()).toHaveLength(3));
+        expect(screen.getByAltText('Berserk')).toBeTruthy();
+        expect(screen.queryByText('Berserk')).toBeNull();
+        unmount();
+
+        localStorage.setItem(
+            'bento:display',
+            JSON.stringify({ layout: 'list' }),
+        );
+        show();
+        await vi.waitFor(() => expect(titles()).toHaveLength(3));
+        expect(screen.getByText('Berserk')).toBeTruthy();
     });
 
     it('sorts by recent additions, in the address', async () => {

@@ -68,4 +68,25 @@ describe('AppearanceModal', () => {
 
         expect(theme()).toBe('violet auto light');
     });
+
+    it('keeps the display of the series on the device', async () => {
+        show();
+
+        await act(async () => {
+            fireEvent.click(screen.getByText('Petites'));
+            fireEvent.click(screen.getByRole('switch'));
+        });
+        expect(JSON.parse(localStorage.getItem('bento:display')!)).toEqual({
+            size: 'small',
+            coversOnly: true,
+        });
+
+        // En liste, taille et couvertures seules ne s'appliquent pas.
+        await act(async () => {
+            fireEvent.click(screen.getByText('Liste'));
+        });
+        expect((screen.getByRole('switch') as HTMLInputElement).disabled).toBe(
+            true,
+        );
+    });
 });
