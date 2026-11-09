@@ -12,7 +12,6 @@ export default defineConfig({
         },
     },
     server: {
-        // Port déclaré comme adresse de retour du client OIDC chez Pocket ID.
         port: 5173,
         strictPort: true,
         proxy: {

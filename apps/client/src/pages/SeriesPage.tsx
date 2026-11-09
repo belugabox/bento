@@ -33,6 +33,7 @@ import { VOLUME_KINDS } from '@server/types';
 
 import { CompletenessBadge } from '@/components/CompletenessBadge';
 import { CoverCard } from '@/components/CoverCard';
+import { SeriesReaders } from '@/components/SeriesReaders';
 import { ageLabel, seriesAgeOf } from '@/components/ageLimits';
 import { completenessOf } from '@/components/completeness';
 import { formatSize } from '@/components/format';
@@ -53,7 +54,7 @@ import {
     seriesCoverUrl,
     setSeriesLists,
 } from '@/services/api';
-import { useCurrentUser } from '@/services/auth';
+import { useCurrentUser, useReadOnly } from '@/services/auth';
 import { useQuery } from '@/services/useQuery';
 
 const ACTION_LABELS = {
@@ -69,6 +70,7 @@ const KIND_SECTIONS = { 'hors-serie': 'Hors-séries', special: 'Spéciaux' };
 export const SeriesPage = () => {
     const seriesId = Number(useParams().id);
     const isAdmin = useCurrentUser().role === 'admin';
+    const readOnly = useReadOnly();
     const { size } = useLibraryDisplay();
     const {
         data: series,
@@ -175,7 +177,7 @@ export const SeriesPage = () => {
                         style={{ flexShrink: 0, alignSelf: 'flex-start' }}
                     />
                 )}
-                <Stack gap="xs">
+                <Stack gap="xs" style={{ flex: 1, minWidth: 0 }}>
                     <Title order={2}>{series.name}</Title>
                     {details.length > 0 && (
                         <Text c="dimmed" size="sm">
@@ -255,70 +257,80 @@ export const SeriesPage = () => {
                             {series.summary}
                         </Text>
                     )}
-                    <Group gap="xs">
-                        {next && (
-                            <Button
-                                component={Link}
-                                // Relire : repartir de la première page.
-                                to={`/read/${next.volume.id}${next.action === 'reread' ? '?page=1' : ''}`}
-                                leftSection={<IconPlayerPlay size={16} />}
-                                w="fit-content"
+                    {/* Boutons de lecture, et « Lu par » à droite. */}
+                    <Group justify="space-between" gap="xs">
+                        <Group gap="xs">
+                            {next && (
+                                <Button
+                                    component={Link}
+                                    // Relire : repartir de la première page.
+                                    to={`/read/${next.volume.id}${next.action === 'reread' ? '?page=1' : ''}`}
+                                    leftSection={<IconPlayerPlay size={16} />}
+                                    w="fit-content"
+                                >
+                                    {ACTION_LABELS[next.action]}{' '}
+                                    {volumeLabel(next.volume).toLowerCase()}
+                                </Button>
+                            )}
+                            <Tooltip
+                                label={
+                                    series.toRead
+                                        ? 'Retirer de « À lire »'
+                                        : 'Ajouter à « À lire »'
+                                }
                             >
-                                {ACTION_LABELS[next.action]}{' '}
-                                {volumeLabel(next.volume).toLowerCase()}
-                            </Button>
-                        )}
-                        <Tooltip
-                            label={
-                                series.toRead
-                                    ? 'Retirer de « À lire »'
-                                    : 'Ajouter à « À lire »'
-                            }
-                        >
-                            <ActionIcon
-                                variant={series.toRead ? 'light' : 'default'}
-                                size="lg"
-                                aria-label="À lire"
-                                aria-pressed={series.toRead}
-                                loading={savingList}
-                                onClick={() => void toggleToRead()}
-                            >
-                                {series.toRead ? (
-                                    <IconBookmarkFilled size={18} />
-                                ) : (
-                                    <IconBookmark size={18} />
-                                )}
-                            </ActionIcon>
-                        </Tooltip>
-                        <Menu position="bottom-start">
-                            <Menu.Target>
                                 <ActionIcon
-                                    variant="default"
-                                    size="lg"
-                                    aria-label="Lecture de la série"
-                                >
-                                    <IconDots size={18} />
-                                </ActionIcon>
-                            </Menu.Target>
-                            <Menu.Dropdown>
-                                <Menu.Item
-                                    leftSection={<IconChecks size={14} />}
-                                    disabled={allRead}
-                                    onClick={() => void markAll(true)}
-                                >
-                                    Marquer toute la série comme lue
-                                </Menu.Item>
-                                <Menu.Item
-                                    leftSection={<IconRestore size={14} />}
-                                    disabled={
-                                        !series.volumes.some((v) => v.progress)
+                                    variant={
+                                        series.toRead ? 'light' : 'default'
                                     }
-                                    onClick={() => void markAll(false)}
+                                    size="lg"
+                                    aria-label="À lire"
+                                    aria-pressed={series.toRead}
+                                    disabled={readOnly}
+                                    loading={savingList}
+                                    onClick={() => void toggleToRead()}
                                 >
-                                    Marquer toute la série comme non lue
-                                </Menu.Item>
-                            </Menu.Dropdown>
-                        </Menu>
+                                    {series.toRead ? (
+                                        <IconBookmarkFilled size={18} />
+                                    ) : (
+                                        <IconBookmark size={18} />
+                                    )}
+                                </ActionIcon>
+                            </Tooltip>
+                            <Menu position="bottom-start">
+                                <Menu.Target>
+                                    <ActionIcon
+                                        variant="default"
+                                        size="lg"
+                                        aria-label="Lecture de la série"
+                                        disabled={readOnly}
+                                    >
+                                        <IconDots size={18} />
+                                    </ActionIcon>
+                                </Menu.Target>
+                                <Menu.Dropdown>
+                                    <Menu.Item
+                                        leftSection={<IconChecks size={14} />}
+                                        disabled={allRead}
+                                        onClick={() => void markAll(true)}
+                                    >
+                                        Marquer toute la série comme lue
+                                    </Menu.Item>
+                                    <Menu.Item
+                                        leftSection={<IconRestore size={14} />}
+                                        disabled={
+                                            !series.volumes.some(
+                                                (v) => v.progress,
+                                            )
+                                        }
+                                        onClick={() => void markAll(false)}
+                                    >
+                                        Marquer toute la série comme non lue
+                                    </Menu.Item>
+                                </Menu.Dropdown>
+                            </Menu>
+                        </Group>
+                        <SeriesReaders seriesId={series.id} />
                     </Group>
                 </Stack>
             </Flex>
@@ -384,6 +396,7 @@ export const SeriesPage = () => {
                                                             ? `${volumeLabel(volume)} lu`
                                                             : `Marquer ${volumeLabel(volume)} comme lu`
                                                     }
+                                                    disabled={readOnly}
                                                     onClick={() =>
                                                         void toggleRead(volume)
                                                     }

@@ -37,6 +37,9 @@ const respond = (body: unknown) =>
         headers: { 'Content-Type': 'application/json' },
     });
 
+// Filtre « Lu par » : les autres comptes et leurs séries lues.
+let readers: unknown[] = [];
+
 let location = '';
 const Location = () => {
     location = useLocation().search;
@@ -84,6 +87,7 @@ beforeEach(() => {
                 },
             ]);
         }
+        if (url === '/api/readers') return respond(readers);
         if (url.startsWith('/api/series')) return respond(SERIES);
         throw new Error(`requête inattendue : ${url}`);
     });
@@ -91,6 +95,7 @@ beforeEach(() => {
 
 afterEach(() => {
     vi.restoreAllMocks();
+    readers = [];
 });
 
 const show = () =>
@@ -133,6 +138,33 @@ describe('LibraryPage', () => {
         expect(read.closest('[style*="opacity"]')).toBeTruthy();
         // Le scan n'est plus sur l'accueil.
         expect(screen.queryByRole('button', { name: /scanner/i })).toBeNull();
+    });
+
+    it('keeps the series read by someone of the family', async () => {
+        readers = [{ id: 7, name: 'Léa', avatarSeed: null, seriesIds: [3] }];
+        show();
+
+        fireEvent.click(
+            await screen.findByRole('button', { name: 'Filtrer par lecteur' }),
+        );
+        fireEvent.click(await screen.findByRole('menuitem', { name: /Léa/ }));
+
+        // Série 3 seule, par son tome à reprendre.
+        await vi.waitFor(() => expect(titles()).toEqual(['/read/42']));
+        expect(location).toContain('readBy=7');
+        expect(
+            screen.getByRole('button', { name: 'Filtrer par lecteur' })
+                .textContent,
+        ).toContain('Léa');
+    });
+
+    it('hides the Lu par filter when nobody else read anything', async () => {
+        show();
+
+        await screen.findByText('T2 · 1/3 lus');
+        expect(
+            screen.queryByRole('button', { name: 'Filtrer par lecteur' }),
+        ).toBeNull();
     });
 
     it('shows covers only, or a list, as chosen in Appearance', async () => {

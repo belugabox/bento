@@ -2,10 +2,15 @@ import { AppShell, Container, Loader } from '@mantine/core';
 import { Suspense, lazy } from 'react';
 import { Navigate, Outlet, Route, Routes } from 'react-router';
 
-import { AppHeader, PreviewBanner } from '@/components/AppHeader';
+import {
+    ActivationBanner,
+    AppHeader,
+    PreviewBanner,
+} from '@/components/AppHeader';
 import { RequireUser } from '@/components/RequireUser';
-import { DeniedPage } from '@/pages/DeniedPage';
+import { JoinPage } from '@/pages/JoinPage';
 import { LibraryPage } from '@/pages/LibraryPage';
+import { LoginPage } from '@/pages/LoginPage';
 import { SeriesPage } from '@/pages/SeriesPage';
 import { ReaderPage } from '@/reader/ReaderPage';
 import { useCurrentUser } from '@/services/auth';
@@ -31,6 +36,9 @@ const ToClassifyPage = lazy(() =>
         default: m.ToClassifyPage,
     })),
 );
+const AccountPage = lazy(() =>
+    import('@/pages/AccountPage').then((m) => ({ default: m.AccountPage })),
+);
 const UsersPage = lazy(() =>
     import('@/pages/UsersPage').then((m) => ({ default: m.UsersPage })),
 );
@@ -54,6 +62,7 @@ const Layout = () => (
         <AppShell.Main>
             <Container size="xl">
                 <PreviewBanner />
+                <ActivationBanner />
                 <Outlet />
             </Container>
         </AppShell.Main>
@@ -62,8 +71,9 @@ const Layout = () => (
 
 export const App = () => (
     <Routes>
-        {/* Publique : explique un refus de connexion. */}
-        <Route path="denied" element={<DeniedPage />} />
+        {/* Publiques : connexion, et liens envoyés par l'admin. */}
+        <Route path="login" element={<LoginPage />} />
+        <Route path="join/:token" element={<JoinPage />} />
         <Route
             element={
                 <RequireUser>
@@ -74,6 +84,14 @@ export const App = () => (
             <Route element={<Layout />}>
                 <Route index element={<LibraryPage />} />
                 <Route path="series/:id" element={<SeriesPage />} />
+                <Route
+                    path="account"
+                    element={
+                        <Suspense fallback={<Loader mx="auto" />}>
+                            <AccountPage />
+                        </Suspense>
+                    }
+                />
                 <Route
                     path="drafts"
                     element={

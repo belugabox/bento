@@ -6,6 +6,13 @@ import { z } from 'zod';
 import type { PageReader } from './archive/archive';
 import { NUMBER_FIELDS } from './archive/comicInfo';
 import { COMIC_INFO_FIELDS } from './archive/write';
+import { avatarChoice, avatarSvg } from './auth/avatar';
+import {
+    createInvitation,
+    createUserLink,
+    deleteInvitation,
+    listInvitations,
+} from './auth/links';
 import {
     type AuthDeps,
     type AuthEnv,
@@ -14,7 +21,8 @@ import {
     requireAdmin,
     requireUser,
 } from './auth/routes';
-import { listUsers, setUserMaxAge } from './auth/users';
+import { isAvatarSeed } from './auth/rules';
+import { deleteUser, listUsers, updateAccount, updateUser } from './auth/users';
 import { READING_MODES } from './classification';
 import type { Db } from './db';
 import {
@@ -60,6 +68,7 @@ import {
     saveProgress,
     snapshotProgress,
 } from './library/progress';
+import { familyReaders, seriesReaders } from './library/readers';
 import { type LibraryScanner, coverFile } from './library/scanner';
 import { readCover } from './library/smallCovers';
 import { getStats } from './library/stats';
@@ -72,7 +81,7 @@ import {
 } from './metadata/sourceLink';
 import type { Wikipedia } from './metadata/wikipedia';
 import { SettingsStore, settingsUpdateSchema } from './settings';
-import { AppError, notFound } from './tools/errors';
+import { AppError, badRequest, notFound } from './tools/errors';
 import type { Logger } from './tools/logger';
 import { zValidator } from './tools/validator';
 
@@ -238,13 +247,56 @@ export const createApi = ({
         // Public : la page de connexion prend aussi le thème par défaut.
         .get('/appearance', (c) => c.json(settings.get().appearance))
         .route('/auth', createAuthRoutes({ db, logger, ...auth }))
+        // Public : avatar DiceBear « Clay » d'une graine (page d'inscription).
+        .get('/avatars/:seed', (c) => {
+            const seed = c.req.param('seed');
+            if (!isAvatarSeed(seed)) throw badRequest('Avatar invalide');
+            c.header('Content-Type', 'image/svg+xml');
+            c.header('Cache-Control', 'public, max-age=31536000, immutable');
+            return c.body(avatarSvg(seed));
+        })
+        // Public : parties d'un avatar, pour le modifier.
+        .get('/avatars/:seed/choice', (c) => {
+            const seed = c.req.param('seed');
+            if (!isAvatarSeed(seed)) throw badRequest('Avatar invalide');
+            c.header('Cache-Control', 'public, max-age=31536000, immutable');
+            return c.json(avatarChoice(seed));
+        })
         // Tout ce qui suit exige une session.
         .use('*', requireUser(db))
         .get('/me', (c) => c.json({ ...c.var.user, preview: c.var.preview }))
+        // « Mon compte » : identifiant, e-mail, avatar, mot de passe.
+        .patch(
+            '/me',
+            zValidator(
+                'json',
+                z.object({
+                    username: z.string().max(100).optional(),
+                    email: z
+                        .string()
+                        .trim()
+                        .email('E-mail invalide')
+                        .max(200)
+                        .or(z.literal(''))
+                        .nullable()
+                        .optional(),
+                    avatarSeed: z
+                        .string()
+                        .refine(isAvatarSeed, 'Avatar invalide')
+                        .optional(),
+                    password: z.string().max(200).optional(),
+                    currentPassword: z.string().max(200).optional(),
+                }),
+            ),
+            async (c) => {
+                await updateAccount(db, c.var.user.id, c.req.valid('json'));
+                return c.json({ ok: true as const });
+            },
+        )
         // Vue lecteur d'un admin (âge choisi), et retour à la vue admin.
         .route(
             '/preview',
-            createPreviewRoutes(auth.publicUrl.startsWith('https://')),
+            createPreviewRoutes(db, auth.publicUrl.startsWith('https://')),
         )
         .get('/libraries', (c) =>
             c.json(
@@ -279,6 +331,21 @@ export const createApi = ({
         )
         .get('/series/:id', zValidator('param', idParam), (c) =>
             c.json(getSeries(db, c.var.user, c.req.valid('param').id)),
+        )
+        // Filtre « Lu par » de l'accueil : les autres comptes et leurs séries lues.
+        .get('/readers', (c) =>
+            c.json(familyReaders(db, c.var.user, settings.get().readByPercent)),
+        )
+        // Les autres comptes qui ont lu la série (seuil dans les réglages).
+        .get('/series/:id/readers', zValidator('param', idParam), (c) =>
+            c.json(
+                seriesReaders(
+                    db,
+                    c.var.user,
+                    c.req.valid('param').id,
+                    settings.get().readByPercent,
+                ),
+            ),
         )
         .put(
             '/series/:id/status',
@@ -958,17 +1025,77 @@ export const createApi = ({
             zValidator(
                 'json',
                 z.object({
-                    maxAge: z.number().int().min(0).max(18).nullable(),
+                    maxAge: z
+                        .number()
+                        .int()
+                        .min(0)
+                        .max(18)
+                        .nullable()
+                        .optional(),
+                    role: z.enum(['admin', 'reader']).optional(),
                 }),
             ),
             (c) =>
                 c.json(
-                    setUserMaxAge(
+                    updateUser(
                         db,
                         c.req.valid('param').id,
-                        c.req.valid('json').maxAge,
+                        c.req.valid('json'),
+                        c.var.user.id,
                     ),
                 ),
+        )
+        .delete(
+            '/users/:id',
+            requireAdmin,
+            zValidator('param', idParam),
+            (c) => {
+                deleteUser(db, c.req.valid('param').id, c.var.user.id);
+                return c.json({ ok: true as const });
+            },
+        )
+        // Lien d'activation ou de nouveau mot de passe d'un compte.
+        .post(
+            '/users/:id/link',
+            requireAdmin,
+            zValidator('param', idParam),
+            (c) => {
+                const { token, expiresAt } = createUserLink(
+                    db,
+                    c.req.valid('param').id,
+                );
+                return c.json({ token, expiresAt });
+            },
+        )
+        // Invitations à créer un compte (admin).
+        .get('/invitations', requireAdmin, (c) => c.json(listInvitations(db)))
+        .post(
+            '/invitations',
+            requireAdmin,
+            zValidator(
+                'json',
+                z.object({
+                    role: z.enum(['admin', 'reader']),
+                    maxAge: z.number().int().min(0).max(18).nullable(),
+                    username: z.string().max(100).nullable().optional(),
+                }),
+            ),
+            (c) => {
+                const { id, token, expiresAt } = createInvitation(
+                    db,
+                    c.req.valid('json'),
+                );
+                return c.json({ id, token, expiresAt });
+            },
+        )
+        .delete(
+            '/invitations/:id',
+            requireAdmin,
+            zValidator('param', idParam),
+            (c) => {
+                deleteInvitation(db, c.req.valid('param').id);
+                return c.json({ ok: true as const });
+            },
         );
 
 export type ApiType = ReturnType<typeof createApi>;

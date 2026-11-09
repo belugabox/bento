@@ -22,13 +22,13 @@ describe('openDatabase', () => {
         const { db, close } = openDatabase(file);
 
         db.insert(users)
-            .values({ oidcSubject: 'abc', name: 'Admin', role: 'admin' })
+            .values({ username: 'abc', name: 'Admin', role: 'admin' })
             .run();
         const [user] = db.select().from(users).all();
         close();
 
         expect(user).toMatchObject({
-            oidcSubject: 'abc',
+            username: 'abc',
             role: 'admin',
             maxAge: null,
         });
@@ -40,7 +40,7 @@ describe('openDatabase', () => {
         const first = openDatabase(file);
         first.db
             .insert(users)
-            .values({ oidcSubject: 'abc', name: 'Admin', role: 'admin' })
+            .values({ username: 'abc', name: 'Admin', role: 'admin' })
             .run();
         first.close();
 

@@ -1,21 +1,27 @@
 import { hc } from 'hono/client';
 
-import type { ApiType, ReadingMode, SourceLink } from '@server/types';
+import {
+    type ApiType,
+    type ReadingMode,
+    type SourceLink,
+    formatAvatar,
+    randomAvatar,
+} from '@server/types';
 
 /** Client typé de l'API (`/api`, servie par le même domaine). */
 export const api = hc<ApiType>('/api');
 
-/** Page de connexion Pocket ID, avec retour sur la page actuelle. */
+/** Page de connexion, avec retour sur la page actuelle. */
 export const loginUrl = (
     redirect = window.location.pathname + window.location.search,
-) => `/api/auth/login?redirect=${encodeURIComponent(redirect)}`;
+) => `/login?redirect=${encodeURIComponent(redirect)}`;
 
 /** Résultat JSON d'un appel, ou erreur avec le message renvoyé par le serveur. */
 export const json = async <T>(
     call: Promise<{ ok: boolean; status: number; json(): Promise<T> }>,
 ): Promise<T> => {
     const response = await call;
-    // Session absente ou expirée : passer par la connexion Pocket ID.
+    // Session absente ou expirée : passer par la page de connexion.
     if (response.status === 401) {
         window.location.assign(loginUrl());
         throw new Error('Connexion requise');
@@ -53,6 +59,21 @@ export const fetchSeriesList = ({
 
 export const fetchSeries = (seriesId: number) =>
     json(api.series[':id'].$get(id(seriesId)));
+
+/** Les autres comptes qui ont lu la série (« Lu par »). */
+export const fetchSeriesReaders = (seriesId: number) =>
+    json(api.series[':id'].readers.$get(id(seriesId)));
+
+/** Filtre « Lu par » de l'accueil : les autres comptes et leurs séries lues. */
+export const fetchFamilyReaders = () => json(api.readers.$get());
+
+export type FamilyReader = Awaited<
+    ReturnType<typeof fetchFamilyReaders>
+>[number];
+
+export type SeriesReader = Awaited<
+    ReturnType<typeof fetchSeriesReaders>
+>[number];
 
 export const fetchVolume = (volumeId: number) =>
     json(api.volumes[':id'].$get(id(volumeId)));
@@ -93,12 +114,85 @@ export type InProgressVolume = Awaited<
 export const setSeriesLists = (seriesId: number, lists: { toRead?: boolean }) =>
     json(api.series[':id'].lists.$put({ ...id(seriesId), json: lists }));
 
+// --- Comptes -------------------------------------------------------------------
+
+export const login = (username: string, password: string) =>
+    json(api.auth.login.$post({ json: { username, password } }));
+
+/** Ce qu'affiche la page d'un lien d'invitation, d'activation… */
+export const fetchLink = (token: string) =>
+    json(api.auth.links[':token'].$get({ param: { token } }));
+
+export type LinkInfo = Awaited<ReturnType<typeof fetchLink>>;
+
+export const submitLink = (
+    token: string,
+    form: {
+        username?: string;
+        password: string;
+        email?: string | null;
+        avatarSeed?: string;
+    },
+) => json(api.auth.links[':token'].$post({ param: { token }, json: form }));
+
+/** « Mon compte » : identifiant, e-mail, avatar, mot de passe. */
+export const updateMe = (changes: {
+    username?: string;
+    email?: string | null;
+    avatarSeed?: string;
+    password?: string;
+    currentPassword?: string;
+}) => json(api.me.$patch({ json: changes }));
+
+/**
+ * Version du dessin des avatars (gardés un an par le navigateur) : à changer
+ * quand le serveur les dessine autrement (`auth/avatar.ts`).
+ */
+const AVATAR_VERSION = 2;
+
+/** Avatar DiceBear « Clay » : graine au hasard ou avatar composé. */
+export const avatarUrl = (seed: string) =>
+    `/api/avatars/${encodeURIComponent(seed)}?v=${AVATAR_VERSION}`;
+
+/** Avatar composé au hasard. */
+export const randomAvatarSeed = () => formatAvatar(randomAvatar());
+
+/** Parties d'un avatar, pour le modifier (aussi celles d'une graine). */
+export const fetchAvatarChoice = (seed: string) =>
+    json(api.avatars[':seed'].choice.$get({ param: { seed } }));
+
+/** Adresse complète d'un lien d'invitation, d'activation… */
+export const joinUrl = (token: string) =>
+    `${window.location.origin}/join/${token}`;
+
 export const fetchUsers = () => json(api.users.$get());
 
 export type Account = Awaited<ReturnType<typeof fetchUsers>>[number];
 
-export const setUserMaxAge = (userId: number, maxAge: number | null) =>
-    json(api.users[':id'].$patch({ ...id(userId), json: { maxAge } }));
+export const updateUser = (
+    userId: number,
+    changes: { maxAge?: number | null; role?: 'admin' | 'reader' },
+) => json(api.users[':id'].$patch({ ...id(userId), json: changes }));
+
+export const deleteUser = (userId: number) =>
+    json(api.users[':id'].$delete(id(userId)));
+
+/** Lien d'activation ou de nouveau mot de passe d'un compte. */
+export const createUserLink = (userId: number) =>
+    json(api.users[':id'].link.$post(id(userId)));
+
+export const fetchInvitations = () => json(api.invitations.$get());
+
+export type Invitation = Awaited<ReturnType<typeof fetchInvitations>>[number];
+
+export const createInvitation = (invitation: {
+    role: 'admin' | 'reader';
+    maxAge: number | null;
+    username?: string | null;
+}) => json(api.invitations.$post({ json: invitation }));
+
+export const deleteInvitation = (invitationId: number) =>
+    json(api.invitations[':id'].$delete(id(invitationId)));
 
 /** Largeur et hauteur de chaque page (double page). */
 export const fetchPageSizes = (volumeId: number) =>
@@ -189,6 +283,7 @@ export const saveSettings = (changes: {
     appearance?: Partial<Settings['appearance']>;
     ages?: number[];
     sourcePriority?: Partial<Settings['sourcePriority']>;
+    readByPercent?: number;
 }) => json(api.settings.$put({ json: changes }));
 
 /** Thème par défaut choisi par l'admin (lisible sans session). */
@@ -295,6 +390,13 @@ export type Task = Awaited<ReturnType<typeof fetchTasks>>[number];
 /** Vue lecteur d'un admin : âge maximal (null : sans limite). */
 export const startPreview = (maxAge: number | null) =>
     json(api.preview.$put({ json: { maxAge } }));
+
+/** Vue lecteur d'un admin : un compte simulé, en lecture seule. */
+export const startSimulation = (userId: number) =>
+    json(api.preview.$put({ json: { userId } }));
+
+/** Comptes que l'admin peut simuler (les lecteurs). */
+export const fetchSimulableAccounts = () => json(api.preview.accounts.$get());
 
 export const stopPreview = () => json(api.preview.$delete());
 

@@ -10,7 +10,10 @@ import { AppHeader, PreviewBanner } from './AppHeader';
 const user = (overrides: Partial<CurrentUser> = {}): CurrentUser => ({
     id: 1,
     name: 'Ben',
+    username: 'ben',
     email: null,
+    avatarSeed: null,
+    hasPassword: true,
     role: 'admin',
     maxAge: null,
     preview: null,
@@ -19,6 +22,8 @@ const user = (overrides: Partial<CurrentUser> = {}): CurrentUser => ({
 
 // Requêtes envoyées : [méthode, adresse, corps].
 let requests: [string, string, unknown][] = [];
+// Comptes que l'admin peut simuler.
+let accounts: unknown[] = [];
 // Tâches de fond renvoyées par le serveur.
 let tasks: unknown[] = [];
 const assign = vi.fn();
@@ -46,6 +51,7 @@ const show = (current: CurrentUser, path = '/') =>
 beforeEach(() => {
     requests = [];
     tasks = [];
+    accounts = [];
     vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
         requests.push([
             init?.method ?? 'GET',
@@ -57,7 +63,9 @@ beforeEach(() => {
             ? { series: 3 }
             : url.endsWith('/tasks')
               ? tasks
-              : { preview: null };
+              : url.endsWith('/preview/accounts')
+                ? accounts
+                : { preview: null };
         return new Response(JSON.stringify(body), {
             headers: { 'Content-Type': 'application/json' },
         });
@@ -144,6 +152,39 @@ describe('AppHeader', () => {
             { maxAge: 10 },
         ]);
         expect(assign).toHaveBeenCalledWith('/');
+    });
+
+    it('lets an admin see the app as one account, read-only', async () => {
+        accounts = [{ id: 5, name: 'Léa', avatarSeed: null, maxAge: 10 }];
+        show(user());
+
+        fireEvent.click(screen.getByRole('button', { name: 'Mon compte' }));
+        fireEvent.click(await screen.findByText('Voir comme un lecteur…'));
+        expect(
+            await screen.findByDisplayValue('Léa · jusqu’à 10 ans'),
+        ).toBeTruthy();
+        expect(screen.getByText(/rien n’est enregistré/)).toBeTruthy();
+        await act(async () => {
+            fireEvent.click(screen.getByRole('button', { name: 'Voir' }));
+        });
+
+        expect(requests).toContainEqual(['PUT', '/api/preview', { userId: 5 }]);
+        expect(assign).toHaveBeenCalledWith('/');
+    });
+
+    it('reminds a simulated account', () => {
+        show(
+            user({
+                id: 5,
+                name: 'Léa',
+                role: 'reader',
+                maxAge: 10,
+                preview: { maxAge: 10, user: { id: 5, name: 'Léa' } },
+            }),
+        );
+
+        expect(screen.getByText(/en lecture seule/)).toBeTruthy();
+        expect(screen.getByText('Léa')).toBeTruthy();
     });
 
     it('reminds the reader view, and goes back to the admin view', async () => {

@@ -36,7 +36,7 @@ export const AppearanceModal = ({
     const list = display.layout === 'list';
 
     return (
-        <Modal opened={opened} onClose={onClose} title="Apparence">
+        <Modal opened={opened} onClose={onClose} title="Thème et affichage">
             <Stack>
                 <ColorSchemeControl
                     value={appearance.colorScheme}

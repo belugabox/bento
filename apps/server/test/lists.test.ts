@@ -105,7 +105,7 @@ describe('personal lists', () => {
         const kidId = ctx.db
             .select({ id: users.id })
             .from(users)
-            .where(eq(users.oidcSubject, 'kid'))
+            .where(eq(users.username, 'kid'))
             .get()!.id;
         await call(`/users/${kidId}`, admin, {
             method: 'PATCH',

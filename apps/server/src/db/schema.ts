@@ -12,12 +12,20 @@ import {
 import type { ComicInfo } from '../archive/comicInfo';
 import { READING_MODES } from '../classification';
 
-/** Compte Bento, créé à la première connexion via Pocket ID. */
+/**
+ * Compte Bento, créé par une invitation. Les comptes venus de Pocket ID
+ * n'ont ni identifiant ni mot de passe tant qu'ils ne sont pas activés.
+ */
 export const users = sqliteTable('users', {
     id: integer('id').primaryKey({ autoIncrement: true }),
-    // Identifiant stable de la personne chez Pocket ID (claim `sub`).
-    oidcSubject: text('oidc_subject').notNull().unique(),
+    // Identifiant tel qu'affiché (« Léa »).
     name: text('name').notNull(),
+    // Identifiant de connexion, en minuscules (« léa ») : unique.
+    username: text('username').unique(),
+    // scrypt, voir `auth/passwords.ts`.
+    passwordHash: text('password_hash'),
+    // Graine de l'avatar DiceBear « Clay ».
+    avatarSeed: text('avatar_seed'),
     email: text('email'),
     role: text('role', { enum: ['admin', 'reader'] }).notNull(),
     // Âge maximal des séries visibles (contrôle parental) ; null = aucune limite.
@@ -146,6 +154,30 @@ export const volumes = sqliteTable(
         index('volumes_series').on(t.seriesId),
     ],
 );
+
+/**
+ * Lien envoyé par l'admin : invitation (nouveau compte, sans `userId`), ou
+ * activation et nouveau mot de passe d'un compte. À usage unique.
+ */
+export const invitations = sqliteTable('invitations', {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    // Empreinte SHA-256 du jeton du lien (jamais le jeton lui-même).
+    tokenHash: text('token_hash').notNull().unique(),
+    userId: integer('user_id').references(() => users.id, {
+        onDelete: 'cascade',
+    }),
+    // Rôle et âge maximal du compte créé par une invitation.
+    role: text('role', { enum: ['admin', 'reader'] })
+        .notNull()
+        .default('reader'),
+    maxAge: integer('max_age'),
+    // Identifiant proposé par l'admin (tel que tapé), modifiable à l'inscription.
+    username: text('username'),
+    createdAt: integer('created_at', { mode: 'timestamp' })
+        .notNull()
+        .default(sql`(unixepoch())`),
+    expiresAt: integer('expires_at', { mode: 'timestamp' }).notNull(),
+});
 
 /** Session de connexion ; le cookie ne contient que son identifiant. */
 export const sessions = sqliteTable(

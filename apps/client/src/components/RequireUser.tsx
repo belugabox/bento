@@ -1,21 +1,26 @@
 import { Center, Loader } from '@mantine/core';
-import { type ReactNode, useEffect, useState } from 'react';
+import { type ReactNode, useCallback, useEffect, useState } from 'react';
 
-import { type CurrentUser, UserContext, fetchMe } from '@/services/auth';
+import {
+    type CurrentUser,
+    RefreshUserContext,
+    UserContext,
+    fetchMe,
+} from '@/services/auth';
 
 /**
  * N'affiche son contenu qu'une fois la personne connue ; sans session,
- * `json` envoie vers la connexion Pocket ID.
+ * `json` envoie vers la page de connexion.
  */
 export const RequireUser = ({ children }: { children: ReactNode }) => {
     const [user, setUser] = useState<CurrentUser>();
     const [error, setError] = useState<string>();
 
+    const refresh = useCallback(() => fetchMe().then(setUser), []);
+
     useEffect(() => {
-        fetchMe()
-            .then(setUser)
-            .catch((e: Error) => setError(e.message));
-    }, []);
+        refresh().catch((e: Error) => setError(e.message));
+    }, [refresh]);
 
     if (error) {
         return <Center h="100dvh">{error}</Center>;
@@ -27,5 +32,9 @@ export const RequireUser = ({ children }: { children: ReactNode }) => {
             </Center>
         );
     }
-    return <UserContext.Provider value={user}>{children}</UserContext.Provider>;
+    return (
+        <RefreshUserContext.Provider value={refresh}>
+            <UserContext.Provider value={user}>{children}</UserContext.Provider>
+        </RefreshUserContext.Provider>
+    );
 };

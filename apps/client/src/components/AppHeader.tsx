@@ -2,7 +2,6 @@ import {
     ActionIcon,
     Alert,
     Anchor,
-    Avatar,
     Button,
     CloseButton,
     Group,
@@ -13,6 +12,7 @@ import {
     Modal,
     Popover,
     Progress,
+    SegmentedControl,
     Select,
     Stack,
     Text,
@@ -32,6 +32,7 @@ import {
     IconSearch,
     IconSettings,
     IconTags,
+    IconUserCircle,
     IconUsers,
 } from '@tabler/icons-react';
 import { useEffect, useState } from 'react';
@@ -39,6 +40,7 @@ import { Link, useLocation, useNavigate } from 'react-router';
 
 import logo from '@/assets/logo.svg';
 import { AppearanceModal } from '@/components/AppearanceModal';
+import { UserAvatar } from '@/components/accounts/UserAvatar';
 import {
     ageLimitLabel,
     ageLimitOptions,
@@ -47,11 +49,14 @@ import {
 import {
     type Task,
     fetchPendingDrafts,
+    fetchSimulableAccounts,
     fetchTasks,
     startPreview,
+    startSimulation,
     stopPreview,
 } from '@/services/api';
 import { logout, useCurrentUser } from '@/services/auth';
+import { useQuery } from '@/services/useQuery';
 
 const REFRESH_MS = 60_000;
 // Tâches : suivies de près pendant qu'il y en a, sinon de temps en temps.
@@ -212,7 +217,12 @@ const TasksIndicator = () => {
     );
 };
 
-/** Choix de l'âge pour voir l'appli comme un lecteur (admin). */
+type PreviewMode = 'account' | 'age';
+
+/**
+ * « Voir comme un lecteur » (admin) : un compte simulé, vu tel quel en
+ * lecture seule, ou un lecteur fictif d'un âge donné.
+ */
 const PreviewModal = ({
     opened,
     onClose,
@@ -222,46 +232,135 @@ const PreviewModal = ({
 }) => {
     const { preview } = useCurrentUser();
     const ages = useAgeSteps(opened);
+    const { data: accounts } = useQuery(
+        () => (opened ? fetchSimulableAccounts() : Promise.resolve(undefined)),
+        [opened],
+    );
     // Âge proposé : celui de la vue en cours (gardé même s'il a quitté la
     // grille), sinon l'âge de la grille le plus proche de 10 ans.
     const childAge = [...ages].reverse().find((age) => age <= 10) ?? ages[0];
-    const [chosen, setChosen] = useState<string>();
+    const [chosenAge, setChosenAge] = useState<string>();
+    const [chosenAccount, setChosenAccount] = useState<string>();
+    const [chosenMode, setChosenMode] = useState<PreviewMode>();
+    const mode: PreviewMode =
+        chosenMode ??
+        (preview && !preview.user
+            ? 'age'
+            : accounts?.length === 0
+              ? 'age'
+              : 'account');
     const maxAge =
-        chosen ??
-        (preview
+        chosenAge ??
+        (preview && !preview.user
             ? String(preview.maxAge ?? NO_LIMIT)
             : String(childAge ?? NO_LIMIT));
+    const accountId =
+        chosenAccount ??
+        (preview?.user ? String(preview.user.id) : undefined) ??
+        (accounts?.[0] ? String(accounts[0].id) : undefined);
+    const account = accounts?.find((a) => String(a.id) === accountId);
     const options = ageLimitOptions(ages, preview?.maxAge).map((limit) => ({
         value: String(limit.value ?? NO_LIMIT),
         label: limit.label,
     }));
+
+    const show = () =>
+        void switchView(() =>
+            mode === 'account'
+                ? startSimulation(Number(accountId))
+                : startPreview(maxAge === NO_LIMIT ? null : Number(maxAge)),
+        );
+
     return (
         <Modal opened={opened} onClose={onClose} title="Voir comme un lecteur">
             <Stack>
-                <Text size="sm" c="dimmed">
-                    L’appli s’affiche comme pour un lecteur de cet âge : séries
-                    filtrées, écrans d’administration masqués.
-                </Text>
-                <Select
-                    label="Séries visibles"
-                    allowDeselect={false}
-                    value={maxAge}
-                    onChange={(value) => value && setChosen(value)}
-                    data={options}
-                    comboboxProps={{ withinPortal: false }}
+                <SegmentedControl
+                    value={mode}
+                    onChange={(value) => setChosenMode(value as PreviewMode)}
+                    data={[
+                        { value: 'account', label: 'Un compte' },
+                        { value: 'age', label: 'Un âge' },
+                    ]}
+                    aria-label="Voir comme"
                 />
+                {mode === 'account' ? (
+                    <>
+                        <Text size="sm" c="dimmed">
+                            L’appli s’affiche comme pour cette personne : ses
+                            séries, ses lectures, sa liste « À lire ». En
+                            lecture seule : rien n’est enregistré.
+                        </Text>
+                        {accounts?.length === 0 ? (
+                            <Alert color="gray">Aucun compte lecteur.</Alert>
+                        ) : (
+                            <Select
+                                label="Compte"
+                                allowDeselect={false}
+                                value={accountId ?? null}
+                                onChange={(value) =>
+                                    value && setChosenAccount(value)
+                                }
+                                placeholder={
+                                    accounts ? undefined : 'Chargement…'
+                                }
+                                leftSection={
+                                    account && (
+                                        <UserAvatar
+                                            name={account.name}
+                                            seed={account.avatarSeed}
+                                            size={22}
+                                        />
+                                    )
+                                }
+                                data={(accounts ?? []).map((a) => ({
+                                    value: String(a.id),
+                                    label: `${a.name} · ${ageLimitLabel(a.maxAge).toLowerCase()}`,
+                                }))}
+                                renderOption={({ option }) => {
+                                    const a = accounts?.find(
+                                        (item) =>
+                                            String(item.id) === option.value,
+                                    );
+                                    return (
+                                        <Group gap="sm" wrap="nowrap">
+                                            {a && (
+                                                <UserAvatar
+                                                    name={a.name}
+                                                    seed={a.avatarSeed}
+                                                    size={24}
+                                                />
+                                            )}
+                                            <Text size="sm">
+                                                {option.label}
+                                            </Text>
+                                        </Group>
+                                    );
+                                }}
+                            />
+                        )}
+                    </>
+                ) : (
+                    <>
+                        <Text size="sm" c="dimmed">
+                            L’appli s’affiche comme pour un lecteur de cet âge :
+                            séries filtrées, écrans d’administration masqués.
+                        </Text>
+                        <Select
+                            label="Séries visibles"
+                            allowDeselect={false}
+                            value={maxAge}
+                            onChange={(value) => value && setChosenAge(value)}
+                            data={options}
+                        />
+                    </>
+                )}
                 <Group justify="flex-end">
                     <Button variant="default" onClick={onClose}>
                         Annuler
                     </Button>
                     <Button
-                        onClick={() =>
-                            void switchView(() =>
-                                startPreview(
-                                    maxAge === NO_LIMIT ? null : Number(maxAge),
-                                ),
-                            )
-                        }
+                        disabled={mode === 'account' && !account}
+                        onClick={show}
                     >
                         Voir
                     </Button>
@@ -286,7 +385,12 @@ const UserMenu = () => {
             <Menu position="bottom-end">
                 <Menu.Target>
                     <UnstyledButton aria-label="Mon compte">
-                        <Avatar name={user.name} color="initials" size="md" />
+                        <UserAvatar
+                            name={user.name}
+                            seed={user.avatarSeed}
+                            size="md"
+                            radius="xl"
+                        />
                     </UnstyledButton>
                 </Menu.Target>
                 <Menu.Dropdown>
@@ -294,12 +398,28 @@ const UserMenu = () => {
                         <Text size="sm" fw={500} c="bright">
                             {user.name}
                         </Text>
-                        {user.preview
-                            ? `Vue lecteur · ${ageLimitLabel(user.preview.maxAge)}`
-                            : isAdmin
-                              ? 'Administrateur'
-                              : 'Lecteur'}
+                        {user.preview?.user
+                            ? 'Vue simulée · lecture seule'
+                            : user.preview
+                              ? `Vue lecteur · ${ageLimitLabel(user.preview.maxAge)}`
+                              : isAdmin
+                                ? 'Administrateur'
+                                : 'Lecteur'}
                     </Menu.Label>
+                    <Menu.Item
+                        component={Link}
+                        to="/account"
+                        leftSection={<IconUserCircle size={14} />}
+                    >
+                        Mon compte
+                    </Menu.Item>
+                    <Menu.Item
+                        leftSection={<IconPalette size={14} />}
+                        onClick={appearanceModal.open}
+                    >
+                        Thème et affichage…
+                    </Menu.Item>
+                    <Menu.Divider />
                     {isAdmin && (
                         <Menu.Item
                             component={Link}
@@ -324,7 +444,7 @@ const UserMenu = () => {
                             to="/users"
                             leftSection={<IconUsers size={14} />}
                         >
-                            Comptes et contrôle parental
+                            Comptes
                         </Menu.Item>
                     )}
                     {isAdmin && (
@@ -355,13 +475,6 @@ const UserMenu = () => {
                             )}
                         </>
                     )}
-                    <Menu.Divider />
-                    <Menu.Item
-                        leftSection={<IconPalette size={14} />}
-                        onClick={appearanceModal.open}
-                    >
-                        Apparence…
-                    </Menu.Item>
                     <Menu.Divider />
                     <Menu.Item
                         leftSection={<IconLogout size={14} />}
@@ -457,6 +570,36 @@ export const AppHeader = () => {
 };
 
 /** Rappel de la vue lecteur d'un admin, avec retour à la vue admin. */
+/**
+ * Compte venu de Pocket ID, encore connecté : il doit choisir son
+ * identifiant et son mot de passe pour pouvoir se reconnecter.
+ */
+export const ActivationBanner = () => {
+    const { hasPassword, preview } = useCurrentUser();
+    const { pathname } = useLocation();
+    // Compte simulé par l'admin : ce n'est pas à lui de l'activer.
+    if (hasPassword || preview?.user || pathname === '/account') return null;
+    return (
+        <Alert color="orange" variant="light" mb="md" py="xs">
+            <Group justify="space-between">
+                <Text size="sm">
+                    Bento n’utilise plus Pocket ID : choisis ton identifiant et
+                    ton mot de passe pour pouvoir te reconnecter.
+                </Text>
+                <Button
+                    size="xs"
+                    variant="light"
+                    color="orange"
+                    component={Link}
+                    to="/account"
+                >
+                    Choisir
+                </Button>
+            </Group>
+        </Alert>
+    );
+};
+
 export const PreviewBanner = () => {
     const { preview } = useCurrentUser();
     if (!preview) return null;
@@ -464,8 +607,18 @@ export const PreviewBanner = () => {
         <Alert color="orange" variant="light" mb="md" py="xs">
             <Group justify="space-between">
                 <Text size="sm">
-                    Vue lecteur : {ageLimitLabel(preview.maxAge).toLowerCase()}.
-                    Les écrans d’administration sont masqués.
+                    {preview.user ? (
+                        <>
+                            Vue de <b>{preview.user.name}</b>, en lecture seule
+                            : rien n’est enregistré.
+                        </>
+                    ) : (
+                        <>
+                            Vue lecteur :{' '}
+                            {ageLimitLabel(preview.maxAge).toLowerCase()}. Les
+                            écrans d’administration sont masqués.
+                        </>
+                    )}
                 </Text>
                 <Button
                     size="xs"

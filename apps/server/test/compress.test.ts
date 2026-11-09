@@ -227,6 +227,7 @@ describe('settings', () => {
             settings: {
                 compression: { quality: 90, maxHeight: 2400 },
                 scanIntervalMinutes: 30,
+                readByPercent: 10,
                 appearance: { colorScheme: 'auto', accent: 'violet' },
                 ages: [0, 8, 10, 12, 14, 16, 18],
                 sourcePriority: DEFAULT_SOURCE_PRIORITY,
@@ -234,6 +235,7 @@ describe('settings', () => {
             defaults: {
                 compression: { quality: 90, maxHeight: 2400 },
                 scanIntervalMinutes: 30,
+                readByPercent: 10,
                 appearance: { colorScheme: 'auto', accent: 'violet' },
                 ages: [0, 8, 10, 12, 14, 16, 18],
                 sourcePriority: DEFAULT_SOURCE_PRIORITY,
@@ -249,6 +251,7 @@ describe('settings', () => {
         const changed = await put({
             compression: { quality: 70 },
             scanIntervalMinutes: 0,
+            readByPercent: 80,
             appearance: { accent: 'teal' },
             // Un champ seulement : les autres gardent leur site.
             sourcePriority: { Writer: 'wikipedia' },
@@ -256,10 +259,12 @@ describe('settings', () => {
         expect((await changed.json()).settings).toEqual({
             compression: { quality: 70, maxHeight: 2400 },
             scanIntervalMinutes: 0,
+            readByPercent: 80,
             appearance: { colorScheme: 'auto', accent: 'teal' },
             ages: [0, 8, 10, 12, 14, 16, 18],
             sourcePriority: { ...DEFAULT_SOURCE_PRIORITY, Writer: 'wikipedia' },
         });
+        expect((await put({ readByPercent: 0 })).status).toBe(400);
         expect((await put({ sourcePriority: { Writer: 'imdb' } })).status).toBe(
             400,
         );

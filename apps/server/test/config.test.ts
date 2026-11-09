@@ -3,14 +3,9 @@ import { describe, expect, it } from 'vitest';
 
 import { loadConfig as load } from '../src/config';
 
-const OIDC = {
-    OIDC_ISSUER: 'https://auth.example.com',
-    OIDC_CLIENT_ID: 'bento',
-    OIDC_CLIENT_SECRET: 'secret',
-    PUBLIC_URL: 'https://bento.example.com/',
-};
+const REQUIRED = { PUBLIC_URL: 'https://bento.example.com/' };
 
-const loadConfig = (env: NodeJS.ProcessEnv) => load({ ...OIDC, ...env });
+const loadConfig = (env: NodeJS.ProcessEnv) => load({ ...REQUIRED, ...env });
 
 describe('loadConfig', () => {
     it('applies the defaults', () => {
@@ -49,12 +44,10 @@ describe('loadConfig', () => {
         ).toThrow(/LIBRARIES\.0\.type/);
     });
 
-    it('requires the OIDC settings and trims the public URL', () => {
-        expect(() => load({})).toThrow(/OIDC_ISSUER/);
+    it('requires the public URL and trims it', () => {
+        expect(() => load({})).toThrow(/PUBLIC_URL/);
         expect(loadConfig({})).toMatchObject({
             PUBLIC_URL: 'https://bento.example.com',
-            OIDC_ADMIN_GROUP: 'bento-admins',
-            OIDC_READER_GROUP: 'bento-readers',
         });
     });
 });

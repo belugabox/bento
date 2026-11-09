@@ -48,6 +48,8 @@ export const settingsSchema = z.object({
     // Grille d'âges proposée pour les séries et les comptes (0 : tout public).
     ages: ageStepsSchema,
     sourcePriority: sourcePrioritySchema,
+    // « Lu par » d'une fiche série : à partir de cette part des pages lues.
+    readByPercent: z.number().int().min(1).max(100),
 });
 
 export type Settings = z.infer<typeof settingsSchema>;
@@ -59,6 +61,7 @@ export const settingsUpdateSchema = z.object({
     appearance: appearanceSchema.partial().optional(),
     ages: ageStepsSchema.optional(),
     sourcePriority: sourcePrioritySchema.partial().optional(),
+    readByPercent: settingsSchema.shape.readByPercent.optional(),
 });
 
 export type SettingsUpdate = z.infer<typeof settingsUpdateSchema>;
@@ -69,6 +72,7 @@ export const defaultSettings = (scanIntervalMinutes = 30): Settings => ({
     appearance: { colorScheme: 'auto', accent: 'violet' },
     ages: DEFAULT_AGE_STEPS,
     sourcePriority: DEFAULT_SOURCE_PRIORITY,
+    readByPercent: 10,
 });
 
 const KEY = 'settings';

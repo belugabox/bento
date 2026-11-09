@@ -112,7 +112,7 @@ describe('GET /volumes/:id/page-sizes', () => {
         ctx.db
             .update(users)
             .set({ maxAge: 10 })
-            .where(eq(users.oidcSubject, 'child'))
+            .where(eq(users.username, 'child'))
             .run();
 
         expect((await sizes(firstVolumeId(), child)).status).toBe(404);

@@ -129,4 +129,21 @@ describe('seriesDetails', () => {
         ).toEqual(['Manga · 1984 · 14+ · Terminée', 'Action, Science-fiction']);
         expect(seriesDetails(series('Akira', 0, null))).toEqual([]);
     });
+
+    it('starts with the author and the artist, once each', () => {
+        expect(
+            seriesDetails({
+                ...series('Death Note', 0, null),
+                writer: 'Tsugumi Ohba',
+                penciller: 'Takeshi Obata',
+            }),
+        ).toEqual(['Tsugumi Ohba · Takeshi Obata']);
+        expect(
+            seriesDetails({
+                ...series('Akira', 0, null),
+                writer: 'Katsuhiro Otomo',
+                penciller: 'katsuhiro otomo',
+            }),
+        ).toEqual(['Katsuhiro Otomo']);
+    });
 });

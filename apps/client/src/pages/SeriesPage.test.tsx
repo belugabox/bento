@@ -10,7 +10,10 @@ import { SeriesPage } from './SeriesPage';
 const READER: CurrentUser = {
     id: 2,
     name: 'Alice',
+    username: 'alice',
     email: null,
+    avatarSeed: null,
+    hasPassword: true,
     role: 'reader',
     maxAge: null,
     preview: null,

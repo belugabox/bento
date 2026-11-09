@@ -39,11 +39,7 @@ Toute la configuration passe par des variables d'environnement :
 | `DATA_PATH` | `./data` (`/config` dans Docker) | Base SQLite et couvertures |
 | `LIBRARIES` | `[]` | Bibliothèques, en JSON : `[{"name":"Mangas","path":"/manga","type":"manga"}]`. Type `manga` ou `comics` : mode de lecture par défaut « Manga (gauche → droite) » ou « BD » |
 | `SCAN_INTERVAL_MINUTES` | `30` | Scan automatique des bibliothèques (`0` = seulement au démarrage et à la demande) |
-| `OIDC_ISSUER` | — (requis) | Adresse de Pocket ID, ex. `https://auth.belugabox.net` |
-| `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET` | — (requis) | Client OIDC « Bento » créé dans Pocket ID |
-| `PUBLIC_URL` | — (requis) | Adresse publique de Bento ; l'adresse de retour à déclarer dans Pocket ID est `PUBLIC_URL/api/auth/callback` |
-| `OIDC_ADMIN_GROUP` | `bento-admins` | Groupe Pocket ID des administrateurs |
-| `OIDC_READER_GROUP` | `bento-readers` | Groupe Pocket ID des lecteurs (sans l'un des deux groupes, l'accès est refusé) |
+| `PUBLIC_URL` | — (requis) | Adresse publique de Bento : liens d'invitation, cookies `Secure` en HTTPS |
 
 ### Gestion des tomes (admin)
 
@@ -76,13 +72,15 @@ L'admin fixe le mode de chaque série dans « Modifier les métadonnées » (par
 
 ### Accueil et listes
 
-- **Accueil** : une seule grille, sans titre. D'abord les tomes à reprendre (pour chaque série entamée, le tome commencé ou, à défaut, le premier pas encore ouvert, avec l'avancement dans la série ; la plus récemment lue d'abord), qui ouvrent le lecteur (▶ en couleur sur la couverture) ; puis les séries de ta liste « À lire » (marque-page gris), les autres, et enfin les séries déjà lues, grisées (coche grise). Un clic sur une icône ouvre la carte. « Apparence… » (menu du compte) règle l'affichage sur l'appareil : grille ou liste (avec, pour chaque série, format, année, âge, parution et genres), taille des cartes (glissière à cinq crans, des très petites aux très grandes, aussi pour les tomes d'une série), couvertures seules. Les filtres et la recherche s'appliquent à tout. Les vignettes utilisent une version réduite des couvertures, créée à la première demande.
+- **Accueil** : une seule grille, sans titre. D'abord les tomes à reprendre (pour chaque série entamée, le tome commencé ou, à défaut, le premier pas encore ouvert, avec l'avancement dans la série ; la plus récemment lue d'abord), qui ouvrent le lecteur (▶ en couleur sur la couverture) ; puis les séries de ta liste « À lire » (marque-page gris), les autres, et enfin les séries déjà lues, grisées (coche grise). Un clic sur une icône ouvre la carte. « Thème et affichage… » (menu du compte, sous « Mon compte ») règle l'affichage sur l'appareil : grille ou liste (avec, pour chaque série, auteur et dessinateur, format, année, âge, parution et genres), taille des cartes (glissière à cinq crans, des très petites aux très grandes, aussi pour les tomes d'une série), couvertures seules. Les filtres et la recherche s'appliquent à tout. Les vignettes utilisent une version réduite des couvertures, créée à la première demande.
 - **Menu ⋮ des cartes** (en bas à droite) :
   - sur une série : lire, reprendre ou relire ; marquer comme lue, lue jusqu'à un tome, ou non lue (après confirmation) ; ajouter à « À lire » ou l'en retirer ; modifier la série (admin) ;
   - sur un tome à reprendre : le marquer comme lu, le retirer de « Reprendre » (progression effacée), voir la série.
   - Chaque action affiche un message avec « Annuler » pendant quelques secondes : la progression revient exactement comme avant, ordre de « Reprendre » compris.
 - **Recherche** : dans l'en-tête, depuis n'importe quelle page ; elle trouve les séries par nom, genre, thème ou auteur (scénario, dessin), sans casse ni accents, et s'affiche sur l'accueil.
-- **Filtres** : sur une seule ligne, collée en bas de l'écran. Elle commence par le choix Grille / Liste (le même que dans « Apparence… »). Le menu de tri (nom, ajouts récents) qui contient aussi le statut de parution, puis les genres en pastilles (les 5 qui ont le plus de séries, les autres dans « Plus » avec leur nombre de séries). Un clic choisit une pastille, un second la retire. Sur un écran étroit, un seul bouton « Genre » ouvre la liste de tous les genres. Tout reste dans l'adresse.
+- **Filtres** : sur une seule ligne, collée en bas de l'écran. Elle commence par le choix Grille / Liste (le même que dans « Thème et affichage… »). Le menu de tri (nom, ajouts récents) qui contient aussi le statut de parution, puis les genres en pastilles (les 5 qui ont le plus de séries, les autres dans « Plus » avec leur nombre de séries). Un clic choisit une pastille, un second la retire. Sur un écran étroit, un seul bouton « Genre » ouvre la liste de tous les genres. Tout reste dans l'adresse.
+- **Filtre « Lu par »** (barre de l'accueil) : ne garder que les séries qu'une personne de la famille a lues (même seuil que la fiche série) ; le menu donne le nombre de séries de chacun. Il n'apparaît que si quelqu'un d'autre a lu quelque chose.
+- **« Lu par »** : sur la fiche série, les avatars des autres comptes qui en ont lu assez (part des pages de la série, 10 % par défaut, réglable dans Réglages, onglet Général), les plus avancés d'abord, à droite des boutons de lecture ; au clic, le nom de chacun, son dernier tome ouvert (« Tome 5, page 34 sur 200 », « Tome 5 lu ») et sa part de la série.
 - **« À lire »** : le marque-page de la fiche série, propre à chacun ; ces séries remontent en tête de l'accueil, après les tomes à reprendre. (Les favoris ont été retirés.)
 - La liste « à lire » suit une série renommée à la publication. (Les collections partagées ont été retirées.)
 
@@ -92,9 +90,9 @@ Depuis le menu de l'avatar, « Réglages », en deux onglets :
 - **Général** : qualité JPEG et hauteur maximale des pages pour la compression, intervalle du scan automatique (la variable `SCAN_INTERVAL_MINUTES` n'en donne plus que la valeur par défaut), apparence par défaut. Enregistrés ensemble.
 - **Classement**, enregistré à chaque changement : les formats (ajouter, renommer, choisir le mode de lecture, supprimer : ses séries devront en choisir un autre), la grille d'âges proposée pour les séries et les comptes, et la liste des genres (ajouter, renommer, changer les autres noms reconnus, supprimer ou fusionner dans un autre ; un genre renommé garde son ancien nom comme autre nom reconnu).
 
-### Apparence
+### Thème et affichage
 
-Par défaut, Bento suit le mode du système (clair ou sombre) en violet ; l'admin change ce thème par défaut dans les réglages. Chacun peut choisir le sien depuis le menu de l'avatar (« Apparence… ») : mode clair, sombre ou celui du système, et une couleur d'accent parmi douze. Ce choix est gardé sur l'appareil ; « Thème par défaut » y revient.
+Par défaut, Bento suit le mode du système (clair ou sombre) en violet ; l'admin change ce thème par défaut dans les réglages. Chacun peut choisir le sien depuis le menu de l'avatar (« Thème et affichage… ») : mode clair, sombre ou celui du système, et une couleur d'accent parmi douze. Ce choix est gardé sur l'appareil ; « Thème par défaut » y revient.
 
 ### Appli et plein écran
 
@@ -109,15 +107,22 @@ Depuis le menu de l'avatar : chiffres de la bibliothèque, lecture par personne,
 
 ### Contrôle parental
 
-- **Âge maximal** : l'admin le règle pour chaque personne dans « Comptes et contrôle parental », depuis le menu de l'avatar, parmi les âges de la grille.
+- **Âge maximal** : l'admin le règle pour chaque personne dans « Comptes », depuis le menu de l'avatar, parmi les âges de la grille.
 - **Âge d'une série** : celui choisi dans l'éditeur (grille des réglages), sinon la classification la plus restrictive de ses tomes (`AgeRating` du ComicInfo).
 - **Comptes limités** : ils ne voient que les séries classées sous leur limite. Une série sans classification leur est masquée, partout : liste, fiche, tomes, pages, couvertures, « Reprendre la lecture ».
-- **Admins** : ils voient tout. « Voir comme un lecteur… », dans le menu de l'avatar, leur permet de **voir l'appli comme un lecteur** d'un âge donné, pour vérifier ce qu'un enfant verra ; un bandeau permet de revenir à la vue admin.
+- **Admins** : ils voient tout. « Voir comme un lecteur… », dans le menu de l'avatar, leur permet de **voir l'appli comme un compte lecteur** (ses séries, ses lectures, sa liste « À lire », en lecture seule : rien n'est enregistré, les boutons qui modifient sont grisés) ou comme un lecteur fictif d'un âge donné ; un bandeau permet de revenir à la vue admin.
 - **Classifications** : les variantes du ComicInfo sont regroupées par âge (« 10 ans et + » regroupe « Everyone 10+ » et « PG », par exemple).
 
-### Connexion
+### Comptes et connexion
 
-La connexion passe par Pocket ID, en OIDC : flux par code avec PKCE, côté serveur. Bento garde ensuite une session de 30 jours dans un cookie `HttpOnly`, prolongée tant qu'elle sert. Nom, e-mail et rôle sont repris de Pocket ID à chaque connexion. Seuls `/api/health` et `/api/auth/*` sont accessibles sans session.
+- **Comptes** : un identifiant (lettres, chiffres, `.`, `-`, `_` ; sans tenir compte des majuscules à la connexion), un mot de passe (8 caractères au moins), un avatar DiceBear « Clay » et un e-mail facultatif.
+- **Invitations** : dans « Comptes » (menu de l'avatar), « Inviter » crée un lien pour un lecteur (avec son âge maximal) ou un admin, avec peut-être un identifiant proposé (modifiable à l'inscription). Bento n'envoie rien lui-même : le lien part par le menu de partage du téléphone, WhatsApp, texto, e-mail, ou se copie. Il sert une fois et vaut 7 jours ; les invitations en attente peuvent être annulées.
+- **Mot de passe oublié** : l'admin crée un lien de nouveau mot de passe depuis le menu (⋮) du compte, envoyé de la même façon. L'admin y change aussi le rôle et supprime un compte (jamais le sien).
+- **Avatar** : douze idées au hasard à côté de l'avatar (« Autres idées » pour en tirer d'autres), puis « Personnaliser », fermé au départ : un onglet par partie (corps, tête, motif, yeux, bouche) et les couleurs (corps, détails, fond), onglets de haut en bas. Tous les avatars bougent doucement (jamais si l'appareil réduit les animations). Un avatar d'avant reste tel quel et se modifie de la même façon.
+- **Mon compte** (menu de l'avatar) : avatar, identifiant, e-mail, mot de passe (l'actuel est demandé).
+- **Connexion** : page `/login`. Après 5 échecs en 15 minutes pour un identifiant, il faut attendre. Session de 30 jours dans un cookie `HttpOnly`, prolongée tant qu'elle sert. Mots de passe chiffrés par scrypt ; la base ne garde que l'empreinte des jetons de session et des liens. Seuls `/api/health`, `/api/appearance`, `/api/avatars/*` et `/api/auth/*` sont accessibles sans session.
+- **Comptes venus de Pocket ID** (avant novembre 2026) : gardés avec leurs lectures, marqués « À activer ». Encore connectés, ils voient un bandeau qui mène à « Mon compte » ; sinon l'admin leur envoie un lien d'activation (même page que l'invitation, identifiant proposé d'après leur nom).
+- **Secours** : au démarrage, si aucun admin n'a de mot de passe, le journal donne un lien pour en choisir un. `pnpm --filter server admin-link [identifiant]` (dans Docker : `node apps/server/dist/adminLink.js`) donne un lien de nouveau mot de passe pour un admin.
 
 ### Organisation des bibliothèques
 
@@ -139,9 +144,6 @@ services:
     environment:
       LIBRARIES: '[{"name":"Mangas","path":"/manga","type":"manga"}]'
       PUBLIC_URL: https://bento.belugabox.net
-      OIDC_ISSUER: https://auth.belugabox.net
-      OIDC_CLIENT_ID: ${BENTO_OIDC_CLIENT_ID}
-      OIDC_CLIENT_SECRET: ${BENTO_OIDC_CLIENT_SECRET}
     volumes:
       - ./bento:/config
       - /BLK/Books/Manga:/manga
