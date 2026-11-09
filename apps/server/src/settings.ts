@@ -72,7 +72,7 @@ export const defaultSettings = (scanIntervalMinutes = 30): Settings => ({
     appearance: { colorScheme: 'auto', accent: 'violet' },
     ages: DEFAULT_AGE_STEPS,
     sourcePriority: DEFAULT_SOURCE_PRIORITY,
-    readByPercent: 50,
+    readByPercent: 10,
 });
 
 const KEY = 'settings';

@@ -227,7 +227,7 @@ describe('settings', () => {
             settings: {
                 compression: { quality: 90, maxHeight: 2400 },
                 scanIntervalMinutes: 30,
-                readByPercent: 50,
+                readByPercent: 10,
                 appearance: { colorScheme: 'auto', accent: 'violet' },
                 ages: [0, 8, 10, 12, 14, 16, 18],
                 sourcePriority: DEFAULT_SOURCE_PRIORITY,
@@ -235,7 +235,7 @@ describe('settings', () => {
             defaults: {
                 compression: { quality: 90, maxHeight: 2400 },
                 scanIntervalMinutes: 30,
-                readByPercent: 50,
+                readByPercent: 10,
                 appearance: { colorScheme: 'auto', accent: 'violet' },
                 ages: [0, 8, 10, 12, 14, 16, 18],
                 sourcePriority: DEFAULT_SOURCE_PRIORITY,

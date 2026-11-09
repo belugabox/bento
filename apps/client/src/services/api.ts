@@ -64,6 +64,10 @@ export const fetchSeries = (seriesId: number) =>
 export const fetchSeriesReaders = (seriesId: number) =>
     json(api.series[':id'].readers.$get(id(seriesId)));
 
+export type SeriesReader = Awaited<
+    ReturnType<typeof fetchSeriesReaders>
+>[number];
+
 export const fetchVolume = (volumeId: number) =>
     json(api.volumes[':id'].$get(id(volumeId)));
 

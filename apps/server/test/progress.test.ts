@@ -291,9 +291,21 @@ describe('series readers', () => {
         await save(gantz[0]!, { page: 0 }, bob);
 
         expect(await readers(bob)).toEqual([
-            expect.objectContaining({ percent: 55 }),
+            expect.objectContaining({
+                percent: 55,
+                // Dernier tome ouvert : le T02, page 2 sur 3.
+                current: {
+                    number: '2',
+                    title: null,
+                    kind: 'volume',
+                    page: 2,
+                    pageCount: 3,
+                    completed: false,
+                },
+            }),
         ]);
-        // Jamais soi-même ; Bob reste sous le seuil (50 %).
+        // Jamais soi-même ; Bob reste sous le seuil choisi.
+        new SettingsStore(ctx.db).update({ readByPercent: 50 });
         expect(await readers(alice)).toEqual([]);
 
         new SettingsStore(ctx.db).update({ readByPercent: 10 });

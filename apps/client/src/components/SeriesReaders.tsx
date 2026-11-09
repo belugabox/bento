@@ -8,11 +8,21 @@ import {
 } from '@mantine/core';
 
 import { UserAvatar } from '@/components/accounts/UserAvatar';
-import { fetchSeriesReaders } from '@/services/api';
+import { volumeLabel } from '@/components/readingStatus';
+import { type SeriesReader, fetchSeriesReaders } from '@/services/api';
 import { useQuery } from '@/services/useQuery';
 
+/** Où en est la personne : son dernier tome ouvert, et la page atteinte. */
+const positionLabel = ({ current }: SeriesReader) =>
+    current &&
+    `${volumeLabel(current)}${
+        current.completed
+            ? ' lu'
+            : `, page ${current.page} sur ${current.pageCount}`
+    }`;
+
 const progressLabel = (percent: number) =>
-    percent === 100 ? 'Tout lu' : `${percent} % lu`;
+    percent === 100 ? 'Toute la série lue' : `${percent} % de la série`;
 
 /**
  * « Lu par » : les avatars des autres comptes qui ont lu assez de la série
@@ -59,6 +69,12 @@ export const SeriesReaders = ({ seriesId }: { seriesId: number }) => {
                                 <Text size="sm" fw={500}>
                                     {reader.name}
                                 </Text>
+                                {reader.percent < 100 &&
+                                    positionLabel(reader) && (
+                                        <Text size="xs">
+                                            {positionLabel(reader)}
+                                        </Text>
+                                    )}
                                 <Text size="xs" c="dimmed">
                                     {progressLabel(reader.percent)}
                                 </Text>

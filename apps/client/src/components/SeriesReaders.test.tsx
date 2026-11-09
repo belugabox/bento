@@ -25,8 +25,27 @@ afterEach(() => {
 describe('SeriesReaders', () => {
     it('shows the avatars of those who read the series', async () => {
         const fetch = answer([
-            { id: 2, name: 'Léa', avatarSeed: 'abc', percent: 100 },
-            { id: 3, name: 'Zoé', avatarSeed: null, percent: 60 },
+            {
+                id: 2,
+                name: 'Léa',
+                avatarSeed: 'abc',
+                percent: 100,
+                current: null,
+            },
+            {
+                id: 3,
+                name: 'Zoé',
+                avatarSeed: null,
+                percent: 60,
+                current: {
+                    number: '5',
+                    title: null,
+                    kind: 'volume',
+                    page: 34,
+                    pageCount: 200,
+                    completed: false,
+                },
+            },
         ]);
         show();
 
@@ -38,8 +57,9 @@ describe('SeriesReaders', () => {
         expect(screen.getByText(/^Z/)).toBeTruthy();
         // Au clic : le nom et l'avancement de chacun.
         fireEvent.click(screen.getByRole('button', { name: 'Lu par' }));
-        expect(await screen.findByText('Tout lu')).toBeTruthy();
-        expect(screen.getByText('60 % lu')).toBeTruthy();
+        expect(await screen.findByText('Toute la série lue')).toBeTruthy();
+        expect(screen.getByText('Tome 5, page 34 sur 200')).toBeTruthy();
+        expect(screen.getByText('60 % de la série')).toBeTruthy();
         expect(screen.getByText('Zoé')).toBeTruthy();
         expect(String(fetch.mock.calls[0]![0])).toMatch(
             /\/api\/series\/3\/readers$/,
