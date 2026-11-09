@@ -73,7 +73,15 @@ export const AppearanceModal = ({
                         data={LAYOUT_OPTIONS}
                     />
                 </Input.Wrapper>
-                <Input.Wrapper label="Taille des cartes" pb="md">
+                <Input.Wrapper
+                    label={
+                        list
+                            ? 'Taille des cartes'
+                            : `Taille des cartes : ${CARD_SIZES[display.size]?.label.toLowerCase()}`
+                    }
+                >
+                    {/* Un point par cran ; le nom est dans le titre (des
+                        légendes sous les bouts dépasseraient de la fenêtre). */}
                     <Slider
                         min={0}
                         max={CARD_SIZES.length - 1}
@@ -81,11 +89,8 @@ export const AppearanceModal = ({
                         disabled={list}
                         value={display.size}
                         onChange={(size) => display.set({ size })}
-                        label={(size) => CARD_SIZES[size]?.label}
-                        marks={[
-                            { value: 0, label: 'Petites' },
-                            { value: CARD_SIZES.length - 1, label: 'Grandes' },
-                        ]}
+                        label={null}
+                        marks={CARD_SIZES.map((_, value) => ({ value }))}
                         thumbLabel="Taille des cartes"
                     />
                 </Input.Wrapper>
