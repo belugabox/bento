@@ -149,7 +149,8 @@ const FilterChip = ({
     <Button
         size="compact-md"
         radius="xl"
-        fw={500}
+        fw={400}
+        fz="sm"
         variant={active ? 'filled' : 'default'}
         aria-pressed={active}
         onClick={onClick}
@@ -454,7 +455,8 @@ export const LibraryPage = () => {
                                         <Button
                                             size="compact-md"
                                             radius="xl"
-                                            fw={500}
+                                            fw={400}
+                                            fz="sm"
                                             variant="default"
                                             aria-label="Trier les séries"
                                             leftSection={
@@ -534,7 +536,8 @@ export const LibraryPage = () => {
                                             <Button
                                                 size="compact-md"
                                                 radius="xl"
-                                                fw={500}
+                                                fw={400}
+                                                fz="sm"
                                                 variant="subtle"
                                                 rightSection={
                                                     <IconChevronDown
@@ -584,7 +587,8 @@ export const LibraryPage = () => {
                                         hiddenFrom="sm"
                                         size="compact-md"
                                         radius="xl"
-                                        fw={500}
+                                        fw={400}
+                                        fz="sm"
                                         variant={genre ? 'filled' : 'default'}
                                         aria-label="Choisir un genre"
                                         rightSection={
