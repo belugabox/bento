@@ -137,6 +137,15 @@ const AvatarSection = () => {
                 >
                     Enregistrer l’avatar
                 </Button>
+                {/* Remet l'avatar enregistré. */}
+                {user.avatarSeed && seed !== user.avatarSeed && (
+                    <Button
+                        variant="default"
+                        onClick={() => setSeed(user.avatarSeed!)}
+                    >
+                        Annuler
+                    </Button>
+                )}
             </Group>
         </Section>
     );

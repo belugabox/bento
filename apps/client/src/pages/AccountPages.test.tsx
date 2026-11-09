@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { type CurrentUser, UserContext } from '@/services/auth';
 
+import { AccountPage } from './AccountPage';
 import { JoinPage } from './JoinPage';
 import { LoginPage } from './LoginPage';
 import { UsersPage } from './UsersPage';
@@ -42,6 +43,7 @@ const show = (path: string) =>
                         <Route path="/login" element={<LoginPage />} />
                         <Route path="/join/:token" element={<JoinPage />} />
                         <Route path="/users" element={<UsersPage />} />
+                        <Route path="/account" element={<AccountPage />} />
                         <Route path="*" element={null} />
                     </Routes>
                     <Address />
@@ -317,5 +319,26 @@ describe('UsersPage', () => {
             name: 'Rôle de Zoé Martin',
         });
         expect((other as HTMLInputElement).disabled).toBe(false);
+    });
+});
+
+describe('AccountPage', () => {
+    it('cancels a new avatar, back to the saved one', async () => {
+        show('/account');
+
+        const save = screen.getByRole('button', {
+            name: 'Enregistrer l’avatar',
+        }) as HTMLButtonElement;
+        expect(save.disabled).toBe(true);
+        expect(screen.queryByRole('button', { name: 'Annuler' })).toBeNull();
+
+        fireEvent.click(screen.getByRole('button', { name: 'Idée 1' }));
+        expect(save.disabled).toBe(false);
+        fireEvent.click(screen.getByRole('button', { name: 'Annuler' }));
+
+        expect(save.disabled).toBe(true);
+        expect(
+            screen.getByAltText('Avatar choisi').getAttribute('src'),
+        ).toMatch(/\/api\/avatars\/abc\?/);
     });
 });
