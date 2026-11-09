@@ -156,6 +156,32 @@ afterEach(() => {
 });
 
 describe('MetadataEditor', () => {
+    it('lets the cover be changed on a phone too', () => {
+        const onEdit = vi.fn();
+        render(
+            <MantineProvider>
+                <MetadataEditor
+                    libraryId={1}
+                    kind="manga"
+                    mode="drafts"
+                    volumes={volumes()}
+                    cover={{ onEdit }}
+                    onChanged={() => {}}
+                />
+            </MantineProvider>,
+        );
+
+        // Un bouton par mise en page : grand écran, et téléphone (la
+        // version grand écran y est masquée).
+        const buttons = screen.getAllByRole('button', { name: 'Couverture…' });
+        expect(buttons).toHaveLength(2);
+        expect(buttons.some((b) => b.closest('.mantine-hidden-from-sm'))).toBe(
+            true,
+        );
+        fireEvent.click(buttons[0]!);
+        expect(onEdit).toHaveBeenCalled();
+    });
+
     it('keeps what is typed when the page re-renders', () => {
         const { rerender } = render(<Editor />);
 

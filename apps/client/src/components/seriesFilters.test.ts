@@ -2,10 +2,10 @@ import { describe, expect, it } from 'vitest';
 
 import {
     type ListedSeries,
-    allFormats,
-    allGenres,
     filterSeries,
+    genresByCount,
     readingStateOf,
+    seriesDetails,
 } from './seriesFilters';
 
 const series = (
@@ -36,24 +36,25 @@ describe('readingStateOf', () => {
 });
 
 describe('filterSeries', () => {
-    it('keeps the server order by name, and filters by reading state', () => {
-        expect(
-            names(filterSeries(list, { filter: 'all', sort: 'name' })),
-        ).toEqual(['Akira', 'Berserk', 'Coq de combat']);
-        expect(
-            names(filterSeries(list, { filter: 'started', sort: 'name' })),
-        ).toEqual(['Coq de combat']);
+    it('keeps the server order by name, read series last', () => {
+        expect(names(filterSeries(list, { sort: 'name' }))).toEqual([
+            'Akira',
+            'Coq de combat',
+            'Berserk',
+        ]);
     });
 
-    it('sorts by the last added volume, most recent first', () => {
-        expect(
-            names(filterSeries(list, { filter: 'all', sort: 'recent' })),
-        ).toEqual(['Berserk', 'Coq de combat', 'Akira']);
+    it('sorts by the last added volume, most recent first, read series last', () => {
+        expect(names(filterSeries(list, { sort: 'recent' }))).toEqual([
+            'Coq de combat',
+            'Akira',
+            'Berserk',
+        ]);
     });
 
     it('does not modify the given list', () => {
         const copy = [...list];
-        filterSeries(list, { filter: 'all', sort: 'recent' });
+        filterSeries(list, { sort: 'recent' });
         expect(list).toEqual(copy);
     });
 });
@@ -89,20 +90,15 @@ describe('list, format, genre and status filters', () => {
         },
     ];
     const kept = (options: Partial<Parameters<typeof filterSeries>[1]>) =>
-        names(filterSeries(items, { filter: 'all', sort: 'name', ...options }));
+        names(filterSeries(items, { sort: 'name', ...options }));
 
-    it('keeps the to-read list', () => {
-        expect(kept({ filter: 'toread' })).toEqual(['Berserk']);
+    it('puts the to-read list first', () => {
+        expect(kept({})).toEqual(['Berserk', 'Akira', 'Solo Leveling']);
     });
 
     it('keeps a genre', () => {
-        expect(kept({ genre: 'Action' })).toEqual(['Akira', 'Berserk']);
+        expect(kept({ genre: 'Action' })).toEqual(['Berserk', 'Akira']);
         expect(kept({ genre: 'Fantasy' })).toEqual(['Berserk']);
-    });
-
-    it('keeps a format', () => {
-        expect(kept({ format: 'manhwa' })).toEqual(['Solo Leveling']);
-        expect(allFormats(items)).toEqual(['manga', 'manhwa']);
     });
 
     it('keeps a status', () => {
@@ -110,11 +106,27 @@ describe('list, format, genre and status filters', () => {
         expect(kept({ status: 'completed' })).toEqual(['Akira']);
     });
 
-    it('lists the genres once each', () => {
-        expect(allGenres(items)).toEqual([
-            'Action',
-            'Fantasy',
-            'Science-fiction',
+    it('lists the genres once each, the most frequent first', () => {
+        expect(genresByCount(items)).toEqual([
+            { name: 'Action', count: 2 },
+            { name: 'Fantasy', count: 1 },
+            { name: 'Science-fiction', count: 1 },
         ]);
+    });
+});
+
+describe('seriesDetails', () => {
+    it('gives format, year, age and status, then the genres', () => {
+        expect(
+            seriesDetails({
+                ...series('Akira', 0, null),
+                format: 'Manga',
+                year: 1984,
+                age: 14,
+                status: 'completed',
+                genres: ['Action', 'Science-fiction'],
+            }),
+        ).toEqual(['Manga · 1984 · 14+ · Terminée', 'Action, Science-fiction']);
+        expect(seriesDetails(series('Akira', 0, null))).toEqual([]);
     });
 });

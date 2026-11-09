@@ -1,6 +1,6 @@
 import { MantineProvider } from '@mantine/core';
 import { act, fireEvent, render, screen } from '@testing-library/react';
-import { MemoryRouter } from 'react-router';
+import { MemoryRouter, useLocation } from 'react-router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { type CurrentUser, UserContext } from '@/services/auth';
@@ -23,13 +23,21 @@ let requests: [string, string, unknown][] = [];
 let tasks: unknown[] = [];
 const assign = vi.fn();
 
-const show = (current: CurrentUser) =>
+let address = '';
+const Address = () => {
+    const location = useLocation();
+    address = location.pathname + location.search;
+    return null;
+};
+
+const show = (current: CurrentUser, path = '/') =>
     render(
         <MantineProvider>
-            <MemoryRouter>
+            <MemoryRouter initialEntries={[path]}>
                 <UserContext.Provider value={current}>
                     <AppHeader />
                     <PreviewBanner />
+                    <Address />
                 </UserContext.Provider>
             </MemoryRouter>
         </MantineProvider>,
@@ -66,6 +74,21 @@ afterEach(() => {
 });
 
 describe('AppHeader', () => {
+    it('searches series from any page, on the home page', async () => {
+        show(user({ role: 'reader' }), '/series/4');
+        const input = screen.getByRole('textbox', {
+            name: 'Rechercher une série',
+        });
+
+        fireEvent.change(input, { target: { value: 'gantz' } });
+        expect(address).toBe('/?q=gantz');
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Effacer la recherche' }),
+        );
+        expect(address).toBe('/');
+        expect((input as HTMLInputElement).value).toBe('');
+    });
+
     it('shows admins how many series wait in the drafts', async () => {
         show(user());
 

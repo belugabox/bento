@@ -126,6 +126,19 @@ describe('genres', () => {
         expect((await call('/series?search=horreur', reader)).body).toEqual([]);
     });
 
+    it('finds series by author', async () => {
+        await writeCbz(ctx.file('Kiseiju/Kiseiju #01.cbz'), {
+            comicInfo:
+                '<Series>Kiseiju</Series><Writer>Hitoshi Iwaaki</Writer><Penciller>Kazuo Umezu</Penciller>',
+        });
+        await ctx.scanner.scan(ctx.library.id);
+        for (const search of ['iwaaki', 'umezu']) {
+            const { body } = await call(`/series?search=${search}`, reader);
+            expect(body).toHaveLength(1);
+            expect(body[0]).not.toHaveProperty('authors');
+        }
+    });
+
     it('is managed by the admin only', async () => {
         const json = { name: 'Espionnage', aliases: ['Espions'] };
         expect(

@@ -68,4 +68,26 @@ describe('AppearanceModal', () => {
 
         expect(theme()).toBe('violet auto light');
     });
+
+    it('keeps the display of the series on the device', async () => {
+        show();
+
+        await act(async () => {
+            // Un cran vers les petites cartes, au clavier.
+            fireEvent.keyDown(screen.getByRole('slider'), { key: 'ArrowLeft' });
+            fireEvent.click(screen.getByRole('switch'));
+        });
+        expect(JSON.parse(localStorage.getItem('bento:display')!)).toEqual({
+            size: 1,
+            coversOnly: true,
+        });
+
+        // En liste, taille et couvertures seules ne s'appliquent pas.
+        await act(async () => {
+            fireEvent.click(screen.getByText('Liste'));
+        });
+        expect((screen.getByRole('switch') as HTMLInputElement).disabled).toBe(
+            true,
+        );
+    });
 });

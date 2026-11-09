@@ -1,4 +1,4 @@
-import { compareNames } from '@server/types';
+import { ageLabel, compareNames } from '@server/types';
 
 /** Ce dont les filtres ont besoin pour une série de la liste. */
 export type ListedSeries = {
@@ -14,20 +14,15 @@ export type ListedSeries = {
     format?: string | null;
     status?: 'ongoing' | 'completed' | null;
     toRead?: boolean;
+    year?: number | null;
+    // Âge minimal : choisi dans Bento, sinon déduit des tomes.
+    age?: number | null;
 };
 
-/** État de lecture, ou la liste « à lire » de la personne. */
-export type ReadingFilter = 'all' | 'toread' | 'unread' | 'started' | 'read';
+/** État de lecture d'une série pour la personne. */
+export type ReadingState = 'unread' | 'started' | 'read';
 export type SeriesSort = 'name' | 'recent';
 export type StatusFilter = 'all' | 'ongoing' | 'completed';
-
-export const READING_FILTERS: { value: ReadingFilter; label: string }[] = [
-    { value: 'all', label: 'Toutes' },
-    { value: 'toread', label: 'À lire' },
-    { value: 'unread', label: 'Non lues' },
-    { value: 'started', label: 'En cours' },
-    { value: 'read', label: 'Lues' },
-];
 
 export const SERIES_SORTS: { value: SeriesSort; label: string }[] = [
     { value: 'name', label: 'Nom' },
@@ -35,70 +30,93 @@ export const SERIES_SORTS: { value: SeriesSort; label: string }[] = [
 ];
 
 export const STATUS_FILTERS: { value: StatusFilter; label: string }[] = [
-    { value: 'all', label: 'Tous les statuts' },
+    { value: 'all', label: 'Toutes' },
     { value: 'ongoing', label: 'En cours de parution' },
     { value: 'completed', label: 'Terminées' },
 ];
 
+const STATUS_LABELS = {
+    ongoing: 'En cours de parution',
+    completed: 'Terminée',
+} as const;
+
+/**
+ * Infos d'une série pour le mode liste : format, année, âge et parution,
+ * puis ses genres (une ligne chacun ; vide s'il n'y a rien).
+ */
+export const seriesDetails = (s: ListedSeries): string[] =>
+    [
+        [
+            s.format,
+            s.year,
+            s.age !== null && s.age !== undefined ? ageLabel(s.age) : null,
+            s.status ? STATUS_LABELS[s.status] : null,
+        ]
+            .filter((value) => value !== null && value !== undefined)
+            .join(' · '),
+        (s.genres ?? []).join(', '),
+    ].filter(Boolean);
+
 /** État de lecture d'une série pour la personne. */
-export const readingStateOf = (
-    s: ListedSeries,
-): Exclude<ReadingFilter, 'all' | 'toread'> =>
+export const readingStateOf = (s: ListedSeries): ReadingState =>
     s.readCount >= s.volumeCount
         ? 'read'
         : s.startedCount > 0
           ? 'started'
           : 'unread';
 
-/** Valeurs présentes dans la liste (genres, formats…), une seule fois. */
-const present = <V>(values: V[]) => [...new Set(values)];
-
-/** Genres présents dans la liste, par ordre alphabétique. */
-export const allGenres = (series: Pick<ListedSeries, 'genres'>[]) =>
-    present(series.flatMap((s) => s.genres ?? [])).sort((a, b) =>
-        a.localeCompare(b, 'fr'),
-    );
-
-/** Formats présents dans la liste. */
-export const allFormats = (series: Pick<ListedSeries, 'format'>[]) =>
-    present(series.flatMap((s) => (s.format ? [s.format] : [])));
-
-const matchesReading = (s: ListedSeries, filter: ReadingFilter) =>
-    filter === 'all' ||
-    (filter === 'toread' ? !!s.toRead : readingStateOf(s) === filter);
+/**
+ * Genres présents dans la liste, avec leur nombre de séries : les plus
+ * fréquents d'abord.
+ */
+export const genresByCount = (series: Pick<ListedSeries, 'genres'>[]) => {
+    const counts = new Map<string, number>();
+    for (const genre of series.flatMap((s) => s.genres ?? [])) {
+        counts.set(genre, (counts.get(genre) ?? 0) + 1);
+    }
+    return [...counts]
+        .map(([name, count]) => ({ name, count }))
+        .sort(
+            (a, b) => b.count - a.count || a.name.localeCompare(b.name, 'fr'),
+        );
+};
 
 /**
- * Séries à afficher, filtrées (lecture, format, genre, statut) puis
- * triées.
+ * Rang d'une série sur l'accueil : celles de la liste « à lire » d'abord,
+ * les séries entièrement lues à la fin.
+ */
+const readingRank = (s: ListedSeries) =>
+    readingStateOf(s) === 'read' ? 2 : s.toRead ? 0 : 1;
+
+/**
+ * Séries à afficher, filtrées (genre, statut) puis triées : « à lire »
+ * d'abord, puis les autres, les séries lues à la fin ; dans chaque groupe,
+ * par nom ou par ajouts récents.
  */
 export const filterSeries = <T extends ListedSeries>(
     series: T[],
     {
-        filter,
         sort,
         genre = null,
-        format = null,
         status = 'all',
     }: {
-        filter: ReadingFilter;
         sort: SeriesSort;
         genre?: string | null;
-        format?: string | null;
         status?: StatusFilter;
     },
 ): T[] => {
     const kept = series.filter(
         (s) =>
-            matchesReading(s, filter) &&
             (!genre || (s.genres ?? []).includes(genre)) &&
-            (!format || s.format === format) &&
             (status === 'all' || s.status === status),
     );
-    return sort === 'recent'
-        ? kept.sort(
-              (a, b) =>
-                  (b.lastAddedAt ?? '').localeCompare(a.lastAddedAt ?? '') ||
-                  compareNames(a.name, b.name),
-          )
-        : kept;
+    // Tri stable : l'ordre par nom du serveur est gardé dans chaque groupe.
+    return kept.sort(
+        (a, b) =>
+            readingRank(a) - readingRank(b) ||
+            (sort === 'recent'
+                ? (b.lastAddedAt ?? '').localeCompare(a.lastAddedAt ?? '') ||
+                  compareNames(a.name, b.name)
+                : 0),
+    );
 };

@@ -76,13 +76,14 @@ L'admin fixe le mode de chaque série dans « Modifier les métadonnées » (par
 
 ### Accueil et listes
 
-- **Accueil** : « Reprendre la lecture » (pour chaque série entamée, le tome commencé ou, à défaut, le premier pas encore ouvert, avec l'avancement dans la série ; la plus récemment lue d'abord), puis toutes les séries. Les vignettes utilisent une version réduite des couvertures, créée à la première demande.
+- **Accueil** : une seule grille, sans titre. D'abord les tomes à reprendre (pour chaque série entamée, le tome commencé ou, à défaut, le premier pas encore ouvert, avec l'avancement dans la série ; la plus récemment lue d'abord), qui ouvrent le lecteur (▶ en couleur sur la couverture) ; puis les séries de ta liste « À lire » (marque-page gris), les autres, et enfin les séries déjà lues, grisées (coche grise). Un clic sur une icône ouvre la carte. « Apparence… » (menu du compte) règle l'affichage sur l'appareil : grille ou liste (avec, pour chaque série, format, année, âge, parution et genres), taille des cartes (glissière à cinq crans, des très petites aux très grandes, aussi pour les tomes d'une série), couvertures seules. Les filtres et la recherche s'appliquent à tout. Les vignettes utilisent une version réduite des couvertures, créée à la première demande.
 - **Menu ⋮ des cartes** (en bas à droite) :
   - sur une série : lire, reprendre ou relire ; marquer comme lue, lue jusqu'à un tome, ou non lue (après confirmation) ; ajouter à « À lire » ou l'en retirer ; modifier la série (admin) ;
-  - sur un tome de « Reprendre la lecture » : le marquer comme lu, le retirer de « Reprendre » (progression effacée), voir la série.
+  - sur un tome à reprendre : le marquer comme lu, le retirer de « Reprendre » (progression effacée), voir la série.
   - Chaque action affiche un message avec « Annuler » pendant quelques secondes : la progression revient exactement comme avant, ordre de « Reprendre » compris.
-- **Filtres** : état de lecture (toutes, à lire, non lues, en cours, lues) ; le bouton « Filtres » pour le format, le genre et le statut de parution, affichés ensuite en pastilles qu'on retire d'un clic ; et le tri par nom ou par ajouts récents. Tout reste dans l'adresse.
-- **« À lire »** : le marque-page de la fiche série, propre à chacun ; « À lire » dans la barre « Séries » n'affiche que ces séries. (Les favoris ont été retirés.)
+- **Recherche** : dans l'en-tête, depuis n'importe quelle page ; elle trouve les séries par nom, genre, thème ou auteur (scénario, dessin), sans casse ni accents, et s'affiche sur l'accueil.
+- **Filtres** : sur une seule ligne, collée en bas de l'écran. Elle commence par le choix Grille / Liste (le même que dans « Apparence… »). Le menu de tri (nom, ajouts récents) qui contient aussi le statut de parution, puis les genres en pastilles (les 5 qui ont le plus de séries, les autres dans « Plus » avec leur nombre de séries). Un clic choisit une pastille, un second la retire. Sur un écran étroit, un seul bouton « Genre » ouvre la liste de tous les genres. Tout reste dans l'adresse.
+- **« À lire »** : le marque-page de la fiche série, propre à chacun ; ces séries remontent en tête de l'accueil, après les tomes à reprendre. (Les favoris ont été retirés.)
 - La liste « à lire » suit une série renommée à la publication. (Les collections partagées ont été retirées.)
 
 ### Réglages (admin)

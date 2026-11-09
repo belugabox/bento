@@ -36,6 +36,7 @@ import { CoverCard } from '@/components/CoverCard';
 import { ageLabel, seriesAgeOf } from '@/components/ageLimits';
 import { completenessOf } from '@/components/completeness';
 import { formatSize } from '@/components/format';
+import { gridColumns, useLibraryDisplay } from '@/components/libraryDisplay';
 import {
     countedVolumes,
     nextToRead,
@@ -68,6 +69,7 @@ const KIND_SECTIONS = { 'hors-serie': 'Hors-séries', special: 'Spéciaux' };
 export const SeriesPage = () => {
     const seriesId = Number(useParams().id);
     const isAdmin = useCurrentUser().role === 'admin';
+    const { size } = useLibraryDisplay();
     const {
         data: series,
         error,
@@ -329,9 +331,7 @@ export const SeriesPage = () => {
                         {kind !== 'volume' && (
                             <Title order={4}>{KIND_SECTIONS[kind]}</Title>
                         )}
-                        <SimpleGrid
-                            cols={{ base: 3, xs: 4, sm: 5, md: 6, lg: 8 }}
-                        >
+                        <SimpleGrid cols={gridColumns(size)}>
                             {group.map((volume) => {
                                 const read =
                                     volume.progress?.completed ?? false;
