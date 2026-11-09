@@ -413,6 +413,12 @@ const UserMenu = () => {
                     >
                         Mon compte
                     </Menu.Item>
+                    <Menu.Item
+                        leftSection={<IconPalette size={14} />}
+                        onClick={appearanceModal.open}
+                    >
+                        Thème et affichage…
+                    </Menu.Item>
                     <Menu.Divider />
                     {isAdmin && (
                         <Menu.Item
@@ -469,13 +475,6 @@ const UserMenu = () => {
                             )}
                         </>
                     )}
-                    <Menu.Divider />
-                    <Menu.Item
-                        leftSection={<IconPalette size={14} />}
-                        onClick={appearanceModal.open}
-                    >
-                        Apparence…
-                    </Menu.Item>
                     <Menu.Divider />
                     <Menu.Item
                         leftSection={<IconLogout size={14} />}

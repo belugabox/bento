@@ -17,6 +17,30 @@ export type ListedSeries = {
     year?: number | null;
     // Âge minimal : choisi dans Bento, sinon déduit des tomes.
     age?: number | null;
+    // Auteur de la fiche, et dessin du premier tome.
+    writer?: string | null;
+    penciller?: string | null;
+};
+
+/** « Auteur · Dessinateur », sans répéter un même nom. */
+export const creditsOf = (s: Pick<ListedSeries, 'writer' | 'penciller'>) => {
+    const names: string[] = [];
+    for (const raw of [s.writer, s.penciller]) {
+        for (const name of (raw ?? '').split(',')) {
+            const trimmed = name.trim();
+            if (
+                trimmed &&
+                !names.some(
+                    (n) =>
+                        n.toLocaleLowerCase('fr') ===
+                        trimmed.toLocaleLowerCase('fr'),
+                )
+            ) {
+                names.push(trimmed);
+            }
+        }
+    }
+    return names.join(' · ');
 };
 
 /** État de lecture d'une série pour la personne. */
@@ -46,6 +70,7 @@ const STATUS_LABELS = {
  */
 export const seriesDetails = (s: ListedSeries): string[] =>
     [
+        creditsOf(s),
         [
             s.format,
             s.year,

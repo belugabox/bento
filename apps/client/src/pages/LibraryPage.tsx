@@ -421,7 +421,7 @@ export const LibraryPage = () => {
                         preventGrowOverflow={false}
                     >
                         <Group gap={6} wrap="nowrap" style={{ flexShrink: 0 }}>
-                            {/* Même réglage que dans « Apparence… ». */}
+                            {/* Même réglage que dans « Thème et affichage… ». */}
                             <SegmentedControl
                                 size="sm"
                                 radius="xl"

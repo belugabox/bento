@@ -43,7 +43,10 @@ export const ReadByFilter = ({
                     rightSection={<IconChevronDown size={12} />}
                     style={{ flexShrink: 0 }}
                 >
-                    {chosen ? chosen.name : 'Lu par'}
+                    {/* Écran étroit : l'icône ou l'avatar seul. */}
+                    <Text span inherit visibleFrom="xs">
+                        {chosen ? chosen.name : 'Lu par'}
+                    </Text>
                 </Button>
             </Menu.Target>
             <Menu.Dropdown>

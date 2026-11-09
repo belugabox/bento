@@ -53,7 +53,7 @@ const isSize = (value: unknown): value is number =>
     (value as number) >= 0 &&
     (value as number) < CARD_SIZES.length;
 
-/** Réglage d'affichage de cet appareil (Apparence), suivi partout. */
+/** Réglage d'affichage de cet appareil (« Thème et affichage »), suivi partout. */
 export const useLibraryDisplay = () => {
     const [saved, setSaved] = useLocalStorage<Partial<LibraryDisplay>>({
         key: 'bento:display',

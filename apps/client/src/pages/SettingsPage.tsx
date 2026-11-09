@@ -231,7 +231,7 @@ const SettingsForm = ({
 
             <Section
                 title="Apparence par défaut"
-                description="Pour tous les appareils, tant que la personne n’a pas choisi la sienne (menu « Apparence »)."
+                description="Pour tous les appareils, tant que la personne n’a pas choisi la sienne (menu « Thème et affichage »)."
             >
                 <ColorSchemeControl
                     value={values.appearance.colorScheme}

@@ -164,6 +164,12 @@ export const listSeries = (
             // Sous-requêtes en SQL brut : Drizzle n'y préfixe pas les colonnes
             // par leur table.
             coverUpdatedAt: series.coverUpdatedAt,
+            // Auteur (celui de la fiche) et dessin du premier tome : affichage
+            // en liste.
+            writer: series.writer,
+            penciller: sql<
+                string | null
+            >`(select json_extract(v.comic_info, '$.Penciller') from volumes v where v.series_id = series.id order by v.kind != 'volume', v.kind, v.sort_number is null, v.sort_number, v.file limit 1)`,
             coverVolumeId: sql<number>`(select v.id from volumes v where v.series_id = series.id order by v.kind != 'volume', v.kind, v.sort_number is null, v.sort_number, v.file limit 1)`,
             coverVolumeVersion: sql<number>`(select cast(v.mtime_ms as integer) from volumes v where v.series_id = series.id order by v.kind != 'volume', v.kind, v.sort_number is null, v.sort_number, v.file limit 1)`,
             // Tomes lus par la personne.
