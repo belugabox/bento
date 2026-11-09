@@ -109,24 +109,26 @@ const show = () =>
     );
 
 describe('LibraryPage', () => {
-    it('shows what to resume, then every series', async () => {
+    it('shows what to resume, then the other series, in one grid', async () => {
         show();
 
-        expect(await screen.findByText('Reprendre la lecture')).toBeTruthy();
         // Le tome en cours, et l'avancement dans la série.
-        expect(screen.getByText('T2 · 1/3 lus')).toBeTruthy();
+        expect(await screen.findByText('T2 · 1/3 lus')).toBeTruthy();
         // Un tome lu sur trois, plus la moitié du deuxième.
         expect(
             screen
                 .getAllByLabelText('Avancement')[0]!
                 .getAttribute('aria-valuenow'),
         ).toBe('50');
+        // Tomes à reprendre d'abord, puis les séries qu'ils ne montrent pas
+        // déjà ; pas de titre de zone.
         await vi.waitFor(() =>
-            expect(titles()).toEqual(['/series/1', '/series/2', '/series/3']),
+            expect(titles()).toEqual(['/read/42', '/read/51', '/series/2']),
         );
-        // Série entièrement lue : marquée ; commencée : « 1 / 3 lus ».
+        expect(screen.queryByText('Reprendre la lecture')).toBeNull();
+        expect(screen.queryByText('Séries')).toBeNull();
+        // Série entièrement lue : marquée.
         expect(screen.getByLabelText('Série lue')).toBeTruthy();
-        expect(screen.getByText('1 / 3 lus')).toBeTruthy();
         // Le scan n'est plus sur l'accueil.
         expect(screen.queryByRole('button', { name: /scanner/i })).toBeNull();
     });
@@ -136,8 +138,9 @@ describe('LibraryPage', () => {
         await screen.findByTestId('series-grid');
         await vi.waitFor(() => expect(titles()).toHaveLength(3));
 
+        // Les tomes à reprendre suivent aussi les filtres.
         await readingFilter('En cours');
-        await vi.waitFor(() => expect(titles()).toEqual(['/series/3']));
+        await vi.waitFor(() => expect(titles()).toEqual(['/read/42']));
         expect(location).toBe('?filter=started');
 
         await readingFilter('Toutes');
@@ -145,7 +148,9 @@ describe('LibraryPage', () => {
             screen.getByRole('button', { name: 'Trier les séries' }),
         );
         fireEvent.click(await screen.findByText('Ajouts récents'));
-        expect(titles()).toEqual(['/series/2', '/series/3', '/series/1']);
+        await vi.waitFor(() =>
+            expect(titles()).toEqual(['/read/42', '/read/51', '/series/2']),
+        );
         expect(location).toBe('?sort=recent');
     });
 
@@ -205,7 +210,7 @@ describe('LibraryPage', () => {
             'Sport1',
         ]);
         fireEvent.click(more[1]!);
-        await vi.waitFor(() => expect(titles()).toEqual(['/series/3']));
+        await vi.waitFor(() => expect(titles()).toEqual(['/read/42']));
         expect(location).toBe('?genre=Sport');
         // Genre choisi dans « Plus » : montré en pastille, qui le retire.
         fireEvent.click(screen.getByRole('button', { name: 'Sport' }));
@@ -217,7 +222,7 @@ describe('LibraryPage', () => {
         await vi.waitFor(() => expect(titles()).toHaveLength(3));
         fireEvent.click(screen.getByRole('button', { name: 'Horreur' }));
         await vi.waitFor(() =>
-            expect(titles()).toEqual(['/series/1', '/series/2']),
+            expect(titles()).toEqual(['/read/51', '/series/2']),
         );
         fireEvent.click(screen.getByRole('button', { name: 'Horreur' }));
         await vi.waitFor(() => expect(location).toBe(''));
