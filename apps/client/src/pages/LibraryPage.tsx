@@ -129,15 +129,21 @@ const ChipRow = ({
     label: string;
     children: ReactNode;
 }) => (
-    <ScrollArea
-        type="never"
+    <Box
         aria-label={label}
-        style={{ flex: 1, minWidth: 0 }}
+        role="group"
+        style={{
+            display: 'flex',
+            gap: 6,
+            // Sa largeur, ou ce qui reste : défile au-delà.
+            flex: '0 1 auto',
+            minWidth: 0,
+            overflowX: 'auto',
+            scrollbarWidth: 'none',
+        }}
     >
-        <Group gap={6} wrap="nowrap">
-            {children}
-        </Group>
-    </ScrollArea>
+        {children}
+    </Box>
 );
 
 /**
@@ -340,7 +346,14 @@ export const LibraryPage = () => {
                 }}
             >
                 <Container size="xl">
-                    <Group gap="lg" py={6} wrap="nowrap">
+                    {/* Centrée ; seuls les genres rétrécissent (et défilent). */}
+                    <Group
+                        gap="lg"
+                        py={6}
+                        wrap="nowrap"
+                        justify="center"
+                        preventGrowOverflow={false}
+                    >
                         <Group gap={6} wrap="nowrap" style={{ flexShrink: 0 }}>
                             <Menu position="top-start">
                                 <Menu.Target>
