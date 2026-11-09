@@ -2,7 +2,6 @@ import {
     ActionIcon,
     Alert,
     Anchor,
-    Avatar,
     Button,
     CloseButton,
     Group,
@@ -32,6 +31,7 @@ import {
     IconSearch,
     IconSettings,
     IconTags,
+    IconUserCircle,
     IconUsers,
 } from '@tabler/icons-react';
 import { useEffect, useState } from 'react';
@@ -39,6 +39,7 @@ import { Link, useLocation, useNavigate } from 'react-router';
 
 import logo from '@/assets/logo.svg';
 import { AppearanceModal } from '@/components/AppearanceModal';
+import { UserAvatar } from '@/components/accounts/UserAvatar';
 import {
     ageLimitLabel,
     ageLimitOptions,
@@ -286,7 +287,12 @@ const UserMenu = () => {
             <Menu position="bottom-end">
                 <Menu.Target>
                     <UnstyledButton aria-label="Mon compte">
-                        <Avatar name={user.name} color="initials" size="md" />
+                        <UserAvatar
+                            name={user.name}
+                            seed={user.avatarSeed}
+                            size="md"
+                            radius="xl"
+                        />
                     </UnstyledButton>
                 </Menu.Target>
                 <Menu.Dropdown>
@@ -300,6 +306,14 @@ const UserMenu = () => {
                               ? 'Administrateur'
                               : 'Lecteur'}
                     </Menu.Label>
+                    <Menu.Item
+                        component={Link}
+                        to="/account"
+                        leftSection={<IconUserCircle size={14} />}
+                    >
+                        Mon compte
+                    </Menu.Item>
+                    <Menu.Divider />
                     {isAdmin && (
                         <Menu.Item
                             component={Link}
@@ -324,7 +338,7 @@ const UserMenu = () => {
                             to="/users"
                             leftSection={<IconUsers size={14} />}
                         >
-                            Comptes et contrôle parental
+                            Comptes
                         </Menu.Item>
                     )}
                     {isAdmin && (
@@ -457,6 +471,35 @@ export const AppHeader = () => {
 };
 
 /** Rappel de la vue lecteur d'un admin, avec retour à la vue admin. */
+/**
+ * Compte venu de Pocket ID, encore connecté : il doit choisir son
+ * identifiant et son mot de passe pour pouvoir se reconnecter.
+ */
+export const ActivationBanner = () => {
+    const { hasPassword } = useCurrentUser();
+    const { pathname } = useLocation();
+    if (hasPassword || pathname === '/account') return null;
+    return (
+        <Alert color="orange" variant="light" mb="md" py="xs">
+            <Group justify="space-between">
+                <Text size="sm">
+                    Bento n’utilise plus Pocket ID : choisis ton identifiant et
+                    ton mot de passe pour pouvoir te reconnecter.
+                </Text>
+                <Button
+                    size="xs"
+                    variant="light"
+                    color="orange"
+                    component={Link}
+                    to="/account"
+                >
+                    Choisir
+                </Button>
+            </Group>
+        </Alert>
+    );
+};
+
 export const PreviewBanner = () => {
     const { preview } = useCurrentUser();
     if (!preview) return null;

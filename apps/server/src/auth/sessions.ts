@@ -1,17 +1,19 @@
-import { and, eq, gt, lt } from 'drizzle-orm';
-import { createHash } from 'node:crypto';
+import { and, eq, gt, lt, sql } from 'drizzle-orm';
+import { createHash, randomBytes } from 'node:crypto';
 
 import type { Db } from '../db';
 import { sessions, users } from '../db/schema';
-import { randomToken } from './oidc';
-import type { OidcUser } from './oidc';
 
 export type Role = 'admin' | 'reader';
 
 export type SessionUser = {
     id: number;
     name: string;
+    username: string | null;
     email: string | null;
+    avatarSeed: string | null;
+    // Faux pour un compte venu de Pocket ID, pas encore activé.
+    hasPassword: boolean;
     role: Role;
     maxAge: number | null;
 };
@@ -21,45 +23,15 @@ export const SESSION_DAYS = 30;
 // Une session utilisée à moins de 15 jours de son expiration est prolongée.
 const RENEW_BELOW_MS = 15 * DAY_MS;
 
-const hash = (token: string) =>
+/** Chaîne aléatoire URL-safe (jetons de session et des liens). */
+export const randomToken = (bytes = 32) =>
+    randomBytes(bytes).toString('base64url');
+
+/** Empreinte d'un jeton, seule gardée en base. */
+export const hashToken = (token: string) =>
     createHash('sha256').update(token).digest('hex');
 
-/** Rôle donné par les groupes Pocket ID, ou `undefined` (accès refusé). */
-export const roleFromGroups = (
-    groups: string[],
-    { adminGroup, readerGroup }: { adminGroup: string; readerGroup: string },
-): Role | undefined =>
-    groups.includes(adminGroup)
-        ? 'admin'
-        : groups.includes(readerGroup)
-          ? 'reader'
-          : undefined;
-
-/**
- * Crée ou met à jour le compte à la connexion. Nom, e-mail et rôle suivent
- * Pocket ID ; la classification d'âge, réglée dans Bento, est conservée.
- */
-export const upsertUser = (db: Db, user: OidcUser, role: Role) =>
-    db
-        .insert(users)
-        .values({
-            oidcSubject: user.sub,
-            name: user.name,
-            email: user.email ?? null,
-            role,
-            lastLoginAt: new Date(),
-        })
-        .onConflictDoUpdate({
-            target: users.oidcSubject,
-            set: {
-                name: user.name,
-                email: user.email ?? null,
-                role,
-                lastLoginAt: new Date(),
-            },
-        })
-        .returning({ id: users.id })
-        .get();
+const hash = hashToken;
 
 /** Ouvre une session ; renvoie le jeton à mettre dans le cookie. */
 export const createSession = (db: Db, userId: number) => {
@@ -87,7 +59,10 @@ export const userForSession = (
             user: {
                 id: users.id,
                 name: users.name,
+                username: users.username,
                 email: users.email,
+                avatarSeed: users.avatarSeed,
+                hasPassword: sql<boolean>`${users.passwordHash} is not null`,
                 role: users.role,
                 maxAge: users.maxAge,
             },
@@ -108,7 +83,7 @@ export const userForSession = (
             .where(eq(sessions.id, hash(token)))
             .run();
     }
-    return row.user;
+    return { ...row.user, hasPassword: Boolean(row.user.hasPassword) };
 };
 
 export const deleteSession = (db: Db, token: string) =>

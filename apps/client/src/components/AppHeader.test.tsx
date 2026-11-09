@@ -10,7 +10,10 @@ import { AppHeader, PreviewBanner } from './AppHeader';
 const user = (overrides: Partial<CurrentUser> = {}): CurrentUser => ({
     id: 1,
     name: 'Ben',
+    username: 'ben',
     email: null,
+    avatarSeed: null,
+    hasPassword: true,
     role: 'admin',
     maxAge: null,
     preview: null,

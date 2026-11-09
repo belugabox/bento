@@ -37,13 +37,8 @@ const schema = z.object({
         .min(0)
         .max(7 * 24 * 60)
         .default(30),
-    // Connexion OIDC (Pocket ID).
-    OIDC_ISSUER: z.string().url(),
-    OIDC_CLIENT_ID: z.string().min(1),
-    OIDC_CLIENT_SECRET: z.string().min(1),
-    OIDC_ADMIN_GROUP: z.string().min(1).default('bento-admins'),
-    OIDC_READER_GROUP: z.string().min(1).default('bento-readers'),
-    // Adresse publique de l'appli, sans « / » final.
+    // Adresse publique de l'appli, sans « / » final : liens d'invitation,
+    // cookies `Secure` en HTTPS.
     PUBLIC_URL: z
         .string()
         .url()

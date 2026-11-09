@@ -39,11 +39,7 @@ Toute la configuration passe par des variables d'environnement :
 | `DATA_PATH` | `./data` (`/config` dans Docker) | Base SQLite et couvertures |
 | `LIBRARIES` | `[]` | Bibliothèques, en JSON : `[{"name":"Mangas","path":"/manga","type":"manga"}]`. Type `manga` ou `comics` : mode de lecture par défaut « Manga (gauche → droite) » ou « BD » |
 | `SCAN_INTERVAL_MINUTES` | `30` | Scan automatique des bibliothèques (`0` = seulement au démarrage et à la demande) |
-| `OIDC_ISSUER` | — (requis) | Adresse de Pocket ID, ex. `https://auth.belugabox.net` |
-| `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET` | — (requis) | Client OIDC « Bento » créé dans Pocket ID |
-| `PUBLIC_URL` | — (requis) | Adresse publique de Bento ; l'adresse de retour à déclarer dans Pocket ID est `PUBLIC_URL/api/auth/callback` |
-| `OIDC_ADMIN_GROUP` | `bento-admins` | Groupe Pocket ID des administrateurs |
-| `OIDC_READER_GROUP` | `bento-readers` | Groupe Pocket ID des lecteurs (sans l'un des deux groupes, l'accès est refusé) |
+| `PUBLIC_URL` | — (requis) | Adresse publique de Bento : liens d'invitation, cookies `Secure` en HTTPS |
 
 ### Gestion des tomes (admin)
 
@@ -109,15 +105,21 @@ Depuis le menu de l'avatar : chiffres de la bibliothèque, lecture par personne,
 
 ### Contrôle parental
 
-- **Âge maximal** : l'admin le règle pour chaque personne dans « Comptes et contrôle parental », depuis le menu de l'avatar, parmi les âges de la grille.
+- **Âge maximal** : l'admin le règle pour chaque personne dans « Comptes », depuis le menu de l'avatar, parmi les âges de la grille.
 - **Âge d'une série** : celui choisi dans l'éditeur (grille des réglages), sinon la classification la plus restrictive de ses tomes (`AgeRating` du ComicInfo).
 - **Comptes limités** : ils ne voient que les séries classées sous leur limite. Une série sans classification leur est masquée, partout : liste, fiche, tomes, pages, couvertures, « Reprendre la lecture ».
 - **Admins** : ils voient tout. « Voir comme un lecteur… », dans le menu de l'avatar, leur permet de **voir l'appli comme un lecteur** d'un âge donné, pour vérifier ce qu'un enfant verra ; un bandeau permet de revenir à la vue admin.
 - **Classifications** : les variantes du ComicInfo sont regroupées par âge (« 10 ans et + » regroupe « Everyone 10+ » et « PG », par exemple).
 
-### Connexion
+### Comptes et connexion
 
-La connexion passe par Pocket ID, en OIDC : flux par code avec PKCE, côté serveur. Bento garde ensuite une session de 30 jours dans un cookie `HttpOnly`, prolongée tant qu'elle sert. Nom, e-mail et rôle sont repris de Pocket ID à chaque connexion. Seuls `/api/health` et `/api/auth/*` sont accessibles sans session.
+- **Comptes** : un identifiant (lettres, chiffres, `.`, `-`, `_` ; sans tenir compte des majuscules à la connexion), un mot de passe (8 caractères au moins), un avatar DiceBear « Clay » et un e-mail facultatif.
+- **Invitations** : dans « Comptes » (menu de l'avatar), « Inviter » crée un lien pour un lecteur (avec son âge maximal) ou un admin. Bento n'envoie rien lui-même : le lien part par le menu de partage du téléphone, WhatsApp, texto, e-mail, ou se copie. Il sert une fois et vaut 7 jours ; les invitations en attente peuvent être annulées.
+- **Mot de passe oublié** : l'admin crée un lien de nouveau mot de passe depuis le menu (⋮) du compte, envoyé de la même façon. L'admin y change aussi le rôle et supprime un compte (jamais le sien).
+- **Mon compte** (menu de l'avatar) : avatar, identifiant, e-mail, mot de passe (l'actuel est demandé).
+- **Connexion** : page `/login`. Après 5 échecs en 15 minutes pour un identifiant, il faut attendre. Session de 30 jours dans un cookie `HttpOnly`, prolongée tant qu'elle sert. Mots de passe chiffrés par scrypt ; la base ne garde que l'empreinte des jetons de session et des liens. Seuls `/api/health`, `/api/appearance`, `/api/avatars/*` et `/api/auth/*` sont accessibles sans session.
+- **Comptes venus de Pocket ID** (avant novembre 2026) : gardés avec leurs lectures, marqués « À activer ». Encore connectés, ils voient un bandeau qui mène à « Mon compte » ; sinon l'admin leur envoie un lien d'activation (même page que l'invitation, identifiant proposé d'après leur nom).
+- **Secours** : au démarrage, si aucun admin n'a de mot de passe, le journal donne un lien pour en choisir un. `pnpm --filter server admin-link [identifiant]` (dans Docker : `node apps/server/dist/adminLink.js`) donne un lien de nouveau mot de passe pour un admin.
 
 ### Organisation des bibliothèques
 
@@ -139,9 +141,6 @@ services:
     environment:
       LIBRARIES: '[{"name":"Mangas","path":"/manga","type":"manga"}]'
       PUBLIC_URL: https://bento.belugabox.net
-      OIDC_ISSUER: https://auth.belugabox.net
-      OIDC_CLIENT_ID: ${BENTO_OIDC_CLIENT_ID}
-      OIDC_CLIENT_SECRET: ${BENTO_OIDC_CLIENT_SECRET}
     volumes:
       - ./bento:/config
       - /BLK/Books/Manga:/manga

@@ -1,6 +1,13 @@
 // Types partagés avec le client (importés via `@server/types`).
 export type { ApiType } from './api';
 export {
+    PASSWORD_MIN_LENGTH,
+    USERNAME_PATTERN,
+    USERNAME_RULE,
+    isAvatarSeed,
+    safeRedirect,
+} from './auth/rules';
+export {
     AGE_RATINGS,
     type AgeRating,
     minAgeOf,

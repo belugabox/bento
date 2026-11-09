@@ -1,22 +1,26 @@
-import { Hono } from 'hono';
+import { eq } from 'drizzle-orm';
+import { type Context, Hono } from 'hono';
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie';
 import { createMiddleware } from 'hono/factory';
 import { z } from 'zod';
 
 import type { Db } from '../db';
-import { forbidden, unauthorized } from '../tools/errors';
+import { users } from '../db/schema';
+import { badRequest, forbidden, unauthorized } from '../tools/errors';
 import type { Logger } from '../tools/logger';
 import { zValidator } from '../tools/validator';
-import { type OidcClient, randomToken } from './oidc';
+import { linkInfo, useLink } from './links';
+import { LoginLimiter } from './loginLimiter';
+import { decoyHash, verifyPassword } from './passwords';
+import { isAvatarSeed } from './rules';
 import {
     SESSION_DAYS,
     type SessionUser,
     createSession,
     deleteSession,
-    roleFromGroups,
-    upsertUser,
     userForSession,
 } from './sessions';
+import { findLogin } from './users';
 
 export type AuthEnv = {
     Variables: {
@@ -30,135 +34,113 @@ export type AuthEnv = {
 export type AuthDeps = {
     db: Db;
     logger: Logger;
-    oidc: OidcClient;
     publicUrl: string;
-    adminGroup: string;
-    readerGroup: string;
+    /** Essais de connexion ratés (un nouveau si absent). */
+    limiter?: LoginLimiter;
 };
 
 const SESSION_COOKIE = 'bento_session';
 // Vue lecteur d'un admin : âge maximal (« all » : sans limite).
 const PREVIEW_COOKIE = 'bento_preview';
-// Le temps d'aller-retour chez Pocket ID : state, code_verifier, page visée.
-const FLOW_COOKIE = 'bento_oidc';
-const FLOW_MINUTES = 10;
 
-type Flow = { state: string; verifier: string; redirect: string };
+const linkForm = z.object({
+    username: z.string().max(100).optional(),
+    password: z.string().max(200),
+    email: z
+        .string()
+        .trim()
+        .email()
+        .max(200)
+        .or(z.literal(''))
+        .nullable()
+        .optional(),
+    avatarSeed: z.string().refine(isAvatarSeed, 'Avatar invalide').optional(),
+});
 
-/** Page interne où revenir après la connexion ; tout le reste mène à l'accueil. */
-export const safeRedirect = (value: string | undefined) =>
-    value &&
-    value.startsWith('/') &&
-    !value.startsWith('//') &&
-    !value.startsWith('/\\') &&
-    !value.startsWith('/api/')
-        ? value
-        : '/';
-
-const readFlow = (raw: string | undefined): Flow | undefined => {
-    if (!raw) return undefined;
-    try {
-        const flow = JSON.parse(
-            Buffer.from(raw, 'base64url').toString(),
-        ) as Flow;
-        return typeof flow.state === 'string' &&
-            typeof flow.verifier === 'string'
-            ? flow
-            : undefined;
-    } catch {
-        return undefined;
-    }
-};
-
-/** Connexion, retour de Pocket ID et déconnexion (montées sous `/auth`). */
+/** Connexion, déconnexion et liens d'invitation (montées sous `/auth`). */
 export const createAuthRoutes = ({
     db,
     logger,
-    oidc,
     publicUrl,
-    adminGroup,
-    readerGroup,
+    limiter = new LoginLimiter(),
 }: AuthDeps) => {
     // Cookies `Secure` dès que l'appli est servie en HTTPS.
     const secure = publicUrl.startsWith('https://');
-    // Échec de connexion : page d'explication du client.
-    const denied = (reason: string) => `/denied?reason=${reason}`;
-
-    return new Hono()
-        .get('/login', async (c) => {
-            const flow: Flow = {
-                state: randomToken(16),
-                verifier: randomToken(32),
-                redirect: safeRedirect(c.req.query('redirect')),
-            };
-            const url = await oidc.authorizationUrl(flow);
-            setCookie(
-                c,
-                FLOW_COOKIE,
-                Buffer.from(JSON.stringify(flow)).toString('base64url'),
-                {
-                    httpOnly: true,
-                    secure,
-                    sameSite: 'Lax',
-                    path: '/api/auth',
-                    maxAge: FLOW_MINUTES * 60,
-                },
-            );
-            return c.redirect(url);
-        })
-        .get('/callback', async (c) => {
-            const flow = readFlow(getCookie(c, FLOW_COOKIE));
-            deleteCookie(c, FLOW_COOKIE, { path: '/api/auth' });
-            const { code, state, error } = c.req.query();
-
-            if (!flow || !state || state !== flow.state) {
-                return c.redirect(denied('expired'));
-            }
-            if (error || !code) return c.redirect(denied('cancelled'));
-
-            let user;
-            try {
-                user = await oidc.userFromCode(code, flow.verifier);
-            } catch (err) {
-                const cause = err instanceof Error ? err.cause : undefined;
-                logger.warn(
-                    `Connexion impossible : ${String(err)}` +
-                        (cause ? ` (${String(cause)})` : ''),
-                );
-                return c.redirect(denied('failed'));
-            }
-            const role = roleFromGroups(user.groups, {
-                adminGroup,
-                readerGroup,
-            });
-            if (!role) {
-                logger.info(
-                    `Connexion refusée pour ${user.name} : ni ${adminGroup} ni ${readerGroup}`,
-                );
-                return c.redirect(denied('group'));
-            }
-
-            const { id } = upsertUser(db, user, role);
-            setCookie(c, SESSION_COOKIE, createSession(db, id), {
-                httpOnly: true,
-                secure,
-                sameSite: 'Lax',
-                path: '/',
-                maxAge: SESSION_DAYS * 24 * 60 * 60,
-            });
-            logger.info(`Connexion de ${user.name} (${role})`);
-            return c.redirect(flow.redirect);
-        })
-        .post('/logout', async (c) => {
-            const token = getCookie(c, SESSION_COOKIE);
-            if (token) deleteSession(db, token);
-            deleteCookie(c, SESSION_COOKIE, { path: '/' });
-            // Fermer aussi la session Pocket ID, si possible.
-            const logoutUrl = await oidc
-                .logoutUrl(publicUrl)
-                .catch(() => undefined);
-            return c.json({ logoutUrl: logoutUrl ?? null });
+    const openSession = (c: Context, userId: number) => {
+        db.update(users)
+            .set({ lastLoginAt: new Date() })
+            .where(eq(users.id, userId))
+            .run();
+        setCookie(c, SESSION_COOKIE, createSession(db, userId), {
+            httpOnly: true,
+            secure,
+            sameSite: 'Lax',
+            path: '/',
+            maxAge: SESSION_DAYS * 24 * 60 * 60,
         });
+    };
+
+    return (
+        new Hono()
+            .post(
+                '/login',
+                zValidator(
+                    'json',
+                    z.object({
+                        username: z.string().min(1).max(100),
+                        password: z.string().min(1).max(200),
+                    }),
+                ),
+                async (c) => {
+                    const { username, password } = c.req.valid('json');
+                    const key = username.trim().toLocaleLowerCase('fr');
+                    limiter.check(key);
+                    const account = findLogin(db, username);
+                    const ok = await verifyPassword(
+                        password,
+                        account?.passwordHash ?? (await decoyHash()),
+                    );
+                    if (!account || !ok) {
+                        limiter.fail(key);
+                        logger.info(`Connexion refusée pour « ${username} »`);
+                        // 400 et non 401 : le client renvoie les 401 vers cette page.
+                        throw badRequest(
+                            'Identifiant ou mot de passe incorrect',
+                        );
+                    }
+                    limiter.succeed(key);
+                    openSession(c, account.id);
+                    logger.info(`Connexion de ${username}`);
+                    return c.json({ ok: true as const });
+                },
+            )
+            .post('/logout', (c) => {
+                const token = getCookie(c, SESSION_COOKIE);
+                if (token) deleteSession(db, token);
+                deleteCookie(c, SESSION_COOKIE, { path: '/' });
+                return c.json({ ok: true as const });
+            })
+            // Lien d'invitation, d'activation ou de nouveau mot de passe.
+            .get('/links/:token', (c) =>
+                c.json(linkInfo(db, c.req.param('token'))),
+            )
+            .post('/links/:token', zValidator('json', linkForm), async (c) => {
+                const { id, kind } = await useLink(
+                    db,
+                    c.req.param('token'),
+                    c.req.valid('json'),
+                );
+                openSession(c, id);
+                logger.info(
+                    kind === 'invite'
+                        ? `Nouveau compte ${id}`
+                        : kind === 'activate'
+                          ? `Compte ${id} activé`
+                          : `Nouveau mot de passe pour le compte ${id}`,
+                );
+                return c.json({ kind });
+            })
+    );
 };
 
 /** Exige une session valide ; la personne connectée est dans `c.var.user`. */

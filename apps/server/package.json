@@ -6,11 +6,14 @@
     "scripts": {
         "build": "tsc",
         "start": "node dist/main.js",
+        "admin-link": "node dist/adminLink.js",
         "dev": "tsx watch ./src/main.ts",
         "test": "tsc -p tsconfig.test.json && vitest run",
         "db:generate": "drizzle-kit generate"
     },
     "dependencies": {
+        "@dicebear/core": "10.7.0",
+        "@dicebear/styles": "10.6.0",
         "@hono/node-server": "^1.19.7",
         "@hono/zod-validator": "^0.4.3",
         "adm-zip": "^0.5.16",

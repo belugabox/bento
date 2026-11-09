@@ -5,17 +5,17 @@ import type { ApiType, ReadingMode, SourceLink } from '@server/types';
 /** Client typé de l'API (`/api`, servie par le même domaine). */
 export const api = hc<ApiType>('/api');
 
-/** Page de connexion Pocket ID, avec retour sur la page actuelle. */
+/** Page de connexion, avec retour sur la page actuelle. */
 export const loginUrl = (
     redirect = window.location.pathname + window.location.search,
-) => `/api/auth/login?redirect=${encodeURIComponent(redirect)}`;
+) => `/login?redirect=${encodeURIComponent(redirect)}`;
 
 /** Résultat JSON d'un appel, ou erreur avec le message renvoyé par le serveur. */
 export const json = async <T>(
     call: Promise<{ ok: boolean; status: number; json(): Promise<T> }>,
 ): Promise<T> => {
     const response = await call;
-    // Session absente ou expirée : passer par la connexion Pocket ID.
+    // Session absente ou expirée : passer par la page de connexion.
     if (response.status === 401) {
         window.location.assign(loginUrl());
         throw new Error('Connexion requise');
@@ -93,12 +93,75 @@ export type InProgressVolume = Awaited<
 export const setSeriesLists = (seriesId: number, lists: { toRead?: boolean }) =>
     json(api.series[':id'].lists.$put({ ...id(seriesId), json: lists }));
 
+// --- Comptes -------------------------------------------------------------------
+
+export const login = (username: string, password: string) =>
+    json(api.auth.login.$post({ json: { username, password } }));
+
+/** Ce qu'affiche la page d'un lien d'invitation, d'activation… */
+export const fetchLink = (token: string) =>
+    json(api.auth.links[':token'].$get({ param: { token } }));
+
+export type LinkInfo = Awaited<ReturnType<typeof fetchLink>>;
+
+export const submitLink = (
+    token: string,
+    form: {
+        username?: string;
+        password: string;
+        email?: string | null;
+        avatarSeed?: string;
+    },
+) => json(api.auth.links[':token'].$post({ param: { token }, json: form }));
+
+/** « Mon compte » : identifiant, e-mail, avatar, mot de passe. */
+export const updateMe = (changes: {
+    username?: string;
+    email?: string | null;
+    avatarSeed?: string;
+    password?: string;
+    currentPassword?: string;
+}) => json(api.me.$patch({ json: changes }));
+
+/** Avatar DiceBear « Clay » d'une graine. */
+export const avatarUrl = (seed: string) =>
+    `/api/avatars/${encodeURIComponent(seed)}`;
+
+/** Graine d'avatar au hasard. */
+export const randomAvatarSeed = () =>
+    Math.random().toString(36).slice(2, 12).padEnd(10, '0');
+
+/** Adresse complète d'un lien d'invitation, d'activation… */
+export const joinUrl = (token: string) =>
+    `${window.location.origin}/join/${token}`;
+
 export const fetchUsers = () => json(api.users.$get());
 
 export type Account = Awaited<ReturnType<typeof fetchUsers>>[number];
 
-export const setUserMaxAge = (userId: number, maxAge: number | null) =>
-    json(api.users[':id'].$patch({ ...id(userId), json: { maxAge } }));
+export const updateUser = (
+    userId: number,
+    changes: { maxAge?: number | null; role?: 'admin' | 'reader' },
+) => json(api.users[':id'].$patch({ ...id(userId), json: changes }));
+
+export const deleteUser = (userId: number) =>
+    json(api.users[':id'].$delete(id(userId)));
+
+/** Lien d'activation ou de nouveau mot de passe d'un compte. */
+export const createUserLink = (userId: number) =>
+    json(api.users[':id'].link.$post(id(userId)));
+
+export const fetchInvitations = () => json(api.invitations.$get());
+
+export type Invitation = Awaited<ReturnType<typeof fetchInvitations>>[number];
+
+export const createInvitation = (invitation: {
+    role: 'admin' | 'reader';
+    maxAge: number | null;
+}) => json(api.invitations.$post({ json: invitation }));
+
+export const deleteInvitation = (invitationId: number) =>
+    json(api.invitations[':id'].$delete(id(invitationId)));
 
 /** Largeur et hauteur de chaque page (double page). */
 export const fetchPageSizes = (volumeId: number) =>

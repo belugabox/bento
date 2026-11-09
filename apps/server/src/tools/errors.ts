@@ -21,9 +21,10 @@ export const unauthorized = (message: string) => new AppError(401, message);
 export const forbidden = (message: string) => new AppError(403, message);
 export const notFound = (message: string) => new AppError(404, message);
 export const conflict = (message: string) => new AppError(409, message);
+export const tooManyRequests = (message: string) => new AppError(429, message);
 // Requête valide, mais certaines données n'ont pas pu être traitées.
 export const unprocessable = (message: string) => new AppError(422, message);
-// Service externe (Pocket ID…) en erreur ou injoignable.
+// Service externe (Manga-news…) en erreur ou injoignable.
 export const badGateway = (message: string) => new AppError(502, message);
 
 /** Message lisible pour une erreur de validation zod (1re erreur seulement). */

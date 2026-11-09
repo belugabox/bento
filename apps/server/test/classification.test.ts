@@ -342,7 +342,7 @@ describe('age', () => {
         ctx.db
             .update(users)
             .set({ maxAge: 12 })
-            .where(eq(users.oidcSubject, 'child'))
+            .where(eq(users.username, 'child'))
             .run();
         // Sans classification : masquée aux comptes limités.
         expect((await call('/series', child)).body).toEqual([]);

@@ -7,7 +7,7 @@ import path from 'node:path';
 
 import { createApi } from './api';
 import { PageReader } from './archive/archive';
-import { OidcClient } from './auth/oidc';
+import { recoveryLink } from './auth/links';
 import { loadConfig } from './config';
 import { openDatabase } from './db';
 import { syncLibraries } from './library/catalog';
@@ -34,6 +34,15 @@ process.on('unhandledRejection', (err) => {
 
 const database = openDatabase(config.DB_FILE);
 logger.info(`Base de données : ${config.DB_FILE}`);
+
+// Aucun admin ne peut se connecter (pas encore de mot de passe) : un lien
+// de secours dans le journal.
+const recovery = recoveryLink(database.db);
+if (recovery) {
+    logger.warn(
+        `Aucun admin n'a de mot de passe. Lien pour en choisir un (valable 7 jours) : ${config.PUBLIC_URL}/join/${recovery}`,
+    );
+}
 
 const scanner = new LibraryScanner(database.db, config.COVERS_PATH, logger);
 const pages = new PageReader();
@@ -73,17 +82,7 @@ const app = new Hono()
             covers: new SeriesCovers(database.db, pages, config.COVERS_PATH),
             settings,
             wikipedia: new Wikipedia(),
-            auth: {
-                oidc: new OidcClient({
-                    issuer: config.OIDC_ISSUER,
-                    clientId: config.OIDC_CLIENT_ID,
-                    clientSecret: config.OIDC_CLIENT_SECRET,
-                    redirectUri: `${config.PUBLIC_URL}/api/auth/callback`,
-                }),
-                publicUrl: config.PUBLIC_URL,
-                adminGroup: config.OIDC_ADMIN_GROUP,
-                readerGroup: config.OIDC_READER_GROUP,
-            },
+            auth: { publicUrl: config.PUBLIC_URL },
         }),
     )
     // Client compilé ; toute autre adresse renvoie l'appli (routage côté client).

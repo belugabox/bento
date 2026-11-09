@@ -10,7 +10,7 @@ Bento est le serveur de lecture et de gestion des mangas et BD de la maison. Il 
   - réparations ZIP/RAR ;
   - compression.
 - **beluga-box** garde la seedbox et continue de synchroniser les tomes téléchargés dans le dossier `_draft` de la bibliothèque manga. Ce dossier est le seul lien entre les deux applis.
-- **Connexion** par **Pocket ID**, déjà en place, en OIDC. Bento ne stocke aucun mot de passe.
+- **Connexion** gérée par Bento (identifiant et mot de passe, comptes créés sur invitation). Pocket ID a servi jusqu'en novembre 2026.
 - **Kavita** : on repart de zéro, sans reprendre la progression de lecture.
 
 ## Périmètre
@@ -25,12 +25,8 @@ Bento est le serveur de lecture et de gestion des mangas et BD de la maison. Il 
 ## Fonctionnalités
 
 ### A. Comptes et accès
-- **Connexion** : OIDC avec Pocket ID (flux par code avec PKCE). Bento garde ensuite une session serveur dans un cookie `HttpOnly`.
-- **Rôles**, selon le groupe Pocket ID :
-  - `bento-admins` donne le rôle admin ;
-  - `bento-readers` donne le rôle lecteur ;
-  - sans l'un de ces groupes, l'accès est refusé.
-- **Comptes** : chaque compte Bento est créé à la première connexion. L'admin règle ensuite pour chacun la **classification d'âge maximale**.
+- **Connexion** : identifiant et mot de passe, puis une session serveur dans un cookie `HttpOnly`.
+- **Comptes** : un identifiant, un mot de passe, un avatar DiceBear « Clay » et un e-mail facultatif. L'admin envoie un **lien d'inscription** (partage du téléphone, WhatsApp, texto, e-mail) avec le rôle (admin ou lecteur) et la **classification d'âge maximale**, modifiables ensuite. Mot de passe oublié : l'admin envoie un lien de nouveau mot de passe.
 
 ### B. Bibliothèques et indexation
 - **Plusieurs bibliothèques**, chacune avec un nom, un dossier, et un type (manga ou BD). La lecture se fait de gauche à droite par défaut, pour toutes les bibliothèques.
@@ -107,7 +103,7 @@ Bento est le serveur de lecture et de gestion des mangas et BD de la maison. Il 
 
 État au 6 novembre 2026 : Bento est déployé (`https://bento.belugabox.net`), Kavita tourne encore.
 
-1. **Socle de lecture** — fait : dépôt, connexion Pocket ID, bibliothèques, scan (à la demande, toutes les 30 min, après publication), grille et fiche série, lecteur, progression.
+1. **Socle de lecture** — fait : dépôt, connexion (Pocket ID, puis comptes propres à Bento en novembre 2026), bibliothèques, scan (à la demande, toutes les 30 min, après publication), grille et fiche série, lecteur, progression.
 2. **Gestion** — fait : brouillons, métadonnées, Wikipédia, publication, réparations, couvertures, statut et mode de lecture dès les brouillons, aperçu de lecture, compression des images.
 3. **Famille** — fait : contrôle parental, vue lecteur pour l'admin, thèmes, statistiques, série lue / non lue, liste « à lire », filtres par liste, genre et statut, la suite des séries entamées dans « Reprendre la lecture » (« Nouveautés » retirée pour l'instant, à revoir).
 4. **Tablettes et Android** — fait, à essayer sur les appareils :
@@ -131,7 +127,6 @@ Bento est le serveur de lecture et de gestion des mangas et BD de la maison. Il 
 
 ## Décisions de déploiement
 
-- **Pocket ID** : `https://auth.belugabox.net`, avec les groupes `bento-admins` et `bento-readers`.
 - **Adresse de Bento** : `https://bento.belugabox.net`.
 - **Bibliothèques** :
   - Mangas : `/BLK/Books/Manga`.

@@ -90,7 +90,7 @@ beforeEach(async () => {
     childId = ctx.db
         .select({ id: users.id })
         .from(users)
-        .where(eq(users.oidcSubject, 'child'))
+        .where(eq(users.username, 'child'))
         .get()!.id;
     await call(`/users/${childId}`, admin, {
         method: 'PATCH',

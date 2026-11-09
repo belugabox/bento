@@ -17,7 +17,7 @@ const userId = (sub: string) =>
     ctx.db
         .select({ id: users.id })
         .from(users)
-        .where(eq(users.oidcSubject, sub))
+        .where(eq(users.username, sub))
         .get()!.id;
 
 const volumeId = (file: string) =>
