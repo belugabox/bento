@@ -94,7 +94,6 @@ const DraftsIndicator = () => {
                 label={pending}
                 size={18}
                 disabled={pending === 0}
-                color="orange"
                 offset={4}
             >
                 <ActionIcon
