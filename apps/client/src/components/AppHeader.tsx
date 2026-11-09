@@ -249,7 +249,6 @@ const PreviewModal = ({
                     value={maxAge}
                     onChange={(value) => value && setChosen(value)}
                     data={options}
-                    comboboxProps={{ withinPortal: false }}
                 />
                 <Group justify="flex-end">
                     <Button variant="default" onClick={onClose}>

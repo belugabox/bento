@@ -130,7 +130,6 @@ const UpToModal = ({
                     data={volumes ?? []}
                     value={upTo}
                     onChange={setUpTo}
-                    comboboxProps={{ withinPortal: false }}
                 />
                 <Text size="xs" c="dimmed">
                     Ce tome et ceux d’avant sont marqués comme lus ; les
