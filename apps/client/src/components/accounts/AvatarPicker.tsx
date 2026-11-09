@@ -12,11 +12,7 @@ import {
     Text,
     UnstyledButton,
 } from '@mantine/core';
-import {
-    IconAdjustments,
-    IconArrowRight,
-    IconDice5,
-} from '@tabler/icons-react';
+import { IconAdjustments, IconDice5 } from '@tabler/icons-react';
 import { type ReactNode, useEffect, useState } from 'react';
 
 import {
@@ -30,9 +26,12 @@ import {
 
 import { avatarUrl, fetchAvatarChoice, randomAvatarSeed } from '@/services/api';
 
-// Idées à côté de l'avatar : deux lignes de trois.
-const IDEAS = 6;
+// Idées à côté de l'avatar : trois lignes de quatre sur un téléphone, deux
+// lignes de six au-delà.
+const IDEAS = 12;
 const IDEA_SIZE = 40;
+const IDEA_GAP = 8;
+const ideasWidth = (cols: number) => cols * IDEA_SIZE + (cols - 1) * IDEA_GAP;
 // Propositions de « Personnaliser » : trois par ligne sur un téléphone.
 const PART_SIZE = 46;
 
@@ -129,7 +128,7 @@ const Swatches = ({
  * Choix de l'avatar Clay : l'avatar en grand, à côté des idées à prendre
  * d'un clic, puis « Personnaliser », fermé au départ : un onglet par partie
  * et les couleurs, de haut en bas, le choix à droite, chaque proposition
- * montrée sur l'avatar lui-même, et « Suivant » pour l'onglet d'après.
+ * montrée sur l'avatar lui-même.
  */
 export const AvatarPicker = ({
     value,
@@ -176,25 +175,6 @@ export const AvatarPicker = ({
     const variant = (current: AvatarChoice, changes: Partial<AvatarChoice>) =>
         formatAvatar({ ...current, ...changes });
 
-    /** « Suivant » : l'onglet d'après, s'il y en a un. */
-    const next = (current: string) => {
-        const following = TABS[TABS.findIndex((t) => t.value === current) + 1];
-        return (
-            following && (
-                <Group justify="flex-end">
-                    <Button
-                        size="compact-sm"
-                        variant="light"
-                        rightSection={<IconArrowRight size={14} />}
-                        onClick={() => setTab(following.value)}
-                    >
-                        Suivant
-                    </Button>
-                </Group>
-            )
-        );
-    };
-
     return (
         <Input.Wrapper label={label}>
             <Stack gap="sm" mt={4}>
@@ -211,10 +191,10 @@ export const AvatarPicker = ({
                             Des idées ? Touche celle qui te plaît.
                         </Text>
                         <SimpleGrid
-                            cols={IDEAS / 2}
-                            spacing={8}
-                            verticalSpacing={8}
-                            w={(IDEAS / 2) * IDEA_SIZE + (IDEAS / 2 - 1) * 8}
+                            cols={{ base: 4, xs: 6 }}
+                            spacing={IDEA_GAP}
+                            verticalSpacing={IDEA_GAP}
+                            w={{ base: ideasWidth(4), xs: ideasWidth(6) }}
                         >
                             {suggestions.map((seed, index) => (
                                 <Choice
@@ -328,7 +308,6 @@ export const AvatarPicker = ({
                                                         ),
                                                     )}
                                                 </Grid>
-                                                {next(part)}
                                             </Stack>
                                         </Tabs.Panel>
                                     ))}

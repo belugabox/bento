@@ -82,19 +82,6 @@ describe('AvatarPicker', () => {
         });
     });
 
-    it('goes from tab to tab with « Suivant »', async () => {
-        show();
-        await edit();
-
-        for (const name of ['Tête', 'Motif', 'Yeux', 'Bouche', 'Couleurs']) {
-            fireEvent.click(screen.getByRole('button', { name: 'Suivant' }));
-            expect(
-                screen.getByRole('tab', { name }).getAttribute('aria-selected'),
-            ).toBe('true');
-        }
-        expect(screen.queryByRole('button', { name: 'Suivant' })).toBeNull();
-    });
-
     it('edits an avatar drawn from a seed, from its parts', async () => {
         vi.spyOn(globalThis, 'fetch').mockResolvedValue(
             new Response(JSON.stringify(parseAvatar(START)), {
