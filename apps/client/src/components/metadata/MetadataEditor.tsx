@@ -894,6 +894,30 @@ export const MetadataEditor = ({
                             }}
                         />
                     )}
+                    {/* Téléphone : couverture réduite, au-dessus des champs. */}
+                    {cover && (
+                        <Group gap="sm" hiddenFrom="sm">
+                            <Image
+                                src={cover.src}
+                                w={60}
+                                h={90}
+                                fit="cover"
+                                radius="sm"
+                                alt=""
+                                fallbackSrc="data:image/gif;base64,R0lGODlhAQABAAAAACw="
+                                bg="var(--mantine-color-default-hover)"
+                            />
+                            <Button
+                                size="xs"
+                                variant="default"
+                                leftSection={<IconPhoto size={14} />}
+                                disabled={cover.disabled}
+                                onClick={cover.onEdit}
+                            >
+                                Couverture…
+                            </Button>
+                        </Group>
+                    )}
                     <Group align="flex-start" wrap="nowrap" gap="lg">
                         {cover && (
                             <Stack gap="xs" align="center" visibleFrom="sm">
