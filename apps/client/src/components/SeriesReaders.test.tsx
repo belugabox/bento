@@ -1,5 +1,5 @@
 import { MantineProvider } from '@mantine/core';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { SeriesReaders } from './SeriesReaders';
@@ -36,6 +36,11 @@ describe('SeriesReaders', () => {
         );
         // Sans avatar choisi : ses initiales.
         expect(screen.getByText(/^Z/)).toBeTruthy();
+        // Au clic : le nom et l'avancement de chacun.
+        fireEvent.click(screen.getByRole('button', { name: 'Lu par' }));
+        expect(await screen.findByText('Tout lu')).toBeTruthy();
+        expect(screen.getByText('60 % lu')).toBeTruthy();
+        expect(screen.getByText('Zoé')).toBeTruthy();
         expect(String(fetch.mock.calls[0]![0])).toMatch(
             /\/api\/series\/3\/readers$/,
         );

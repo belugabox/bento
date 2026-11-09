@@ -26,8 +26,8 @@ import {
 
 import { avatarUrl, fetchAvatarChoice, randomAvatarSeed } from '@/services/api';
 
-// Idées à côté de l'avatar : trois lignes de quatre sur un téléphone, deux
-// lignes de six au-delà.
+// Idées à côté de l'avatar : quatre ou six par ligne selon la place
+// réellement disponible (la carte peut être étroite sur un grand écran).
 const IDEAS = 12;
 const IDEA_SIZE = 40;
 const IDEA_GAP = 8;
@@ -186,15 +186,16 @@ export const AvatarPicker = ({
                         alt="Avatar choisi"
                         style={{ flexShrink: 0 }}
                     />
-                    <Stack gap={8} style={{ minWidth: 0 }}>
+                    <Stack gap={8} style={{ flex: 1, minWidth: 0 }}>
                         <Text size="xs" c="dimmed">
                             Des idées ? Touche celle qui te plaît.
                         </Text>
                         <SimpleGrid
-                            cols={{ base: 4, xs: 6 }}
+                            type="container"
+                            cols={{ base: 4, [`${ideasWidth(6)}px`]: 6 }}
                             spacing={IDEA_GAP}
                             verticalSpacing={IDEA_GAP}
-                            w={{ base: ideasWidth(4), xs: ideasWidth(6) }}
+                            maw={ideasWidth(6)}
                         >
                             {suggestions.map((seed, index) => (
                                 <Choice
