@@ -64,6 +64,13 @@ export const fetchSeries = (seriesId: number) =>
 export const fetchSeriesReaders = (seriesId: number) =>
     json(api.series[':id'].readers.$get(id(seriesId)));
 
+/** Filtre « Lu par » de l'accueil : les autres comptes et leurs séries lues. */
+export const fetchFamilyReaders = () => json(api.readers.$get());
+
+export type FamilyReader = Awaited<
+    ReturnType<typeof fetchFamilyReaders>
+>[number];
+
 export type SeriesReader = Awaited<
     ReturnType<typeof fetchSeriesReaders>
 >[number];

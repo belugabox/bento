@@ -104,3 +104,67 @@ export const seriesReaders = (
         .filter((reader) => reader.percent >= minPercent)
         .sort((a, b) => b.percent - a.percent || a.name.localeCompare(b.name));
 };
+
+export type FamilyReader = {
+    id: number;
+    name: string;
+    avatarSeed: string | null;
+    /** Séries visibles dont la personne a lu au moins le seuil. */
+    seriesIds: number[];
+};
+
+/**
+ * Pour le filtre « Lu par » de l'accueil : les autres comptes, chacun avec
+ * les séries (visibles pour `viewer`) dont il a lu au moins `minPercent` %
+ * des pages ; seulement ceux qui en ont, par nom.
+ */
+export const familyReaders = (
+    db: Db,
+    viewer: Viewer,
+    minPercent: number,
+): FamilyReader[] => {
+    const visible = new Set(
+        db
+            .select({ id: series.id })
+            .from(series)
+            .where(visibleTo(viewer))
+            .all()
+            .map((s) => s.id),
+    );
+    const rows = db.all<{
+        id: number;
+        name: string;
+        avatarSeed: string | null;
+        seriesId: number;
+        readPages: number;
+        totalPages: number;
+    }>(sql`
+        select users.id as id, users.name as name,
+            users.avatar_seed as avatarSeed, v.series_id as seriesId,
+            sum(case when rp.completed then v.page_count
+                else min(rp.page + 1, v.page_count) end) as readPages,
+            (select sum(t.page_count) from volumes t
+                where t.series_id = v.series_id) as totalPages
+        from read_progress rp
+        join volumes v on v.id = rp.volume_id
+        join users on users.id = rp.user_id
+        where users.id != ${viewer.id}
+        group by users.id, v.series_id
+    `);
+    const byUser = new Map<number, FamilyReader>();
+    for (const row of rows) {
+        if (!visible.has(row.seriesId) || !row.totalPages) continue;
+        if ((row.readPages * 100) / row.totalPages < minPercent) continue;
+        const reader = byUser.get(row.id) ?? {
+            id: row.id,
+            name: row.name,
+            avatarSeed: row.avatarSeed,
+            seriesIds: [],
+        };
+        reader.seriesIds.push(row.seriesId);
+        byUser.set(row.id, reader);
+    }
+    return [...byUser.values()].sort((a, b) =>
+        a.name.localeCompare(b.name, 'fr'),
+    );
+};

@@ -68,7 +68,7 @@ import {
     saveProgress,
     snapshotProgress,
 } from './library/progress';
-import { seriesReaders } from './library/readers';
+import { familyReaders, seriesReaders } from './library/readers';
 import { type LibraryScanner, coverFile } from './library/scanner';
 import { readCover } from './library/smallCovers';
 import { getStats } from './library/stats';
@@ -331,6 +331,10 @@ export const createApi = ({
         )
         .get('/series/:id', zValidator('param', idParam), (c) =>
             c.json(getSeries(db, c.var.user, c.req.valid('param').id)),
+        )
+        // Filtre « Lu par » de l'accueil : les autres comptes et leurs séries lues.
+        .get('/readers', (c) =>
+            c.json(familyReaders(db, c.var.user, settings.get().readByPercent)),
         )
         // Les autres comptes qui ont lu la série (seuil dans les réglages).
         .get('/series/:id/readers', zValidator('param', idParam), (c) =>

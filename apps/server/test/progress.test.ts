@@ -314,3 +314,21 @@ describe('series readers', () => {
         ]);
     });
 });
+
+describe('family readers (home filter)', () => {
+    it('lists the others with the series they read enough of', async () => {
+        // Alice : tout Spirale, 1 page de Gantz (1 sur 9, sous 20 %).
+        await save(spirale, { completed: true });
+        await save(gantz[0]!, { page: 0 });
+        new SettingsStore(ctx.db).update({ readByPercent: 20 });
+
+        const spiraleSeries = (await call('/series', bob)).body.find(
+            (s: { name: string }) => s.name === 'Spirale',
+        ).id;
+        expect((await call('/readers', bob)).body).toEqual([
+            expect.objectContaining({ seriesIds: [spiraleSeries] }),
+        ]);
+        // Jamais soi-même ; Bob n'a rien lu.
+        expect((await call('/readers', alice)).body).toEqual([]);
+    });
+});
