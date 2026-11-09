@@ -157,6 +157,18 @@ describe('LibraryPage', () => {
         expect(screen.getByText('Action, Horreur')).toBeTruthy();
     });
 
+    it('switches between grid and list from the bottom bar', async () => {
+        show();
+        await vi.waitFor(() => expect(titles()).toHaveLength(3));
+        expect(screen.queryByText('Action, Horreur')).toBeNull();
+
+        fireEvent.click(screen.getByLabelText('Liste'));
+        expect(await screen.findByText('Action, Horreur')).toBeTruthy();
+        expect(JSON.parse(localStorage.getItem('bento:display')!)).toEqual({
+            layout: 'list',
+        });
+    });
+
     it('sorts by recent additions, in the address', async () => {
         show();
         await screen.findByTestId('series-grid');

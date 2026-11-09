@@ -2,6 +2,7 @@ import {
     Alert,
     Box,
     Button,
+    Center,
     Container,
     Divider,
     Group,
@@ -15,6 +16,7 @@ import {
     Stack,
     Text,
     ThemeIcon,
+    VisuallyHidden,
 } from '@mantine/core';
 import { useDebouncedValue } from '@mantine/hooks';
 import {
@@ -22,6 +24,8 @@ import {
     IconBookmarkFilled,
     IconCheck,
     IconChevronDown,
+    IconLayoutGrid,
+    IconList,
     IconPlayerPlayFilled,
 } from '@tabler/icons-react';
 import { type ReactNode, useContext } from 'react';
@@ -32,6 +36,7 @@ import { CoverCard } from '@/components/CoverCard';
 import {
     LIST_COLUMNS,
     type LibraryDisplay,
+    type LibraryLayout,
     gridColumns,
     useLibraryDisplay,
 } from '@/components/libraryDisplay';
@@ -403,6 +408,42 @@ export const LibraryPage = () => {
                         preventGrowOverflow={false}
                     >
                         <Group gap={6} wrap="nowrap" style={{ flexShrink: 0 }}>
+                            {/* Même réglage que dans « Apparence… ». */}
+                            <SegmentedControl
+                                size="xs"
+                                radius="xl"
+                                aria-label="Affichage"
+                                value={display.layout}
+                                onChange={(layout) =>
+                                    display.set({
+                                        layout: layout as LibraryLayout,
+                                    })
+                                }
+                                data={[
+                                    {
+                                        value: 'grid',
+                                        label: (
+                                            <Center>
+                                                <IconLayoutGrid size={14} />
+                                                <VisuallyHidden>
+                                                    Grille
+                                                </VisuallyHidden>
+                                            </Center>
+                                        ),
+                                    },
+                                    {
+                                        value: 'list',
+                                        label: (
+                                            <Center>
+                                                <IconList size={14} />
+                                                <VisuallyHidden>
+                                                    Liste
+                                                </VisuallyHidden>
+                                            </Center>
+                                        ),
+                                    },
+                                ]}
+                            />
                             <Menu position="top-start">
                                 <Menu.Target>
                                     <Indicator
