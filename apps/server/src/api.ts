@@ -1,6 +1,7 @@
 import { sql } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { readFile } from 'node:fs/promises';
+import path from 'node:path';
 import { z } from 'zod';
 
 import type { PageReader } from './archive/archive';
@@ -69,6 +70,7 @@ import {
     snapshotProgress,
 } from './library/progress';
 import { familyReaders, seriesReaders } from './library/readers';
+import { addReadingTime } from './library/readingTime';
 import { type LibraryScanner, coverFile } from './library/scanner';
 import { readCover } from './library/smallCovers';
 import { getStats } from './library/stats';
@@ -80,6 +82,7 @@ import {
     sourcesText,
 } from './metadata/sourceLink';
 import type { Wikipedia } from './metadata/wikipedia';
+import { KavitaImport } from './migration/kavita';
 import { SettingsStore, settingsUpdateSchema } from './settings';
 import { AppError, badRequest, notFound } from './tools/errors';
 import type { Logger } from './tools/logger';
@@ -99,6 +102,7 @@ export type ApiDeps = {
     mangaNews?: MangaNews;
     /** Réglages de l'admin (valeurs par défaut si absents). */
     settings?: SettingsStore;
+    kavita?: KavitaImport;
     /** File des compressions (créée avec `files` si absente). */
     compression?: CompressionQueue;
     auth: Omit<AuthDeps, 'db' | 'logger'>;
@@ -213,6 +217,11 @@ export const createApi = ({
     wikipedia,
     mangaNews = new MangaNews(),
     settings = new SettingsStore(db),
+    // Base de Kavita envoyée pour la migration, à côté des couvertures.
+    kavita = new KavitaImport(
+        db,
+        path.join(path.dirname(coversPath), 'kavita'),
+    ),
     compression = new CompressionQueue(
         files,
         logger,
@@ -647,6 +656,27 @@ export const createApi = ({
                 });
             },
         )
+        // Temps passé dans le lecteur, envoyé par morceaux (statistiques).
+        .post(
+            '/volumes/:id/reading-time',
+            zValidator('param', idParam),
+            zValidator(
+                'json',
+                z.object({
+                    seconds: z.number().int().min(1).max(600),
+                    pages: z.number().int().min(0).max(2000),
+                }),
+            ),
+            (c) => {
+                const { id } = getVolume(
+                    db,
+                    c.var.user,
+                    c.req.valid('param').id,
+                );
+                addReadingTime(db, c.var.user.id, id, c.req.valid('json'));
+                return c.json({ ok: true as const });
+            },
+        )
         // Dimensions des pages (double page), calculées à la première demande.
         .get(
             '/volumes/:id/page-sizes',
@@ -1067,6 +1097,74 @@ export const createApi = ({
                 return c.json({ token, expiresAt });
             },
         )
+        // Migration depuis Kavita (admin) : sa base, puis l'import choisi.
+        .get('/migration/kavita', requireAdmin, async (c) =>
+            c.json(
+                (await kavita.hasFiles())
+                    ? { analysis: kavita.analyze() }
+                    : { analysis: null },
+            ),
+        )
+        .post('/migration/kavita', requireAdmin, async (c) => {
+            const body = await c.req.parseBody({ all: true });
+            const sent = [body.files ?? []].flat();
+            const files = await Promise.all(
+                sent
+                    .filter((f): f is File => f instanceof File)
+                    .map(async (f) => ({
+                        name: f.name,
+                        data: new Uint8Array(await f.arrayBuffer()),
+                    })),
+            );
+            await kavita.save(files);
+            return c.json({ analysis: kavita.analyze() });
+        })
+        .post(
+            '/migration/kavita/apply',
+            requireAdmin,
+            zValidator(
+                'json',
+                z.object({
+                    accounts: z.array(
+                        z.discriminatedUnion('action', [
+                            z.object({
+                                kavitaId: z.number().int(),
+                                action: z.literal('link'),
+                                userId: z.number().int(),
+                            }),
+                            z.object({
+                                kavitaId: z.number().int(),
+                                action: z.literal('create'),
+                                name: z.string().trim().min(1).max(100),
+                                maxAge: z
+                                    .number()
+                                    .int()
+                                    .min(0)
+                                    .max(18)
+                                    .nullable(),
+                            }),
+                            z.object({
+                                kavitaId: z.number().int(),
+                                action: z.literal('skip'),
+                            }),
+                        ]),
+                    ),
+                    addedDates: z.boolean(),
+                    readingTime: z.boolean(),
+                    estimatedSessions: z.boolean(),
+                }),
+            ),
+            async (c) => {
+                if (!(await kavita.hasFiles())) {
+                    throw badRequest('Envoie d’abord la base de Kavita');
+                }
+                return c.json(kavita.apply(c.req.valid('json')));
+            },
+        )
+        .delete('/migration/kavita', requireAdmin, async (c) => {
+            await kavita.clear();
+            return c.json({ ok: true as const });
+        })
         // Invitations à créer un compte (admin).
         .get('/invitations', requireAdmin, (c) => c.json(listInvitations(db)))
         .post(

@@ -43,12 +43,17 @@ export const getStats = (db: Db) => {
         completed: number;
         inProgress: number;
         lastReadAt: number | null;
+        readingSeconds: number;
     }>(sql`
         select u.id, u.name, u.role, u.max_age as maxAge,
             u.last_login_at as lastLoginAt,
             coalesce(sum(rp.completed = 1), 0) as completed,
             coalesce(sum(rp.completed = 0), 0) as inProgress,
-            max(rp.updated_at) as lastReadAt
+            max(rp.updated_at) as lastReadAt,
+            -- Temps de lecture (séances Bento et Kavita), en secondes.
+            coalesce((select sum(rs.ended_at - rs.started_at) / 1000
+                from reading_sessions rs where rs.user_id = u.id), 0)
+                as readingSeconds
         from users u
         left join read_progress rp on rp.user_id = u.id
         group by u.id

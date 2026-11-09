@@ -64,6 +64,52 @@ export const fetchSeries = (seriesId: number) =>
 export const fetchSeriesReaders = (seriesId: number) =>
     json(api.series[':id'].readers.$get(id(seriesId)));
 
+/** Temps passé dans le lecteur sur un tome (statistiques). */
+export const sendReadingTime = (
+    volumeId: number,
+    time: { seconds: number; pages: number },
+) =>
+    json(
+        api.volumes[':id']['reading-time'].$post({
+            ...id(volumeId),
+            json: time,
+        }),
+    );
+
+/** Migration Kavita : analyse de la base envoyée (null : rien envoyé). */
+export const fetchKavitaMigration = () => json(api.migration.kavita.$get());
+
+export type KavitaAnalysis = NonNullable<
+    Awaited<ReturnType<typeof fetchKavitaMigration>>['analysis']
+>;
+
+/** Envoie kavita.db (et ses -wal et -shm), puis renvoie l'analyse. */
+export const uploadKavita = (files: File[]) => {
+    const form = new FormData();
+    for (const file of files) form.append('files', file);
+    return json<{ analysis: KavitaAnalysis }>(
+        fetch('/api/migration/kavita', { method: 'POST', body: form }),
+    );
+};
+
+export const applyKavita = (choices: {
+    accounts: (
+        | { kavitaId: number; action: 'link'; userId: number }
+        | {
+              kavitaId: number;
+              action: 'create';
+              name: string;
+              maxAge: number | null;
+          }
+        | { kavitaId: number; action: 'skip' }
+    )[];
+    addedDates: boolean;
+    readingTime: boolean;
+    estimatedSessions: boolean;
+}) => json(api.migration.kavita.apply.$post({ json: choices }));
+
+export const clearKavita = () => json(api.migration.kavita.$delete());
+
 /** Filtre « Lu par » de l'accueil : les autres comptes et leurs séries lues. */
 export const fetchFamilyReaders = () => json(api.readers.$get());
 

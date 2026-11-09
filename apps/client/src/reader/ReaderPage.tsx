@@ -16,6 +16,7 @@ import { useQuery } from '@/services/useQuery';
 import { Reader } from './Reader';
 import { exitFullscreen } from './fullscreen';
 import { type ReadingMode, clampPage } from './navigation';
+import { useReadingTime } from './readingTime';
 
 // `?page=last` : dernière page (en revenant du tome suivant).
 const LAST_PAGE = 'last';
@@ -75,13 +76,17 @@ export const ReaderPage = () => {
     const savedPage = useRef<string>(undefined);
     const seen = useRef({ volumeId: 0, pages: new Set<number>() });
     const urlReady = !!volume && rawPage !== null && rawPage !== LAST_PAGE;
+    // Temps de lecture (statistiques), sauf en simulation d'un compte.
+    const readingActivity = useReadingTime(volume?.id, !readOnly);
     const onShown = useCallback(
         (shown: number[]) => {
             if (!volume || !urlReady) return;
             if (seen.current.volumeId !== volume.id) {
                 seen.current = { volumeId: volume.id, pages: new Set() };
             }
+            const before = seen.current.pages.size;
             for (const page of shown) seen.current.pages.add(page);
+            readingActivity(seen.current.pages.size - before);
             const lastShown = Math.max(...shown);
             const needed = Math.min(PAGES_BEFORE_SAVE, volume.pageCount);
             if (seen.current.pages.size < needed) return;
@@ -95,7 +100,7 @@ export const ReaderPage = () => {
                 savedPage.current = undefined;
             });
         },
-        [volume, urlReady, readOnly],
+        [volume, urlReady, readOnly, readingActivity],
     );
 
     const pageSrc = useCallback(

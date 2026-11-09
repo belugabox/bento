@@ -216,6 +216,34 @@ export const readProgress = sqliteTable(
 );
 
 /**
+ * Séances de lecture : temps passé dans le lecteur (Bento), ou repris de
+ * Kavita à la migration. Pour les statistiques.
+ */
+export const readingSessions = sqliteTable(
+    'reading_sessions',
+    {
+        id: integer('id').primaryKey({ autoIncrement: true }),
+        userId: integer('user_id')
+            .notNull()
+            .references(() => users.id, { onDelete: 'cascade' }),
+        // Tome lu ; null s'il a disparu (ou introuvable à l'import).
+        volumeId: integer('volume_id').references(() => volumes.id, {
+            onDelete: 'set null',
+        }),
+        startedAt: integer('started_at', { mode: 'timestamp_ms' }).notNull(),
+        endedAt: integer('ended_at', { mode: 'timestamp_ms' }).notNull(),
+        pages: integer('pages').notNull().default(0),
+        source: text('source', { enum: ['bento', 'kavita'] })
+            .notNull()
+            .default('bento'),
+        // Séance importée : son numéro d'origine (import relancé sans
+        // doublon).
+        externalId: text('external_id').unique(),
+    },
+    (t) => [index('reading_sessions_user').on(t.userId, t.startedAt)],
+);
+
+/**
  * Réglages choisis pour la série d'un dossier de brouillons (statut, mode
  * de lecture, couverture) : appliqués à la série à la publication (elle
  * n'existe pas encore en base). La table garde son nom d'origine.

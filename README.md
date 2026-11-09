@@ -90,6 +90,18 @@ Depuis le menu de l'avatar, « Réglages », en deux onglets :
 - **Général** : qualité JPEG et hauteur maximale des pages pour la compression, intervalle du scan automatique (la variable `SCAN_INTERVAL_MINUTES` n'en donne plus que la valeur par défaut), apparence par défaut. Enregistrés ensemble.
 - **Classement**, enregistré à chaque changement : les formats (ajouter, renommer, choisir le mode de lecture, supprimer : ses séries devront en choisir un autre), la grille d'âges proposée pour les séries et les comptes, et la liste des genres (ajouter, renommer, changer les autres noms reconnus, supprimer ou fusionner dans un autre ; un genre renommé garde son ancien nom comme autre nom reconnu).
 
+### Migration depuis Kavita
+
+Réglages, onglet « Migration Kavita » (admin) : envoyer `kavita.db` (avec `kavita.db-wal` et `kavita.db-shm`, copiés depuis le dossier de configuration de Kavita, Kavita arrêté), voir ce qui serait repris, puis « Migrer ». Relançable : rien n'est repris deux fois.
+
+- **Tomes** retrouvés par leur chemin dans la bibliothèque (Kavita et Bento lisent les mêmes fichiers) ; la liste des introuvables (renommés depuis le dernier scan de Kavita) est affichée.
+- **Comptes** : chacun associé au compte Bento du même nom (sans casse ni accents), sinon créé « à activer » avec la limite d'âge de Kavita (modifiable), ou ignoré.
+- **Progression** : tomes finis et page atteinte ; une lecture plus récente dans Bento est gardée. « Want to read » devient « À lire ».
+- **Dates d'ajout** (case à cocher) : la plus ancienne entre Kavita et Bento.
+- **Temps de lecture** (case à cocher) : les séances de Kavita ; celles qu'il a estimées (minuit pile, environ une heure) seulement si on coche « Avec les séances estimées ».
+
+Bento mesure aussi le temps passé dans son lecteur (temps entre deux pages, sans les pauses de plus de 2 minutes) : colonne « Temps » et tuile « Temps de lecture » des statistiques.
+
 ### Thème et affichage
 
 Par défaut, Bento suit le mode du système (clair ou sombre) en violet ; l'admin change ce thème par défaut dans les réglages. Chacun peut choisir le sien depuis le menu de l'avatar (« Thème et affichage… ») : mode clair, sombre ou celui du système, et une couleur d'accent parmi douze. Ce choix est gardé sur l'appareil ; « Thème par défaut » y revient.

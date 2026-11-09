@@ -12,13 +12,18 @@ import {
     Text,
     Title,
 } from '@mantine/core';
-import { IconAdjustments, IconTags } from '@tabler/icons-react';
+import {
+    IconAdjustments,
+    IconDatabaseImport,
+    IconTags,
+} from '@tabler/icons-react';
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router';
 
 import { AgesSettings } from '@/components/AgesSettings';
 import { FormatsSettings } from '@/components/FormatsSettings';
 import { GenresSettings } from '@/components/GenresSettings';
+import { KavitaMigration } from '@/components/KavitaMigration';
 import { SourcePrioritySettings } from '@/components/SourcePrioritySettings';
 import { AccentPicker, ColorSchemeControl } from '@/components/ThemePickers';
 import { useDefaultAppearance } from '@/components/theme';
@@ -271,7 +276,7 @@ const SettingsForm = ({
     );
 };
 
-type Tab = 'general' | 'classement';
+type Tab = 'general' | 'classement' | 'kavita';
 
 /**
  * Réglages de Bento (admin), en deux onglets : « Général » (compression,
@@ -282,8 +287,9 @@ export const SettingsPage = () => {
     const { data, error } = useQuery(fetchSettings, []);
     const [saved, setSaved] = useState<SettingsResponse>();
     const [params, setParams] = useSearchParams();
+    const asked = params.get('tab');
     const tab: Tab =
-        params.get('tab') === 'classement' ? 'classement' : 'general';
+        asked === 'classement' || asked === 'kavita' ? asked : 'general';
     const current = saved ?? data;
 
     if (error) return <Alert color="red">{error.message}</Alert>;
@@ -295,9 +301,10 @@ export const SettingsPage = () => {
             <Tabs
                 value={tab}
                 onChange={(value) =>
-                    setParams(value === 'classement' ? { tab: value } : {}, {
-                        replace: true,
-                    })
+                    setParams(
+                        value && value !== 'general' ? { tab: value } : {},
+                        { replace: true },
+                    )
                 }
                 keepMounted={false}
             >
@@ -313,6 +320,12 @@ export const SettingsPage = () => {
                         leftSection={<IconTags size={16} />}
                     >
                         Classement
+                    </Tabs.Tab>
+                    <Tabs.Tab
+                        value="kavita"
+                        leftSection={<IconDatabaseImport size={16} />}
+                    >
+                        Migration Kavita
                     </Tabs.Tab>
                 </Tabs.List>
                 <Tabs.Panel value="general">
@@ -331,6 +344,9 @@ export const SettingsPage = () => {
                             onSaved={setSaved}
                         />
                     </Stack>
+                </Tabs.Panel>
+                <Tabs.Panel value="kavita">
+                    <KavitaMigration />
                 </Tabs.Panel>
             </Tabs>
         </Stack>
