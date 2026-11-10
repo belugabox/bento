@@ -184,4 +184,28 @@ describe('VolumeCardMenu', () => {
         });
         expect(location).toBe('/series/3');
     });
+
+    it('marks the whole series read, or up to this volume', async () => {
+        show(<VolumeCardMenu volume={volume} onChanged={() => {}} />);
+
+        await choose(
+            'Actions pour Gantz, tome 1',
+            'Marquer la série comme lue',
+        );
+        expect(requests.at(-1)).toEqual([
+            'PUT',
+            '/api/series/3/read',
+            { read: true },
+        ]);
+
+        await choose(
+            'Actions pour Gantz, tome 1',
+            'Marquer lue jusqu’à ce tome',
+        );
+        expect(requests.at(-1)).toEqual([
+            'PUT',
+            '/api/series/3/read',
+            { read: true, upTo: 11 },
+        ]);
+    });
 });

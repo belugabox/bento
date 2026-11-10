@@ -50,6 +50,30 @@ export const countedVolume = (alias: string) =>
         `(${alias}.kind in ${MAIN_KINDS_SQL} or not exists (select 1 from volumes w where w.series_id = ${alias}.series_id and w.kind in ${MAIN_KINDS_SQL}))`,
     );
 
+/**
+ * Nouveaux tomes de chaque série pour la personne : comptés, et ajoutés
+ * après sa dernière lecture dans la série (séries où elle n'a rien lu :
+ * absentes). Une seule requête pour toutes les séries : en sous-requête par
+ * série, elle était recalculée pour chaque tome. `added_at` est en
+ * secondes, `updated_at` en millisecondes.
+ */
+export const newVolumeCounts = (db: Db, viewerId: number) =>
+    new Map(
+        db
+            .all<{ seriesId: number; count: number }>(
+                sql`select v.series_id as seriesId, count(*) as count
+                    from volumes v
+                    join (select v2.series_id as sid, max(rp.updated_at) as last
+                        from read_progress rp
+                        join volumes v2 on v2.id = rp.volume_id
+                        where rp.user_id = ${viewerId}
+                        group by v2.series_id) l on l.sid = v.series_id
+                    where v.added_at * 1000 > l.last and ${countedVolume('v')}
+                    group by v.series_id`,
+            )
+            .map((row) => [row.seriesId, row.count]),
+    );
+
 // Tomes, hors-séries puis spéciaux ; sans numéro en dernier, puis par
 // numéro, puis par fichier.
 export const volumeOrder = [
@@ -157,6 +181,8 @@ export const listSeries = (
     // Sans casse ni accents : « comedie » trouve « Comédie ».
     const text = search ? genreKey(search) : '';
     const catalog = genreCatalog(db);
+    // Tomes ajoutés depuis sa dernière lecture (pastille « +2 »).
+    const fresh = newVolumeCounts(db, viewer.id);
     return db
         .select({
             id: series.id,
@@ -221,6 +247,7 @@ export const listSeries = (
         .sort((a, b) => compareNames(a.name, b.name))
         .map(({ genre, tags, libraryType: _type, ...row }) => ({
             ...row,
+            newCount: fresh.get(row.id) ?? 0,
             ...classify(genre, tags, catalog),
             // Genres tels qu'écrits dans les fichiers (« Humour »), cherchés
             // aussi.

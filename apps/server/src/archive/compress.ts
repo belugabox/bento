@@ -6,6 +6,7 @@ import { openArchive, pageEntries, readArchive } from './archive';
 import { withFileLock } from './fileLock';
 import { readImage } from './image';
 import { clearDescriptorFlags } from './write';
+import { readZipComment } from './zipIndex';
 
 /**
  * Réglages de la compression (réglables par l'admin) : qualité JPEG et
@@ -20,6 +21,47 @@ const PARALLEL_PAGES = 4;
 const STORED = 0;
 // Pages compressées pour estimer le gain d'un tome.
 const SAMPLE_PAGES = 8;
+// Tomes échantillonnés pour estimer une série (début, milieu, fin) : ceux
+// d'une même série viennent en général du même scan.
+const SAMPLE_FILES = 3;
+
+/**
+ * Marque laissée dans le commentaire de l'archive par la compression, avec
+ * ses réglages : « bento:compressed q=90 h=2400 » (h=0 : taille gardée).
+ */
+const MARK = /^bento:compressed q=(\d+) h=(\d+)$/;
+const markOf = ({ quality, maxHeight }: CompressionOptions) =>
+    `bento:compressed q=${quality} h=${maxHeight ?? 0}`;
+
+/**
+ * Déjà compressé avec des réglages au moins aussi forts : rien à gagner (et
+ * recompresser un JPEG ne ferait que l'abîmer).
+ */
+export const alreadyCompressed = async (
+    fullPath: string,
+    { quality, maxHeight }: CompressionOptions,
+) => {
+    const mark = MARK.exec(await readZipComment(fullPath).catch(() => ''));
+    if (!mark) return false;
+    const markHeight = Number(mark[2]) || null;
+    return (
+        Number(mark[1]) <= quality &&
+        (maxHeight === null || (markHeight !== null && markHeight <= maxHeight))
+    );
+};
+
+/** Lance `task` sur chaque élément, `PARALLEL_PAGES` à la fois. */
+const inBatches = async <T, R>(items: T[], task: (item: T) => Promise<R>) => {
+    const results: R[] = [];
+    for (let start = 0; start < items.length; start += PARALLEL_PAGES) {
+        results.push(
+            ...(await Promise.all(
+                items.slice(start, start + PARALLEL_PAGES).map(task),
+            )),
+        );
+    }
+    return results;
+};
 
 export type CompressionResult = {
     originalSize: number;
@@ -62,33 +104,103 @@ const sampleOf = <T>(items: T[], count: number) =>
                   items[Math.floor((i * (items.length - 1)) / (count - 1))]!,
           );
 
+/** Taille d'un fichier et de ses images (lue dans son répertoire). */
+const sizesOf = async (fullPath: string) => {
+    const { size } = await stat(fullPath);
+    const pages = pageEntries(await readArchive(fullPath));
+    return {
+        size,
+        pages,
+        imagesSize: pages.reduce((t, entry) => t + entry.compressedSize, 0),
+    };
+};
+
 /**
- * Gain estimé en compressant quelques pages : le rapport obtenu sur elles
- * est appliqué à toutes les images.
+ * Tailles avant et après sur quelques pages d'un fichier, recompressées
+ * `PARALLEL_PAGES` à la fois.
+ */
+const samplePages = async (
+    pages: Awaited<ReturnType<typeof sizesOf>>['pages'],
+    options: CompressionOptions,
+) => {
+    const sizes = await inBatches(
+        sampleOf(pages, SAMPLE_PAGES),
+        async (entry) => {
+            const data = await entry.getData();
+            const compressed = await recompress(data, entry.entryName, options);
+            return [data.length, compressed?.length ?? data.length] as const;
+        },
+    );
+    return {
+        before: sizes.reduce((t, [before]) => t + before, 0),
+        after: sizes.reduce((t, [, after]) => t + after, 0),
+    };
+};
+
+const estimated = (size: number, imagesSize: number, ratio: number) =>
+    Math.round(size - imagesSize * (1 - ratio));
+
+/**
+ * Gain estimé d'un ensemble de fichiers (les tomes d'une série) : quelques
+ * pages de trois d'entre eux (début, milieu, fin) sont recompressées, et le
+ * rapport obtenu est appliqué aux images de tous. Un fichier déjà compressé
+ * avec ces réglages n'y gagne rien ; un fichier illisible a son erreur.
  */
 export const estimateCompression = async (
-    fullPath: string,
+    fullPaths: string[],
     options: CompressionOptions,
-): Promise<CompressionResult> => {
-    const { size: originalSize } = await stat(fullPath);
-    const pages = pageEntries(await readArchive(fullPath));
-    const imagesSize = pages.reduce(
-        (total, entry) => total + entry.compressedSize,
-        0,
-    );
+): Promise<Record<string, CompressionResult | { error: string }>> => {
+    const results: Record<string, CompressionResult | { error: string }> = {};
+    const todo: {
+        fullPath: string;
+        size: number;
+        imagesSize: number;
+        pages: Awaited<ReturnType<typeof sizesOf>>['pages'];
+    }[] = [];
+    for (const fullPath of fullPaths) {
+        try {
+            const sizes = await sizesOf(fullPath);
+            if (await alreadyCompressed(fullPath, options)) {
+                results[fullPath] = {
+                    originalSize: sizes.size,
+                    compressedSize: sizes.size,
+                };
+            } else {
+                todo.push({ fullPath, ...sizes });
+            }
+        } catch (e) {
+            results[fullPath] = { error: (e as Error).message };
+        }
+    }
+    // Rapport de chaque fichier échantillonné, et celui de l'ensemble.
+    const own = new Map<string, number>();
     let before = 0;
     let after = 0;
-    for (const entry of sampleOf(pages, SAMPLE_PAGES)) {
-        const data = await entry.getData();
-        const compressed = await recompress(data, entry.entryName, options);
-        before += data.length;
-        after += compressed?.length ?? data.length;
+    for (const file of sampleOf(todo, SAMPLE_FILES)) {
+        try {
+            const sample = await samplePages(file.pages, options);
+            if (sample.before > 0) {
+                own.set(file.fullPath, sample.after / sample.before);
+            }
+            before += sample.before;
+            after += sample.after;
+        } catch (e) {
+            results[file.fullPath] = { error: (e as Error).message };
+        }
     }
     const ratio = before > 0 ? after / before : 1;
-    return {
-        originalSize,
-        compressedSize: Math.round(originalSize - imagesSize * (1 - ratio)),
-    };
+    for (const file of todo) {
+        if (results[file.fullPath]) continue;
+        results[file.fullPath] = {
+            originalSize: file.size,
+            compressedSize: estimated(
+                file.size,
+                file.imagesSize,
+                own.get(file.fullPath) ?? ratio,
+            ),
+        };
+    }
+    return results;
 };
 
 /**
@@ -107,6 +219,10 @@ const compressPages = async (
     options: CompressionOptions,
 ): Promise<CompressionResult> => {
     const { size: originalSize } = await stat(fullPath);
+    // Déjà compressé ainsi : rien à gagner, et la qualité baisserait.
+    if (await alreadyCompressed(fullPath, options)) {
+        return { originalSize, compressedSize: originalSize };
+    }
     const zip = await openArchive(fullPath);
     const pages = new Set(
         pageEntries(zip.getEntries()).map((entry) => entry.entryName),
@@ -150,6 +266,8 @@ const compressPages = async (
     }
     if (changed === 0) return { originalSize, compressedSize: originalSize };
     clearDescriptorFlags(output);
+    // Réglages utilisés, gardés dans l'archive (estimations suivantes).
+    output.addZipComment(markOf(options));
     const buffer = output.toBuffer();
     if (buffer.length >= originalSize) {
         return { originalSize, compressedSize: originalSize };

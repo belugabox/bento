@@ -58,7 +58,7 @@ export const CompressionModal = ({
     onCompressed: () => void;
 }) => {
     const [estimates, setEstimates] = useState<Record<string, Estimate>>({});
-    const [estimating, setEstimating] = useState<number>();
+    const [estimating, setEstimating] = useState(false);
     const [jobs, setJobs] = useState<CompressionJob[]>([]);
     const [error, setError] = useState<string>();
     // Réglages actuels, rappelés en tête.
@@ -106,17 +106,17 @@ export const CompressionModal = ({
         }
     }, [active, onCompressed]);
 
+    /** Tous les fichiers en une fois : le serveur en échantillonne trois. */
     const estimate = async () => {
         setError(undefined);
-        const next: Record<string, Estimate> = {};
-        for (const [index, path] of paths.entries()) {
-            setEstimating(index);
-            next[path] = await estimateCompression(libraryId, path).catch(
-                (e: Error) => ({ error: e.message }),
-            );
-            setEstimates({ ...next });
+        setEstimating(true);
+        try {
+            setEstimates(await estimateCompression(libraryId, paths));
+        } catch (e) {
+            setError((e as Error).message);
+        } finally {
+            setEstimating(false);
         }
-        setEstimating(undefined);
     };
 
     const compress = async () => {
@@ -164,12 +164,7 @@ export const CompressionModal = ({
                     continue sur le serveur si tu fermes cette fenêtre.
                 </Text>
                 {error && <Alert color="red">{error}</Alert>}
-                {estimating !== undefined && (
-                    <Progress
-                        value={(estimating / Math.max(files.length, 1)) * 100}
-                        animated
-                    />
-                )}
+                {estimating && <Progress value={100} animated />}
                 {active > 0 && (
                     <Stack gap={4}>
                         <Text size="sm">
@@ -266,7 +261,7 @@ export const CompressionModal = ({
                 <Group justify="flex-end">
                     <Button
                         variant="default"
-                        loading={estimating !== undefined}
+                        loading={estimating}
                         disabled={active > 0}
                         onClick={() => void estimate()}
                     >
@@ -274,9 +269,7 @@ export const CompressionModal = ({
                     </Button>
                     <Button
                         disabled={
-                            files.length === 0 ||
-                            active > 0 ||
-                            estimating !== undefined
+                            files.length === 0 || active > 0 || estimating
                         }
                         onClick={() => void compress()}
                     >

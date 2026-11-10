@@ -300,12 +300,15 @@ export const fetchFilePageSizes = (library: number, path: string) =>
         }),
     );
 
-/** Gain estimé en compressant les pages d'un fichier. */
-export const estimateCompression = (library: number, path: string) =>
+/**
+ * Gain estimé en compressant les pages de fichiers (les tomes d'une série,
+ * estimés ensemble), par chemin.
+ */
+export const estimateCompression = (library: number, paths: string[]) =>
     json(
         api.libraries[':id'].files.compression.estimate.$post({
             ...libraryId(library),
-            json: { path },
+            json: { paths },
         }),
     );
 

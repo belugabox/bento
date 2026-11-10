@@ -1,5 +1,6 @@
 import {
     Alert,
+    Badge,
     Box,
     Button,
     Center,
@@ -25,15 +26,22 @@ import {
     IconCheck,
     IconChevronDown,
     IconLayoutGrid,
+    IconLayoutRows,
     IconList,
     IconPlayerPlayFilled,
 } from '@tabler/icons-react';
-import { type ReactNode, useContext, useEffect } from 'react';
-import { useSearchParams } from 'react-router';
+import {
+    type ReactNode,
+    useContext,
+    useEffect,
+    useLayoutEffect,
+    useRef,
+} from 'react';
+import { useLocation, useSearchParams } from 'react-router';
 
 import { SeriesCardMenu, VolumeCardMenu } from '@/components/CardMenus';
 import { CoverCard } from '@/components/CoverCard';
-import { ReadByFilter } from '@/components/ReadByFilter';
+import { GROUPINGS, type Grouping, groupSeries } from '@/components/homeGroups';
 import {
     LIST_COLUMNS,
     type LibraryDisplay,
@@ -68,6 +76,21 @@ import {
 import { UserContext } from '@/services/auth';
 import { useQuery } from '@/services/useQuery';
 
+/**
+ * Pastille « +2 », en haut à gauche (l'icône d'état est à droite) : tomes
+ * ajoutés depuis la dernière lecture de la série (rien sans nouveauté).
+ */
+const newBadge = (count: number | undefined) =>
+    count ? (
+        <Badge
+            size="sm"
+            variant="filled"
+            aria-label={`${count} nouveau${count > 1 ? 'x' : ''} tome${count > 1 ? 's' : ''}`}
+        >
+            +{count}
+        </Badge>
+    ) : undefined;
+
 /** Tome à reprendre : ouvre le lecteur. */
 const ResumeCard = ({
     volume,
@@ -86,6 +109,7 @@ const ResumeCard = ({
         | 'number'
         | 'title'
         | 'page'
+        | 'newCount'
     >;
     subtitle?: string;
     progress?: number;
@@ -105,6 +129,7 @@ const ResumeCard = ({
         layout={display.layout === 'list' ? 'row' : 'card'}
         coversOnly={display.coversOnly}
         details={details}
+        tag={newBadge(volume.newCount)}
         // ▶ en couleur : la carte ouvre le lecteur, pas la fiche.
         badge={
             <ThemeIcon size="sm" radius="xl" aria-label="Tome à reprendre">
@@ -139,6 +164,31 @@ const seriesProgress = (volume: InProgressVolume) =>
           volume.volumeCount
         : 0;
 
+// Position dans la page de chaque passage sur l'accueil (clé de
+// l'historique), le temps de l'onglet.
+const scrollPositions = new Map<string, number>();
+
+/**
+ * Garde la position dans la page en partant, et la rend au retour arrière
+ * (même entrée de l'historique) dès que le contenu est là.
+ */
+const useScrollMemory = (ready: boolean) => {
+    const { key } = useLocation();
+    const restored = useRef(false);
+    useLayoutEffect(() => {
+        if (!ready || restored.current) return;
+        restored.current = true;
+        const saved = scrollPositions.get(key);
+        if (saved) window.scrollTo(0, saved);
+    }, [ready, key]);
+    useEffect(
+        () => () => {
+            scrollPositions.set(key, window.scrollY);
+        },
+        [key],
+    );
+};
+
 // Dernière bibliothèque ouverte, gardée sur l'appareil.
 const LIBRARY_KEY = 'bento:library';
 
@@ -161,28 +211,78 @@ const rememberLibrary = (id: number) => {
 /** Genres montrés en pastilles ; les autres sont dans « Plus ». */
 const GENRE_CHIPS = 3;
 
-/** Bloc de l'accueil, sous un titre très discret (petites capitales). */
+/**
+ * Bloc de l'accueil, sous un titre très discret (petites capitales) ; sans
+ * titre pour le groupement « Aucun ».
+ */
 const HomeSection = ({
     title,
     count,
     children,
 }: {
-    title: string;
+    title: string | null;
     count: number;
     children: ReactNode;
 }) => (
-    <Stack gap={8} component="section" aria-label={title}>
-        <Text
-            size="xs"
-            c="dimmed"
-            fw={600}
-            tt="uppercase"
-            style={{ letterSpacing: '0.08em' }}
-        >
-            {title} · {count}
-        </Text>
+    <Stack gap={8} component="section" aria-label={title ?? undefined}>
+        {title && (
+            <Text
+                size="xs"
+                c="var(--mantine-primary-color-light-color)"
+                fw={600}
+                tt="uppercase"
+                style={{ letterSpacing: '0.08em' }}
+            >
+                {title}{' '}
+                <Text span inherit c="dimmed">
+                    · {count}
+                </Text>
+            </Text>
+        )}
         {children}
     </Stack>
+);
+
+/** Choix du groupement de l'accueil (gardé sur l'appareil). */
+const GroupingMenu = ({
+    value,
+    onChange,
+}: {
+    value: Grouping;
+    onChange: (value: Grouping) => void;
+}) => (
+    <Menu position="top-start">
+        <Menu.Target>
+            <Button
+                size="compact-md"
+                radius="xl"
+                fw={400}
+                fz="sm"
+                variant="default"
+                aria-label="Grouper les séries"
+                leftSection={<IconLayoutRows size={16} />}
+                style={{ flexShrink: 0 }}
+            >
+                <Box component="span" visibleFrom="xs">
+                    {GROUPINGS.find((g) => g.value === value)?.label}
+                </Box>
+            </Button>
+        </Menu.Target>
+        <Menu.Dropdown>
+            <Menu.Label>Grouper par</Menu.Label>
+            {GROUPINGS.map((option) => (
+                <Menu.Item
+                    key={option.value}
+                    rightSection={
+                        option.value === value && <IconCheck size={14} />
+                    }
+                    onClick={() => onChange(option.value)}
+                >
+                    {option.label}
+                </Menu.Item>
+            ))}
+        </Menu.Dropdown>
+    </Menu>
 );
 
 /** Pastille d'un filtre : un clic la choisit, un autre la retire. */
@@ -252,14 +352,17 @@ export const LibraryPage = () => {
     const sort = (params.get('sort') as SeriesSort | null) ?? 'name';
     const genre = params.get('genre');
     const status = (params.get('status') as StatusFilter | null) ?? 'all';
-    // « Lu par » : une personne de la famille (son numéro de compte).
-    const readBy = Number(params.get('readBy')) || null;
 
     const isAdmin = useContext(UserContext)?.role === 'admin';
     const display = useLibraryDisplay();
-    const libraries = useQuery(fetchLibraries, []);
-    const inProgress = useQuery(fetchInProgress, []);
-    const readers = useQuery(fetchFamilyReaders, []);
+    // Gardées en mémoire : revenir à l'accueil l'affiche tout de suite.
+    const libraries = useQuery(fetchLibraries, [], { cacheKey: 'libraries' });
+    const inProgress = useQuery(fetchInProgress, [], {
+        cacheKey: 'continue',
+    });
+    const readers = useQuery(fetchFamilyReaders, [], {
+        cacheKey: 'readers',
+    });
     // Bibliothèque : celle de l'adresse, sinon la dernière ouverte sur
     // l'appareil (les séries se chargent sans attendre la liste des
     // bibliothèques), sinon la première.
@@ -281,7 +384,10 @@ export const LibraryPage = () => {
                 ? fetchSeriesList({ libraryId, search: debouncedSearch })
                 : Promise.resolve(undefined),
         [libraryId, debouncedSearch],
+        { cacheKey: `series:${libraryId}:${debouncedSearch}` },
     );
+    // Retour arrière : la page revient où elle était.
+    useScrollMemory(!!series.data);
 
     /** Après une action d'un menu ⋮ : reprises et séries à jour. */
     const reloadHome = () => {
@@ -311,31 +417,48 @@ export const LibraryPage = () => {
         );
     }
 
-    // Séries lues par la personne choisie (inconnue : filtre ignoré).
-    const readBySeries = new Set(
-        readers.data?.find((r) => r.id === readBy)?.seriesIds,
-    );
-    const readByActive = readBy !== null && readers.data !== undefined;
     const visible = filterSeries(
         (series.data ?? []).filter(
-            (s) =>
-                (!readByActive || readBySeries.has(s.id)) &&
-                !(display.hideRead && readingStateOf(s) === 'read'),
+            (s) => !(display.hideRead && readingStateOf(s) === 'read'),
         ),
         { sort, genre, status },
     );
-    const filtered = !!genre || status !== 'all' || readByActive;
+    const filtered = !!genre || status !== 'all';
     // Tomes à reprendre en tête, si leur série passe les filtres et la
     // recherche ; puis les autres séries.
     const visibleIds = new Set(visible.map((s) => s.id));
     const resume = (inProgress.data ?? []).filter((v) =>
         visibleIds.has(v.seriesId),
     );
-    const resumed = new Set(resume.map((v) => v.seriesId));
-    const others = visible.filter((s) => !resumed.has(s.id));
-    // Trois blocs, séparés par un espace : en cours, pas lues, terminées.
-    const unread = others.filter((s) => readingStateOf(s) !== 'read');
-    const done = others.filter((s) => readingStateOf(s) === 'read');
+    const resumeOf = new Map(resume.map((v) => [v.seriesId, v]));
+    // « Lecture » : le bloc « En cours » en tête, puis les autres séries.
+    // Autres groupements : chaque série dans son bloc, en cours ou non (sa
+    // carte de reprise si elle est en cours) ; jamais à deux endroits.
+    const withResume = display.groupBy === 'reading';
+    const groups = groupSeries(
+        withResume ? visible.filter((s) => !resumeOf.has(s.id)) : visible,
+        display.groupBy,
+        { readers: readers.data },
+    );
+    /** Tome à reprendre : ouvre le lecteur, avec l'avancement dans la série. */
+    const resumeCard = (volume: InProgressVolume) => (
+        <ResumeCard
+            key={`resume-${volume.volumeId}`}
+            volume={volume}
+            // Court : tient sur une ligne de la carte.
+            subtitle={`${volumeShortLabel(volume)} · ${volume.readCount}/${volume.volumeCount} lus`}
+            progress={seriesProgress(volume)}
+            onChanged={reloadHome}
+            display={display}
+            details={
+                display.layout === 'list'
+                    ? seriesDetails(
+                          visible.find((s) => s.id === volume.seriesId)!,
+                      )
+                    : undefined
+            }
+        />
+    );
     const cols =
         display.layout === 'list' ? LIST_COLUMNS : gridColumns(display.size);
     // Pastilles : les genres les plus fréquents, et celui choisi.
@@ -385,7 +508,6 @@ export const LibraryPage = () => {
                                     update({
                                         genre: '',
                                         status: '',
-                                        readBy: '',
                                     })
                                 }
                             >
@@ -395,109 +517,84 @@ export const LibraryPage = () => {
                     </Stack>
                 )}
                 <Stack gap="xl" data-testid="series-grid">
-                    {resume.length > 0 && (
+                    {withResume && resume.length > 0 && (
                         <HomeSection title="En cours" count={resume.length}>
                             <SimpleGrid
                                 cols={cols}
                                 spacing="sm"
                                 data-testid="resume-grid"
                             >
-                                {resume.map((volume) => (
-                                    <ResumeCard
-                                        key={volume.volumeId}
-                                        volume={volume}
-                                        // Court : tient sur une ligne de la carte.
-                                        subtitle={`${volumeShortLabel(volume)} · ${volume.readCount}/${volume.volumeCount} lus`}
-                                        progress={seriesProgress(volume)}
-                                        onChanged={reloadHome}
-                                        display={display}
-                                        details={
-                                            display.layout === 'list'
-                                                ? seriesDetails(
-                                                      visible.find(
-                                                          (s) =>
-                                                              s.id ===
-                                                              volume.seriesId,
-                                                      )!,
-                                                  )
-                                                : undefined
-                                        }
-                                    />
-                                ))}
+                                {resume.map(resumeCard)}
                             </SimpleGrid>
                         </HomeSection>
                     )}
-                    {[
-                        { key: 'unread', title: 'À découvrir', list: unread },
-                        { key: 'read', title: 'Déjà lues', list: done },
-                    ]
-                        .filter((group) => group.list.length > 0)
-                        .map((group) => (
-                            <HomeSection
-                                key={group.key}
-                                title={group.title}
-                                count={group.list.length}
+                    {groups.map((group) => (
+                        <HomeSection
+                            key={group.key}
+                            title={group.title}
+                            count={group.list.length}
+                        >
+                            <SimpleGrid
+                                cols={cols}
+                                spacing="sm"
+                                data-testid={`${group.key}-grid`}
                             >
-                                <SimpleGrid
-                                    cols={cols}
-                                    spacing="sm"
-                                    data-testid={`${group.key}-grid`}
-                                >
-                                    {group.list.map((item) => {
-                                        const state = readingStateOf(item);
-                                        return (
-                                            <CoverCard
-                                                key={item.id}
-                                                to={`/series/${item.id}`}
-                                                menu={
-                                                    <SeriesCardMenu
-                                                        series={item}
-                                                        isAdmin={isAdmin}
-                                                        onChanged={reloadHome}
-                                                    />
-                                                }
-                                                cover={seriesCoverUrl(
-                                                    item,
-                                                    'small',
-                                                )}
-                                                // Déjà lue : à la fin, grisée.
-                                                dimmed={state === 'read'}
-                                                title={item.name}
-                                                subtitle={
-                                                    state === 'started'
-                                                        ? `${item.readCount} / ${item.volumeCount} lus`
-                                                        : seriesVolumesLabel(
-                                                              item.volumeCount,
-                                                              item.volumeKinds,
-                                                          )
-                                                }
-                                                progress={
-                                                    state === 'started'
-                                                        ? item.readCount /
-                                                          item.volumeCount
-                                                        : undefined
-                                                }
-                                                badge={seriesBadge(
-                                                    state,
-                                                    !!item.toRead,
-                                                )}
-                                                layout={
-                                                    display.layout === 'list'
-                                                        ? 'row'
-                                                        : 'card'
-                                                }
-                                                coversOnly={display.coversOnly}
-                                                details={
-                                                    display.layout === 'list'
-                                                        ? seriesDetails(item)
-                                                        : undefined
-                                                }
-                                            />
-                                        );
-                                    })}
-                                </SimpleGrid>
-                            </HomeSection>
-                        ))}
+                                {group.list.map((item) => {
+                                    const volume = resumeOf.get(item.id);
+                                    if (volume) return resumeCard(volume);
+                                    const state = readingStateOf(item);
+                                    return (
+                                        <CoverCard
+                                            key={item.id}
+                                            to={`/series/${item.id}`}
+                                            menu={
+                                                <SeriesCardMenu
+                                                    series={item}
+                                                    isAdmin={isAdmin}
+                                                    onChanged={reloadHome}
+                                                />
+                                            }
+                                            cover={seriesCoverUrl(
+                                                item,
+                                                'small',
+                                            )}
+                                            title={item.name}
+                                            tag={newBadge(item.newCount)}
+                                            subtitle={
+                                                state === 'started'
+                                                    ? `${item.readCount} / ${item.volumeCount} lus`
+                                                    : seriesVolumesLabel(
+                                                          item.volumeCount,
+                                                          item.volumeKinds,
+                                                      )
+                                            }
+                                            progress={
+                                                state === 'started'
+                                                    ? item.readCount /
+                                                      item.volumeCount
+                                                    : undefined
+                                            }
+                                            badge={seriesBadge(
+                                                state,
+                                                !!item.toRead,
+                                            )}
+                                            layout={
+                                                display.layout === 'list'
+                                                    ? 'row'
+                                                    : 'card'
+                                            }
+                                            coversOnly={display.coversOnly}
+                                            details={
+                                                display.layout === 'list'
+                                                    ? seriesDetails(item)
+                                                    : undefined
+                                            }
+                                        />
+                                    );
+                                })}
+                            </SimpleGrid>
+                        </HomeSection>
+                    ))}
                 </Stack>
             </Stack>
 
@@ -651,15 +748,10 @@ export const LibraryPage = () => {
                                     ))}
                                 </Menu.Dropdown>
                             </Menu>
-                            {readers.data && readers.data.length > 0 && (
-                                <ReadByFilter
-                                    readers={readers.data}
-                                    value={readBy}
-                                    onChange={(id) =>
-                                        update({ readBy: id ? String(id) : '' })
-                                    }
-                                />
-                            )}
+                            <GroupingMenu
+                                value={display.groupBy}
+                                onChange={(groupBy) => display.set({ groupBy })}
+                            />
                         </Group>
                         {genres.length > 0 && (
                             <Divider orientation="vertical" />

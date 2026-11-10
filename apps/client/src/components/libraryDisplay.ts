@@ -1,5 +1,7 @@
 import { useLocalStorage } from '@mantine/hooks';
 
+import { type Grouping, isGrouping } from '@/components/homeGroups';
+
 export type LibraryLayout = 'grid' | 'list';
 
 /** Affichage des séries et des tomes, propre à l'appareil. */
@@ -11,6 +13,8 @@ export type LibraryDisplay = {
     coversOnly: boolean;
     /** Accueil : séries entièrement lues masquées (menu de tri). */
     hideRead: boolean;
+    /** Accueil : blocs des séries (lecture, format, âge…). */
+    groupBy: Grouping;
 };
 
 export const DEFAULT_DISPLAY: LibraryDisplay = {
@@ -18,6 +22,7 @@ export const DEFAULT_DISPLAY: LibraryDisplay = {
     size: 2,
     coversOnly: false,
     hideRead: false,
+    groupBy: 'reading',
 };
 
 export const LAYOUT_OPTIONS: { value: LibraryLayout; label: string }[] = [
@@ -74,6 +79,9 @@ export const useLibraryDisplay = () => {
             typeof saved?.hideRead === 'boolean'
                 ? saved.hideRead
                 : DEFAULT_DISPLAY.hideRead,
+        groupBy: isGrouping(saved?.groupBy)
+            ? saved.groupBy
+            : DEFAULT_DISPLAY.groupBy,
     };
     return {
         ...display,

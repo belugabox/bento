@@ -14,6 +14,8 @@ export type ListedSeries = {
     format?: string | null;
     status?: 'ongoing' | 'completed' | null;
     toRead?: boolean;
+    // Tomes ajoutés depuis la dernière lecture (pastille « +2 »).
+    newCount?: number;
     year?: number | null;
     // Âge minimal : choisi dans Bento, sinon déduit des tomes.
     age?: number | null;

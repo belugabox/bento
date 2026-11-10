@@ -52,8 +52,8 @@ export const CoverCard = ({
     progress,
     corner,
     badge,
+    tag,
     menu,
-    dimmed = false,
     layout = 'card',
     coversOnly = false,
     details = [],
@@ -77,10 +77,13 @@ export const CoverCard = ({
      * lien, un clic dessus ouvre la carte.
      */
     badge?: ReactNode;
+    /**
+     * Pastille en haut à gauche (nouveaux tomes : « +2 »), loin de l'icône
+     * d'état ; dans le lien.
+     */
+    tag?: ReactNode;
     /** Menu d'actions (⋮), en bas à droite, à côté du titre. */
     menu?: ReactNode;
-    /** Grisée (série déjà lue). */
-    dimmed?: boolean;
     layout?: 'card' | 'row';
     /** Sans titre ni légende sous la couverture (grille). */
     coversOnly?: boolean;
@@ -90,7 +93,7 @@ export const CoverCard = ({
     const shown = progress !== undefined && progress > 0;
     if (layout === 'row') {
         return (
-            <Box pos="relative" style={dimmed ? { opacity: 0.5 } : undefined}>
+            <Box pos="relative">
                 <Card
                     component={Link}
                     to={to}
@@ -139,6 +142,7 @@ export const CoverCard = ({
                                 />
                             )}
                         </Stack>
+                        {tag && <Box style={{ flexShrink: 0 }}>{tag}</Box>}
                         {badge && <Box style={{ flexShrink: 0 }}>{badge}</Box>}
                     </Group>
                 </Card>
@@ -167,7 +171,7 @@ export const CoverCard = ({
     }
     return (
         // Le coin est hors du lien : un bouton ne peut pas être dans un lien.
-        <Box pos="relative" style={dimmed ? { opacity: 0.5 } : undefined}>
+        <Box pos="relative">
             <Card component={Link} to={to} padding={0} radius="md" withBorder>
                 <Box pos="relative">
                     <Cover cover={cover} title={title} iconSize={32} />
@@ -186,6 +190,11 @@ export const CoverCard = ({
                     {badge && (
                         <Box pos="absolute" top={6} right={6}>
                             {badge}
+                        </Box>
+                    )}
+                    {tag && (
+                        <Box pos="absolute" top={6} left={6}>
+                            {tag}
                         </Box>
                     )}
                 </Box>

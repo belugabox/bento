@@ -1,6 +1,8 @@
+import { eq } from 'drizzle-orm';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { createApi } from '../src/api';
+import { volumes } from '../src/db/schema';
 import { SettingsStore } from '../src/settings';
 import { authDeps, sessionCookie, setup, silent, writeCbz } from './helpers';
 
@@ -327,6 +329,39 @@ describe('series readers', () => {
         expect(await readers(alice)).toEqual([
             expect.objectContaining({ percent: 11 }),
         ]);
+    });
+});
+
+describe('new volumes', () => {
+    it('counts the volumes added since the last reading of the series', async () => {
+        // Alice a lu le T01 ; le T03 arrive après.
+        await save(gantz[0]!, { completed: true });
+        ctx.db
+            .update(volumes)
+            .set({ addedAt: new Date(Date.now() + 60_000) })
+            .where(eq(volumes.id, gantz[2]!))
+            .run();
+
+        const gantzOf = async (cookie: string) =>
+            (await call('/series', cookie)).body.find(
+                (s: { name: string }) => s.name === 'Gantz',
+            );
+        expect((await gantzOf(alice)).newCount).toBe(1);
+        // Bob n'a rien lu : pas de nouveauté pour lui.
+        expect((await gantzOf(bob)).newCount).toBe(0);
+        // La suite à ouvrir le dit aussi.
+        expect((await call('/continue', alice)).body).toEqual([
+            expect.objectContaining({ seriesName: 'Gantz', newCount: 1 }),
+        ]);
+
+        // Une lecture plus récente : plus rien de nouveau.
+        await save(gantz[1]!, { page: 1 });
+        ctx.db
+            .update(volumes)
+            .set({ addedAt: new Date(Date.now() - 60_000) })
+            .where(eq(volumes.id, gantz[2]!))
+            .run();
+        expect((await gantzOf(alice)).newCount).toBe(0);
     });
 });
 

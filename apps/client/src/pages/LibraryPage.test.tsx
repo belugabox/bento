@@ -46,6 +46,11 @@ const Location = () => {
     return null;
 };
 
+/** Titre d'un bloc de l'accueil (couleur principale), et son nombre. */
+const block = (title: string) => screen.queryByRole('region', { name: title });
+const countOf = (title: string) =>
+    within(block(title)!).getByText(/^· \d+$/).textContent;
+
 /** Cartes de l'accueil dans l'ordre (les trois blocs de la grille). */
 const hrefs = (zone: HTMLElement) =>
     within(zone)
@@ -86,6 +91,8 @@ beforeEach(() => {
                     updatedAt: '2026-03-01T00:00:00.000Z',
                     readCount: 3,
                     volumeCount: 6,
+                    // Deux tomes ajoutés depuis la dernière lecture.
+                    newCount: 2,
                 },
             ]);
         }
@@ -135,9 +142,9 @@ describe('LibraryPage', () => {
         expect(
             screen.getAllByLabelText('Tome à reprendre')[0]!.closest('a'),
         ).toBeTruthy();
-        // Série entièrement lue : marquée, à la fin et grisée.
+        // Série entièrement lue : marquée et à la fin, pas grisée.
         const read = screen.getByLabelText('Série lue');
-        expect(read.closest('[style*="opacity"]')).toBeTruthy();
+        expect(read.closest('[style*="opacity"]')).toBeNull();
         // Le scan n'est plus sur l'accueil.
         expect(screen.queryByRole('button', { name: /scanner/i })).toBeNull();
     });
@@ -153,8 +160,8 @@ describe('LibraryPage', () => {
         expect(screen.queryByTestId('unread-grid')).toBeNull();
         expect(hrefs(screen.getByTestId('read-grid'))).toEqual(['/series/2']);
         // Un titre discret par bloc, avec son nombre de cartes.
-        expect(screen.getByText('En cours · 2')).toBeTruthy();
-        expect(screen.getByText('Déjà lues · 1')).toBeTruthy();
+        expect(countOf('En cours')).toBe('· 2');
+        expect(countOf('Déjà lues')).toBe('· 1');
         expect(screen.queryByText(/À découvrir/)).toBeNull();
     });
 
@@ -181,22 +188,34 @@ describe('LibraryPage', () => {
         });
     });
 
-    it('keeps the series read by someone of the family', async () => {
-        readers = [{ id: 7, name: 'Léa', avatarSeed: null, seriesIds: [3] }];
+    it('groups the series by reader, remembered on this device', async () => {
+        readers = [{ id: 7, name: 'Léa', avatarSeed: null, seriesIds: [2] }];
         show();
+        await vi.waitFor(() => expect(titles()).toHaveLength(3));
 
         fireEvent.click(
-            await screen.findByRole('button', { name: 'Filtrer par lecteur' }),
+            screen.getByRole('button', { name: 'Grouper les séries' }),
         );
-        fireEvent.click(await screen.findByRole('menuitem', { name: /Léa/ }));
+        fireEvent.click(
+            await screen.findByRole('menuitem', { name: 'Lecteur' }),
+        );
 
-        // Série 3 seule, par son tome à reprendre.
-        await vi.waitFor(() => expect(titles()).toEqual(['/read/42']));
-        expect(location).toContain('readBy=7');
+        await vi.waitFor(() => expect(countOf('Lu par Léa')).toBe('· 1'));
+        // Pas de bloc « En cours » : les séries en cours sont dans leur bloc,
+        // avec leur carte de reprise (jamais à deux endroits).
+        expect(block('En cours')).toBeNull();
         expect(
-            screen.getByRole('button', { name: 'Filtrer par lecteur' })
-                .textContent,
-        ).toContain('Léa');
+            within(block('Lues par personne d’autre')!)
+                .getAllByRole('link')
+                .map((link) => link.getAttribute('href')),
+        ).toEqual(['/read/51', '/read/42']);
+        expect(
+            JSON.parse(localStorage.getItem('bento:display')!),
+        ).toMatchObject({ groupBy: 'reader' });
+        // Plus de filtre « Lu par » dans la barre.
+        expect(
+            screen.queryByRole('button', { name: 'Filtrer par lecteur' }),
+        ).toBeNull();
     });
 
     it('loads the series of the last library without waiting', async () => {
@@ -220,13 +239,19 @@ describe('LibraryPage', () => {
         );
     });
 
-    it('hides the Lu par filter when nobody else read anything', async () => {
+    it('shows no titles when grouping by nothing', async () => {
+        localStorage.setItem(
+            'bento:display',
+            JSON.stringify({ groupBy: 'none' }),
+        );
         show();
 
-        await screen.findByText('T2 · 1/3 lus');
-        expect(
-            screen.queryByRole('button', { name: 'Filtrer par lecteur' }),
-        ).toBeNull();
+        // Une seule grille, dans l'ordre du tri (en cours compris).
+        await vi.waitFor(() =>
+            expect(titles()).toEqual(['/read/51', '/read/42', '/series/2']),
+        );
+        expect(screen.queryByText(/En cours/)).toBeNull();
+        expect(screen.queryByText(/Déjà lues/)).toBeNull();
     });
 
     it('shows covers only, or a list, as chosen in Appearance', async () => {
@@ -282,6 +307,11 @@ describe('LibraryPage', () => {
 
     it('resumes with the next volume of a series, in the same row', async () => {
         show();
+
+        // Pastille des tomes ajoutés depuis la dernière lecture.
+        expect(
+            (await screen.findByLabelText('2 nouveaux tomes')).textContent,
+        ).toBe('+2');
 
         expect(await screen.findByText('T4 · 3/6 lus')).toBeTruthy();
         expect(screen.queryByText('La suite de tes séries')).toBeNull();

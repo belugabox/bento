@@ -3,7 +3,12 @@ import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 import type { Db } from '../db';
 import { readProgress, series, volumes } from '../db/schema';
 import { notFound } from '../tools/errors';
-import { countedVolume, volumeOrder, volumeVersion } from './catalog';
+import {
+    countedVolume,
+    newVolumeCounts,
+    volumeOrder,
+    volumeVersion,
+} from './catalog';
 import { type Viewer, visibleTo } from './visibility';
 import { isMainKind } from './volumeKind';
 
@@ -177,7 +182,7 @@ export const saveProgress = (
  * seul par série, avec l'avancement dans la série (tomes lus sur le total).
  */
 export const listInProgress = (db: Db, viewer: Viewer, limit = 12) => {
-    return db
+    const rows = db
         .select({
             volumeId: volumes.id,
             version: volumeVersion,
@@ -209,6 +214,12 @@ export const listInProgress = (db: Db, viewer: Viewer, limit = 12) => {
         .orderBy(desc(readProgress.updatedAt))
         .limit(limit)
         .all();
+    // Tomes ajoutés depuis la dernière lecture (pastille « +2 »).
+    const fresh = newVolumeCounts(db, viewer.id);
+    return rows.map((row) => ({
+        ...row,
+        newCount: fresh.get(row.seriesId) ?? 0,
+    }));
 };
 
 /**
@@ -288,6 +299,7 @@ export const listNextVolumes = (db: Db, viewer: Viewer, limit = 12) => {
             pageCount: volumes.pageCount,
             completed: readProgress.completed,
             updatedAt: readProgress.updatedAt,
+            addedAt: volumes.addedAt,
         })
         .from(volumes)
         .innerJoin(series, eq(series.id, volumes.seriesId))
@@ -321,22 +333,28 @@ export const listNextVolumes = (db: Db, viewer: Viewer, limit = 12) => {
         const {
             completed: _completed,
             updatedAt: _updatedAt,
+            addedAt: _addedAt,
             ...volume
         } = unread;
         // Comptés : les tomes, sans hors-séries ni spéciaux (voir
         // `countedVolume`).
         const regular = items.filter((v) => isMainKind(v.kind));
         const counted = regular.length > 0 ? regular : items;
+        const lastRead = Math.max(
+            ...items.map((v) => v.updatedAt?.getTime() ?? 0),
+        );
         next.push({
             ...volume,
             // Pas encore ouvert.
             page: null,
             // Date de la dernière lecture dans la série.
-            updatedAt: new Date(
-                Math.max(...items.map((v) => v.updatedAt?.getTime() ?? 0)),
-            ),
+            updatedAt: new Date(lastRead),
             volumeCount: counted.length,
             readCount: counted.filter((v) => v.completed).length,
+            // Tomes ajoutés depuis la dernière lecture (pastille « +2 »).
+            newCount: counted.filter(
+                (v) => v.addedAt && v.addedAt.getTime() > lastRead,
+            ).length,
         });
     }
     return next
