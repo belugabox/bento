@@ -155,6 +155,16 @@ const keep = async (cache: Cache, url: string) => {
     return blob.size;
 };
 
+// Téléchargements arrêtés (« Supprimer » pendant le téléchargement).
+const cancelled = new Set<number>();
+
+class Cancelled extends Error {}
+
+/** Arrêté entre-temps : on s'arrête là (les pages gardées sont effacées). */
+const checkCancelled = (volumeId: number) => {
+    if (cancelled.has(volumeId)) throw new Cancelled();
+};
+
 /** Télécharge un tome : ses infos, sa couverture et ses pages. */
 const download = async (volumeId: number, userId: number) => {
     const update = (changes: Partial<DownloadJob>) => {
@@ -173,6 +183,7 @@ const download = async (volumeId: number, userId: number) => {
     let done = 0;
     const worker = async () => {
         while (next < volume.pageCount) {
+            checkCancelled(volumeId);
             const index = next++;
             // Taille lue avant d'être ajoutée : `bytes += await …` lirait le
             // total d'avant l'attente, et perdrait celles des autres pages.
@@ -186,6 +197,7 @@ const download = async (volumeId: number, userId: number) => {
         }
     };
     await Promise.all(Array.from({ length: PARALLEL }, worker));
+    checkCancelled(volumeId);
     await saveMeta({
         ...volume,
         userId,
@@ -210,8 +222,16 @@ const run = async (userId: number) => {
                 jobs = jobs.filter((j) => j.volumeId !== job.volumeId);
                 await refreshDownloads();
             } catch (e) {
-                // Pages déjà gardées : effacées, le tome reste à télécharger.
+                // Pages déjà gardées : effacées.
                 await removeFiles(job.volumeId);
+                // Arrêté : simplement oublié.
+                if (e instanceof Cancelled) {
+                    cancelled.delete(job.volumeId);
+                    jobs = jobs.filter((j) => j.volumeId !== job.volumeId);
+                    changed();
+                    continue;
+                }
+                // Échec : le tome reste à télécharger (« Réessayer »).
                 jobs = jobs.map((j) =>
                     j.volumeId === job.volumeId
                         ? { ...j, state: 'failed', error: (e as Error).message }
@@ -268,16 +288,26 @@ const removeFiles = async (volumeId: number) => {
     }
 };
 
-/** Supprime un tome de l'appareil. */
+/**
+ * Supprime un tome de l'appareil ; en cours de téléchargement, l'arrête
+ * (ses pages déjà gardées sont effacées).
+ */
 export const deleteDownload = async (volumeId: number) => {
     if (!supported()) return;
-    await removeFiles(volumeId);
+    if (jobs.some((j) => j.volumeId === volumeId && j.state === 'running')) {
+        cancelled.add(volumeId);
+    }
     jobs = jobs.filter((j) => j.volumeId !== volumeId);
+    changed();
+    await removeFiles(volumeId);
     await refreshDownloads();
 };
 
 /** Efface tout : déconnexion, ou autre compte sur l'appareil. */
 export const clearDownloads = async () => {
+    for (const job of jobs) {
+        if (job.state === 'running') cancelled.add(job.volumeId);
+    }
     jobs = [];
     if (supported()) await caches.delete(DOWNLOADS_CACHE);
     await refreshDownloads();

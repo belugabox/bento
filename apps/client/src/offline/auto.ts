@@ -91,6 +91,52 @@ export const readLongAgo = (volume: DownloadedVolume, now = Date.now()) => {
     return now - readAt > CLEAN_DAYS * 24 * 3600 * 1000;
 };
 
+/** Tome proposé au téléchargement. */
+export type Proposal = {
+    id: number;
+    label: string;
+    seriesId: number;
+    seriesName: string;
+    version: number;
+    pageCount: number;
+    /** Le tome en cours de lecture (sinon un des suivants). */
+    current: boolean;
+};
+
+/**
+ * Propositions : dans les séries en cours (les `AUTO_SERIES` plus récemment
+ * lues), le tome en cours et les suivants, `count` par série, pas encore
+ * lus ni téléchargés. Le mode automatique les télécharge.
+ */
+export const fetchProposals = async (count: number): Promise<Proposal[]> => {
+    const downloaded = new Set((await refreshDownloads()).map((d) => d.id));
+    const continuing = (await fetchInProgress()).slice(0, AUTO_SERIES);
+    const proposals: Proposal[] = [];
+    for (const item of continuing) {
+        const series = await fetchSeries(item.seriesId);
+        const main = series.volumes.filter((v) => isMainKind(v.kind));
+        const from = Math.max(
+            main.findIndex((v) => v.id === item.volumeId),
+            0,
+        );
+        for (const volume of main.slice(from, from + count)) {
+            if (volume.progress?.completed || downloaded.has(volume.id)) {
+                continue;
+            }
+            proposals.push({
+                id: volume.id,
+                label: `${series.name}, ${volumeLabel(volume).toLowerCase()}`,
+                seriesId: series.id,
+                seriesName: series.name,
+                version: volume.version,
+                pageCount: volume.pageCount,
+                current: volume.id === item.volumeId,
+            });
+        }
+    }
+    return proposals;
+};
+
 let lastRun = 0;
 
 /**
@@ -113,24 +159,5 @@ export const runAutoDownloads = async (userId: number, force = false) => {
         return 0;
     }
 
-    // Séries en cours, les plus récemment lues d'abord (une ligne par série).
-    const continuing = (await fetchInProgress()).slice(0, AUTO_SERIES);
-    const wanted: { id: number; label: string }[] = [];
-    for (const item of continuing) {
-        const series = await fetchSeries(item.seriesId);
-        const main = series.volumes.filter((v) => isMainKind(v.kind));
-        const from = Math.max(
-            main.findIndex((v) => v.id === item.volumeId),
-            0,
-        );
-        for (const volume of main.slice(from, from + settings.count)) {
-            if (!volume.progress?.completed) {
-                wanted.push({
-                    id: volume.id,
-                    label: `${series.name}, ${volumeLabel(volume).toLowerCase()}`,
-                });
-            }
-        }
-    }
-    return queueDownloads(wanted, userId);
+    return queueDownloads(await fetchProposals(settings.count), userId);
 };

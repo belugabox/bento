@@ -2,8 +2,13 @@ import {
     ActionIcon,
     Alert,
     Button,
+    Card,
+    Center,
     Group,
+    Image,
+    Loader,
     Menu,
+    Paper,
     Progress,
     Select,
     SimpleGrid,
@@ -11,9 +16,17 @@ import {
     Switch,
     Text,
     Title,
+    Tooltip,
+    UnstyledButton,
 } from '@mantine/core';
-import { IconDotsVertical, IconRefresh, IconTrash } from '@tabler/icons-react';
-import { useEffect, useState } from 'react';
+import {
+    IconDotsVertical,
+    IconDownload,
+    IconRefresh,
+    IconTrash,
+} from '@tabler/icons-react';
+import { type ReactNode, useEffect, useState } from 'react';
+import { Link } from 'react-router';
 
 import { CoverCard } from '@/components/CoverCard';
 import { formatSize } from '@/components/format';
@@ -23,11 +36,14 @@ import {
     AUTO_SERIES,
     type AutoSettings,
     CLEAN_DAYS,
+    type Proposal,
+    fetchProposals,
     runAutoDownloads,
     useAutoSettings,
 } from '@/offline/auto';
 import {
     type DownloadedVolume,
+    clearDownloads,
     deleteDownload,
     progressOf,
     queueDownloads,
@@ -36,6 +52,8 @@ import {
 } from '@/offline/downloads';
 import { coverUrl } from '@/services/api';
 import { useCurrentUser, useReadOnly } from '@/services/auth';
+import { useOnline } from '@/services/network';
+import { useQuery } from '@/services/useQuery';
 
 /** État de lecture d'un tome téléchargé (sur l'appareil ou le serveur). */
 const stateOf = (volume: DownloadedVolume) => {
@@ -163,64 +181,336 @@ export const DownloadedVolumes = () => {
     );
 };
 
-/** Téléchargements en cours, avec leur avancement ; « Réessayer » si échec. */
-const DownloadJobs = () => {
-    const { jobs } = useDownloads();
+/** « Le tome en cours et les 2 suivants » : les tomes proposés par série. */
+const proposedLabel = (count: number) =>
+    count === 1
+        ? 'Le tome en cours'
+        : count === 2
+          ? 'Le tome en cours et le suivant'
+          : `Le tome en cours et les ${count - 1} suivants`;
+
+/** Titre d'une partie de la page, avec ses boutons à droite. */
+const Section = ({
+    title,
+    description,
+    actions,
+    children,
+}: {
+    title: string;
+    description?: ReactNode;
+    actions?: ReactNode;
+    children: ReactNode;
+}) => (
+    <Stack gap="sm" component="section" aria-label={title}>
+        <Group justify="space-between" align="flex-end" gap="xs">
+            <div>
+                <Title order={4}>{title}</Title>
+                {description && (
+                    <Text size="sm" c="dimmed">
+                        {description}
+                    </Text>
+                )}
+            </div>
+            {actions && <Group gap="xs">{actions}</Group>}
+        </Group>
+        {children}
+    </Stack>
+);
+
+/** Couverture d'une ligne (ou une case vide, avant la fin du téléchargement). */
+const RowCover = ({ src }: { src?: string }) =>
+    src ? (
+        <Image
+            src={src}
+            w={40}
+            h={60}
+            fit="cover"
+            radius="sm"
+            alt=""
+            style={{ flexShrink: 0 }}
+        />
+    ) : (
+        <Center
+            w={40}
+            h={60}
+            bg="var(--mantine-color-default-hover)"
+            style={{ flexShrink: 0, borderRadius: 'var(--mantine-radius-sm)' }}
+        >
+            <IconDownload size={16} opacity={0.5} />
+        </Center>
+    );
+
+/**
+ * Ligne d'un tome : couverture, nom, détail, et à droite ses boutons ;
+ * `to` : un clic ouvre le lecteur.
+ */
+const Row = ({
+    cover,
+    title,
+    detail,
+    to,
+    progress,
+    actions,
+}: {
+    cover?: string;
+    title: string;
+    detail: ReactNode;
+    to?: string;
+    progress?: ReactNode;
+    actions: ReactNode;
+}) => {
+    const body = (
+        <Group gap="sm" wrap="nowrap" style={{ flex: 1, minWidth: 0 }}>
+            <RowCover src={cover} />
+            <Stack gap={4} style={{ flex: 1, minWidth: 0 }}>
+                <Text size="sm" fw={500} lineClamp={1}>
+                    {title}
+                </Text>
+                <Text size="xs" c="dimmed" lineClamp={1}>
+                    {detail}
+                </Text>
+                {progress}
+            </Stack>
+        </Group>
+    );
+    return (
+        <Card withBorder padding="xs" radius="md">
+            <Group gap="sm" wrap="nowrap">
+                {to ? (
+                    <UnstyledButton
+                        component={Link}
+                        to={to}
+                        style={{ flex: 1, minWidth: 0, display: 'flex' }}
+                    >
+                        {body}
+                    </UnstyledButton>
+                ) : (
+                    body
+                )}
+                <Group gap={4} wrap="nowrap" style={{ flexShrink: 0 }}>
+                    {actions}
+                </Group>
+            </Group>
+        </Card>
+    );
+};
+
+/** Corbeille d'une ligne : supprime le tome, ou arrête son téléchargement. */
+const DeleteButton = ({ id, label }: { id: number; label: string }) => (
+    <Tooltip label="Supprimer de l’appareil">
+        <ActionIcon
+            variant="subtle"
+            color="red"
+            size="lg"
+            aria-label={`Supprimer ${label}`}
+            onClick={() => void deleteDownload(id)}
+        >
+            <IconTrash size={18} />
+        </ActionIcon>
+    </Tooltip>
+);
+
+/** Où en est la lecture d'un tome téléchargé. */
+const readingDetail = (volume: DownloadedVolume) => {
+    const progress = progressOf(volume);
+    if (progress?.completed) return 'Lu';
+    if (progress) return `Page ${progress.page + 1} sur ${volume.pageCount}`;
+    return 'Pas commencé';
+};
+
+/**
+ * Tomes de l'appareil, en liste : téléchargements en cours d'abord (avec
+ * leur avancement), puis les tomes gardés, par série.
+ */
+const DeviceVolumes = () => {
+    const { downloads, jobs } = useDownloads();
     const user = useCurrentUser();
-    if (jobs.length === 0) return null;
+    const sorted = [...downloads].sort(
+        (a, b) =>
+            a.seriesName.localeCompare(b.seriesName, 'fr') ||
+            (a.number ?? '').localeCompare(b.number ?? '', 'fr', {
+                numeric: true,
+            }),
+    );
+    if (jobs.length === 0 && sorted.length === 0) {
+        return (
+            <Text size="sm" c="dimmed">
+                Aucun tome sur l’appareil. Télécharge les propositions
+                ci-dessous, ou un tome depuis son menu ⋮ sur la fiche d’une
+                série.
+            </Text>
+        );
+    }
     return (
         <Stack gap="xs">
             {jobs.map((job) => (
-                <Stack key={job.volumeId} gap={4}>
-                    <Group justify="space-between" wrap="nowrap">
-                        <Text size="sm" lineClamp={1}>
-                            {job.label}
-                        </Text>
-                        {job.state === 'failed' ? (
-                            <Button
-                                size="compact-xs"
-                                variant="subtle"
-                                leftSection={<IconRefresh size={12} />}
-                                onClick={() =>
-                                    queueDownloads(
-                                        [
-                                            {
-                                                id: job.volumeId,
-                                                label: job.label,
-                                            },
-                                        ],
-                                        user.id,
-                                    )
-                                }
-                            >
-                                Réessayer
-                            </Button>
-                        ) : (
-                            <Text size="xs" c="dimmed">
-                                {job.state === 'waiting'
-                                    ? 'En attente'
-                                    : `${job.done} / ${job.total} pages`}
+                <Row
+                    key={`job-${job.volumeId}`}
+                    title={job.label}
+                    detail={
+                        job.state === 'failed' ? (
+                            <Text span inherit c="red">
+                                {job.error}
                             </Text>
-                        )}
-                    </Group>
-                    {job.state === 'failed' ? (
-                        <Text size="xs" c="red">
-                            {job.error}
-                        </Text>
-                    ) : (
-                        <Progress
-                            value={job.total ? (job.done / job.total) * 100 : 0}
-                            size="sm"
-                            animated={job.state === 'running'}
-                        />
-                    )}
-                </Stack>
+                        ) : job.state === 'waiting' ? (
+                            'En attente'
+                        ) : (
+                            `Téléchargement : ${job.done} / ${job.total} pages`
+                        )
+                    }
+                    progress={
+                        job.state !== 'failed' && (
+                            <Progress
+                                value={
+                                    job.total ? (job.done / job.total) * 100 : 0
+                                }
+                                size="sm"
+                                animated={job.state === 'running'}
+                                aria-label={`Téléchargement de ${job.label}`}
+                            />
+                        )
+                    }
+                    actions={
+                        <>
+                            {job.state === 'failed' && (
+                                <Tooltip label="Réessayer">
+                                    <ActionIcon
+                                        variant="subtle"
+                                        size="lg"
+                                        aria-label={`Réessayer ${job.label}`}
+                                        onClick={() =>
+                                            queueDownloads(
+                                                [
+                                                    {
+                                                        id: job.volumeId,
+                                                        label: job.label,
+                                                    },
+                                                ],
+                                                user.id,
+                                            )
+                                        }
+                                    >
+                                        <IconRefresh size={18} />
+                                    </ActionIcon>
+                                </Tooltip>
+                            )}
+                            <DeleteButton id={job.volumeId} label={job.label} />
+                        </>
+                    }
+                />
             ))}
+            {sorted.map((volume) => {
+                const label = `${volume.seriesName}, ${volumeLabel(volume).toLowerCase()}`;
+                return (
+                    <Row
+                        key={volume.id}
+                        to={`/read/${volume.id}`}
+                        cover={coverUrl(volume.id, volume.version, 'small')}
+                        title={`${volume.seriesName} — ${volumeLabel(volume)}`}
+                        detail={`${readingDetail(volume)} · ${formatSize(volume.bytes)}`}
+                        actions={<DeleteButton id={volume.id} label={label} />}
+                    />
+                );
+            })}
         </Stack>
     );
 };
 
-/** Réglages des téléchargements automatiques (propres à l'appareil). */
+/**
+ * Propositions : le tome en cours et les suivants des séries en cours, pas
+ * encore sur l'appareil ; « Télécharger » sur chacun, ou tout d'un coup.
+ */
+const Proposals = () => {
+    const user = useCurrentUser();
+    const readOnly = useReadOnly();
+    const online = useOnline();
+    const auto = useAutoSettings();
+    const { downloads, jobs } = useDownloads();
+    const proposals = useQuery(
+        () =>
+            online && typeof caches !== 'undefined'
+                ? fetchProposals(auto.count)
+                : Promise.resolve(undefined),
+        [online, auto.count, downloads.length],
+    );
+    // Déjà en téléchargement : plus proposé.
+    const queued = new Set(
+        jobs.filter((j) => j.state !== 'failed').map((j) => j.volumeId),
+    );
+    const list = (proposals.data ?? []).filter((p) => !queued.has(p.id));
+    const download = (items: Proposal[]) =>
+        queueDownloads(
+            items.map((p) => ({ id: p.id, label: p.label })),
+            user.id,
+        );
+
+    return (
+        <Section
+            title="Propositions"
+            description={`${proposedLabel(auto.count)}, pour tes ${AUTO_SERIES} séries lues le plus récemment.`}
+            actions={
+                list.length > 1 && (
+                    <Button
+                        size="xs"
+                        variant="light"
+                        leftSection={<IconDownload size={14} />}
+                        disabled={readOnly}
+                        onClick={() => download(list)}
+                    >
+                        Tout télécharger ({list.length})
+                    </Button>
+                )
+            }
+        >
+            {!online ? (
+                <Text size="sm" c="dimmed">
+                    Les propositions reviennent avec le réseau.
+                </Text>
+            ) : proposals.error ? (
+                <Alert color="red">{proposals.error.message}</Alert>
+            ) : !proposals.data ? (
+                <Loader size="sm" />
+            ) : list.length === 0 ? (
+                <Text size="sm" c="dimmed">
+                    Rien à proposer : tes séries en cours sont déjà sur
+                    l’appareil.
+                </Text>
+            ) : (
+                <Stack gap="xs">
+                    {list.map((proposal) => (
+                        <Row
+                            key={proposal.id}
+                            cover={coverUrl(
+                                proposal.id,
+                                proposal.version,
+                                'small',
+                            )}
+                            title={proposal.label}
+                            detail={`${proposal.current ? 'Tome en cours' : 'Tome suivant'} · ${proposal.pageCount} pages`}
+                            actions={
+                                <Button
+                                    size="compact-sm"
+                                    variant="light"
+                                    leftSection={<IconDownload size={14} />}
+                                    disabled={readOnly}
+                                    aria-label={`Télécharger ${proposal.label}`}
+                                    onClick={() => download([proposal])}
+                                >
+                                    Télécharger
+                                </Button>
+                            }
+                        />
+                    ))}
+                </Stack>
+            )}
+        </Section>
+    );
+};
+
+/**
+ * Mode automatique (réglage de l'appareil) : télécharge tout seul les
+ * propositions, et fait le ménage des tomes lus.
+ */
 const AutoDownloads = () => {
     const auto = useAutoSettings();
     const user = useCurrentUser();
@@ -234,56 +524,59 @@ const AutoDownloads = () => {
         );
     };
     return (
-        <Stack gap="xs">
-            <Text size="sm" fw={500}>
-                Automatique, sur cet appareil
-            </Text>
-            <Switch
-                label="Garder d’avance les tomes suivants de mes séries en cours"
-                description={`Les ${AUTO_SERIES} séries lues le plus récemment.`}
-                checked={auto.enabled}
-                disabled={readOnly}
-                onChange={(e) => change({ enabled: e.currentTarget.checked })}
-            />
-            {auto.enabled && (
-                <Group gap="md" pl={54}>
+        <Paper withBorder p="md" radius="md">
+            <Section
+                title="Automatique"
+                description="Sur cet appareil, à l’ouverture de Bento puis toutes les 30 minutes."
+            >
+                <Switch
+                    label="Télécharger les propositions tout seul"
+                    checked={auto.enabled}
+                    disabled={readOnly}
+                    onChange={(e) =>
+                        change({ enabled: e.currentTarget.checked })
+                    }
+                />
+                <Group gap="md">
                     <Select
                         size="xs"
-                        w={140}
-                        aria-label="Tomes d’avance par série"
+                        w={260}
+                        label="Tomes proposés par série"
                         allowDeselect={false}
                         data={[1, 2, 3, 5].map((n) => ({
                             value: String(n),
-                            label: `${n} tome${n > 1 ? 's' : ''} d’avance`,
+                            label: proposedLabel(n),
                         }))}
                         value={String(auto.count)}
                         onChange={(value) => change({ count: Number(value) })}
                     />
-                    <Switch
-                        size="xs"
-                        label="En Wi-Fi seulement"
-                        checked={auto.wifiOnly}
-                        onChange={(e) =>
-                            change({ wifiOnly: e.currentTarget.checked })
-                        }
-                    />
                 </Group>
-            )}
-            <Switch
-                label={`Effacer les tomes lus depuis ${CLEAN_DAYS} jours`}
-                checked={auto.clean}
-                onChange={(e) => change({ clean: e.currentTarget.checked })}
-            />
-        </Stack>
+                <Switch
+                    label="En Wi-Fi seulement"
+                    description="Jamais sur les données mobiles (Android)."
+                    checked={auto.wifiOnly}
+                    disabled={!auto.enabled}
+                    onChange={(e) =>
+                        change({ wifiOnly: e.currentTarget.checked })
+                    }
+                />
+                <Switch
+                    label={`Effacer les tomes lus depuis ${CLEAN_DAYS} jours`}
+                    checked={auto.clean}
+                    onChange={(e) => change({ clean: e.currentTarget.checked })}
+                />
+            </Section>
+        </Paper>
     );
 };
 
 /**
- * Téléchargements de l'appareil : en cours, place prise et libre, tomes
- * gardés ; suppression des tomes lus, ou de tout ; réglages automatiques.
+ * Téléchargements de l'appareil : les tomes gardés (en liste, avec leur
+ * avancement et une corbeille), les propositions, et le mode automatique à
+ * part.
  */
 export const DownloadsPage = () => {
-    const { downloads } = useDownloads();
+    const { downloads, jobs } = useDownloads();
     const [storage, setStorage] = useState<{
         used: number;
         available?: number;
@@ -292,9 +585,10 @@ export const DownloadsPage = () => {
         void storageEstimate().then(setStorage);
     }, [downloads]);
     const read = downloads.filter((v) => stateOf(v) === 'read');
+    const count = downloads.length;
 
     return (
-        <Stack>
+        <Stack gap="xl">
             <div>
                 <Title order={2}>Téléchargements</Title>
                 <Text size="sm" c="dimmed">
@@ -302,58 +596,67 @@ export const DownloadsPage = () => {
                     Ils sont effacés à la déconnexion.
                 </Text>
             </div>
-            {storage && (
-                <Text size="sm">
-                    {downloads.length} tome{downloads.length > 1 ? 's' : ''} ·{' '}
-                    {formatSize(storage.used)}
-                    {storage.available !== undefined &&
-                        ` · ${formatSize(storage.available)} libres sur l’appareil`}
-                </Text>
-            )}
             {typeof caches === 'undefined' && (
                 <Alert color="yellow">
                     Ce navigateur ne permet pas de télécharger des tomes.
                 </Alert>
             )}
-            <AutoDownloads />
-            <DownloadJobs />
-            <DownloadedVolumes />
-            {downloads.length > 0 && (
-                <Group>
-                    <Button
-                        variant="default"
-                        disabled={read.length === 0}
-                        onClick={() =>
-                            void (async () => {
-                                for (const volume of read) {
-                                    await deleteDownload(volume.id);
+
+            <Section
+                title="Sur cet appareil"
+                description={
+                    storage &&
+                    `${count} tome${count > 1 ? 's' : ''} · ${formatSize(storage.used)}${
+                        storage.available !== undefined
+                            ? ` · ${formatSize(storage.available)} libres`
+                            : ''
+                    }`
+                }
+                actions={
+                    (count > 0 || jobs.length > 0) && (
+                        <>
+                            <Button
+                                size="xs"
+                                variant="light"
+                                color="red"
+                                leftSection={<IconTrash size={14} />}
+                                disabled={read.length === 0}
+                                onClick={() =>
+                                    void (async () => {
+                                        for (const volume of read) {
+                                            await deleteDownload(volume.id);
+                                        }
+                                    })()
                                 }
-                            })()
-                        }
-                    >
-                        Supprimer les tomes lus ({read.length})
-                    </Button>
-                    <Button
-                        variant="subtle"
-                        color="red"
-                        onClick={() => {
-                            if (
-                                window.confirm(
-                                    'Supprimer tous les tomes téléchargés de cet appareil ?',
-                                )
-                            ) {
-                                void (async () => {
-                                    for (const volume of downloads) {
-                                        await deleteDownload(volume.id);
+                            >
+                                Supprimer les tomes lus ({read.length})
+                            </Button>
+                            <Button
+                                size="xs"
+                                variant="subtle"
+                                color="red"
+                                onClick={() => {
+                                    if (
+                                        window.confirm(
+                                            'Supprimer tous les tomes de cet appareil ?',
+                                        )
+                                    ) {
+                                        void clearDownloads();
                                     }
-                                })();
-                            }
-                        }}
-                    >
-                        Tout supprimer
-                    </Button>
-                </Group>
-            )}
+                                }}
+                            >
+                                Tout supprimer
+                            </Button>
+                        </>
+                    )
+                }
+            >
+                <DeviceVolumes />
+            </Section>
+
+            <Proposals />
+
+            <AutoDownloads />
         </Stack>
     );
 };
