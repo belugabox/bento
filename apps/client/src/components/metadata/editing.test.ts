@@ -16,6 +16,7 @@ import {
     isMixed,
     isSeriesFieldChanged,
     joinSeries,
+    rowOptions,
     searchNameOf,
     seriesValue,
     setSeriesField,
@@ -295,6 +296,44 @@ describe('comparison with online sheets', () => {
         expect(
             chosenValues(rows, { Series: 'current', Writer: 'wikipedia' }),
         ).toEqual({ Writer: 'Tatsuya Endō' });
+    });
+
+    it('shows each different value once, with who gives it', () => {
+        const rows = comparisonRows(
+            { Publisher: 'Casterman', Tags: 'Roman graphique' },
+            [
+                {
+                    site: 'wikipedia',
+                    values: {
+                        Publisher: 'Pantheon Books',
+                        Tags: 'Roman Graphique',
+                    },
+                },
+                {
+                    site: 'bedetheque',
+                    values: {
+                        Publisher: 'casterman',
+                        Tags: 'Roman graphique',
+                    },
+                },
+            ],
+        );
+        // Thèmes : seule une majuscule change, pas de ligne.
+        expect(rows.map((row) => row.field)).toEqual(['Publisher']);
+        expect(
+            rowOptions(rows[0]!, ['manga-news', 'wikipedia', 'bedetheque']),
+        ).toEqual([
+            {
+                choice: 'current',
+                value: 'Casterman',
+                sources: ['current', 'bedetheque'],
+            },
+            {
+                choice: 'wikipedia',
+                value: 'Pantheon Books',
+                sources: ['wikipedia'],
+            },
+        ]);
     });
 
     it('applies the chosen values, keeping themes from the files', () => {

@@ -623,9 +623,9 @@ describe('MetadataEditor', () => {
             (await screen.findByRole('radio', {
                 name: `Scénario : ${site}`,
             })) as HTMLInputElement;
-        // Champ vide, deux valeurs : celle du site préféré (Manga-news).
-        expect((await writerFrom('Manga-news')).checked).toBe(true);
-        fireEvent.click(await writerFrom('Wikipédia'));
+        // Champ vide, même nom sur les deux sites (« Hiroya OKU » remis
+        // comme le nom connu) : un seul choix, proposé d'office.
+        expect((await writerFrom('Manga-news · Wikipédia')).checked).toBe(true);
         // Format et âge déjà ceux des fiches : pas de ligne.
         expect(screen.queryByRole('radio', { name: /^Format/ })).toBeNull();
         fireEvent.click(screen.getByRole('button', { name: 'Appliquer' }));

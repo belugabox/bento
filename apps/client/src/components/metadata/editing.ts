@@ -407,8 +407,41 @@ export type ComparisonRow = {
     found: Partial<Record<MetadataSource, string>>;
 };
 
+/**
+ * Même valeur, sans compter majuscules, accents, espaces ni ponctuation
+ * (« Roman graphique » et « Roman Graphique »).
+ */
 const sameValue = (a?: string, b?: string) =>
-    (a ?? '').trim() === (b ?? '').trim();
+    genreKey(a ?? '') === genreKey(b ?? '');
+
+/** Un choix d'une ligne : une valeur, et les fiches qui la donnent. */
+export type ComparisonOption = {
+    /** Choix enregistré quand on la prend (l'actuelle d'abord). */
+    choice: SheetChoice;
+    value: string;
+    /** L'actuelle et les sites qui donnent cette même valeur. */
+    sources: SheetChoice[];
+};
+
+/**
+ * Valeurs différentes d'une ligne, chacune une fois avec ceux qui la
+ * donnent : l'actuelle d'abord, puis les sites dans l'ordre.
+ */
+export const rowOptions = (
+    row: ComparisonRow,
+    order: readonly MetadataSource[],
+): ComparisonOption[] => {
+    const options: ComparisonOption[] = [];
+    const add = (choice: SheetChoice, value: string | undefined) => {
+        if (!value?.trim()) return;
+        const same = options.find((option) => sameValue(option.value, value));
+        if (same) same.sources.push(choice);
+        else options.push({ choice, value, sources: [choice] });
+    };
+    add('current', row.current);
+    for (const site of order) add(site, row.found[site]);
+    return options;
+};
 
 /**
  * Lignes du tableau : les champs pour lesquels une fiche apporte une valeur
