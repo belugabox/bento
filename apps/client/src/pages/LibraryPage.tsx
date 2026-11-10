@@ -179,7 +179,7 @@ const HomeSection = ({
         {title && (
             <Text
                 size="xs"
-                c="var(--mantine-primary-color-filled)"
+                c="var(--mantine-primary-color-light-color)"
                 fw={600}
                 tt="uppercase"
                 style={{ letterSpacing: '0.08em' }}
