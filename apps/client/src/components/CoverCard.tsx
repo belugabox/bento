@@ -52,6 +52,7 @@ export const CoverCard = ({
     progress,
     corner,
     badge,
+    tag,
     menu,
     layout = 'card',
     coversOnly = false,
@@ -76,6 +77,11 @@ export const CoverCard = ({
      * lien, un clic dessus ouvre la carte.
      */
     badge?: ReactNode;
+    /**
+     * Pastille en haut à gauche (nouveaux tomes : « +2 »), loin de l'icône
+     * d'état ; dans le lien.
+     */
+    tag?: ReactNode;
     /** Menu d'actions (⋮), en bas à droite, à côté du titre. */
     menu?: ReactNode;
     layout?: 'card' | 'row';
@@ -136,6 +142,7 @@ export const CoverCard = ({
                                 />
                             )}
                         </Stack>
+                        {tag && <Box style={{ flexShrink: 0 }}>{tag}</Box>}
                         {badge && <Box style={{ flexShrink: 0 }}>{badge}</Box>}
                     </Group>
                 </Card>
@@ -183,6 +190,11 @@ export const CoverCard = ({
                     {badge && (
                         <Box pos="absolute" top={6} right={6}>
                             {badge}
+                        </Box>
+                    )}
+                    {tag && (
+                        <Box pos="absolute" top={6} left={6}>
+                            {tag}
                         </Box>
                     )}
                 </Box>

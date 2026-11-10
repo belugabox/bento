@@ -77,8 +77,8 @@ import { UserContext } from '@/services/auth';
 import { useQuery } from '@/services/useQuery';
 
 /**
- * Pastille « +2 » : tomes ajoutés depuis la dernière lecture de la série
- * (rien sans nouveauté).
+ * Pastille « +2 », en haut à gauche (l'icône d'état est à droite) : tomes
+ * ajoutés depuis la dernière lecture de la série (rien sans nouveauté).
  */
 const newBadge = (count: number | undefined) =>
     count ? (
@@ -129,7 +129,7 @@ const ResumeCard = ({
         layout={display.layout === 'list' ? 'row' : 'card'}
         coversOnly={display.coversOnly}
         details={details}
-        corner={newBadge(volume.newCount)}
+        tag={newBadge(volume.newCount)}
         // ▶ en couleur : la carte ouvre le lecteur, pas la fiche.
         badge={
             <ThemeIcon size="sm" radius="xl" aria-label="Tome à reprendre">
@@ -559,7 +559,7 @@ export const LibraryPage = () => {
                                                 'small',
                                             )}
                                             title={item.name}
-                                            corner={newBadge(item.newCount)}
+                                            tag={newBadge(item.newCount)}
                                             subtitle={
                                                 state === 'started'
                                                     ? `${item.readCount} / ${item.volumeCount} lus`
