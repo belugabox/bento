@@ -42,6 +42,7 @@ import { Link, useLocation, useNavigate } from 'react-router';
 
 import logo from '@/assets/logo.svg';
 import { AppearanceModal } from '@/components/AppearanceModal';
+import { DownloadIndicator } from '@/components/DownloadIndicator';
 import { UserAvatar } from '@/components/accounts/UserAvatar';
 import {
     ageLimitLabel,
@@ -589,6 +590,7 @@ export const AppHeader = () => {
             </Anchor>
             <HeaderSearch />
             <Group gap="sm" wrap="nowrap">
+                <DownloadIndicator />
                 {user.role === 'admin' && <TasksIndicator />}
                 {user.role === 'admin' && <DraftsIndicator />}
                 <UserMenu />

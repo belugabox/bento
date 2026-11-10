@@ -37,6 +37,7 @@ import { isMainKind, isStandalone } from '@server/types';
 import { SeriesVolumeMenu } from '@/components/CardMenus';
 import { CompletenessBadge } from '@/components/CompletenessBadge';
 import { CoverCard } from '@/components/CoverCard';
+import { DownloadRing } from '@/components/DownloadIndicator';
 import { SeriesReaders } from '@/components/SeriesReaders';
 import { ageLabel, seriesAgeOf } from '@/components/ageLimits';
 import { completenessOf } from '@/components/completeness';
@@ -80,7 +81,7 @@ export const SeriesPage = () => {
     const seriesId = Number(useParams().id);
     const user = useCurrentUser();
     const isAdmin = user.role === 'admin';
-    const { downloads } = useDownloads();
+    const { downloads, jobs } = useDownloads();
     const readOnly = useReadOnly();
     const { size } = useLibraryDisplay();
     const {
@@ -417,6 +418,11 @@ export const SeriesPage = () => {
                                 const read =
                                     volume.progress?.completed ?? false;
                                 const downloaded = downloadedIds.has(volume.id);
+                                const job = jobs.find(
+                                    (j) =>
+                                        j.volumeId === volume.id &&
+                                        j.state !== 'failed',
+                                );
                                 return (
                                     <CoverCard
                                         key={volume.id}
@@ -457,7 +463,17 @@ export const SeriesPage = () => {
                                         }
                                         // Gardé sur l'appareil (lecture sans réseau).
                                         tag={
-                                            downloaded ? (
+                                            // En téléchargement : son avancement.
+                                            job ? (
+                                                <DownloadRing
+                                                    ratio={
+                                                        job.total
+                                                            ? job.done /
+                                                              job.total
+                                                            : 0
+                                                    }
+                                                />
+                                            ) : downloaded ? (
                                                 <ThemeIcon
                                                     size="sm"
                                                     radius="xl"

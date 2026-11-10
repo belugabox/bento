@@ -48,6 +48,19 @@ export type DownloadJob = {
     error?: string;
 };
 
+/**
+ * Avancement de téléchargements (0 à 1) : les pages faites sur toutes les
+ * pages connues ; un tome encore en attente compte pour zéro.
+ */
+export const jobsProgress = (jobs: DownloadJob[]) => {
+    const active = jobs.filter((j) => j.state !== 'failed');
+    if (active.length === 0) return undefined;
+    const ratio =
+        active.reduce((t, j) => t + (j.total ? j.done / j.total : 0), 0) /
+        active.length;
+    return { count: active.length, ratio };
+};
+
 const supported = () => typeof caches !== 'undefined';
 const metaUrl = (volumeId: number) => `${META_PREFIX}${volumeId}`;
 
