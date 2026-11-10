@@ -179,12 +179,15 @@ const HomeSection = ({
         {title && (
             <Text
                 size="xs"
-                c="dimmed"
+                c="var(--mantine-primary-color-filled)"
                 fw={600}
                 tt="uppercase"
                 style={{ letterSpacing: '0.08em' }}
             >
-                {title} · {count}
+                {title}{' '}
+                <Text span inherit c="dimmed">
+                    · {count}
+                </Text>
             </Text>
         )}
         {children}
@@ -370,14 +373,35 @@ export const LibraryPage = () => {
     const resume = (inProgress.data ?? []).filter((v) =>
         visibleIds.has(v.seriesId),
     );
-    const resumed = new Set(resume.map((v) => v.seriesId));
-    const others = visible.filter((s) => !resumed.has(s.id));
-    // Les autres séries, en blocs selon le groupement choisi (« En cours »
-    // reste en tête).
-    const groups = groupSeries(others, display.groupBy, {
-        readers: readers.data,
-    });
-    const untitled = display.groupBy === 'none';
+    const resumeOf = new Map(resume.map((v) => [v.seriesId, v]));
+    // « Lecture » : le bloc « En cours » en tête, puis les autres séries.
+    // Autres groupements : chaque série dans son bloc, en cours ou non (sa
+    // carte de reprise si elle est en cours) ; jamais à deux endroits.
+    const withResume = display.groupBy === 'reading';
+    const groups = groupSeries(
+        withResume ? visible.filter((s) => !resumeOf.has(s.id)) : visible,
+        display.groupBy,
+        { readers: readers.data },
+    );
+    /** Tome à reprendre : ouvre le lecteur, avec l'avancement dans la série. */
+    const resumeCard = (volume: InProgressVolume) => (
+        <ResumeCard
+            key={`resume-${volume.volumeId}`}
+            volume={volume}
+            // Court : tient sur une ligne de la carte.
+            subtitle={`${volumeShortLabel(volume)} · ${volume.readCount}/${volume.volumeCount} lus`}
+            progress={seriesProgress(volume)}
+            onChanged={reloadHome}
+            display={display}
+            details={
+                display.layout === 'list'
+                    ? seriesDetails(
+                          visible.find((s) => s.id === volume.seriesId)!,
+                      )
+                    : undefined
+            }
+        />
+    );
     const cols =
         display.layout === 'list' ? LIST_COLUMNS : gridColumns(display.size);
     // Pastilles : les genres les plus fréquents, et celui choisi.
@@ -436,38 +460,14 @@ export const LibraryPage = () => {
                     </Stack>
                 )}
                 <Stack gap="xl" data-testid="series-grid">
-                    {resume.length > 0 && (
-                        <HomeSection
-                            title={untitled ? null : 'En cours'}
-                            count={resume.length}
-                        >
+                    {withResume && resume.length > 0 && (
+                        <HomeSection title="En cours" count={resume.length}>
                             <SimpleGrid
                                 cols={cols}
                                 spacing="sm"
                                 data-testid="resume-grid"
                             >
-                                {resume.map((volume) => (
-                                    <ResumeCard
-                                        key={volume.volumeId}
-                                        volume={volume}
-                                        // Court : tient sur une ligne de la carte.
-                                        subtitle={`${volumeShortLabel(volume)} · ${volume.readCount}/${volume.volumeCount} lus`}
-                                        progress={seriesProgress(volume)}
-                                        onChanged={reloadHome}
-                                        display={display}
-                                        details={
-                                            display.layout === 'list'
-                                                ? seriesDetails(
-                                                      visible.find(
-                                                          (s) =>
-                                                              s.id ===
-                                                              volume.seriesId,
-                                                      )!,
-                                                  )
-                                                : undefined
-                                        }
-                                    />
-                                ))}
+                                {resume.map(resumeCard)}
                             </SimpleGrid>
                         </HomeSection>
                     )}
@@ -483,6 +483,8 @@ export const LibraryPage = () => {
                                 data-testid={`${group.key}-grid`}
                             >
                                 {group.list.map((item) => {
+                                    const volume = resumeOf.get(item.id);
+                                    if (volume) return resumeCard(volume);
                                     const state = readingStateOf(item);
                                     return (
                                         <CoverCard

@@ -46,6 +46,11 @@ const Location = () => {
     return null;
 };
 
+/** Titre d'un bloc de l'accueil (couleur principale), et son nombre. */
+const block = (title: string) => screen.queryByRole('region', { name: title });
+const countOf = (title: string) =>
+    within(block(title)!).getByText(/^· \d+$/).textContent;
+
 /** Cartes de l'accueil dans l'ordre (les trois blocs de la grille). */
 const hrefs = (zone: HTMLElement) =>
     within(zone)
@@ -153,8 +158,8 @@ describe('LibraryPage', () => {
         expect(screen.queryByTestId('unread-grid')).toBeNull();
         expect(hrefs(screen.getByTestId('read-grid'))).toEqual(['/series/2']);
         // Un titre discret par bloc, avec son nombre de cartes.
-        expect(screen.getByText('En cours · 2')).toBeTruthy();
-        expect(screen.getByText('Déjà lues · 1')).toBeTruthy();
+        expect(countOf('En cours')).toBe('· 2');
+        expect(countOf('Déjà lues')).toBe('· 1');
         expect(screen.queryByText(/À découvrir/)).toBeNull();
     });
 
@@ -193,9 +198,15 @@ describe('LibraryPage', () => {
             await screen.findByRole('menuitem', { name: 'Lecteur' }),
         );
 
-        expect(await screen.findByText('Lu par Léa · 1')).toBeTruthy();
-        // « En cours » reste en tête.
-        expect(screen.getByText('En cours · 2')).toBeTruthy();
+        await vi.waitFor(() => expect(countOf('Lu par Léa')).toBe('· 1'));
+        // Pas de bloc « En cours » : les séries en cours sont dans leur bloc,
+        // avec leur carte de reprise (jamais à deux endroits).
+        expect(block('En cours')).toBeNull();
+        expect(
+            within(block('Lues par personne d’autre')!)
+                .getAllByRole('link')
+                .map((link) => link.getAttribute('href')),
+        ).toEqual(['/read/51', '/read/42']);
         expect(
             JSON.parse(localStorage.getItem('bento:display')!),
         ).toMatchObject({ groupBy: 'reader' });
@@ -233,8 +244,9 @@ describe('LibraryPage', () => {
         );
         show();
 
+        // Une seule grille, dans l'ordre du tri (en cours compris).
         await vi.waitFor(() =>
-            expect(titles()).toEqual(['/read/42', '/read/51', '/series/2']),
+            expect(titles()).toEqual(['/read/51', '/read/42', '/series/2']),
         );
         expect(screen.queryByText(/En cours/)).toBeNull();
         expect(screen.queryByText(/Déjà lues/)).toBeNull();
