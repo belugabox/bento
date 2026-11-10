@@ -56,6 +56,18 @@ export const KIND_PREFIXES: Record<
 };
 
 /**
+ * Tome seul, sans numéro : un one-shot, ou une intégrale non numérotée
+ * (traitée comme un one-shot : « Intégrale », « Lire », fichier sans
+ * numéro).
+ */
+export const isStandalone = (volume: {
+    kind?: VolumeKind;
+    number?: string | null;
+}) =>
+    volume.kind === 'one-shot' ||
+    (volume.kind === 'integrale' && !volume.number?.trim());
+
+/**
  * Titre par défaut d'un tome : « Tome 3 », « Intégrale 1 », « One-shot »
  * (sans numéro).
  */

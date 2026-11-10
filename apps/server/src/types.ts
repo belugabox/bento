@@ -65,6 +65,7 @@ export {
     VOLUME_KINDS,
     MAIN_KINDS,
     isMainKind,
+    isStandalone,
     kindTitle,
     type VolumeKind,
     kindOfWord,

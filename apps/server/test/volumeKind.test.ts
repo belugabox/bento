@@ -172,6 +172,14 @@ describe('one-shots and omnibus volumes', () => {
             }),
         ).toBe('Origin/Origin INT02.cbz');
         expect(volumeNumberOf('Origin INT02.cbz')).toBe('INT2');
+        // Intégrale sans numéro : comme un one-shot.
+        expect(
+            publicationPathOf({
+                Series: 'Amer béton',
+                Format: 'Intégrale',
+                Year: 2007,
+            }),
+        ).toBe('Amer béton/Amer béton (2007).cbz');
     });
 
     describe('in the library', () => {

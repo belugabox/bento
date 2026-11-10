@@ -209,14 +209,14 @@ describe('MetadataEditor', () => {
         expect(numberOf(2).value).toBe('2');
         // Champs remplis : surlignés jusqu'à l'enregistrement.
         expect(numberOf(1).getAttribute('data-changed')).toBe('true');
-        // Titre rempli (« Tome 1 ») ; le genre, lui, n'a pas changé.
+        // Pas de titre « Tome 1 » ; le genre, lui, n'a pas changé.
         expect(
             (
                 screen.getByLabelText(
                     'Titre de Gantz T01 (2017).cbz',
                 ) as HTMLInputElement
             ).value,
-        ).toBe('Tome 1');
+        ).toBe('');
         expect(
             screen
                 .getByRole('textbox', { name: 'Genres' })
@@ -239,7 +239,6 @@ describe('MetadataEditor', () => {
                             path: '_draft/Gantz/Gantz T01 (2017).cbz',
                             changes: {
                                 Number: '1',
-                                Title: 'Tome 1',
                                 Year: 2017,
                             },
                         },
@@ -248,7 +247,6 @@ describe('MetadataEditor', () => {
                             changes: {
                                 Series: 'Gantz',
                                 Number: '2',
-                                Title: 'Tome 2',
                                 Year: 2017,
                             },
                         },
@@ -515,15 +513,8 @@ describe('MetadataEditor', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Appliquer' }));
 
         expect(pillsOf('Genres')).toEqual(['Science-fiction']);
-        // Puis les noms de fichiers : numéros, titres, années.
+        // Puis les noms de fichiers : numéros et années (pas de titre).
         expect(numberOf(2).value).toBe('2');
-        expect(
-            (
-                screen.getByLabelText(
-                    'Titre de Gantz T02 (2017).cbz',
-                ) as HTMLInputElement
-            ).value,
-        ).toBe('Tome 2');
     });
 
     it('fills from Manga-news: sorted genres, themes, age, format, and keeps the sheet', async () => {

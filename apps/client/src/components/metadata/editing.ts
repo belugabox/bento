@@ -11,7 +11,6 @@ import {
     classify,
     genreKey,
     kindOfWord,
-    kindTitle,
     parseVolumeFileName,
     volumeNumbering,
 } from '@server/types';
@@ -126,7 +125,12 @@ export const setVolumeKind = (
     const info = edits[path] ?? {};
     let next = edits;
     const { number } = volumeNumbering(info);
-    if (number && number !== info.Number?.trim()) {
+    // One-shot : jamais de numéro.
+    if (kind === 'one-shot') {
+        if (info.Number !== undefined) {
+            next = setVolumeField(next, path, 'Number', undefined);
+        }
+    } else if (number && number !== info.Number?.trim()) {
         next = setVolumeField(next, path, 'Number', number);
     }
     if (kind !== 'volume') {
@@ -157,23 +161,18 @@ export const fillFromFileNames = (
             volume.name.replace(/\.cb[zr]$/i, ''),
         );
         const info = next[volume.path] ?? {};
-        if (parsed.number && fillable(info.Number, overwrite)) {
+        if (
+            parsed.number &&
+            fillable(info.Number, overwrite) &&
+            volumeKindOf(info) !== 'one-shot'
+        ) {
             next = setVolumeField(next, volume.path, 'Number', parsed.number);
         }
         // « HS01 », « SP01 » : hors-série, spécial (type d'un tome sinon).
         if (parsed.kind && (overwrite || !kindOfWord(info.Format))) {
             next = setVolumeKind(next, volume.path, parsed.kind);
         }
-        // Titre par défaut : « Tome N », « Hors-série N », « One-shot ».
-        const { kind, number } = volumeNumbering(next[volume.path] ?? {});
-        if (number && fillable(info.Title, overwrite)) {
-            next = setVolumeField(
-                next,
-                volume.path,
-                'Title',
-                kindTitle(kind, number),
-            );
-        }
+        // Pas de titre par défaut (« Tome N ») : il est facultatif.
         if (parsed.year && fillable(info.Year, overwrite)) {
             next = setVolumeField(next, volume.path, 'Year', parsed.year);
         }

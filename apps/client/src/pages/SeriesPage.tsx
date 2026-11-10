@@ -29,7 +29,7 @@ import {
 import { useState } from 'react';
 import { Link, useParams } from 'react-router';
 
-import { isMainKind } from '@server/types';
+import { isMainKind, isStandalone } from '@server/types';
 
 import { SeriesVolumeMenu } from '@/components/CardMenus';
 import { CompletenessBadge } from '@/components/CompletenessBadge';
@@ -273,7 +273,7 @@ export const SeriesPage = () => {
                                 >
                                     {ACTION_LABELS[next.action]}
                                     {/* One-shot : « Lire » seul. */}
-                                    {next.volume.kind !== 'one-shot' &&
+                                    {!isStandalone(next.volume) &&
                                         ` ${volumeLabel(next.volume).toLowerCase()}`}
                                 </Button>
                             )}
@@ -345,6 +345,14 @@ export const SeriesPage = () => {
                     key === 'main' ? isMainKind(v.kind) : v.kind === key,
                 );
                 if (group.length === 0) return null;
+                // Un one-shot seul : pas de tome à montrer (« Lire » suffit).
+                if (
+                    key === 'main' &&
+                    group.length === 1 &&
+                    isStandalone(group[0]!)
+                ) {
+                    return null;
+                }
                 return (
                     <Stack key={key} gap="xs">
                         {title && <Title order={4}>{title}</Title>}

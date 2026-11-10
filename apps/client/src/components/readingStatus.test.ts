@@ -174,6 +174,14 @@ describe('one-shots and omnibus volumes', () => {
         expect(
             volumeShortLabel({ number: '2', title: null, kind: 'integrale' }),
         ).toBe('INT2');
+        // Intégrale sans numéro : comme un one-shot.
+        const whole = {
+            number: null,
+            title: 'Amer béton',
+            kind: 'integrale' as const,
+        };
+        expect(volumeLabel(whole)).toBe('Intégrale');
+        expect(volumeCountLabel([whole])).toBe('Intégrale');
     });
 
     it('are counted with the series', () => {
@@ -189,6 +197,7 @@ describe('one-shots and omnibus volumes', () => {
             countedVolumes([{ kind: 'integrale' }, { kind: 'special' }]),
         ).toEqual([{ kind: 'integrale' }]);
         expect(seriesVolumesLabel(1, 'one-shot')).toBe('One-shot');
+        expect(seriesVolumesLabel(1, 'integrale')).toBe('Intégrale');
         expect(seriesVolumesLabel(3, 'integrale')).toBe('3 intégrales');
         expect(seriesVolumesLabel(12, 'volume,integrale')).toBe('12 tomes');
         expect(seriesVolumesLabel(1, null)).toBe('1 tome');

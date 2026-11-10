@@ -1,6 +1,6 @@
 // Sans dépendance à Node : partagé avec le client (via `@server/types`).
 import type { ComicInfo } from '../archive/comicInfo';
-import { KIND_PREFIXES, volumeNumbering } from './volumeKind';
+import { KIND_PREFIXES, isStandalone, volumeNumbering } from './volumeKind';
 
 /**
  * Nom de série utilisable comme nom de dossier : pas de séparateur, ni de
@@ -29,8 +29,8 @@ export const publicationPathOf = (
     const series = comicInfo.Series ? folderName(comicInfo.Series) : '';
     const { kind, number } = volumeNumbering(comicInfo);
     const year = comicInfo.Year ? ` (${comicInfo.Year})` : '';
-    // One-shot : sans numéro, « Spirale/Spirale (2021).cbz ».
-    if (kind === 'one-shot') {
+    // One-shot, intégrale sans numéro : « Spirale/Spirale (2021).cbz ».
+    if (kind === 'one-shot' || isStandalone({ kind, number })) {
         return series ? `${series}/${series}${year}.cbz` : undefined;
     }
     if (!series || !number) return undefined;

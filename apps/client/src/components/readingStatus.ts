@@ -3,6 +3,7 @@ import {
     VOLUME_KIND_LABELS,
     type VolumeKind,
     isMainKind,
+    isStandalone,
     kindTitle,
 } from '@server/types';
 
@@ -26,7 +27,8 @@ export const volumeLabel = (volume: {
     kind?: VolumeKind;
 }) => {
     const kind = volume.kind ?? 'volume';
-    if (kind === 'one-shot') return VOLUME_KIND_LABELS[kind];
+    // One-shot, intégrale sans numéro : le nom du type.
+    if (isStandalone(volume)) return VOLUME_KIND_LABELS[kind];
     return volume.number
         ? kindTitle(kind, volume.number)
         : (volume.title ??
@@ -39,7 +41,7 @@ export const volumeShortLabel = (volume: {
     title: string | null;
     kind?: VolumeKind;
 }) =>
-    volume.number && volume.kind !== 'one-shot'
+    volume.number && !isStandalone(volume)
         ? `${SHORT_PREFIXES[volume.kind ?? 'volume']}${volume.number}`
         : volumeLabel(volume);
 
@@ -75,9 +77,11 @@ export const countedVolumes = <T extends { kind?: VolumeKind }>(
  * « 12 tomes · 1 spécial » : chaque type compté à part ; « One-shot » pour
  * un one-shot seul.
  */
-export const volumeCountLabel = (volumes: { kind?: VolumeKind }[]) =>
-    volumes.length === 1 && volumes[0]!.kind === 'one-shot'
-        ? 'One-shot'
+export const volumeCountLabel = (
+    volumes: { kind?: VolumeKind; number?: string | null }[],
+) =>
+    volumes.length === 1 && isStandalone(volumes[0]!)
+        ? VOLUME_KIND_LABELS[volumes[0]!.kind!]
         : VOLUME_KINDS.flatMap((kind) => {
               const count = volumes.filter(
                   (v) => (v.kind ?? 'volume') === kind,
@@ -95,7 +99,10 @@ export const volumeCountLabel = (volumes: { kind?: VolumeKind }[]) =>
 export const seriesVolumesLabel = (count: number, kinds?: string | null) => {
     const list = (kinds ?? '').split(',').filter(Boolean) as VolumeKind[];
     const only = list.length === 1 ? list[0]! : 'volume';
-    if (only === 'one-shot' && count === 1) return 'One-shot';
+    // Un one-shot, une intégrale : le nom du type seul.
+    if ((only === 'one-shot' || only === 'integrale') && count === 1) {
+        return VOLUME_KIND_LABELS[only];
+    }
     const [one, many] = KIND_COUNTS[isMainKind(only) ? only : 'volume'];
     return `${count} ${count > 1 ? many : one}`;
 };

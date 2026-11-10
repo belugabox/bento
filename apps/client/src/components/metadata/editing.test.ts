@@ -106,13 +106,11 @@ describe('fillFromFileNames', () => {
         expect(edits[first]).toEqual({
             Series: 'Spy x Family',
             Number: '1',
-            Title: 'Tome 1',
             Year: 2020,
         });
         expect(edits[second]).toEqual({
             Series: 'Spy x Family',
             Number: '2',
-            Title: 'Tome 2',
             Year: 2020,
         });
     });
@@ -140,14 +138,14 @@ describe('fillFromFileNames', () => {
             Series: 'Gantz',
             Number: '1',
             Format: 'Hors-série',
-            Title: 'Hors-série 1',
             Year: 2010,
         });
         expect(edits[specials[1]!.path]).toMatchObject({
             Number: '2',
             Format: 'Spécial',
-            Title: 'Spécial 2',
         });
+        // Pas de titre par défaut : il est facultatif.
+        expect(edits[specials[1]!.path]!.Title).toBeUndefined();
     });
 
     it('changes the kind of a volume in its Format field', () => {
@@ -157,6 +155,10 @@ describe('fillFromFileNames', () => {
         expect(special[first]).toEqual({ Number: '1', Format: 'Spécial' });
         expect(setVolumeKind(special, first, 'volume')[first]).toEqual({
             Number: '1',
+        });
+        // One-shot : le numéro est vidé.
+        expect(setVolumeKind(edits, first, 'one-shot')[first]).toEqual({
+            Format: 'One-shot',
         });
         // Un autre Format n'est pas un type : gardé.
         expect(
@@ -190,7 +192,6 @@ describe('fillFromFileNames', () => {
         expect(edits[first]).toEqual({
             Series: 'Mine',
             Number: '1',
-            Title: 'Tome 1',
             Year: 2020,
         });
     });

@@ -198,6 +198,46 @@ describe('SeriesPage', () => {
         );
     });
 
+    it('shows a one-shot without its volume', async () => {
+        vi.spyOn(globalThis, 'fetch').mockImplementation(
+            async () =>
+                new Response(
+                    JSON.stringify({
+                        ...SERIES,
+                        volumes: [
+                            {
+                                ...volume(1, null),
+                                number: null,
+                                kind: 'one-shot',
+                            },
+                        ],
+                    }),
+                    { headers: { 'Content-Type': 'application/json' } },
+                ),
+        );
+        render(
+            <MantineProvider>
+                <UserContext.Provider value={READER}>
+                    <MemoryRouter initialEntries={['/series/3']}>
+                        <Routes>
+                            <Route
+                                path="/series/:id"
+                                element={<SeriesPage />}
+                            />
+                        </Routes>
+                    </MemoryRouter>
+                </UserContext.Provider>
+            </MantineProvider>,
+        );
+
+        expect(await screen.findByText('One-shot')).toBeTruthy();
+        // « Lire », sans « tome 1 » ; pas de carte de tome.
+        expect(screen.getByRole('link', { name: 'Lire' })).toBeTruthy();
+        expect(
+            screen.queryByRole('button', { name: /^Actions pour/ }),
+        ).toBeNull();
+    });
+
     it('offers a menu on each volume', async () => {
         const requests: [string, string, unknown][] = [];
         vi.spyOn(globalThis, 'fetch').mockImplementation(
