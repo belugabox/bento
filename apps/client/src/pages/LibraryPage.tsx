@@ -572,6 +572,12 @@ export const LibraryPage = () => {
                                                 'small',
                                             )}
                                             title={item.name}
+                                            // Déjà lue (groupement « Lecture ») :
+                                            // légèrement grisée.
+                                            dimmed={
+                                                display.groupBy === 'reading' &&
+                                                state === 'read'
+                                            }
                                             tag={newBadge(item.newCount)}
                                             subtitle={
                                                 state === 'started'
