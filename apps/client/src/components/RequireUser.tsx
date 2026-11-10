@@ -6,20 +6,35 @@ import {
     RefreshUserContext,
     UserContext,
     fetchMe,
+    saveUser,
+    savedUser,
 } from '@/services/auth';
+import { NetworkError } from '@/services/network';
 
 /**
  * N'affiche son contenu qu'une fois la personne connue ; sans session,
- * `json` envoie vers la page de connexion.
+ * `json` envoie vers la page de connexion. Sans réseau, la dernière personne
+ * connue sur l'appareil (lecture de ses tomes téléchargés).
  */
 export const RequireUser = ({ children }: { children: ReactNode }) => {
     const [user, setUser] = useState<CurrentUser>();
     const [error, setError] = useState<string>();
 
-    const refresh = useCallback(() => fetchMe().then(setUser), []);
+    const refresh = useCallback(
+        () =>
+            fetchMe().then((me) => {
+                saveUser(me);
+                setUser(me);
+            }),
+        [],
+    );
 
     useEffect(() => {
-        refresh().catch((e: Error) => setError(e.message));
+        refresh().catch((e: Error) => {
+            const saved = e instanceof NetworkError ? savedUser() : undefined;
+            if (saved) setUser(saved);
+            else setError(e.message);
+        });
     }, [refresh]);
 
     if (error) {

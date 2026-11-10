@@ -7,6 +7,7 @@ import {
     AppHeader,
     PreviewBanner,
 } from '@/components/AppHeader';
+import { OfflineBanner } from '@/components/OfflineBanner';
 import { RequireUser } from '@/components/RequireUser';
 import { JoinPage } from '@/pages/JoinPage';
 import { LibraryPage } from '@/pages/LibraryPage';
@@ -61,6 +62,7 @@ const Layout = () => (
         </AppShell.Header>
         <AppShell.Main>
             <Container size="xl">
+                <OfflineBanner />
                 <PreviewBanner />
                 <ActivationBanner />
                 <Outlet />

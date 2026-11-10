@@ -6,10 +6,54 @@ export type CurrentUser = Awaited<ReturnType<typeof fetchMe>>;
 
 export const fetchMe = () => json(api.me.$get());
 
-/** Ferme la session, puis revient à la page de connexion. */
+// Dernière personne connectée sur l'appareil : pour ouvrir Bento sans réseau.
+const SAVED_USER = 'bento:user';
+
+/**
+ * Garde la personne connectée sur l'appareil ; pas une vue simulée par
+ * l'admin (« Voir comme un lecteur »).
+ */
+export const saveUser = (user: CurrentUser) => {
+    if (user.preview) return;
+    try {
+        localStorage.setItem(SAVED_USER, JSON.stringify(user));
+    } catch {
+        // Stockage refusé : pas d'ouverture hors ligne.
+    }
+};
+
+export const savedUser = (): CurrentUser | undefined => {
+    try {
+        const saved = localStorage.getItem(SAVED_USER);
+        return saved ? (JSON.parse(saved) as CurrentUser) : undefined;
+    } catch {
+        return undefined;
+    }
+};
+
+export const forgetSavedUser = () => {
+    try {
+        localStorage.removeItem(SAVED_USER);
+    } catch {
+        // Rien de gardé.
+    }
+};
+
+/**
+ * Ferme la session, oublie la personne sur l'appareil (et ses tomes
+ * téléchargés), puis revient à la page de connexion.
+ */
 export const logout = async () => {
     await json(api.auth.logout.$post());
+    forgetSavedUser();
+    await onLogout();
     window.location.assign('/login');
+};
+
+// Nettoyage des données de l'appareil à la déconnexion (téléchargements).
+let onLogout: () => Promise<unknown> = async () => {};
+export const setLogoutCleanup = (cleanup: () => Promise<unknown>) => {
+    onLogout = cleanup;
 };
 
 export const UserContext = createContext<CurrentUser | undefined>(undefined);

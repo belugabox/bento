@@ -111,6 +111,7 @@ Par défaut, Bento suit le mode du système (clair ou sombre) en violet ; l'admi
 
 ### Appli et plein écran
 
+- **Sans réseau** : un service worker (`apps/client/sw/sw.js`, écrit au build avec la liste de tous les fichiers de l'appli) garde l'application sur l'appareil : Bento s'ouvre sans réseau, avec la dernière personne connectée sur l'appareil, et un bandeau « Hors ligne ». Les pages demandées passent par le réseau d'abord (4 s au plus). En développement (`pnpm dev`), pas de service worker.
 - **Pages à la taille de l'écran** : le lecteur demande chaque page réduite à la largeur de l'écran (800, 1200 ou 1600 pixels réels, d'après son petit côté ; au-delà, la page d'origine), en WebP : environ trois fois plus légère. Le serveur calcule chaque page réduite une fois et la garde dans `DATA_PATH/pages` (2 Go au plus, les plus anciennes effacées) ; une nouvelle version du tome efface les anciennes.
 - **Android (Chrome)** : menu ⋮, « Installer l'application » (ou « Ajouter à l'écran d'accueil »). Bento s'ouvre alors depuis son icône, dans sa propre fenêtre, sans barre d'adresse.
 - **iPad, iPhone (Safari)** : bouton Partager, « Sur l'écran d'accueil ».

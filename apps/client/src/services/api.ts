@@ -9,6 +9,8 @@ import {
     randomAvatar,
 } from '@server/types';
 
+import { reachServer } from './network';
+
 /** Client typé de l'API (`/api`, servie par le même domaine). */
 export const api = hc<ApiType>('/api');
 
@@ -21,7 +23,8 @@ export const loginUrl = (
 export const json = async <T>(
     call: Promise<{ ok: boolean; status: number; json(): Promise<T> }>,
 ): Promise<T> => {
-    const response = await call;
+    // Sans réponse du serveur : `NetworkError`, et l'appli passe hors ligne.
+    const response = await reachServer(() => call);
     // Session absente ou expirée : passer par la page de connexion.
     if (response.status === 401) {
         window.location.assign(loginUrl());
