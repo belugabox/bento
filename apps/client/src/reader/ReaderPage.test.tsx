@@ -139,14 +139,20 @@ afterEach(() => {
 describe('ReaderPage', () => {
     it('turns pages with the left arrow when reading a manga', async () => {
         await open('rtl');
-        expect(shownPage()).toBe('/api/volumes/7/pages/0?v=1700000000000');
+        expect(shownPage()).toBe(
+            '/api/volumes/7/pages/0?v=1700000000000&w=800',
+        );
 
         press('ArrowLeft');
-        expect(shownPage()).toBe('/api/volumes/7/pages/1?v=1700000000000');
+        expect(shownPage()).toBe(
+            '/api/volumes/7/pages/1?v=1700000000000&w=800',
+        );
         expect(location).toBe('/read/7?page=2');
 
         press('ArrowRight');
-        expect(shownPage()).toBe('/api/volumes/7/pages/0?v=1700000000000');
+        expect(shownPage()).toBe(
+            '/api/volumes/7/pages/0?v=1700000000000&w=800',
+        );
     });
 
     it('turns pages with the right arrow when reading a comic', async () => {
@@ -154,13 +160,17 @@ describe('ReaderPage', () => {
 
         press('ArrowRight');
 
-        expect(shownPage()).toBe('/api/volumes/7/pages/1?v=1700000000000');
+        expect(shownPage()).toBe(
+            '/api/volumes/7/pages/1?v=1700000000000&w=800',
+        );
     });
 
     it('resumes at the page in the address', async () => {
         await open('rtl', '/read/7?page=3');
 
-        expect(shownPage()).toBe('/api/volumes/7/pages/2?v=1700000000000');
+        expect(shownPage()).toBe(
+            '/api/volumes/7/pages/2?v=1700000000000&w=800',
+        );
     });
 
     it('offers the next volume after the last page', async () => {
@@ -227,7 +237,9 @@ describe('ReaderPage', () => {
     it('resumes where the person stopped', async () => {
         await open('rtl', '/read/7', { page: 1, completed: false });
 
-        expect(shownPage()).toBe('/api/volumes/7/pages/1?v=1700000000000');
+        expect(shownPage()).toBe(
+            '/api/volumes/7/pages/1?v=1700000000000&w=800',
+        );
         // L'adresse suit au rendu suivant.
         await vi.waitFor(() => expect(location).toBe('/read/7?page=2'));
     });
@@ -263,35 +275,47 @@ describe('ReaderPage', () => {
     it('starts over a volume already read', async () => {
         await open('rtl', '/read/7', { page: 2, completed: true });
 
-        expect(shownPage()).toBe('/api/volumes/7/pages/0?v=1700000000000');
+        expect(shownPage()).toBe(
+            '/api/volumes/7/pages/0?v=1700000000000&w=800',
+        );
     });
 
     it('turns the page with a swipe, following the direction', async () => {
         await open('ltr');
 
         swipe(600, 300);
-        expect(shownPage()).toBe('/api/volumes/7/pages/1?v=1700000000000');
+        expect(shownPage()).toBe(
+            '/api/volumes/7/pages/1?v=1700000000000&w=800',
+        );
 
         swipe(300, 600);
-        expect(shownPage()).toBe('/api/volumes/7/pages/0?v=1700000000000');
+        expect(shownPage()).toBe(
+            '/api/volumes/7/pages/0?v=1700000000000&w=800',
+        );
     });
 
     it('turns the page when tapping a side, and ignores the middle', async () => {
         await open('ltr');
 
         tap(900);
-        expect(shownPage()).toBe('/api/volumes/7/pages/1?v=1700000000000');
+        expect(shownPage()).toBe(
+            '/api/volumes/7/pages/1?v=1700000000000&w=800',
+        );
         tap(500);
-        expect(shownPage()).toBe('/api/volumes/7/pages/1?v=1700000000000');
+        expect(shownPage()).toBe(
+            '/api/volumes/7/pages/1?v=1700000000000&w=800',
+        );
         tap(100);
-        expect(shownPage()).toBe('/api/volumes/7/pages/0?v=1700000000000');
+        expect(shownPage()).toBe(
+            '/api/volumes/7/pages/0?v=1700000000000&w=800',
+        );
     });
 
     it('shows two pages side by side in landscape, cover alone', async () => {
         landscape();
         await open('ltr');
         expect(shownPages()).toEqual([
-            '/api/volumes/7/pages/0?v=1700000000000',
+            '/api/volumes/7/pages/0?v=1700000000000&w=800',
         ]);
         await vi.waitFor(() => expect(location).toBe('/read/7?page=1'));
 
@@ -299,8 +323,8 @@ describe('ReaderPage', () => {
 
         await vi.waitFor(() =>
             expect(shownPages()).toEqual([
-                '/api/volumes/7/pages/1?v=1700000000000',
-                '/api/volumes/7/pages/2?v=1700000000000',
+                '/api/volumes/7/pages/1?v=1700000000000&w=800',
+                '/api/volumes/7/pages/2?v=1700000000000&w=800',
             ]),
         );
         // Les deux pages comptent : trois pages vues, la progression
@@ -316,8 +340,8 @@ describe('ReaderPage', () => {
 
         await vi.waitFor(() =>
             expect(shownPages()).toEqual([
-                '/api/volumes/7/pages/2?v=1700000000000',
-                '/api/volumes/7/pages/1?v=1700000000000',
+                '/api/volumes/7/pages/2?v=1700000000000&w=800',
+                '/api/volumes/7/pages/1?v=1700000000000&w=800',
             ]),
         );
     });
@@ -330,8 +354,8 @@ describe('ReaderPage', () => {
 
         await vi.waitFor(() =>
             expect(shownPages()).toEqual([
-                '/api/volumes/7/pages/2?v=1700000000000',
-                '/api/volumes/7/pages/1?v=1700000000000',
+                '/api/volumes/7/pages/2?v=1700000000000&w=800',
+                '/api/volumes/7/pages/1?v=1700000000000&w=800',
             ]),
         );
     });
@@ -341,9 +365,9 @@ describe('ReaderPage', () => {
 
         await vi.waitFor(() =>
             expect(shownPages()).toEqual([
-                '/api/volumes/7/pages/0?v=1700000000000',
-                '/api/volumes/7/pages/1?v=1700000000000',
-                '/api/volumes/7/pages/2?v=1700000000000',
+                '/api/volumes/7/pages/0?v=1700000000000&w=800',
+                '/api/volumes/7/pages/1?v=1700000000000&w=800',
+                '/api/volumes/7/pages/2?v=1700000000000&w=800',
             ]),
         );
         expect(screen.queryByRole('slider')).toBeNull();
@@ -394,7 +418,7 @@ describe('ReaderPage', () => {
         );
         await vi.waitFor(() =>
             expect(scrolled).toContain(
-                '/api/volumes/7/pages/2?v=1700000000000',
+                '/api/volumes/7/pages/2?v=1700000000000&w=800',
             ),
         );
 
@@ -402,7 +426,7 @@ describe('ReaderPage', () => {
 
         await vi.waitFor(() =>
             expect(scrolled.at(-1)).toBe(
-                '/api/volumes/8/pages/0?v=1700000000000',
+                '/api/volumes/8/pages/0?v=1700000000000&w=800',
             ),
         );
         await vi.waitFor(() => expect(location).toBe('/read/8?page=1'));

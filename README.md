@@ -111,6 +111,7 @@ Par défaut, Bento suit le mode du système (clair ou sombre) en violet ; l'admi
 
 ### Appli et plein écran
 
+- **Pages à la taille de l'écran** : le lecteur demande chaque page réduite à la largeur de l'écran (800, 1200 ou 1600 pixels réels, d'après son petit côté ; au-delà, la page d'origine), en WebP : environ trois fois plus légère. Le serveur calcule chaque page réduite une fois et la garde dans `DATA_PATH/pages` (2 Go au plus, les plus anciennes effacées) ; une nouvelle version du tome efface les anciennes.
 - **Android (Chrome)** : menu ⋮, « Installer l'application » (ou « Ajouter à l'écran d'accueil »). Bento s'ouvre alors depuis son icône, dans sa propre fenêtre, sans barre d'adresse.
 - **iPad, iPhone (Safari)** : bouton Partager, « Sur l'écran d'accueil ».
 - **Plein écran** : dans le lecteur, le bouton à côté des réglages masque la barre du navigateur et la barre d'état ; « Plein écran à l'ouverture », dans les réglages de lecture, l'active au premier toucher. Le plein écran continue d'un tome au suivant, et s'arrête en quittant le lecteur. Safari sur iPhone ne le permet pas : installer l'appli donne alors le plus grand écran possible.

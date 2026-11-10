@@ -5,6 +5,7 @@ import {
     type ReadingMode,
     type SourceLink,
     formatAvatar,
+    pageWidthFor,
     randomAvatar,
 } from '@server/types';
 
@@ -136,8 +137,29 @@ export type Volume = Awaited<ReturnType<typeof fetchVolume>>;
 // des grilles), plus légère.
 export const coverUrl = (volumeId: number, version: number, size?: 'small') =>
     `/api/volumes/${volumeId}/cover?v=${version}${size ? `&size=${size}` : ''}`;
-export const pageUrl = (volumeId: number, version: number, index: number) =>
-    `/api/volumes/${volumeId}/pages/${index}?v=${version}`;
+/**
+ * Page d'un tome ; avec `width`, réduite à cette largeur par le serveur
+ * (une des largeurs prévues, voir `screenPageWidth`).
+ */
+export const pageUrl = (
+    volumeId: number,
+    version: number,
+    index: number,
+    width?: number,
+) =>
+    `/api/volumes/${volumeId}/pages/${index}?v=${version}${width ? `&w=${width}` : ''}`;
+
+/**
+ * Largeur des pages pour cet écran (petit côté en pixels réels), ou
+ * `undefined` pour la page d'origine (écran plus grand que les largeurs
+ * prévues).
+ */
+export const screenPageWidth = () =>
+    pageWidthFor({
+        width: window.screen.width,
+        height: window.screen.height,
+        pixelRatio: window.devicePixelRatio,
+    });
 
 export const saveProgress = (
     volumeId: number,

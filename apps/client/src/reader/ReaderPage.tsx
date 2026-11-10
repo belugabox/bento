@@ -9,6 +9,7 @@ import {
     fetchVolume,
     pageUrl,
     saveProgress,
+    screenPageWidth,
 } from '@/services/api';
 import { useReadOnly } from '@/services/auth';
 import { useQuery } from '@/services/useQuery';
@@ -104,7 +105,9 @@ export const ReaderPage = () => {
     );
 
     const pageSrc = useCallback(
-        (index: number) => pageUrl(volumeId, volume?.version ?? 0, index),
+        // Réduite à la largeur de l'écran : trois fois plus légère.
+        (index: number) =>
+            pageUrl(volumeId, volume?.version ?? 0, index, screenPageWidth()),
         [volumeId, volume?.version],
     );
     const loadSizes = useCallback(() => fetchPageSizes(volumeId), [volumeId]);
