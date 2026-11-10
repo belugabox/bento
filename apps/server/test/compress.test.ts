@@ -1,6 +1,6 @@
 import AdmZip from 'adm-zip';
 import { randomBytes } from 'node:crypto';
-import { mkdir, stat, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import sharp from 'sharp';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -106,25 +106,39 @@ describe('compression', () => {
         expect((await stat(fullPath)).mtimeMs).toBe(before.mtimeMs);
     });
 
-    it('estimates a whole series at once, from a few of its volumes', async () => {
-        const paths = [1, 2, 3, 4, 5].map((n) => `_draft/Gantz T0${n}.cbz`);
-        for (const relative of paths) await writeHeavyCbz(relative);
-        await writeFile(ctx.file('_draft/broken.cbz'), 'pas une archive');
+    // Plus lent que les autres (24 pages recompressées) : délai plus large
+    // pour les machines de GitHub.
+    it(
+        'estimates a whole series at once, from a few of its volumes',
+        {
+            timeout: 30_000,
+        },
+        async () => {
+            const paths = [1, 2, 3, 4, 5].map((n) => `_draft/Gantz T0${n}.cbz`);
+            // Un seul tome fabriqué (images de bruit, lentes à créer), copié.
+            const first = await writeHeavyCbz(paths[0]!);
+            for (const relative of paths.slice(1)) {
+                await copyFile(first, ctx.file(relative));
+            }
+            await writeFile(ctx.file('_draft/broken.cbz'), 'pas une archive');
 
-        const estimates = await (
-            await post('compression/estimate', {
-                paths: [...paths, '_draft/broken.cbz'],
-            })
-        ).json();
+            const estimates = await (
+                await post('compression/estimate', {
+                    paths: [...paths, '_draft/broken.cbz'],
+                })
+            ).json();
 
-        for (const relative of paths) {
-            const { size } = await stat(ctx.file(relative));
-            expect(estimates[relative].originalSize).toBe(size);
-            expect(estimates[relative].compressedSize).toBeLessThan(size * 0.8);
-        }
-        // Un fichier illisible : son erreur, sans gêner les autres.
-        expect(estimates['_draft/broken.cbz'].error).toBeTruthy();
-    });
+            for (const relative of paths) {
+                const { size } = await stat(ctx.file(relative));
+                expect(estimates[relative].originalSize).toBe(size);
+                expect(estimates[relative].compressedSize).toBeLessThan(
+                    size * 0.8,
+                );
+            }
+            // Un fichier illisible : son erreur, sans gêner les autres.
+            expect(estimates['_draft/broken.cbz'].error).toBeTruthy();
+        },
+    );
 
     it('marks a compressed file, which is then left alone', async () => {
         const fullPath = await writeHeavyCbz('_draft/Gantz T01.cbz');
