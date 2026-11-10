@@ -97,13 +97,70 @@ describe('compression', () => {
         const before = await stat(fullPath);
 
         const response = await post('compression/estimate', {
-            path: '_draft/Gantz T01.cbz',
+            paths: ['_draft/Gantz T01.cbz'],
         });
 
-        const estimate = await response.json();
+        const estimate = (await response.json())['_draft/Gantz T01.cbz'];
         expect(estimate.originalSize).toBe(before.size);
         expect(estimate.compressedSize).toBeLessThan(before.size * 0.8);
         expect((await stat(fullPath)).mtimeMs).toBe(before.mtimeMs);
+    });
+
+    it('estimates a whole series at once, from a few of its volumes', async () => {
+        const paths = [1, 2, 3, 4, 5].map((n) => `_draft/Gantz T0${n}.cbz`);
+        for (const relative of paths) await writeHeavyCbz(relative);
+        await writeFile(ctx.file('_draft/broken.cbz'), 'pas une archive');
+
+        const estimates = await (
+            await post('compression/estimate', {
+                paths: [...paths, '_draft/broken.cbz'],
+            })
+        ).json();
+
+        for (const relative of paths) {
+            const { size } = await stat(ctx.file(relative));
+            expect(estimates[relative].originalSize).toBe(size);
+            expect(estimates[relative].compressedSize).toBeLessThan(size * 0.8);
+        }
+        // Un fichier illisible : son erreur, sans gêner les autres.
+        expect(estimates['_draft/broken.cbz'].error).toBeTruthy();
+    });
+
+    it('marks a compressed file, which is then left alone', async () => {
+        const fullPath = await writeHeavyCbz('_draft/Gantz T01.cbz');
+        await compress('_draft/Gantz T01.cbz');
+        expect(new AdmZip(fullPath).getZipComment()).toBe(
+            'bento:compressed q=90 h=2400',
+        );
+        const after = await stat(fullPath);
+
+        // Rien à gagner : estimé sans gain, et pas recompressé.
+        const estimate = (
+            await (
+                await post('compression/estimate', {
+                    paths: ['_draft/Gantz T01.cbz'],
+                })
+            ).json()
+        )['_draft/Gantz T01.cbz'];
+        expect(estimate).toEqual({
+            originalSize: after.size,
+            compressedSize: after.size,
+        });
+        queue.clear();
+        const again = await compress('_draft/Gantz T01.cbz');
+        expect(again.compressedSize).toBe(after.size);
+        expect((await stat(fullPath)).mtimeMs).toBe(after.mtimeMs);
+
+        // Réglages plus forts (qualité plus basse) : de nouveau estimé.
+        settings.update({ compression: { quality: 60 } });
+        const stronger = (
+            await (
+                await post('compression/estimate', {
+                    paths: ['_draft/Gantz T01.cbz'],
+                })
+            ).json()
+        )['_draft/Gantz T01.cbz'];
+        expect(stronger.compressedSize).toBeLessThan(after.size);
     });
 
     it('recompresses the pages, keeping their order and the ComicInfo', async () => {

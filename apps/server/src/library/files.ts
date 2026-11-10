@@ -830,12 +830,23 @@ export class LibraryFiles {
     page = (libraryId: number, relative: string, index: number) =>
         this.reader.page(this.fullPath(libraryId, relative), index);
 
-    /** Gain estimé en compressant les pages d'un fichier. */
-    estimateCompression = (
+    /**
+     * Gain estimé en compressant les pages de fichiers (les tomes d'une
+     * série), par chemin relatif.
+     */
+    estimateCompression = async (
         libraryId: number,
-        relative: string,
+        relatives: string[],
         options: CompressionOptions,
-    ) => estimateCompression(this.fullPath(libraryId, relative), options);
+    ) => {
+        const fullPaths = relatives.map((relative) =>
+            this.fullPath(libraryId, relative),
+        );
+        const results = await estimateCompression(fullPaths, options);
+        return Object.fromEntries(
+            relatives.map((relative, i) => [relative, results[fullPaths[i]!]!]),
+        );
+    };
 
     /** Compresse les pages d'un fichier ; un tome publié est rescanné. */
     compress = async (

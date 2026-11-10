@@ -40,7 +40,13 @@ describe('CompressionModal', () => {
                         },
                     };
                 } else if (url.endsWith('/compression/estimate')) {
-                    body = { originalSize: 1000, compressedSize: 600 };
+                    // Tous les fichiers, en une seule requête.
+                    body = Object.fromEntries(
+                        files.map((f) => [
+                            f.path,
+                            { originalSize: 1000, compressedSize: 600 },
+                        ]),
+                    );
                 } else if (url.endsWith('/compress')) {
                     queue = files.map((f) => job(f.path, 'pending'));
                     body = { jobs: queue };
@@ -89,6 +95,9 @@ describe('CompressionModal', () => {
             expect(screen.getAllByText('−40 %')).toHaveLength(2),
         );
         expect(screen.getByText(/^Estimation :/).textContent).toMatch(/−40 %/);
+        expect(
+            requests.filter((r) => r.endsWith('/compression/estimate')),
+        ).toHaveLength(1);
 
         await act(async () => {
             fireEvent.click(screen.getByText('Compresser (2)'));

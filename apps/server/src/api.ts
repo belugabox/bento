@@ -944,12 +944,17 @@ export const createApi = ({
             '/libraries/:id/files/compression/estimate',
             requireAdmin,
             zValidator('param', idParam),
-            zValidator('json', fileQuery),
+            zValidator(
+                'json',
+                z.object({
+                    paths: z.array(z.string().min(1)).min(1).max(2000),
+                }),
+            ),
             async (c) =>
                 c.json(
                     await files.estimateCompression(
                         c.req.valid('param').id,
-                        c.req.valid('json').path,
+                        c.req.valid('json').paths,
                         settings.get().compression,
                     ),
                 ),

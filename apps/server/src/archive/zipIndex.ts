@@ -147,6 +147,29 @@ export const readZipEntries = async (fullPath: string): Promise<ZipEntry[]> => {
     }
 };
 
+/** Commentaire de l'archive (fin du répertoire central), vide sans. */
+export const readZipComment = async (fullPath: string): Promise<string> => {
+    const file = await open(fullPath, 'r');
+    try {
+        const { size: fileSize } = await file.stat();
+        const tailSize = Math.min(fileSize, MAX_TAIL);
+        const tail = await readAt(file, fileSize - tailSize, tailSize);
+        for (let i = tail.length - END_SIZE; i >= 0; i--) {
+            if (tail.readUInt32LE(i) === END_OF_CENTRAL_DIRECTORY) {
+                const length = tail.readUInt16LE(i + 20);
+                return tail.toString(
+                    'utf8',
+                    i + END_SIZE,
+                    i + END_SIZE + length,
+                );
+            }
+        }
+        return '';
+    } finally {
+        await file.close();
+    }
+};
+
 /** Position des données d'une entrée, après son en-tête local. */
 const dataOffsetOf = async (file: FileHandle, entry: ZipEntry) => {
     const header = await readAt(file, entry.offset, 30);
