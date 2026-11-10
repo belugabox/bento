@@ -91,6 +91,8 @@ beforeEach(() => {
                     updatedAt: '2026-03-01T00:00:00.000Z',
                     readCount: 3,
                     volumeCount: 6,
+                    // Deux tomes ajoutés depuis la dernière lecture.
+                    newCount: 2,
                 },
             ]);
         }
@@ -305,6 +307,11 @@ describe('LibraryPage', () => {
 
     it('resumes with the next volume of a series, in the same row', async () => {
         show();
+
+        // Pastille des tomes ajoutés depuis la dernière lecture.
+        expect(
+            (await screen.findByLabelText('2 nouveaux tomes')).textContent,
+        ).toBe('+2');
 
         expect(await screen.findByText('T4 · 3/6 lus')).toBeTruthy();
         expect(screen.queryByText('La suite de tes séries')).toBeNull();

@@ -1,5 +1,6 @@
 import {
     Alert,
+    Badge,
     Box,
     Button,
     Center,
@@ -75,6 +76,21 @@ import {
 import { UserContext } from '@/services/auth';
 import { useQuery } from '@/services/useQuery';
 
+/**
+ * Pastille « +2 » : tomes ajoutés depuis la dernière lecture de la série
+ * (rien sans nouveauté).
+ */
+const newBadge = (count: number | undefined) =>
+    count ? (
+        <Badge
+            size="sm"
+            variant="filled"
+            aria-label={`${count} nouveau${count > 1 ? 'x' : ''} tome${count > 1 ? 's' : ''}`}
+        >
+            +{count}
+        </Badge>
+    ) : undefined;
+
 /** Tome à reprendre : ouvre le lecteur. */
 const ResumeCard = ({
     volume,
@@ -93,6 +109,7 @@ const ResumeCard = ({
         | 'number'
         | 'title'
         | 'page'
+        | 'newCount'
     >;
     subtitle?: string;
     progress?: number;
@@ -112,6 +129,7 @@ const ResumeCard = ({
         layout={display.layout === 'list' ? 'row' : 'card'}
         coversOnly={display.coversOnly}
         details={details}
+        corner={newBadge(volume.newCount)}
         // ▶ en couleur : la carte ouvre le lecteur, pas la fiche.
         badge={
             <ThemeIcon size="sm" radius="xl" aria-label="Tome à reprendre">
@@ -541,6 +559,7 @@ export const LibraryPage = () => {
                                                 'small',
                                             )}
                                             title={item.name}
+                                            corner={newBadge(item.newCount)}
                                             subtitle={
                                                 state === 'started'
                                                     ? `${item.readCount} / ${item.volumeCount} lus`
