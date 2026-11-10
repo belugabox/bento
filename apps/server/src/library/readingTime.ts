@@ -35,7 +35,10 @@ export const addReadingTime = (
         .orderBy(desc(readingSessions.endedAt))
         .limit(1)
         .get();
-    if (last && now.getTime() - last.endedAt.getTime() <= SAME_SESSION_MS) {
+    // Envoi plus ancien que la dernière séance (lecture hors ligne) : une
+    // séance à part.
+    const gap = last ? now.getTime() - last.endedAt.getTime() : -1;
+    if (last && gap >= 0 && gap <= SAME_SESSION_MS) {
         db.update(readingSessions)
             .set({
                 endedAt: new Date(last.endedAt.getTime() + seconds * 1000),

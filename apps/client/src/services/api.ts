@@ -71,7 +71,8 @@ export const fetchSeriesReaders = (seriesId: number) =>
 /** Temps passé dans le lecteur sur un tome (statistiques). */
 export const sendReadingTime = (
     volumeId: number,
-    time: { seconds: number; pages: number },
+    // `at` : heure réelle d'une lecture faite hors ligne (ms).
+    time: { seconds: number; pages: number; at?: number },
 ) =>
     json(
         api.volumes[':id']['reading-time'].$post({
@@ -166,7 +167,8 @@ export const screenPageWidth = () =>
 
 export const saveProgress = (
     volumeId: number,
-    progress: { page?: number; completed?: boolean },
+    // `at` : heure réelle d'une lecture faite hors ligne (ms).
+    progress: { page?: number; completed?: boolean; at?: number },
 ) =>
     json(
         api.volumes[':id'].progress.$put({

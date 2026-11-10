@@ -642,6 +642,8 @@ export const createApi = ({
                 z.object({
                     page: z.number().int().min(0).optional(),
                     completed: z.boolean().optional(),
+                    // Lecture hors ligne : son heure réelle (ms).
+                    at: z.number().int().positive().optional(),
                 }),
             ),
             (c) => {
@@ -659,6 +661,9 @@ export const createApi = ({
                         c.var.user.id,
                         id,
                         c.req.valid('json'),
+                        c.req.valid('json').at
+                            ? new Date(c.req.valid('json').at!)
+                            : undefined,
                     ),
                     previous: previous!,
                 });
@@ -673,6 +678,8 @@ export const createApi = ({
                 z.object({
                     seconds: z.number().int().min(1).max(600),
                     pages: z.number().int().min(0).max(2000),
+                    // Lecture hors ligne : l'heure de fin réelle (ms).
+                    at: z.number().int().positive().optional(),
                 }),
             ),
             (c) => {
@@ -681,7 +688,14 @@ export const createApi = ({
                     c.var.user,
                     c.req.valid('param').id,
                 );
-                addReadingTime(db, c.var.user.id, id, c.req.valid('json'));
+                const { at, ...time } = c.req.valid('json');
+                addReadingTime(
+                    db,
+                    c.var.user.id,
+                    id,
+                    time,
+                    at && at < Date.now() ? new Date(at) : new Date(),
+                );
                 return c.json({ ok: true as const });
             },
         )

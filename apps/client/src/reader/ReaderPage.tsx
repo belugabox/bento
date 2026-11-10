@@ -1,13 +1,14 @@
 import { Alert, Button, Center, Loader, Text } from '@mantine/core';
 import { useLocalStorage } from '@mantine/hooks';
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useContext, useEffect, useRef } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 
 import { volumeLabel } from '@/components/readingStatus';
 import { saveLocalProgress, useDownloads } from '@/offline/downloads';
 import { loadPageSizes, loadVolume } from '@/offline/reading';
+import { saveProgressOrQueue } from '@/offline/syncQueue';
 import { pageUrl, saveProgress, screenPageWidth } from '@/services/api';
-import { useReadOnly } from '@/services/auth';
+import { UserContext, useReadOnly } from '@/services/auth';
 import { useOnline } from '@/services/network';
 import { useQuery } from '@/services/useQuery';
 
@@ -28,6 +29,7 @@ const PAGES_BEFORE_SAVE = 3;
 export const ReaderPage = () => {
     const volumeId = Number(useParams().id);
     const readOnly = useReadOnly();
+    const userId = useContext(UserContext)?.id;
     const navigate = useNavigate();
     const [params, setParams] = useSearchParams();
     // Sans réseau : la fiche du tome téléchargé.
@@ -101,12 +103,16 @@ export const ReaderPage = () => {
                 page: lastShown,
                 completed: lastShown >= volume.pageCount - 1,
             });
-            saveProgress(volume.id, { page: lastShown }).catch(() => {
-                // Sans réseau, la lecture continue ; la page suivante réessaiera.
+            // Sans réseau : gardée sur l'appareil, envoyée au retour du réseau.
+            const save = userId
+                ? saveProgressOrQueue(userId, volume.id, { page: lastShown })
+                : saveProgress(volume.id, { page: lastShown });
+            save.catch(() => {
+                // Refusée : la page suivante réessaiera.
                 savedPage.current = undefined;
             });
         },
-        [volume, urlReady, readOnly, readingActivity],
+        [volume, urlReady, readOnly, readingActivity, userId],
     );
 
     const pageSrc = useCallback(

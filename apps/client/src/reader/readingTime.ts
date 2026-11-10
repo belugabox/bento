@@ -1,6 +1,9 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useContext, useEffect, useRef } from 'react';
 
+import { sendReadingTimeOrQueue } from '@/offline/syncQueue';
 import { sendReadingTime } from '@/services/api';
+import { UserContext } from '@/services/auth';
+import { isOnline } from '@/services/network';
 
 // Sans changer de page pendant plus longtemps : pause, ce temps ne compte pas.
 export const IDLE_MS = 2 * 60 * 1000;
@@ -24,6 +27,7 @@ export const useReadingTime = (
     enabled: boolean,
 ) => {
     const pending = useRef<Pending>(undefined);
+    const userId = useContext(UserContext)?.id;
     // Dernière page vue (heure), pour le temps passé dessus.
     const last = useRef<number>(undefined);
 
@@ -31,45 +35,54 @@ export const useReadingTime = (
      * Envoie le temps accumulé. `close` : on quitte ce tome, le temps sur la
      * dernière page compte ; `beacon` : la page se ferme.
      */
-    const flush = useCallback(({ close = false, beacon = false } = {}) => {
-        const current = pending.current;
-        if (!current) return;
-        if (close) {
-            if (last.current !== undefined) {
-                const idle = Date.now() - last.current;
-                if (idle <= IDLE_MS) current.ms += idle;
+    const flush = useCallback(
+        ({ close = false, beacon = false } = {}) => {
+            const current = pending.current;
+            if (!current) return;
+            if (close) {
+                if (last.current !== undefined) {
+                    const idle = Date.now() - last.current;
+                    if (idle <= IDLE_MS) current.ms += idle;
+                }
+                last.current = undefined;
+                pending.current = undefined;
+            } else {
+                pending.current = { ...current, ms: 0, pages: 0 };
             }
-            last.current = undefined;
-            pending.current = undefined;
-        } else {
-            pending.current = { ...current, ms: 0, pages: 0 };
-        }
-        if (current.ms < 1000) {
-            // Trop peu pour un envoi : gardé pour le suivant.
-            if (!close) pending.current = current;
-            return;
-        }
-        const time = {
-            seconds: Math.min(MAX_SECONDS, Math.round(current.ms / 1000)),
-            pages: current.pages,
-        };
-        const url = `/api/volumes/${current.volumeId}/reading-time`;
-        // Page qui se ferme : sendBeacon part même après la fermeture.
-        if (
-            beacon &&
-            navigator.sendBeacon?.(
-                url,
-                new Blob([JSON.stringify(time)], {
-                    type: 'application/json',
-                }),
-            )
-        ) {
-            return;
-        }
-        sendReadingTime(current.volumeId, time).catch(() => {
-            // Sans réseau : ce temps est perdu, la lecture continue.
-        });
-    }, []);
+            if (current.ms < 1000) {
+                // Trop peu pour un envoi : gardé pour le suivant.
+                if (!close) pending.current = current;
+                return;
+            }
+            const time = {
+                seconds: Math.min(MAX_SECONDS, Math.round(current.ms / 1000)),
+                pages: current.pages,
+            };
+            const url = `/api/volumes/${current.volumeId}/reading-time`;
+            // Page qui se ferme : sendBeacon part même après la fermeture (pas
+            // sans réseau : il serait perdu, la file le garde).
+            if (
+                beacon &&
+                isOnline() &&
+                navigator.sendBeacon?.(
+                    url,
+                    new Blob([JSON.stringify(time)], {
+                        type: 'application/json',
+                    }),
+                )
+            ) {
+                return;
+            }
+            // Sans réseau : gardé sur l'appareil, envoyé au retour du réseau.
+            (userId
+                ? sendReadingTimeOrQueue(userId, current.volumeId, time)
+                : sendReadingTime(current.volumeId, time)
+            ).catch(() => {
+                // Refusé : ce temps est perdu, la lecture continue.
+            });
+        },
+        [userId],
+    );
 
     const activity = useCallback(
         (newPages: number) => {

@@ -2,6 +2,7 @@ import { Center, Loader } from '@mantine/core';
 import { type ReactNode, useCallback, useEffect, useState } from 'react';
 
 import { keepOnlyDownloadsOf } from '@/offline/downloads';
+import { flushQueue } from '@/offline/syncQueue';
 import {
     type CurrentUser,
     RefreshUserContext,
@@ -10,7 +11,7 @@ import {
     saveUser,
     savedUser,
 } from '@/services/auth';
-import { NetworkError } from '@/services/network';
+import { NetworkError, useOnline } from '@/services/network';
 
 /**
  * N'affiche son contenu qu'une fois la personne connue ; sans session,
@@ -39,6 +40,13 @@ export const RequireUser = ({ children }: { children: ReactNode }) => {
             else setError(e.message);
         });
     }, [refresh]);
+
+    // Lecture faite sans réseau : envoyée au retour du réseau (et à
+    // l'ouverture, si elle attendait).
+    const online = useOnline();
+    useEffect(() => {
+        if (online && user && !user.preview) void flushQueue(user.id);
+    }, [online, user]);
 
     if (error) {
         return <Center h="100dvh">{error}</Center>;

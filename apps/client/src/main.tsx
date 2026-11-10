@@ -5,10 +5,15 @@ import { createRoot } from 'react-dom/client';
 
 import { ThemedApp } from './ThemedApp';
 import { clearDownloads } from './offline/downloads';
+import { clearQueue } from './offline/syncQueue';
 import { setLogoutCleanup } from './services/auth';
 
-// Déconnexion : les tomes téléchargés partent avec la personne.
-setLogoutCleanup(clearDownloads);
+// Déconnexion : les tomes téléchargés et la lecture pas encore envoyée
+// partent avec la personne.
+setLogoutCleanup(async () => {
+    clearQueue();
+    await clearDownloads();
+});
 
 // Service worker (build seulement) : Bento s'ouvre sans réseau, et sert les
 // tomes téléchargés depuis l'appareil.
