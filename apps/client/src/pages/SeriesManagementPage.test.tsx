@@ -88,12 +88,10 @@ const show = (path = '/manage') =>
         </MantineProvider>,
     );
 
-/** Noms des séries du tableau, dans l'ordre. */
+/** Noms des séries, dans l'ordre des cartes. */
+const cards = () => screen.getAllByTestId('managed-card');
 const names = () =>
-    screen
-        .getAllByRole('row')
-        .slice(1)
-        .map((row) => within(row).getAllByRole('link')[0]!.textContent);
+    cards().map((card) => within(card).getAllByRole('link')[0]!.textContent);
 
 describe('SeriesManagementPage', () => {
     it('starts with the series to classify, then shows them all', async () => {
@@ -113,8 +111,8 @@ describe('SeriesManagementPage', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Toutes (3)' }));
         expect(names()).toEqual(['Coq de combat', 'Gantz', 'Spirale']);
         // Moyennes : par tome et par page.
-        const gantz = screen.getAllByRole('row')[2]!;
-        expect(within(gantz).getByText('450 Mo / tome')).toBeTruthy();
+        const gantz = cards()[1]!;
+        expect(within(gantz).getByText(/450 Mo \/ tome/)).toBeTruthy();
         expect(within(gantz).getByText(/2,3 Mo \/ page/)).toBeTruthy();
     });
 
@@ -122,14 +120,17 @@ describe('SeriesManagementPage', () => {
         show('/manage?filter=all');
         await screen.findByText('Gantz');
 
-        fireEvent.click(
-            screen.getByRole('button', { name: 'Trier par taille' }),
+        fireEvent.click(screen.getByRole('textbox', { name: 'Trier par' }));
+        fireEvent.click(await screen.findByRole('option', { name: 'Taille' }));
+        await vi.waitFor(() =>
+            expect(names()).toEqual(['Spirale', 'Coq de combat', 'Gantz']),
         );
-        expect(names()).toEqual(['Spirale', 'Coq de combat', 'Gantz']);
         fireEvent.click(
-            screen.getByRole('button', { name: 'Trier par taille' }),
+            screen.getByRole('button', { name: 'Ordre croissant' }),
         );
-        expect(names()).toEqual(['Gantz', 'Coq de combat', 'Spirale']);
+        await vi.waitFor(() =>
+            expect(names()).toEqual(['Gantz', 'Coq de combat', 'Spirale']),
+        );
     });
 
     it('sets the format in the row, which stays on screen', async () => {

@@ -3,28 +3,27 @@ import {
     Alert,
     Anchor,
     Button,
+    Card,
     Group,
     Image,
     Loader,
     Select,
+    SimpleGrid,
     Stack,
-    Table,
     Text,
     TextInput,
     Title,
     Tooltip,
-    UnstyledButton,
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import {
-    IconChevronDown,
-    IconChevronUp,
     IconPencil,
     IconSearch,
-    IconSelector,
+    IconSortAscending,
+    IconSortDescending,
     IconWand,
 } from '@tabler/icons-react';
-import { type ReactNode, useState } from 'react';
+import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 
 import { compareNames, genreKey } from '@server/types';
@@ -163,44 +162,18 @@ const compareRows = (key: SortKey, desc: boolean) => (a: Row, b: Row) => {
     return key === 'name' && desc ? -byName : byName;
 };
 
-/** En-tête de colonne cliquable : trie, puis inverse le sens. */
-const SortHeader = ({
-    column,
-    sort,
-    desc,
-    onSort,
-    children,
-    align,
-}: {
-    column: SortKey;
-    sort: SortKey;
-    desc: boolean;
-    onSort: (column: SortKey) => void;
-    children: ReactNode;
-    align?: 'right';
-}) => {
-    const Icon =
-        sort !== column ? IconSelector : desc ? IconChevronDown : IconChevronUp;
-    return (
-        <Table.Th ta={align}>
-            <UnstyledButton
-                onClick={() => onSort(column)}
-                aria-label={`Trier par ${String(children).toLowerCase()}`}
-            >
-                <Group
-                    gap={4}
-                    wrap="nowrap"
-                    justify={align === 'right' ? 'flex-end' : undefined}
-                >
-                    <Text size="sm" fw={600}>
-                        {children}
-                    </Text>
-                    <Icon size={14} opacity={sort === column ? 1 : 0.4} />
-                </Group>
-            </UnstyledButton>
-        </Table.Th>
-    );
-};
+/** Tris proposés (« Trier par »). */
+const SORTS: { value: SortKey; label: string }[] = [
+    { value: 'name', label: 'Nom' },
+    { value: 'format', label: 'Format' },
+    { value: 'age', label: 'Âge' },
+    { value: 'status', label: 'Statut' },
+    { value: 'completeness', label: 'Fiche' },
+    { value: 'volumes', label: 'Tomes' },
+    { value: 'size', label: 'Taille' },
+    { value: 'perPage', label: 'Taille par page' },
+    { value: 'added', label: 'Dernier ajout' },
+];
 
 const formatDay = (iso: string | null) =>
     iso
@@ -271,12 +244,6 @@ export const SeriesManagementPage = () => {
         .filter((r) => !text || genreKey(r.name).includes(text))
         .sort(compareRows(sort, desc));
 
-    const onSort = (column: SortKey) =>
-        update({
-            sort: column === 'name' ? null : column,
-            dir: column === sort && !desc ? 'desc' : null,
-        });
-
     /** Enregistre un changement de la ligne, puis recharge la liste. */
     const save = async (id: number, action: () => Promise<unknown>) => {
         setTouched((current) => new Set(current).add(id));
@@ -292,16 +259,15 @@ export const SeriesManagementPage = () => {
         value: String(f.id),
         label: f.name,
     }));
-    const sortProps = { sort, desc, onSort };
 
     return (
         <Stack>
             <div>
                 <Title order={2}>Séries</Title>
                 <Text size="sm" c="dimmed">
-                    Format, âge et statut se changent dans le tableau. Sans âge,
-                    une série est masquée aux comptes limités. « Remplir » lance
-                    la recherche en ligne dans l’éditeur.
+                    Format, âge et statut se changent sur chaque carte. Sans
+                    âge, une série est masquée aux comptes limités. « Remplir »
+                    lance la recherche en ligne dans l’éditeur.
                 </Text>
             </div>
 
@@ -326,20 +292,18 @@ export const SeriesManagementPage = () => {
                     </Button>
                 ))}
             </Group>
-            <Group gap="xs" align="flex-end">
+            <SimpleGrid cols={{ base: 2, md: 4 }} spacing="xs">
                 <TextInput
                     placeholder="Chercher une série"
                     aria-label="Chercher une série"
                     leftSection={<IconSearch size={14} />}
                     value={search}
                     onChange={(e) => setSearch(e.currentTarget.value)}
-                    w={220}
                 />
                 <Select
                     aria-label="Format"
                     placeholder="Tous les formats"
                     clearable
-                    w={180}
                     data={[
                         { value: 'none', label: 'Sans format' },
                         ...formatChoices,
@@ -351,7 +315,6 @@ export const SeriesManagementPage = () => {
                     aria-label="Statut"
                     placeholder="Tous les statuts"
                     clearable
-                    w={180}
                     data={[
                         { value: 'none', label: 'Sans statut' },
                         ...STATUSES,
@@ -359,7 +322,37 @@ export const SeriesManagementPage = () => {
                     value={statusFilter}
                     onChange={(value) => update({ status: value })}
                 />
-            </Group>
+                <Group gap={4} wrap="nowrap">
+                    <Select
+                        aria-label="Trier par"
+                        style={{ flex: 1 }}
+                        allowDeselect={false}
+                        data={SORTS}
+                        value={sort}
+                        onChange={(value) =>
+                            update({ sort: value === 'name' ? null : value })
+                        }
+                    />
+                    <Tooltip label={desc ? 'Décroissant' : 'Croissant'}>
+                        <ActionIcon
+                            variant="default"
+                            size="input-sm"
+                            aria-label={
+                                desc ? 'Ordre décroissant' : 'Ordre croissant'
+                            }
+                            onClick={() =>
+                                update({ dir: desc ? null : 'desc' })
+                            }
+                        >
+                            {desc ? (
+                                <IconSortDescending size={18} />
+                            ) : (
+                                <IconSortAscending size={18} />
+                            )}
+                        </ActionIcon>
+                    </Tooltip>
+                </Group>
+            </SimpleGrid>
 
             {shown.length === 0 ? (
                 <Alert color={filter === 'to-classify' ? 'green' : 'gray'}>
@@ -368,253 +361,177 @@ export const SeriesManagementPage = () => {
                         : 'Aucune série dans ce filtre.'}
                 </Alert>
             ) : (
-                <Table.ScrollContainer minWidth={1180}>
-                    <Table verticalSpacing={6} highlightOnHover>
-                        <Table.Thead>
-                            <Table.Tr>
-                                <Table.Th w={44} />
-                                <SortHeader column="name" {...sortProps}>
-                                    Série
-                                </SortHeader>
-                                <SortHeader column="format" {...sortProps}>
-                                    Format
-                                </SortHeader>
-                                <SortHeader column="age" {...sortProps}>
-                                    Âge
-                                </SortHeader>
-                                <SortHeader column="status" {...sortProps}>
-                                    Statut
-                                </SortHeader>
-                                <Table.Th>Genres</Table.Th>
-                                <SortHeader
-                                    column="completeness"
-                                    {...sortProps}
+                <SimpleGrid
+                    cols={{ base: 1, sm: 2, lg: 3 }}
+                    spacing="sm"
+                    data-testid="managed-series"
+                >
+                    {shown.map((s) => (
+                        <Card
+                            key={s.id}
+                            withBorder
+                            padding="sm"
+                            radius="md"
+                            data-testid="managed-card"
+                        >
+                            <Stack gap="sm">
+                                <Group
+                                    gap="sm"
+                                    wrap="nowrap"
+                                    align="flex-start"
                                 >
-                                    Fiche
-                                </SortHeader>
-                                <SortHeader
-                                    column="volumes"
-                                    align="right"
-                                    {...sortProps}
-                                >
-                                    Tomes
-                                </SortHeader>
-                                <SortHeader
-                                    column="size"
-                                    align="right"
-                                    {...sortProps}
-                                >
-                                    Taille
-                                </SortHeader>
-                                <SortHeader
-                                    column="perPage"
-                                    align="right"
-                                    {...sortProps}
-                                >
-                                    Moyenne
-                                </SortHeader>
-                                <SortHeader column="added" {...sortProps}>
-                                    Ajout
-                                </SortHeader>
-                                <Table.Th />
-                            </Table.Tr>
-                        </Table.Thead>
-                        <Table.Tbody>
-                            {shown.map((s) => (
-                                <Table.Tr key={s.id}>
-                                    <Table.Td>
-                                        <Image
-                                            src={seriesCoverUrl(s, 'small')}
-                                            w={32}
-                                            h={48}
-                                            fit="cover"
-                                            radius="xs"
-                                            alt=""
-                                            loading="lazy"
-                                        />
-                                    </Table.Td>
-                                    <Table.Td maw={240}>
+                                    <Image
+                                        src={seriesCoverUrl(s, 'small')}
+                                        w={48}
+                                        h={72}
+                                        fit="cover"
+                                        radius="sm"
+                                        alt=""
+                                        loading="lazy"
+                                        style={{ flexShrink: 0 }}
+                                    />
+                                    <Stack
+                                        gap={2}
+                                        style={{ flex: 1, minWidth: 0 }}
+                                    >
                                         <Anchor
                                             component={Link}
                                             to={`/series/${s.id}`}
-                                            size="sm"
-                                            lineClamp={2}
+                                            fw={500}
+                                            lineClamp={1}
                                         >
                                             {s.name}
                                         </Anchor>
-                                    </Table.Td>
-                                    <Table.Td>
-                                        <Select
-                                            size="xs"
-                                            w={130}
-                                            aria-label={`Format de ${s.name}`}
-                                            placeholder="—"
-                                            clearable
-                                            error={!s.formatId}
-                                            data={formatChoices}
-                                            value={
-                                                s.formatId
-                                                    ? String(s.formatId)
-                                                    : null
-                                            }
-                                            onChange={(value) =>
-                                                void save(s.id, () =>
-                                                    setSeriesClassification(
-                                                        s.id,
-                                                        {
-                                                            formatId: value
-                                                                ? Number(value)
-                                                                : null,
-                                                        },
-                                                    ),
-                                                )
-                                            }
-                                        />
-                                    </Table.Td>
-                                    <Table.Td>
-                                        <Select
-                                            size="xs"
-                                            w={130}
-                                            aria-label={`Âge de ${s.name}`}
-                                            // Sans choix : l'âge déduit des fichiers.
-                                            placeholder={
-                                                s.fileAge !== null
-                                                    ? `${ageLabel(s.fileAge)} (fichiers)`
-                                                    : '—'
-                                            }
-                                            clearable
-                                            error={s.effectiveAge === null}
-                                            data={ageOptions(ages, s.age)}
-                                            value={
-                                                s.age === null
-                                                    ? null
-                                                    : String(s.age)
-                                            }
-                                            onChange={(value) =>
-                                                void save(s.id, () =>
-                                                    setSeriesClassification(
-                                                        s.id,
-                                                        {
-                                                            age:
-                                                                value === null
-                                                                    ? null
-                                                                    : Number(
-                                                                          value,
-                                                                      ),
-                                                        },
-                                                    ),
-                                                )
-                                            }
-                                        />
-                                    </Table.Td>
-                                    <Table.Td>
-                                        <Select
-                                            size="xs"
-                                            w={120}
-                                            aria-label={`Statut de ${s.name}`}
-                                            placeholder="—"
-                                            clearable
-                                            data={STATUSES}
-                                            value={s.status}
-                                            onChange={(value) =>
-                                                void save(s.id, () =>
-                                                    setSeriesStatus(
-                                                        s.id,
-                                                        value as
-                                                            | 'ongoing'
-                                                            | 'completed'
-                                                            | null,
-                                                    ),
-                                                )
-                                            }
-                                        />
-                                    </Table.Td>
-                                    <Table.Td maw={180}>
-                                        <Text
-                                            size="xs"
-                                            c="dimmed"
-                                            lineClamp={2}
-                                        >
-                                            {s.genres.join(', ') || '—'}
-                                        </Text>
-                                    </Table.Td>
-                                    <Table.Td>
-                                        <CompletenessBadge
-                                            completeness={{
-                                                percent: s.percent,
-                                                missing: s.missing,
-                                            }}
-                                            short
-                                        />
-                                    </Table.Td>
-                                    <Table.Td ta="right">
-                                        <Text size="sm">{s.volumeCount}</Text>
-                                    </Table.Td>
-                                    <Table.Td ta="right">
-                                        <Text
-                                            size="sm"
-                                            style={{ whiteSpace: 'nowrap' }}
-                                        >
-                                            {formatSize(s.size)}
-                                        </Text>
-                                    </Table.Td>
-                                    <Table.Td ta="right">
-                                        <Text
-                                            size="xs"
-                                            style={{ whiteSpace: 'nowrap' }}
-                                        >
-                                            {formatSize(s.perVolume)} / tome
+                                        <Text size="xs" c="dimmed">
+                                            {[
+                                                `${s.volumeCount} tome${s.volumeCount > 1 ? 's' : ''}`,
+                                                formatSize(s.size),
+                                                `${formatSize(s.perVolume)} / tome`,
+                                                `${formatSize(s.perPage)} / page`,
+                                            ].join(' · ')}
                                         </Text>
                                         <Text
                                             size="xs"
                                             c="dimmed"
-                                            style={{ whiteSpace: 'nowrap' }}
+                                            lineClamp={1}
                                         >
-                                            {formatSize(s.perPage)} / page
+                                            {[
+                                                s.genres.join(', '),
+                                                s.lastAddedAt &&
+                                                    `ajout ${formatDay(s.lastAddedAt)}`,
+                                            ]
+                                                .filter(Boolean)
+                                                .join(' · ')}
                                         </Text>
-                                    </Table.Td>
-                                    <Table.Td>
-                                        <Text
-                                            size="xs"
-                                            c="dimmed"
-                                            style={{ whiteSpace: 'nowrap' }}
+                                    </Stack>
+                                </Group>
+                                <SimpleGrid cols={3} spacing={6}>
+                                    <Select
+                                        size="xs"
+                                        aria-label={`Format de ${s.name}`}
+                                        placeholder="Format"
+                                        clearable
+                                        error={!s.formatId}
+                                        data={formatChoices}
+                                        value={
+                                            s.formatId
+                                                ? String(s.formatId)
+                                                : null
+                                        }
+                                        onChange={(value) =>
+                                            void save(s.id, () =>
+                                                setSeriesClassification(s.id, {
+                                                    formatId: value
+                                                        ? Number(value)
+                                                        : null,
+                                                }),
+                                            )
+                                        }
+                                    />
+                                    <Select
+                                        size="xs"
+                                        aria-label={`Âge de ${s.name}`}
+                                        // Sans choix : l'âge déduit des fichiers.
+                                        placeholder={
+                                            s.fileAge !== null
+                                                ? `${ageLabel(s.fileAge)} (fichiers)`
+                                                : 'Âge'
+                                        }
+                                        clearable
+                                        error={s.effectiveAge === null}
+                                        data={ageOptions(ages, s.age)}
+                                        value={
+                                            s.age === null
+                                                ? null
+                                                : String(s.age)
+                                        }
+                                        onChange={(value) =>
+                                            void save(s.id, () =>
+                                                setSeriesClassification(s.id, {
+                                                    age:
+                                                        value === null
+                                                            ? null
+                                                            : Number(value),
+                                                }),
+                                            )
+                                        }
+                                    />
+                                    <Select
+                                        size="xs"
+                                        aria-label={`Statut de ${s.name}`}
+                                        placeholder="Statut"
+                                        clearable
+                                        data={STATUSES}
+                                        value={s.status}
+                                        onChange={(value) =>
+                                            void save(s.id, () =>
+                                                setSeriesStatus(
+                                                    s.id,
+                                                    value as
+                                                        | 'ongoing'
+                                                        | 'completed'
+                                                        | null,
+                                                ),
+                                            )
+                                        }
+                                    />
+                                </SimpleGrid>
+                                <Group justify="space-between" wrap="nowrap">
+                                    <CompletenessBadge
+                                        completeness={{
+                                            percent: s.percent,
+                                            missing: s.missing,
+                                        }}
+                                    />
+                                    <Group gap={6} wrap="nowrap">
+                                        <Button
+                                            component={Link}
+                                            to={`/series/${s.id}/edit?fill=online&from=to-classify`}
+                                            size="compact-sm"
+                                            variant="light"
+                                            leftSection={<IconWand size={14} />}
+                                            aria-label={`Remplir ${s.name}`}
                                         >
-                                            {formatDay(s.lastAddedAt)}
-                                        </Text>
-                                    </Table.Td>
-                                    <Table.Td>
-                                        <Group
-                                            gap={4}
-                                            wrap="nowrap"
-                                            justify="flex-end"
+                                            Remplir
+                                        </Button>
+                                        <Button
+                                            component={Link}
+                                            to={`/series/${s.id}/edit?from=to-classify`}
+                                            size="compact-sm"
+                                            variant="default"
+                                            leftSection={
+                                                <IconPencil size={14} />
+                                            }
+                                            aria-label={`Modifier ${s.name}`}
                                         >
-                                            <Tooltip label="Remplir en ligne">
-                                                <ActionIcon
-                                                    component={Link}
-                                                    to={`/series/${s.id}/edit?fill=online&from=to-classify`}
-                                                    variant="light"
-                                                    aria-label={`Remplir ${s.name}`}
-                                                >
-                                                    <IconWand size={16} />
-                                                </ActionIcon>
-                                            </Tooltip>
-                                            <Tooltip label="Modifier">
-                                                <ActionIcon
-                                                    component={Link}
-                                                    to={`/series/${s.id}/edit?from=to-classify`}
-                                                    variant="default"
-                                                    aria-label={`Modifier ${s.name}`}
-                                                >
-                                                    <IconPencil size={16} />
-                                                </ActionIcon>
-                                            </Tooltip>
-                                        </Group>
-                                    </Table.Td>
-                                </Table.Tr>
-                            ))}
-                        </Table.Tbody>
-                    </Table>
-                </Table.ScrollContainer>
+                                            Modifier
+                                        </Button>
+                                    </Group>
+                                </Group>
+                            </Stack>
+                        </Card>
+                    ))}
+                </SimpleGrid>
             )}
         </Stack>
     );
