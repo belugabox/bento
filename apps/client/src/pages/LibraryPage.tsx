@@ -25,6 +25,7 @@ import {
     IconCheck,
     IconChevronDown,
     IconLayoutGrid,
+    IconLayoutRows,
     IconList,
     IconPlayerPlayFilled,
 } from '@tabler/icons-react';
@@ -33,7 +34,7 @@ import { useSearchParams } from 'react-router';
 
 import { SeriesCardMenu, VolumeCardMenu } from '@/components/CardMenus';
 import { CoverCard } from '@/components/CoverCard';
-import { ReadByFilter } from '@/components/ReadByFilter';
+import { GROUPINGS, type Grouping, groupSeries } from '@/components/homeGroups';
 import {
     LIST_COLUMNS,
     type LibraryDisplay,
@@ -161,28 +162,75 @@ const rememberLibrary = (id: number) => {
 /** Genres montrés en pastilles ; les autres sont dans « Plus ». */
 const GENRE_CHIPS = 3;
 
-/** Bloc de l'accueil, sous un titre très discret (petites capitales). */
+/**
+ * Bloc de l'accueil, sous un titre très discret (petites capitales) ; sans
+ * titre pour le groupement « Aucun ».
+ */
 const HomeSection = ({
     title,
     count,
     children,
 }: {
-    title: string;
+    title: string | null;
     count: number;
     children: ReactNode;
 }) => (
-    <Stack gap={8} component="section" aria-label={title}>
-        <Text
-            size="xs"
-            c="dimmed"
-            fw={600}
-            tt="uppercase"
-            style={{ letterSpacing: '0.08em' }}
-        >
-            {title} · {count}
-        </Text>
+    <Stack gap={8} component="section" aria-label={title ?? undefined}>
+        {title && (
+            <Text
+                size="xs"
+                c="dimmed"
+                fw={600}
+                tt="uppercase"
+                style={{ letterSpacing: '0.08em' }}
+            >
+                {title} · {count}
+            </Text>
+        )}
         {children}
     </Stack>
+);
+
+/** Choix du groupement de l'accueil (gardé sur l'appareil). */
+const GroupingMenu = ({
+    value,
+    onChange,
+}: {
+    value: Grouping;
+    onChange: (value: Grouping) => void;
+}) => (
+    <Menu position="top-start">
+        <Menu.Target>
+            <Button
+                size="compact-md"
+                radius="xl"
+                fw={400}
+                fz="sm"
+                variant="default"
+                aria-label="Grouper les séries"
+                leftSection={<IconLayoutRows size={16} />}
+                style={{ flexShrink: 0 }}
+            >
+                <Box component="span" visibleFrom="xs">
+                    {GROUPINGS.find((g) => g.value === value)?.label}
+                </Box>
+            </Button>
+        </Menu.Target>
+        <Menu.Dropdown>
+            <Menu.Label>Grouper par</Menu.Label>
+            {GROUPINGS.map((option) => (
+                <Menu.Item
+                    key={option.value}
+                    rightSection={
+                        option.value === value && <IconCheck size={14} />
+                    }
+                    onClick={() => onChange(option.value)}
+                >
+                    {option.label}
+                </Menu.Item>
+            ))}
+        </Menu.Dropdown>
+    </Menu>
 );
 
 /** Pastille d'un filtre : un clic la choisit, un autre la retire. */
@@ -252,8 +300,6 @@ export const LibraryPage = () => {
     const sort = (params.get('sort') as SeriesSort | null) ?? 'name';
     const genre = params.get('genre');
     const status = (params.get('status') as StatusFilter | null) ?? 'all';
-    // « Lu par » : une personne de la famille (son numéro de compte).
-    const readBy = Number(params.get('readBy')) || null;
 
     const isAdmin = useContext(UserContext)?.role === 'admin';
     const display = useLibraryDisplay();
@@ -311,20 +357,13 @@ export const LibraryPage = () => {
         );
     }
 
-    // Séries lues par la personne choisie (inconnue : filtre ignoré).
-    const readBySeries = new Set(
-        readers.data?.find((r) => r.id === readBy)?.seriesIds,
-    );
-    const readByActive = readBy !== null && readers.data !== undefined;
     const visible = filterSeries(
         (series.data ?? []).filter(
-            (s) =>
-                (!readByActive || readBySeries.has(s.id)) &&
-                !(display.hideRead && readingStateOf(s) === 'read'),
+            (s) => !(display.hideRead && readingStateOf(s) === 'read'),
         ),
         { sort, genre, status },
     );
-    const filtered = !!genre || status !== 'all' || readByActive;
+    const filtered = !!genre || status !== 'all';
     // Tomes à reprendre en tête, si leur série passe les filtres et la
     // recherche ; puis les autres séries.
     const visibleIds = new Set(visible.map((s) => s.id));
@@ -333,9 +372,12 @@ export const LibraryPage = () => {
     );
     const resumed = new Set(resume.map((v) => v.seriesId));
     const others = visible.filter((s) => !resumed.has(s.id));
-    // Trois blocs, séparés par un espace : en cours, pas lues, terminées.
-    const unread = others.filter((s) => readingStateOf(s) !== 'read');
-    const done = others.filter((s) => readingStateOf(s) === 'read');
+    // Les autres séries, en blocs selon le groupement choisi (« En cours »
+    // reste en tête).
+    const groups = groupSeries(others, display.groupBy, {
+        readers: readers.data,
+    });
+    const untitled = display.groupBy === 'none';
     const cols =
         display.layout === 'list' ? LIST_COLUMNS : gridColumns(display.size);
     // Pastilles : les genres les plus fréquents, et celui choisi.
@@ -385,7 +427,6 @@ export const LibraryPage = () => {
                                     update({
                                         genre: '',
                                         status: '',
-                                        readBy: '',
                                     })
                                 }
                             >
@@ -396,7 +437,10 @@ export const LibraryPage = () => {
                 )}
                 <Stack gap="xl" data-testid="series-grid">
                     {resume.length > 0 && (
-                        <HomeSection title="En cours" count={resume.length}>
+                        <HomeSection
+                            title={untitled ? null : 'En cours'}
+                            count={resume.length}
+                        >
                             <SimpleGrid
                                 cols={cols}
                                 spacing="sm"
@@ -427,75 +471,70 @@ export const LibraryPage = () => {
                             </SimpleGrid>
                         </HomeSection>
                     )}
-                    {[
-                        { key: 'unread', title: 'À découvrir', list: unread },
-                        { key: 'read', title: 'Déjà lues', list: done },
-                    ]
-                        .filter((group) => group.list.length > 0)
-                        .map((group) => (
-                            <HomeSection
-                                key={group.key}
-                                title={group.title}
-                                count={group.list.length}
+                    {groups.map((group) => (
+                        <HomeSection
+                            key={group.key}
+                            title={group.title}
+                            count={group.list.length}
+                        >
+                            <SimpleGrid
+                                cols={cols}
+                                spacing="sm"
+                                data-testid={`${group.key}-grid`}
                             >
-                                <SimpleGrid
-                                    cols={cols}
-                                    spacing="sm"
-                                    data-testid={`${group.key}-grid`}
-                                >
-                                    {group.list.map((item) => {
-                                        const state = readingStateOf(item);
-                                        return (
-                                            <CoverCard
-                                                key={item.id}
-                                                to={`/series/${item.id}`}
-                                                menu={
-                                                    <SeriesCardMenu
-                                                        series={item}
-                                                        isAdmin={isAdmin}
-                                                        onChanged={reloadHome}
-                                                    />
-                                                }
-                                                cover={seriesCoverUrl(
-                                                    item,
-                                                    'small',
-                                                )}
-                                                title={item.name}
-                                                subtitle={
-                                                    state === 'started'
-                                                        ? `${item.readCount} / ${item.volumeCount} lus`
-                                                        : seriesVolumesLabel(
-                                                              item.volumeCount,
-                                                              item.volumeKinds,
-                                                          )
-                                                }
-                                                progress={
-                                                    state === 'started'
-                                                        ? item.readCount /
-                                                          item.volumeCount
-                                                        : undefined
-                                                }
-                                                badge={seriesBadge(
-                                                    state,
-                                                    !!item.toRead,
-                                                )}
-                                                layout={
-                                                    display.layout === 'list'
-                                                        ? 'row'
-                                                        : 'card'
-                                                }
-                                                coversOnly={display.coversOnly}
-                                                details={
-                                                    display.layout === 'list'
-                                                        ? seriesDetails(item)
-                                                        : undefined
-                                                }
-                                            />
-                                        );
-                                    })}
-                                </SimpleGrid>
-                            </HomeSection>
-                        ))}
+                                {group.list.map((item) => {
+                                    const state = readingStateOf(item);
+                                    return (
+                                        <CoverCard
+                                            key={item.id}
+                                            to={`/series/${item.id}`}
+                                            menu={
+                                                <SeriesCardMenu
+                                                    series={item}
+                                                    isAdmin={isAdmin}
+                                                    onChanged={reloadHome}
+                                                />
+                                            }
+                                            cover={seriesCoverUrl(
+                                                item,
+                                                'small',
+                                            )}
+                                            title={item.name}
+                                            subtitle={
+                                                state === 'started'
+                                                    ? `${item.readCount} / ${item.volumeCount} lus`
+                                                    : seriesVolumesLabel(
+                                                          item.volumeCount,
+                                                          item.volumeKinds,
+                                                      )
+                                            }
+                                            progress={
+                                                state === 'started'
+                                                    ? item.readCount /
+                                                      item.volumeCount
+                                                    : undefined
+                                            }
+                                            badge={seriesBadge(
+                                                state,
+                                                !!item.toRead,
+                                            )}
+                                            layout={
+                                                display.layout === 'list'
+                                                    ? 'row'
+                                                    : 'card'
+                                            }
+                                            coversOnly={display.coversOnly}
+                                            details={
+                                                display.layout === 'list'
+                                                    ? seriesDetails(item)
+                                                    : undefined
+                                            }
+                                        />
+                                    );
+                                })}
+                            </SimpleGrid>
+                        </HomeSection>
+                    ))}
                 </Stack>
             </Stack>
 
@@ -649,15 +688,10 @@ export const LibraryPage = () => {
                                     ))}
                                 </Menu.Dropdown>
                             </Menu>
-                            {readers.data && readers.data.length > 0 && (
-                                <ReadByFilter
-                                    readers={readers.data}
-                                    value={readBy}
-                                    onChange={(id) =>
-                                        update({ readBy: id ? String(id) : '' })
-                                    }
-                                />
-                            )}
+                            <GroupingMenu
+                                value={display.groupBy}
+                                onChange={(groupBy) => display.set({ groupBy })}
+                            />
                         </Group>
                         {genres.length > 0 && (
                             <Divider orientation="vertical" />

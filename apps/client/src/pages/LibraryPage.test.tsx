@@ -181,22 +181,28 @@ describe('LibraryPage', () => {
         });
     });
 
-    it('keeps the series read by someone of the family', async () => {
-        readers = [{ id: 7, name: 'Léa', avatarSeed: null, seriesIds: [3] }];
+    it('groups the series by reader, remembered on this device', async () => {
+        readers = [{ id: 7, name: 'Léa', avatarSeed: null, seriesIds: [2] }];
         show();
+        await vi.waitFor(() => expect(titles()).toHaveLength(3));
 
         fireEvent.click(
-            await screen.findByRole('button', { name: 'Filtrer par lecteur' }),
+            screen.getByRole('button', { name: 'Grouper les séries' }),
         );
-        fireEvent.click(await screen.findByRole('menuitem', { name: /Léa/ }));
+        fireEvent.click(
+            await screen.findByRole('menuitem', { name: 'Lecteur' }),
+        );
 
-        // Série 3 seule, par son tome à reprendre.
-        await vi.waitFor(() => expect(titles()).toEqual(['/read/42']));
-        expect(location).toContain('readBy=7');
+        expect(await screen.findByText('Lu par Léa · 1')).toBeTruthy();
+        // « En cours » reste en tête.
+        expect(screen.getByText('En cours · 2')).toBeTruthy();
         expect(
-            screen.getByRole('button', { name: 'Filtrer par lecteur' })
-                .textContent,
-        ).toContain('Léa');
+            JSON.parse(localStorage.getItem('bento:display')!),
+        ).toMatchObject({ groupBy: 'reader' });
+        // Plus de filtre « Lu par » dans la barre.
+        expect(
+            screen.queryByRole('button', { name: 'Filtrer par lecteur' }),
+        ).toBeNull();
     });
 
     it('loads the series of the last library without waiting', async () => {
@@ -220,13 +226,18 @@ describe('LibraryPage', () => {
         );
     });
 
-    it('hides the Lu par filter when nobody else read anything', async () => {
+    it('shows no titles when grouping by nothing', async () => {
+        localStorage.setItem(
+            'bento:display',
+            JSON.stringify({ groupBy: 'none' }),
+        );
         show();
 
-        await screen.findByText('T2 · 1/3 lus');
-        expect(
-            screen.queryByRole('button', { name: 'Filtrer par lecteur' }),
-        ).toBeNull();
+        await vi.waitFor(() =>
+            expect(titles()).toEqual(['/read/42', '/read/51', '/series/2']),
+        );
+        expect(screen.queryByText(/En cours/)).toBeNull();
+        expect(screen.queryByText(/Déjà lues/)).toBeNull();
     });
 
     it('shows covers only, or a list, as chosen in Appearance', async () => {
