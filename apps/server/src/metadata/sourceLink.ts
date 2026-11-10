@@ -1,9 +1,13 @@
 /**
- * Fiches en ligne choisies pour une série (Manga-news, Wikipédia), gardées
- * pour la mettre à jour sans refaire de recherche. Sans Node : partagé
- * avec le client.
+ * Fiches en ligne choisies pour une série (Manga-news, Wikipédia,
+ * Bedetheque), gardées pour la mettre à jour sans refaire de recherche.
+ * Sans Node : partagé avec le client.
  */
-export const METADATA_SOURCES = ['manga-news', 'wikipedia'] as const;
+export const METADATA_SOURCES = [
+    'manga-news',
+    'wikipedia',
+    'bedetheque',
+] as const;
 export type MetadataSource = (typeof METADATA_SOURCES)[number];
 
 /** Une fiche : son site et son identifiant. */
@@ -12,11 +16,12 @@ export type SourceLink = { site: MetadataSource; id: string };
 export const SOURCE_LABELS: Record<MetadataSource, string> = {
     'manga-news': 'Manga-news',
     wikipedia: 'Wikipédia',
+    bedetheque: 'Bedetheque',
 };
 
 /**
  * Identifiant valide : fin de l'adresse de la fiche Manga-news
- * (« Dr-Stone »), numéro de la page Wikipédia.
+ * (« Dr-Stone »), numéro de la page Wikipédia ou de la série Bedetheque.
  */
 export const isSourceId = ({ site, id }: SourceLink) =>
     site === 'manga-news'
@@ -53,11 +58,17 @@ export const sourcesText = (links: SourceLink[]) => {
 export const mangaNewsSeriesUrl = (id: string) =>
     `https://www.manga-news.com/index.php/serie/${encodeURIComponent(id).replace(/%3A/gi, ':')}`;
 
+/** Fiche d'une série sur Bedetheque (le site la redirige vers son nom). */
+export const bedethequeSeriesUrl = (id: string) =>
+    `https://www.bedetheque.com/serie_${id}.html`;
+
 /** Adresse de la fiche, à ouvrir dans le navigateur. */
 export const sourceUrl = ({ site, id }: SourceLink) =>
     site === 'manga-news'
         ? mangaNewsSeriesUrl(id)
-        : `https://fr.wikipedia.org/?curid=${id}`;
+        : site === 'bedetheque'
+          ? bedethequeSeriesUrl(id)
+          : `https://fr.wikipedia.org/?curid=${id}`;
 
 /** Champs d'une fiche de série, comparés aux fiches en ligne, dans l'ordre. */
 export const SHEET_FIELDS = [

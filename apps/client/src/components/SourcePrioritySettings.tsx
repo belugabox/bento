@@ -4,6 +4,7 @@ import {
     Paper,
     SegmentedControl,
     Stack,
+    Switch,
     Table,
     Text,
 } from '@mantine/core';
@@ -20,33 +21,48 @@ import {
 
 import { type SettingsResponse, saveSettings } from '@/services/api';
 
-const SITES = METADATA_SOURCES.map((site) => ({
-    value: site,
-    label: SOURCE_LABELS[site],
-}));
+/** Ce que chaque site apporte, sous son interrupteur. */
+const SITE_NOTES: Record<MetadataSource, string> = {
+    'manga-news': 'Mangas en français : éditions VF, âge conseillé, thèmes.',
+    wikipedia: 'Mangas et bandes dessinées : auteurs, années de parution.',
+    bedetheque:
+        'BD, comics et romans graphiques : éditeur français, one shots.',
+};
 
 /**
- * Site préféré pour chaque champ d'une fiche de série (admin) : quand les
- * deux fiches en donnent une valeur pour un champ vide, la comparaison
- * propose d'office celle de ce site. Enregistré à chaque changement.
+ * Sites des fiches en ligne (admin) : chacun peut être désactivé (ni
+ * cherché, ni relu), et le site préféré pour chaque champ, quand plusieurs
+ * en donnent une valeur pour un champ vide, est proposé d'office dans la
+ * comparaison. Enregistré à chaque changement.
  */
 export const SourcePrioritySettings = ({
     priority,
+    disabled,
     onSaved,
 }: {
     priority: SourcePriority;
+    disabled: MetadataSource[];
     onSaved: (saved: SettingsResponse) => void;
 }) => {
     const [error, setError] = useState<string>();
+    const enabled = METADATA_SOURCES.filter((site) => !disabled.includes(site));
 
-    const change = async (field: string, site: MetadataSource) => {
+    const save = async (changes: Parameters<typeof saveSettings>[0]) => {
         setError(undefined);
         try {
-            onSaved(await saveSettings({ sourcePriority: { [field]: site } }));
+            onSaved(await saveSettings(changes));
         } catch (e) {
             setError((e as Error).message);
         }
     };
+    const change = (field: string, site: MetadataSource) =>
+        save({ sourcePriority: { [field]: site } });
+    const toggle = (site: MetadataSource, on: boolean) =>
+        save({
+            disabledSources: on
+                ? disabled.filter((s) => s !== site)
+                : [...disabled, site],
+        });
 
     return (
         <Paper withBorder p="md" radius="md">
@@ -54,12 +70,33 @@ export const SourcePrioritySettings = ({
                 <div>
                     <Text fw={600}>Fiches en ligne</Text>
                     <Text size="sm" c="dimmed">
-                        Le site préféré pour chaque champ. Quand Manga-news et
-                        Wikipédia en donnent une valeur et que le champ est
-                        vide, la comparaison propose d’office celle de ce site ;
-                        tu peux toujours choisir l’autre.
+                        Les sites où « Remplir » cherche une série. Un site
+                        désactivé n’est ni cherché, ni relu.
                     </Text>
                 </div>
+                <Stack gap="xs">
+                    {METADATA_SOURCES.map((site) => (
+                        <Switch
+                            key={site}
+                            label={SOURCE_LABELS[site]}
+                            description={SITE_NOTES[site]}
+                            checked={!disabled.includes(site)}
+                            // Au moins un site reste actif.
+                            disabled={
+                                enabled.length === 1 && enabled[0] === site
+                            }
+                            onChange={(e) =>
+                                void toggle(site, e.currentTarget.checked)
+                            }
+                        />
+                    ))}
+                </Stack>
+                <Text size="sm" c="dimmed">
+                    Le site préféré pour chaque champ. Quand plusieurs sites en
+                    donnent une valeur et que le champ est vide, la comparaison
+                    propose d’office celle de ce site ; tu peux toujours choisir
+                    une autre.
+                </Text>
                 <Table verticalSpacing={4} withRowBorders={false}>
                     <Table.Tbody>
                         {SHEET_FIELDS.map((field) => (
@@ -75,7 +112,14 @@ export const SourcePrioritySettings = ({
                                             size="xs"
                                             aria-label={`Site préféré : ${SHEET_FIELD_LABELS[field]}`}
                                             value={priority[field]}
-                                            data={SITES}
+                                            data={METADATA_SOURCES.map(
+                                                (site) => ({
+                                                    value: site,
+                                                    label: SOURCE_LABELS[site],
+                                                    disabled:
+                                                        disabled.includes(site),
+                                                }),
+                                            )}
                                             onChange={(value) =>
                                                 void change(
                                                     field,

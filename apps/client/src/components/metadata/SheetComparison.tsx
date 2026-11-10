@@ -3,9 +3,9 @@ import {
     Button,
     Group,
     Modal,
+    Paper,
     Radio,
     Stack,
-    Table,
     Text,
 } from '@mantine/core';
 import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
@@ -26,26 +26,44 @@ import {
     chosenValues,
     comparisonRows,
     defaultChoice,
+    rowOptions,
     sheetValues,
 } from './editing';
 import type { FoundSeries } from './onlineSheets';
 
-/** Une valeur dans une case : un long résumé n'est montré qu'en partie. */
-const Value = ({ field, text }: { field: SheetField; text: string }) => (
+/** Une valeur : un long résumé n'est montré qu'en partie (« voir tout »). */
+const Value = ({
+    field,
+    text,
+    expanded,
+}: {
+    field: SheetField;
+    text: string;
+    expanded: boolean;
+}) => (
     <Text
         size="sm"
-        lineClamp={field === 'Summary' ? 4 : undefined}
-        title={field === 'Summary' ? text : undefined}
+        lineClamp={field === 'Summary' && !expanded ? 3 : undefined}
         style={{ whiteSpace: 'pre-line', wordBreak: 'break-word' }}
     >
         {text}
     </Text>
 );
 
+/** Qui donne une valeur : « Actuel · Bedetheque ». */
+const sourcesLabel = (sources: SheetChoice[]) =>
+    sources
+        .map((source) =>
+            source === 'current' ? 'Actuel' : SOURCE_LABELS[source],
+        )
+        .join(' · ');
+
 /**
- * Valeurs actuelles et celles des fiches trouvées, champ par champ : pour
- * chacun, on garde l'actuelle ou on prend celle d'une fiche. Seuls les
- * champs où une fiche apporte du nouveau sont montrés.
+ * Valeurs actuelles et celles des fiches trouvées, champ par champ, en
+ * cartes : pour chacun, on garde l'actuelle ou on prend celle d'une fiche.
+ * Une même valeur (majuscules, accents mis à part) n'est montrée qu'une
+ * fois, avec ceux qui la donnent. Seuls les champs où une fiche apporte du
+ * nouveau sont montrés.
  */
 export const SheetComparison = ({
     found,
@@ -68,7 +86,7 @@ export const SheetComparison = ({
     formats: { id: number; name: string }[];
     /** Noms déjà connus : ceux des fiches en reprennent l'écriture. */
     known: KnownNames;
-    /** Ordre des colonnes, le site le plus utile d'abord. */
+    /** Ordre des sites, le plus utile d'abord. */
     order: MetadataSource[];
     /** Site préféré pour chaque champ (choix de départ d'un champ vide). */
     priority: SourcePriority;
@@ -127,133 +145,144 @@ export const SheetComparison = ({
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [sheets, priority]);
 
-    const chooseColumn = (choice: SheetChoice) =>
-        setChoices(
-            Object.fromEntries(
-                rows.map((row) => [
-                    row.field,
-                    choice === 'current' || row.found[choice]
-                        ? choice
-                        : (choices[row.field] ?? 'current'),
-                ]),
-            ),
-        );
-
-    const cell = (
-        field: SheetField,
-        choice: SheetChoice,
-        value: string | undefined,
-    ) => (
-        <Table.Td key={choice} style={{ verticalAlign: 'top' }}>
-            {value ? (
-                <Radio
-                    name={field}
-                    value={choice}
-                    checked={choices[field] === choice}
-                    onChange={() =>
-                        setChoices((current) => ({
-                            ...current,
-                            [field]: choice,
-                        }))
-                    }
-                    aria-label={`${SHEET_FIELD_LABELS[field]} : ${choice === 'current' ? 'actuel' : SOURCE_LABELS[choice]}`}
-                    label={<Value field={field} text={display(field, value)} />}
-                />
-            ) : (
-                <Text size="sm" c="dimmed">
-                    —
-                </Text>
-            )}
-        </Table.Td>
-    );
+    // Résumés dépliés (« voir tout »).
+    const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+    const choose = (field: SheetField, choice: SheetChoice) =>
+        setChoices((current) => ({ ...current, [field]: choice }));
 
     return (
         <Modal
             opened={!!found}
             onClose={onClose}
             title="Comparer avec les fiches en ligne"
-            size="xl"
+            size="lg"
         >
             <Stack>
+                {sheets.length > 0 && (
+                    <Text size="xs" c="dimmed">
+                        Fiches :{' '}
+                        {sheets.map(({ site, found: f }, index) => (
+                            <span key={site}>
+                                {index > 0 && ' · '}
+                                <Anchor href={f.url} target="_blank" size="xs">
+                                    {SOURCE_LABELS[site]}
+                                </Anchor>
+                            </span>
+                        ))}
+                    </Text>
+                )}
                 {rows.length === 0 ? (
                     <Text size="sm">
                         Les fiches n’apportent rien de nouveau : la série garde
                         ses valeurs.
                     </Text>
                 ) : (
-                    <Table.ScrollContainer minWidth={560}>
-                        <Table verticalSpacing="xs">
-                            <Table.Thead>
-                                <Table.Tr>
-                                    <Table.Th w={90} />
-                                    <Table.Th>
-                                        <Stack gap={2} align="flex-start">
-                                            <Text size="sm" fw={600}>
-                                                Actuel
-                                            </Text>
-                                            <Anchor
-                                                component="button"
-                                                size="xs"
-                                                onClick={() =>
-                                                    chooseColumn('current')
-                                                }
-                                            >
-                                                Tout garder
-                                            </Anchor>
-                                        </Stack>
-                                    </Table.Th>
-                                    {sheets.map(({ site, found: f }) => (
-                                        <Table.Th key={site}>
-                                            <Stack gap={2} align="flex-start">
-                                                <Anchor
-                                                    href={f.url}
-                                                    target="_blank"
-                                                    size="sm"
-                                                    fw={600}
-                                                >
-                                                    {SOURCE_LABELS[site]}
-                                                </Anchor>
-                                                <Anchor
-                                                    component="button"
-                                                    size="xs"
-                                                    onClick={() =>
-                                                        chooseColumn(site)
-                                                    }
-                                                >
-                                                    Tout prendre
-                                                </Anchor>
-                                            </Stack>
-                                        </Table.Th>
-                                    ))}
-                                </Table.Tr>
-                            </Table.Thead>
-                            <Table.Tbody>
-                                {rows.map((row) => (
-                                    <Table.Tr key={row.field}>
-                                        <Table.Td
-                                            style={{ verticalAlign: 'top' }}
-                                        >
-                                            <Text size="sm" fw={500}>
-                                                {SHEET_FIELD_LABELS[row.field]}
-                                            </Text>
-                                        </Table.Td>
-                                        {cell(
-                                            row.field,
-                                            'current',
-                                            row.current,
-                                        )}
-                                        {sheets.map(({ site }) =>
-                                            cell(
-                                                row.field,
-                                                site,
-                                                row.found[site],
-                                            ),
-                                        )}
-                                    </Table.Tr>
-                                ))}
-                            </Table.Tbody>
-                        </Table>
-                    </Table.ScrollContainer>
+                    // Une carte par champ, ses valeurs empilées : lisible sur
+                    // un téléphone comme sur un grand écran.
+                    <Stack gap="sm">
+                        {rows.map((row) => {
+                            const options = rowOptions(row, order);
+                            const chosen = choices[row.field];
+                            return (
+                                <Paper
+                                    key={row.field}
+                                    withBorder
+                                    p="sm"
+                                    radius="md"
+                                    component="fieldset"
+                                    aria-label={SHEET_FIELD_LABELS[row.field]}
+                                    style={{ margin: 0 }}
+                                >
+                                    <Stack gap="xs">
+                                        <Text size="sm" fw={600}>
+                                            {SHEET_FIELD_LABELS[row.field]}
+                                        </Text>
+                                        {options.map((option) => {
+                                            const key = `${row.field}:${option.choice}`;
+                                            return (
+                                                <Stack key={key} gap={2}>
+                                                    <Radio
+                                                        name={row.field}
+                                                        value={option.choice}
+                                                        checked={
+                                                            chosen !==
+                                                                undefined &&
+                                                            option.sources.includes(
+                                                                chosen,
+                                                            )
+                                                        }
+                                                        onChange={() =>
+                                                            choose(
+                                                                row.field,
+                                                                option.choice,
+                                                            )
+                                                        }
+                                                        aria-label={`${SHEET_FIELD_LABELS[row.field]} : ${sourcesLabel(option.sources)}`}
+                                                        label={
+                                                            <Stack gap={2}>
+                                                                <Value
+                                                                    field={
+                                                                        row.field
+                                                                    }
+                                                                    text={display(
+                                                                        row.field,
+                                                                        option.value,
+                                                                    )}
+                                                                    expanded={
+                                                                        !!expanded[
+                                                                            key
+                                                                        ]
+                                                                    }
+                                                                />
+                                                                <Text
+                                                                    size="xs"
+                                                                    c="dimmed"
+                                                                >
+                                                                    {sourcesLabel(
+                                                                        option.sources,
+                                                                    )}
+                                                                </Text>
+                                                            </Stack>
+                                                        }
+                                                    />
+                                                    {row.field === 'Summary' &&
+                                                        option.value.length >
+                                                            200 && (
+                                                            <Anchor
+                                                                component="button"
+                                                                type="button"
+                                                                size="xs"
+                                                                ml={32}
+                                                                style={{
+                                                                    alignSelf:
+                                                                        'flex-start',
+                                                                }}
+                                                                onClick={() =>
+                                                                    setExpanded(
+                                                                        (
+                                                                            current,
+                                                                        ) => ({
+                                                                            ...current,
+                                                                            [key]: !current[
+                                                                                key
+                                                                            ],
+                                                                        }),
+                                                                    )
+                                                                }
+                                                            >
+                                                                {expanded[key]
+                                                                    ? 'Réduire'
+                                                                    : 'Voir tout'}
+                                                            </Anchor>
+                                                        )}
+                                                </Stack>
+                                            );
+                                        })}
+                                    </Stack>
+                                </Paper>
+                            );
+                        })}
+                    </Stack>
                 )}
                 {footer}
                 <Group justify="flex-end">

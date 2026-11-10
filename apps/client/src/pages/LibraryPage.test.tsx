@@ -142,9 +142,9 @@ describe('LibraryPage', () => {
         expect(
             screen.getAllByLabelText('Tome à reprendre')[0]!.closest('a'),
         ).toBeTruthy();
-        // Série entièrement lue : marquée et à la fin, pas grisée.
+        // Série entièrement lue : marquée, à la fin, légèrement grisée.
         const read = screen.getByLabelText('Série lue');
-        expect(read.closest('[style*="opacity"]')).toBeNull();
+        expect(read.closest('[style*="opacity"]')).toBeTruthy();
         // Le scan n'est plus sur l'accueil.
         expect(screen.queryByRole('button', { name: /scanner/i })).toBeNull();
     });

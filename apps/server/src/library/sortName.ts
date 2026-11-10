@@ -16,7 +16,9 @@ const TRAILING_ARTICLE = new RegExp(
 export const articleFirst = (name: string) => {
     const match = TRAILING_ARTICLE.exec(name.trim());
     if (!match) return name.trim();
-    const [, rest, article] = match as unknown as [string, string, string];
+    const [, rest, found] = match as unknown as [string, string, string];
+    // En tête du nom : avec une majuscule (« Sculpteur (le) », « Le Sculpteur »).
+    const article = found.charAt(0).toUpperCase() + found.slice(1);
     return /['’]$/.test(article) ? `${article}${rest}` : `${article} ${rest}`;
 };
 

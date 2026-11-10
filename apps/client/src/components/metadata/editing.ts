@@ -8,6 +8,7 @@ import {
     type SheetField,
     type SourcePriority,
     type VolumeKind,
+    articleFirst,
     classify,
     genreKey,
     kindOfWord,
@@ -192,7 +193,8 @@ export const searchNameOf = (
     series: string,
     volumes: Pick<EditableVolume, 'name' | 'path'>[],
 ): string => {
-    if (series.trim()) return series.trim();
+    // « Sculpteur (le) » (nom de fichier rangé) : « Le Sculpteur ».
+    if (series.trim()) return articleFirst(series.trim());
     for (const volume of volumes) {
         const parsed = parseVolumeFileName(
             volume.name.replace(/\.cb[zr]$/i, ''),
@@ -204,6 +206,18 @@ export const searchNameOf = (
         if (folder && folder !== '_draft') return folder;
     }
     return '';
+};
+
+/** Fiche Bedetheque, telle que renvoyée par le serveur. */
+export type BedethequeSeries = {
+    title: string;
+    summary: string;
+    genres: string[];
+    origin: string;
+    writer: string;
+    penciller: string;
+    publisher: string;
+    ongoing?: boolean;
 };
 
 /** Fiche Wikipédia, telle que renvoyée par le serveur. */
@@ -292,6 +306,35 @@ export const sheetFromMangaNews = (series: MangaNewsSeries): SeriesSheet => ({
 });
 
 /**
+ * Format d'après l'origine Bedetheque : « Franco-Belge » est une BD,
+ * « Comics » des comics, « Manga » un manga ; une autre origine telle quelle.
+ */
+const formatFromOrigin = (origin: string) =>
+    /franco|europ/i.test(origin)
+        ? 'BD'
+        : /comics/i.test(origin)
+          ? 'Comics'
+          : /manga|asie/i.test(origin)
+            ? 'Manga'
+            : origin || undefined;
+
+export const sheetFromBedetheque = (series: BedethequeSeries): SeriesSheet => ({
+    title: series.title,
+    summary: series.summary,
+    genre: series.genres.join(', '),
+    writer: series.writer,
+    penciller: series.penciller,
+    publisher: series.publisher,
+    status:
+        series.ongoing === undefined
+            ? undefined
+            : series.ongoing
+              ? 'ongoing'
+              : 'completed',
+    format: formatFromOrigin(series.origin),
+});
+
+/**
  * Valeurs d'une série comme l'éditeur les garde : texte, id du format, âge,
  * statut, genres et thèmes rangés d'après la liste (« Suspense » devient
  * « Thriller »). Une valeur vide n'y figure pas.
@@ -364,8 +407,41 @@ export type ComparisonRow = {
     found: Partial<Record<MetadataSource, string>>;
 };
 
+/**
+ * Même valeur, sans compter majuscules, accents, espaces ni ponctuation
+ * (« Roman graphique » et « Roman Graphique »).
+ */
 const sameValue = (a?: string, b?: string) =>
-    (a ?? '').trim() === (b ?? '').trim();
+    genreKey(a ?? '') === genreKey(b ?? '');
+
+/** Un choix d'une ligne : une valeur, et les fiches qui la donnent. */
+export type ComparisonOption = {
+    /** Choix enregistré quand on la prend (l'actuelle d'abord). */
+    choice: SheetChoice;
+    value: string;
+    /** L'actuelle et les sites qui donnent cette même valeur. */
+    sources: SheetChoice[];
+};
+
+/**
+ * Valeurs différentes d'une ligne, chacune une fois avec ceux qui la
+ * donnent : l'actuelle d'abord, puis les sites dans l'ordre.
+ */
+export const rowOptions = (
+    row: ComparisonRow,
+    order: readonly MetadataSource[],
+): ComparisonOption[] => {
+    const options: ComparisonOption[] = [];
+    const add = (choice: SheetChoice, value: string | undefined) => {
+        if (!value?.trim()) return;
+        const same = options.find((option) => sameValue(option.value, value));
+        if (same) same.sources.push(choice);
+        else options.push({ choice, value, sources: [choice] });
+    };
+    add('current', row.current);
+    for (const site of order) add(site, row.found[site]);
+    return options;
+};
 
 /**
  * Lignes du tableau : les champs pour lesquels une fiche apporte une valeur

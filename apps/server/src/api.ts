@@ -77,6 +77,7 @@ import { ResizedPages } from './library/resizedPages';
 import { type LibraryScanner, coverFile } from './library/scanner';
 import { readCover } from './library/smallCovers';
 import { getStats } from './library/stats';
+import { Bedetheque } from './metadata/bedetheque';
 import { MangaNews } from './metadata/mangaNews';
 import {
     METADATA_SOURCES,
@@ -103,6 +104,8 @@ export type ApiDeps = {
     wikipedia: Wikipedia;
     /** Manga-news (le vrai site si absent). */
     mangaNews?: MangaNews;
+    /** Bedetheque (le vrai site si absent). */
+    bedetheque?: Bedetheque;
     /** Réglages de l'admin (valeurs par défaut si absents). */
     settings?: SettingsStore;
     kavita?: KavitaImport;
@@ -221,6 +224,7 @@ export const createApi = ({
     covers,
     wikipedia,
     mangaNews = new MangaNews(),
+    bedetheque = new Bedetheque(),
     settings = new SettingsStore(db),
     // Base de Kavita envoyée pour la migration, à côté des couvertures.
     kavita = new KavitaImport(
@@ -588,17 +592,8 @@ export const createApi = ({
         .get(
             '/metadata/wikipedia/search',
             requireAdmin,
-            zValidator(
-                'query',
-                z.object({
-                    q: z.string().trim().min(1),
-                    kind: z.enum(['manga', 'comics']).default('manga'),
-                }),
-            ),
-            async (c) => {
-                const { q, kind } = c.req.valid('query');
-                return c.json(await wikipedia.search(q, kind));
-            },
+            zValidator('query', z.object({ q: z.string().trim().min(1) })),
+            async (c) => c.json(await wikipedia.search(c.req.valid('query').q)),
         )
         .get(
             '/metadata/wikipedia/:id',
@@ -621,6 +616,25 @@ export const createApi = ({
             zValidator('query', z.object({ id: z.string().min(1).max(200) })),
             async (c) =>
                 c.json(await mangaNews.series(c.req.valid('query').id)),
+        )
+        // --- Bedetheque (admin) : BD, comics, romans graphiques.
+        .get(
+            '/metadata/bedetheque/search',
+            requireAdmin,
+            zValidator('query', z.object({ q: z.string().trim().min(1) })),
+            async (c) =>
+                c.json(await bedetheque.search(c.req.valid('query').q)),
+        )
+        .get(
+            '/metadata/bedetheque/series',
+            requireAdmin,
+            // Identifiant de la série (IdBEL).
+            zValidator(
+                'query',
+                z.object({ id: z.string().regex(/^\d{1,12}$/) }),
+            ),
+            async (c) =>
+                c.json(await bedetheque.series(c.req.valid('query').id)),
         )
         .get('/volumes/:id', zValidator('param', idParam), (c) => {
             // Le chemin sur disque reste côté serveur.

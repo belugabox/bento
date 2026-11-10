@@ -77,14 +77,19 @@ export class Wikipedia {
         return (await response.json()) as T;
     };
 
-    /** Articles de séries (mangas ou BD) correspondant au texte. */
-    search = async (text: string, kind: SeriesKind) => {
+    /**
+     * Articles de séries correspondant au texte : mangas et bandes dessinées
+     * ensemble, quelle que soit la bibliothèque (une bibliothèque de mangas
+     * a aussi ses romans graphiques : « Asterios Polyp », « Le Sculpteur »).
+     */
+    search = async (text: string) => {
         const data = await this.get<{
             query?: { search: { pageid: number; title: string }[] };
         }>({
             action: 'query',
             list: 'search',
-            srsearch: `${text} hastemplate:"${INFOBOXES[kind]}"`,
+            // « A|B » : l'un ou l'autre modèle.
+            srsearch: `${text} hastemplate:"${INFOBOXES.manga}|${INFOBOXES.comics}"`,
             srlimit: '10',
             srprop: '',
         });
@@ -147,7 +152,12 @@ export class Wikipedia {
             url: pageUrl(page.title),
             summary: extractSummary(html.text),
             ...infobox,
-            ongoing: infobox.firstYear !== undefined && !infobox.lastYear,
+            // Une seule année : en cours, sauf un volume unique (one-shot,
+            // roman graphique), fini dès sa sortie.
+            ongoing:
+                infobox.firstYear !== undefined &&
+                !infobox.lastYear &&
+                infobox.volumeCount !== 1,
             coverUrl: page.thumbnail?.source,
         };
     };

@@ -26,6 +26,8 @@ describe('articleFirst', () => {
     it('puts back an article written after the name', () => {
         expect(articleFirst('Boxer (The)')).toBe('The Boxer');
         expect(articleFirst('Petit Prince (Le)')).toBe('Le Petit Prince');
+        // Article en minuscules : une majuscule une fois devant.
+        expect(articleFirst('Sculpteur (le)')).toBe('Le Sculpteur');
         expect(articleFirst("Attaque des Titans (L')")).toBe(
             "L'Attaque des Titans",
         );

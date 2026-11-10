@@ -341,6 +341,7 @@ export const SettingsPage = () => {
                         <GenresSettings />
                         <SourcePrioritySettings
                             priority={current.settings.sourcePriority}
+                            disabled={current.settings.disabledSources}
                             onSaved={setSaved}
                         />
                     </Stack>

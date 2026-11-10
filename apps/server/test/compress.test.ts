@@ -1,6 +1,6 @@
 import AdmZip from 'adm-zip';
 import { randomBytes } from 'node:crypto';
-import { mkdir, stat, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import sharp from 'sharp';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -106,25 +106,39 @@ describe('compression', () => {
         expect((await stat(fullPath)).mtimeMs).toBe(before.mtimeMs);
     });
 
-    it('estimates a whole series at once, from a few of its volumes', async () => {
-        const paths = [1, 2, 3, 4, 5].map((n) => `_draft/Gantz T0${n}.cbz`);
-        for (const relative of paths) await writeHeavyCbz(relative);
-        await writeFile(ctx.file('_draft/broken.cbz'), 'pas une archive');
+    // Plus lent que les autres (24 pages recompressées) : délai plus large
+    // pour les machines de GitHub.
+    it(
+        'estimates a whole series at once, from a few of its volumes',
+        {
+            timeout: 30_000,
+        },
+        async () => {
+            const paths = [1, 2, 3, 4, 5].map((n) => `_draft/Gantz T0${n}.cbz`);
+            // Un seul tome fabriqué (images de bruit, lentes à créer), copié.
+            const first = await writeHeavyCbz(paths[0]!);
+            for (const relative of paths.slice(1)) {
+                await copyFile(first, ctx.file(relative));
+            }
+            await writeFile(ctx.file('_draft/broken.cbz'), 'pas une archive');
 
-        const estimates = await (
-            await post('compression/estimate', {
-                paths: [...paths, '_draft/broken.cbz'],
-            })
-        ).json();
+            const estimates = await (
+                await post('compression/estimate', {
+                    paths: [...paths, '_draft/broken.cbz'],
+                })
+            ).json();
 
-        for (const relative of paths) {
-            const { size } = await stat(ctx.file(relative));
-            expect(estimates[relative].originalSize).toBe(size);
-            expect(estimates[relative].compressedSize).toBeLessThan(size * 0.8);
-        }
-        // Un fichier illisible : son erreur, sans gêner les autres.
-        expect(estimates['_draft/broken.cbz'].error).toBeTruthy();
-    });
+            for (const relative of paths) {
+                const { size } = await stat(ctx.file(relative));
+                expect(estimates[relative].originalSize).toBe(size);
+                expect(estimates[relative].compressedSize).toBeLessThan(
+                    size * 0.8,
+                );
+            }
+            // Un fichier illisible : son erreur, sans gêner les autres.
+            expect(estimates['_draft/broken.cbz'].error).toBeTruthy();
+        },
+    );
 
     it('marks a compressed file, which is then left alone', async () => {
         const fullPath = await writeHeavyCbz('_draft/Gantz T01.cbz');
@@ -285,6 +299,7 @@ describe('settings', () => {
                 compression: { quality: 90, maxHeight: 2400 },
                 scanIntervalMinutes: 30,
                 readByPercent: 10,
+                disabledSources: [],
                 appearance: { colorScheme: 'auto', accent: 'violet' },
                 ages: [0, 8, 10, 12, 14, 16, 18],
                 sourcePriority: DEFAULT_SOURCE_PRIORITY,
@@ -293,6 +308,7 @@ describe('settings', () => {
                 compression: { quality: 90, maxHeight: 2400 },
                 scanIntervalMinutes: 30,
                 readByPercent: 10,
+                disabledSources: [],
                 appearance: { colorScheme: 'auto', accent: 'violet' },
                 ages: [0, 8, 10, 12, 14, 16, 18],
                 sourcePriority: DEFAULT_SOURCE_PRIORITY,
@@ -312,6 +328,8 @@ describe('settings', () => {
             appearance: { accent: 'teal' },
             // Un champ seulement : les autres gardent leur site.
             sourcePriority: { Writer: 'wikipedia' },
+            // Un site désactivé (en double : gardé une fois).
+            disabledSources: ['manga-news', 'manga-news'],
         });
         expect((await changed.json()).settings).toEqual({
             compression: { quality: 70, maxHeight: 2400 },
@@ -320,7 +338,11 @@ describe('settings', () => {
             appearance: { colorScheme: 'auto', accent: 'teal' },
             ages: [0, 8, 10, 12, 14, 16, 18],
             sourcePriority: { ...DEFAULT_SOURCE_PRIORITY, Writer: 'wikipedia' },
+            disabledSources: ['manga-news'],
         });
+        expect((await put({ disabledSources: ['nautiljon'] })).status).toBe(
+            400,
+        );
         expect((await put({ readByPercent: 0 })).status).toBe(400);
         expect((await put({ sourcePriority: { Writer: 'imdb' } })).status).toBe(
             400,

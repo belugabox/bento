@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+    Wikipedia,
     cleanWikitext,
     extractSummary,
     parseInfobox,
@@ -23,6 +24,32 @@ const SPY_FAMILY = `{{Infobox Animation et bande dessinée asiatiques/Entête
  | titre               = Spy × Family : Portrait de famille
  | nb_volumes          = 1
 }}`;
+
+describe('Wikipedia search', () => {
+    it('looks for manga and comics articles together', async () => {
+        let asked = '';
+        const wikipedia = new Wikipedia((async (input: string | URL) => {
+            asked = new URL(String(input)).searchParams.get('srsearch') ?? '';
+            return new Response(
+                JSON.stringify({
+                    query: { search: [{ pageid: 1, title: 'Asterios Polyp' }] },
+                }),
+            );
+        }) as unknown as typeof fetch);
+
+        expect(await wikipedia.search('Asterios Polyp')).toEqual([
+            {
+                id: 1,
+                title: 'Asterios Polyp',
+                url: 'https://fr.wikipedia.org/wiki/Asterios_Polyp',
+            },
+        ]);
+        // Un roman graphique dans une bibliothèque de mangas : trouvé aussi.
+        expect(asked).toBe(
+            'Asterios Polyp hastemplate:"Infobox Animation et bande dessinée asiatiques/Livre|Infobox Bande dessinée"',
+        );
+    });
+});
 
 describe('cleanWikitext', () => {
     it('keeps link labels and drops references', () => {

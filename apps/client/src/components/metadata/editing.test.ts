@@ -16,10 +16,12 @@ import {
     isMixed,
     isSeriesFieldChanged,
     joinSeries,
+    rowOptions,
     searchNameOf,
     seriesValue,
     setSeriesField,
     setVolumeKind,
+    sheetFromBedetheque,
     sheetFromWikipedia,
     sheetValues,
     statusFromWikipedia,
@@ -90,6 +92,8 @@ describe('joinSeries', () => {
 describe('searchNameOf', () => {
     it('uses the series, else a file name, else the folder', () => {
         expect(searchNameOf(' Gantz ', volumes)).toBe('Gantz');
+        // Article à la fin (nom rangé) : remis devant.
+        expect(searchNameOf('Sculpteur (le)', volumes)).toBe('Le Sculpteur');
         expect(searchNameOf('', volumes)).toBe('Spy x Family');
         const numbered = [
             { path: '_draft/Dr Stone/01.cbz', name: '01.cbz' },
@@ -294,6 +298,44 @@ describe('comparison with online sheets', () => {
         ).toEqual({ Writer: 'Tatsuya Endō' });
     });
 
+    it('shows each different value once, with who gives it', () => {
+        const rows = comparisonRows(
+            { Publisher: 'Casterman', Tags: 'Roman graphique' },
+            [
+                {
+                    site: 'wikipedia',
+                    values: {
+                        Publisher: 'Pantheon Books',
+                        Tags: 'Roman Graphique',
+                    },
+                },
+                {
+                    site: 'bedetheque',
+                    values: {
+                        Publisher: 'casterman',
+                        Tags: 'Roman graphique',
+                    },
+                },
+            ],
+        );
+        // Thèmes : seule une majuscule change, pas de ligne.
+        expect(rows.map((row) => row.field)).toEqual(['Publisher']);
+        expect(
+            rowOptions(rows[0]!, ['manga-news', 'wikipedia', 'bedetheque']),
+        ).toEqual([
+            {
+                choice: 'current',
+                value: 'Casterman',
+                sources: ['current', 'bedetheque'],
+            },
+            {
+                choice: 'wikipedia',
+                value: 'Pantheon Books',
+                sources: ['wikipedia'],
+            },
+        ]);
+    });
+
     it('applies the chosen values, keeping themes from the files', () => {
         const edits = applySheetValues(
             setSeriesField(initialEdits(volumes), 'Genre', 'Shonen'),
@@ -349,5 +391,41 @@ describe('statusFromWikipedia', () => {
         );
         expect(statusFromWikipedia({ ongoing: true })).toBe('ongoing');
         expect(statusFromWikipedia({ ongoing: false })).toBeUndefined();
+    });
+});
+
+describe('sheetFromBedetheque', () => {
+    it('takes the format from the origin, and a one shot is finished', () => {
+        expect(
+            sheetFromBedetheque({
+                title: 'Asterios Polyp',
+                summary: 'Un architecte…',
+                genres: ['Roman graphique'],
+                origin: 'Comics',
+                writer: 'David Mazzucchelli',
+                penciller: 'David Mazzucchelli',
+                publisher: 'Casterman',
+                ongoing: false,
+            }),
+        ).toMatchObject({
+            genre: 'Roman graphique',
+            format: 'Comics',
+            status: 'completed',
+            publisher: 'Casterman',
+        });
+        const blacksad = {
+            title: 'Blacksad',
+            summary: '',
+            genres: ['Policier'],
+            origin: 'Franco-Belge',
+            writer: '',
+            penciller: '',
+            publisher: 'Dargaud',
+            ongoing: true,
+        };
+        expect(sheetFromBedetheque(blacksad)).toMatchObject({
+            format: 'BD',
+            status: 'ongoing',
+        });
     });
 });

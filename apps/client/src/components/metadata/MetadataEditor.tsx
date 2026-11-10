@@ -381,6 +381,8 @@ export const MetadataEditor = ({
     const settings = useQuery(fetchSettings, []);
     const priority =
         settings.data?.settings.sourcePriority ?? DEFAULT_SOURCE_PRIORITY;
+    // Sites désactivés (réglages) : ni cherchés, ni relus.
+    const disabledSources = settings.data?.settings.disabledSources ?? [];
     // Noms déjà connus : suggestions de Scénario, Dessin, Éditeur.
     const credits = useQuery(() => fetchCredits(libraryId), [libraryId]);
     const creditNames = (field: SeriesField) => {
@@ -560,7 +562,11 @@ export const MetadataEditor = ({
     const refresh = async () => {
         setRefreshing(true);
         setReport(undefined);
-        const results = await Promise.allSettled(sourcesValue.map(loadFound));
+        const results = await Promise.allSettled(
+            sourcesValue
+                .filter((link) => !disabledSources.includes(link.site))
+                .map(loadFound),
+        );
         setRefreshing(false);
         const loaded = results.flatMap((r) =>
             r.status === 'fulfilled' ? [r.value] : [],
@@ -1465,7 +1471,7 @@ export const MetadataEditor = ({
                 catalog={catalog}
                 formats={formats.data ?? []}
                 known={knownNames}
-                order={sitesFor(kind)}
+                order={sitesFor(kind, disabledSources)}
                 priority={priority}
                 display={display}
                 onApply={(values) => applyComparison(values, comparing ?? [])}

@@ -43,6 +43,9 @@ const Cover = ({
  * Vignette cliquable : couverture et légende (série ou tome). En ligne
  * (`layout="row"`), une petite couverture à gauche du texte.
  */
+// Série déjà lue : visible, mais en retrait.
+const DIMMED = 0.65;
+
 export const CoverCard = ({
     to,
     cover,
@@ -53,6 +56,7 @@ export const CoverCard = ({
     corner,
     badge,
     tag,
+    dimmed = false,
     menu,
     layout = 'card',
     coversOnly = false,
@@ -82,6 +86,8 @@ export const CoverCard = ({
      * d'état ; dans le lien.
      */
     tag?: ReactNode;
+    /** Légèrement grisée (série déjà lue, accueil groupé par lecture). */
+    dimmed?: boolean;
     /** Menu d'actions (⋮), en bas à droite, à côté du titre. */
     menu?: ReactNode;
     layout?: 'card' | 'row';
@@ -93,7 +99,10 @@ export const CoverCard = ({
     const shown = progress !== undefined && progress > 0;
     if (layout === 'row') {
         return (
-            <Box pos="relative">
+            <Box
+                pos="relative"
+                style={dimmed ? { opacity: DIMMED } : undefined}
+            >
                 <Card
                     component={Link}
                     to={to}
@@ -171,7 +180,7 @@ export const CoverCard = ({
     }
     return (
         // Le coin est hors du lien : un bouton ne peut pas être dans un lien.
-        <Box pos="relative">
+        <Box pos="relative" style={dimmed ? { opacity: DIMMED } : undefined}>
             <Card component={Link} to={to} padding={0} radius="md" withBorder>
                 <Box pos="relative">
                     <Cover cover={cover} title={title} iconSize={32} />

@@ -1,14 +1,17 @@
 import type { MetadataSource, SourceLink } from '@server/types';
 
 import {
+    type BedethequeDetails,
     type MangaNewsDetails,
     type WikipediaDetails,
+    fetchBedethequeSeries,
     fetchMangaNewsSeries,
     fetchWikipediaSeries,
 } from '@/services/api';
 
 import {
     type SeriesSheet,
+    sheetFromBedetheque,
     sheetFromMangaNews,
     sheetFromWikipedia,
 } from './editing';
@@ -69,14 +72,48 @@ const fromMangaNews = (details: MangaNewsDetails): Preview => ({
     ].filter(Boolean),
 });
 
+const fromBedetheque = (details: BedethequeDetails): Preview => ({
+    source: 'bedetheque',
+    id: details.id,
+    title: details.title,
+    url: details.url,
+    coverUrl: details.coverUrl,
+    sheet: sheetFromBedetheque(details),
+    lines: [
+        [details.origin, details.oneShot ? 'One shot' : '']
+            .filter(Boolean)
+            .join(' · '),
+        details.genres.join(', '),
+        details.writer,
+        details.publisher,
+        details.firstYear
+            ? details.lastYear
+                ? `${details.firstYear} – ${details.lastYear}`
+                : String(details.firstYear)
+            : '',
+        details.volumeCount && !details.oneShot
+            ? `${details.volumeCount} tomes${details.ongoing === undefined ? '' : details.ongoing ? ' (en cours)' : ' (terminée)'}`
+            : '',
+    ].filter(Boolean),
+});
+
 /** Fiche déjà connue d'une série, relue sur son site. */
 export const loadFound = async ({ site, id }: SourceLink): Promise<Preview> =>
     site === 'wikipedia'
         ? fromWikipedia(await fetchWikipediaSeries(Number(id)))
-        : fromMangaNews(await fetchMangaNewsSeries(id));
+        : site === 'bedetheque'
+          ? fromBedetheque(await fetchBedethequeSeries(id))
+          : fromMangaNews(await fetchMangaNewsSeries(id));
 
-/** Sites interrogés, le plus utile d'abord (Manga-news pour un manga). */
-export const sitesFor = (kind: 'manga' | 'comics'): MetadataSource[] =>
-    kind === 'manga'
-        ? ['manga-news', 'wikipedia']
-        : ['wikipedia', 'manga-news'];
+/**
+ * Sites interrogés, le plus utile d'abord (Manga-news pour un manga,
+ * Bedetheque pour une BD), sans ceux désactivés dans les réglages.
+ */
+export const sitesFor = (
+    kind: 'manga' | 'comics',
+    disabled: readonly MetadataSource[] = [],
+): MetadataSource[] =>
+    (kind === 'manga'
+        ? (['manga-news', 'wikipedia', 'bedetheque'] as const)
+        : (['bedetheque', 'wikipedia', 'manga-news'] as const)
+    ).filter((site) => !disabled.includes(site));
