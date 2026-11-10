@@ -588,17 +588,8 @@ export const createApi = ({
         .get(
             '/metadata/wikipedia/search',
             requireAdmin,
-            zValidator(
-                'query',
-                z.object({
-                    q: z.string().trim().min(1),
-                    kind: z.enum(['manga', 'comics']).default('manga'),
-                }),
-            ),
-            async (c) => {
-                const { q, kind } = c.req.valid('query');
-                return c.json(await wikipedia.search(q, kind));
-            },
+            zValidator('query', z.object({ q: z.string().trim().min(1) })),
+            async (c) => c.json(await wikipedia.search(c.req.valid('query').q)),
         )
         .get(
             '/metadata/wikipedia/:id',

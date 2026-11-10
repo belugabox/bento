@@ -8,6 +8,7 @@ import {
     type SheetField,
     type SourcePriority,
     type VolumeKind,
+    articleFirst,
     classify,
     genreKey,
     kindOfWord,
@@ -192,7 +193,8 @@ export const searchNameOf = (
     series: string,
     volumes: Pick<EditableVolume, 'name' | 'path'>[],
 ): string => {
-    if (series.trim()) return series.trim();
+    // « Sculpteur (le) » (nom de fichier rangé) : « Le Sculpteur ».
+    if (series.trim()) return articleFirst(series.trim());
     for (const volume of volumes) {
         const parsed = parseVolumeFileName(
             volume.name.replace(/\.cb[zr]$/i, ''),

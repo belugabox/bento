@@ -380,8 +380,9 @@ export const fileCoverUrl = (library: number, path: string, version = '') =>
 
 // --- Métadonnées et couvertures (admin) ----------------------------------------
 
-export const searchWikipedia = (q: string, kind: 'manga' | 'comics') =>
-    json(api.metadata.wikipedia.search.$get({ query: { q, kind } }));
+/** Séries de Wikipédia FR (mangas et bandes dessinées) pour ce texte. */
+export const searchWikipedia = (q: string) =>
+    json(api.metadata.wikipedia.search.$get({ query: { q } }));
 
 export const fetchWikipediaSeries = (wikiId: number) =>
     json(api.metadata.wikipedia[':id'].$get(id(wikiId)));

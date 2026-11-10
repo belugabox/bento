@@ -102,7 +102,7 @@ export const SeriesSearch = ({
         try {
             const results =
                 site === 'wikipedia'
-                    ? (await searchWikipedia(text, kind)).map((r) => ({
+                    ? (await searchWikipedia(text)).map((r) => ({
                           key: String(r.id),
                           title: r.title,
                       }))

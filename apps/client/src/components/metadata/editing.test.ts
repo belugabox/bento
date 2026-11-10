@@ -90,6 +90,8 @@ describe('joinSeries', () => {
 describe('searchNameOf', () => {
     it('uses the series, else a file name, else the folder', () => {
         expect(searchNameOf(' Gantz ', volumes)).toBe('Gantz');
+        // Article à la fin (nom rangé) : remis devant.
+        expect(searchNameOf('Sculpteur (le)', volumes)).toBe('Le Sculpteur');
         expect(searchNameOf('', volumes)).toBe('Spy x Family');
         const numbered = [
             { path: '_draft/Dr Stone/01.cbz', name: '01.cbz' },
