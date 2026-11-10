@@ -53,7 +53,8 @@ const notifyDone = (
 ) => {
     const id = notifications.show({
         autoClose: UNDO_MS,
-        withCloseButton: !undo,
+        // Croix toujours là : le message se ferme tout de suite.
+        withCloseButton: true,
         message: (
             <Group justify="space-between" wrap="nowrap" gap="sm">
                 <Text size="sm">{message}</Text>

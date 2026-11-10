@@ -97,8 +97,9 @@ describe('SeriesPage', () => {
 
         expect(await screen.findByText('Série terminée')).toBeTruthy();
         // Format, genres et thèmes.
-        // Taille totale des tomes (1 octet chacun ici).
-        expect(screen.getByText('Manga · 3 o')).toBeTruthy();
+        // Pas la taille des fichiers.
+        expect(screen.getByText('Manga')).toBeTruthy();
+        expect(screen.queryByText(/ o$/)).toBeNull();
         // Complétude : seulement pour l'admin.
         expect(screen.queryByText(/Fiche à/)).toBeNull();
         expect(screen.getByText('Sport')).toBeTruthy();

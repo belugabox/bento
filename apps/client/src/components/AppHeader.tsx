@@ -419,7 +419,8 @@ const UserMenu = () => {
                     >
                         Thème et affichage…
                     </Menu.Item>
-                    <Menu.Divider />
+                    {/* Partie admin : sans elle, pas de séparation en double. */}
+                    {isAdmin && <Menu.Divider />}
                     {isAdmin && (
                         <Menu.Item
                             component={Link}

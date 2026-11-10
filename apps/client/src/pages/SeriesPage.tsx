@@ -37,7 +37,6 @@ import { CoverCard } from '@/components/CoverCard';
 import { SeriesReaders } from '@/components/SeriesReaders';
 import { ageLabel, seriesAgeOf } from '@/components/ageLimits';
 import { completenessOf } from '@/components/completeness';
-import { formatSize } from '@/components/format';
 import { gridColumns, useLibraryDisplay } from '@/components/libraryDisplay';
 import {
     countedVolumes,
@@ -94,13 +93,11 @@ export const SeriesPage = () => {
     // Titre de chaque tome sous son numéro, si l'un d'eux en a un.
     const withTitles = series.volumes.some((v) => volumeTitleOf(v));
     const age = seriesAgeOf(series);
-    const totalSize = series.volumes.reduce((sum, v) => sum + v.size, 0);
     const details = [
         series.format,
         series.year && String(series.year),
         series.writer,
         series.publisher,
-        totalSize > 0 && formatSize(totalSize),
     ].filter(Boolean);
     // Fiche incomplète : montrée à l'admin seulement (ComicInfo des tomes).
     const completeness = isAdmin

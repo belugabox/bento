@@ -64,6 +64,35 @@ describe('SeriesReaders', () => {
         expect(String(fetch.mock.calls[0]![0])).toMatch(
             /\/api\/series\/3\/readers$/,
         );
+        // Au toucher, un second appui ferme.
+        fireEvent.click(screen.getByRole('button', { name: 'Lu par' }));
+        await vi.waitFor(() =>
+            expect(
+                screen
+                    .getByRole('button', { name: 'Lu par' })
+                    .getAttribute('aria-expanded'),
+            ).toBe('false'),
+        );
+    });
+
+    it('opens the details when the mouse passes over', async () => {
+        answer([
+            {
+                id: 2,
+                name: 'Léa',
+                avatarSeed: 'abc',
+                percent: 100,
+                current: null,
+            },
+        ]);
+        show();
+        const target = await screen.findByRole('button', { name: 'Lu par' });
+        fireEvent.pointerEnter(target, { pointerType: 'mouse' });
+        expect(await screen.findByText('Toute la série lue')).toBeTruthy();
+        fireEvent.pointerLeave(target, { pointerType: 'mouse' });
+        await vi.waitFor(() =>
+            expect(target.getAttribute('aria-expanded')).toBe('false'),
+        );
     });
 
     it('shows nothing when nobody read it', async () => {
