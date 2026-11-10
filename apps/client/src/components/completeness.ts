@@ -9,7 +9,15 @@ export type CompletenessInput = {
     penciller?: string | null;
     publisher?: string | null;
     summary?: string | null;
-    volumes: { number?: string | null; year?: number | null }[];
+    /** Les tomes, ou seulement leurs comptes (gestion des séries). */
+    volumes: { number?: string | null; year?: number | null }[] | VolumeCounts;
+};
+
+/** Tomes d'une série : combien, et combien ont un numéro ou une année. */
+export type VolumeCounts = {
+    total: number;
+    withNumber: number;
+    withYear: number;
 };
 
 export type Completeness = {
@@ -39,9 +47,13 @@ export const completenessOf = (input: CompletenessInput): Completeness => {
         ['Éditeur', filled(input.publisher)],
         ['Résumé', filled(input.summary)],
     ];
-    const total = input.volumes.length;
-    const withNumber = input.volumes.filter((v) => filled(v.number)).length;
-    const withYear = input.volumes.filter((v) => !!v.year).length;
+    const { total, withNumber, withYear } = Array.isArray(input.volumes)
+        ? {
+              total: input.volumes.length,
+              withNumber: input.volumes.filter((v) => filled(v.number)).length,
+              withYear: input.volumes.filter((v) => !!v.year).length,
+          }
+        : input.volumes;
     const parts = [
         ...fields.map(([, done]) => (done ? 1 : 0)),
         total ? withNumber / total : 1,

@@ -452,6 +452,17 @@ export const setSeriesStatus = (
     status: 'ongoing' | 'completed' | null,
 ) => json(api.series[':id'].status.$put({ ...id(seriesId), json: { status } }));
 
+/** Gestion des séries (admin) : toutes, avec taille, pages et fiche. */
+export const fetchManagedSeries = () => json(api.manage.series.$get());
+
+export type ManagedSeries = Awaited<
+    ReturnType<typeof fetchManagedSeries>
+>[number];
+
+/** Nombre de séries à classer (menu de l'admin). */
+export const fetchToClassifyCount = () =>
+    json(api.manage.series['to-classify'].$get());
+
 /** Statistiques de la bibliothèque et de la lecture (admin). */
 export const fetchStats = () => json(api.stats.$get());
 

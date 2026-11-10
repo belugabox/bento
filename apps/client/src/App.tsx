@@ -31,9 +31,9 @@ const SettingsPage = lazy(() =>
 const StatsPage = lazy(() =>
     import('@/pages/StatsPage').then((m) => ({ default: m.StatsPage })),
 );
-const ToClassifyPage = lazy(() =>
-    import('@/pages/ToClassifyPage').then((m) => ({
-        default: m.ToClassifyPage,
+const SeriesManagementPage = lazy(() =>
+    import('@/pages/SeriesManagementPage').then((m) => ({
+        default: m.SeriesManagementPage,
     })),
 );
 const AccountPage = lazy(() =>
@@ -109,12 +109,17 @@ export const App = () => (
                     }
                 />
                 <Route
-                    path="to-classify"
+                    path="manage"
                     element={
                         <AdminOnly>
-                            <ToClassifyPage />
+                            <SeriesManagementPage />
                         </AdminOnly>
                     }
+                />
+                {/* Ancienne adresse de « Séries à classer ». */}
+                <Route
+                    path="to-classify"
+                    element={<Navigate to="/manage" replace />}
                 />
                 <Route
                     path="stats"

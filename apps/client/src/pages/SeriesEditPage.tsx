@@ -78,7 +78,7 @@ export const SeriesEditPage = () => {
             <Group justify="space-between" align="baseline">
                 <Title order={2}>Modifier la série</Title>
                 {fromQueue && queue.data && (
-                    <Anchor component={Link} to="/to-classify" size="sm">
+                    <Anchor component={Link} to="/manage" size="sm">
                         Séries à classer : {queue.data.length}
                     </Anchor>
                 )}

@@ -134,6 +134,16 @@ export const seriesAgeSql = sql<
  * Séries, filtrées par bibliothèque et par texte (nom, genres et thèmes,
  * auteurs, sans tenir compte de la casse).
  */
+/**
+ * Couverture d'une série : celle de son premier tome, et sa version.
+ * Sous-requêtes en SQL brut : Drizzle n'y préfixe pas les colonnes par leur
+ * table.
+ */
+export const coverVolumeSql = {
+    coverVolumeId: sql<number>`(select v.id from volumes v where v.series_id = series.id order by v.kind != 'volume', v.kind, v.sort_number is null, v.sort_number, v.file limit 1)`,
+    coverVolumeVersion: sql<number>`(select cast(v.mtime_ms as integer) from volumes v where v.series_id = series.id order by v.kind != 'volume', v.kind, v.sort_number is null, v.sort_number, v.file limit 1)`,
+};
+
 export const listSeries = (
     db: Db,
     viewer: Viewer,
@@ -170,8 +180,7 @@ export const listSeries = (
             penciller: sql<
                 string | null
             >`(select json_extract(v.comic_info, '$.Penciller') from volumes v where v.series_id = series.id order by v.kind != 'volume', v.kind, v.sort_number is null, v.sort_number, v.file limit 1)`,
-            coverVolumeId: sql<number>`(select v.id from volumes v where v.series_id = series.id order by v.kind != 'volume', v.kind, v.sort_number is null, v.sort_number, v.file limit 1)`,
-            coverVolumeVersion: sql<number>`(select cast(v.mtime_ms as integer) from volumes v where v.series_id = series.id order by v.kind != 'volume', v.kind, v.sort_number is null, v.sort_number, v.file limit 1)`,
+            ...coverVolumeSql,
             // Tomes lus par la personne.
             readCount: sql<number>`(select count(*) from read_progress rp join volumes v on v.id = rp.volume_id where v.series_id = series.id and rp.user_id = ${viewer.id} and rp.completed = 1 and ${countedVolume('v')})`,
             // Tomes ouverts (lus ou en cours) : série commencée.

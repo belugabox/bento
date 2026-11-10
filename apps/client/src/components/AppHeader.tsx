@@ -1,6 +1,7 @@
 import {
     ActionIcon,
     Alert,
+    Badge,
     Anchor,
     Button,
     CloseButton,
@@ -51,6 +52,7 @@ import {
     fetchPendingDrafts,
     fetchSimulableAccounts,
     fetchTasks,
+    fetchToClassifyCount,
     startPreview,
     startSimulation,
     stopPreview,
@@ -375,6 +377,14 @@ const UserMenu = () => {
     const isAdmin = user.role === 'admin';
     const [previewOpened, previewModal] = useDisclosure(false);
     const [appearanceOpened, appearanceModal] = useDisclosure(false);
+    // Séries à classer : comptées à l'ouverture du menu (admin).
+    const [toClassify, setToClassify] = useState(0);
+    const countToClassify = () => {
+        if (!isAdmin) return;
+        fetchToClassifyCount()
+            .then(({ count }) => setToClassify(count))
+            .catch(() => undefined);
+    };
     return (
         <>
             <PreviewModal opened={previewOpened} onClose={previewModal.close} />
@@ -382,7 +392,7 @@ const UserMenu = () => {
                 opened={appearanceOpened}
                 onClose={appearanceModal.close}
             />
-            <Menu position="bottom-end">
+            <Menu position="bottom-end" onOpen={countToClassify}>
                 <Menu.Target>
                     <UnstyledButton aria-label="Mon compte">
                         <UserAvatar
@@ -433,10 +443,19 @@ const UserMenu = () => {
                     {isAdmin && (
                         <Menu.Item
                             component={Link}
-                            to="/to-classify"
+                            to="/manage"
                             leftSection={<IconTags size={14} />}
+                            rightSection={
+                                toClassify > 0 && (
+                                    <Tooltip label="Séries à classer">
+                                        <Badge size="sm" variant="light" circle>
+                                            {toClassify}
+                                        </Badge>
+                                    </Tooltip>
+                                )
+                            }
                         >
-                            Séries à classer
+                            Séries
                         </Menu.Item>
                     )}
                     {isAdmin && (
