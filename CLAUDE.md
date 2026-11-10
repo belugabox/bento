@@ -8,7 +8,7 @@ Serveur de lecture et de gestion de mangas et BD, qui remplace Kavita pour la fa
 - Il donne souvent plusieurs demandes à la suite. Traite-les toutes, puis récapitule point par point.
 - **Branche de travail : `feat/reading-foundation`** (poussée, pas encore de PR). Commit et push sur cette branche à la fin de chaque demande terminée et testée : c'est acquis. Ne pas fusionner dans `main`, ne pas ouvrir de PR sans qu'il le demande.
 - Le déploiement est reporté (« on déploiera plus tard »).
-- Il a refusé un nom de tri modifiable par série (« oublie »).
+- Il a refusé un nom de tri modifiable par série (« oublie »), et le 10 novembre 2026 un champ « Édition » de série (Deluxe, Perfect, Kanzenban… : « oublie »).
 - Classement décidé le 6 novembre 2026 : format, âge, genres, thèmes. Formats, grille d'âges et genres sont gérés par l'admin (Réglages, onglet Classement). Le format est obligatoire, sans valeur par défaut ; format et âge exact restent dans Bento (le ComicInfo reçoit la classification la plus proche, plus stricte). Le « public » (shonen, seinen…) a été retiré : « je ne l'utiliserai pas » (migration 0015).
 - Favoris retirés le 6 novembre 2026 (« À lire » seul : ces séries passent en tête de l'accueil). Collections retirées le même jour (« tu peux supprimer la partie collection ») : code supprimé, tables `collections` et `collection_series` gardées en base, inutilisées (les supprimer effacerait celles de la prod). Pocket ID retiré le 9 novembre 2026 : comptes gérés dans Bento (identifiant, mot de passe, avatar DiceBear « Clay », e-mail facultatif), créés par des liens d'invitation que l'admin envoie lui-même (partage, WhatsApp, texto, e-mail : pas de serveur de mail). Connexion par identifiant seul, pas par e-mail.
 
