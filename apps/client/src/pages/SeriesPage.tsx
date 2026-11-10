@@ -29,14 +29,14 @@ import {
 import { useState } from 'react';
 import { Link, useParams } from 'react-router';
 
-import { VOLUME_KINDS } from '@server/types';
+import { isMainKind, isStandalone } from '@server/types';
 
+import { SeriesVolumeMenu } from '@/components/CardMenus';
 import { CompletenessBadge } from '@/components/CompletenessBadge';
 import { CoverCard } from '@/components/CoverCard';
 import { SeriesReaders } from '@/components/SeriesReaders';
 import { ageLabel, seriesAgeOf } from '@/components/ageLimits';
 import { completenessOf } from '@/components/completeness';
-import { formatSize } from '@/components/format';
 import { gridColumns, useLibraryDisplay } from '@/components/libraryDisplay';
 import {
     countedVolumes,
@@ -65,7 +65,12 @@ const ACTION_LABELS = {
 
 /** Fiche d'une série : informations, tomes et où en est la personne. */
 // Titre des sections de la fiche, sous les tomes.
-const KIND_SECTIONS = { 'hors-serie': 'Hors-séries', special: 'Spéciaux' };
+// La série (tomes, one-shots, intégrales) d'abord, sans titre.
+const KIND_SECTIONS = [
+    { key: 'main', title: null },
+    { key: 'hors-serie', title: 'Hors-séries' },
+    { key: 'special', title: 'Spéciaux' },
+] as const;
 
 export const SeriesPage = () => {
     const seriesId = Number(useParams().id);
@@ -93,13 +98,11 @@ export const SeriesPage = () => {
     // Titre de chaque tome sous son numéro, si l'un d'eux en a un.
     const withTitles = series.volumes.some((v) => volumeTitleOf(v));
     const age = seriesAgeOf(series);
-    const totalSize = series.volumes.reduce((sum, v) => sum + v.size, 0);
     const details = [
         series.format,
         series.year && String(series.year),
         series.writer,
         series.publisher,
-        totalSize > 0 && formatSize(totalSize),
     ].filter(Boolean);
     // Fiche incomplète : montrée à l'admin seulement (ComicInfo des tomes).
     const completeness = isAdmin
@@ -268,8 +271,10 @@ export const SeriesPage = () => {
                                     leftSection={<IconPlayerPlay size={16} />}
                                     w="fit-content"
                                 >
-                                    {ACTION_LABELS[next.action]}{' '}
-                                    {volumeLabel(next.volume).toLowerCase()}
+                                    {ACTION_LABELS[next.action]}
+                                    {/* One-shot : « Lire » seul. */}
+                                    {!isStandalone(next.volume) &&
+                                        ` ${volumeLabel(next.volume).toLowerCase()}`}
                                 </Button>
                             )}
                             <Tooltip
@@ -335,16 +340,24 @@ export const SeriesPage = () => {
                 </Stack>
             </Flex>
 
-            {VOLUME_KINDS.map((kind) => {
-                const group = series.volumes.filter((v) => v.kind === kind);
+            {KIND_SECTIONS.map(({ key, title }) => {
+                const group = series.volumes.filter((v) =>
+                    key === 'main' ? isMainKind(v.kind) : v.kind === key,
+                );
                 if (group.length === 0) return null;
+                // Un one-shot seul : pas de tome à montrer (« Lire » suffit).
+                if (
+                    key === 'main' &&
+                    group.length === 1 &&
+                    isStandalone(group[0]!)
+                ) {
+                    return null;
+                }
                 return (
-                    <Stack key={kind} gap="xs">
-                        {kind !== 'volume' && (
-                            <Title order={4}>{KIND_SECTIONS[kind]}</Title>
-                        )}
+                    <Stack key={key} gap="xs">
+                        {title && <Title order={4}>{title}</Title>}
                         <SimpleGrid cols={gridColumns(size)}>
-                            {group.map((volume) => {
+                            {group.map((volume, index) => {
                                 const read =
                                     volume.progress?.completed ?? false;
                                 return (
@@ -371,6 +384,19 @@ export const SeriesPage = () => {
                                             read
                                                 ? undefined
                                                 : progressRatio(volume)
+                                        }
+                                        menu={
+                                            <SeriesVolumeMenu
+                                                volume={volume}
+                                                series={series}
+                                                // Tomes seulement : « jusqu'à »
+                                                // suit l'ordre des tomes.
+                                                upTo={
+                                                    key === 'main' && index > 0
+                                                }
+                                                isAdmin={isAdmin}
+                                                onChanged={reload}
+                                            />
                                         }
                                         corner={
                                             <Tooltip

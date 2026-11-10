@@ -97,8 +97,9 @@ describe('SeriesPage', () => {
 
         expect(await screen.findByText('Série terminée')).toBeTruthy();
         // Format, genres et thèmes.
-        // Taille totale des tomes (1 octet chacun ici).
-        expect(screen.getByText('Manga · 3 o')).toBeTruthy();
+        // Pas la taille des fichiers.
+        expect(screen.getByText('Manga')).toBeTruthy();
+        expect(screen.queryByText(/ o$/)).toBeNull();
         // Complétude : seulement pour l'admin.
         expect(screen.queryByText(/Fiche à/)).toBeNull();
         expect(screen.getByText('Sport')).toBeTruthy();
@@ -195,5 +196,111 @@ describe('SeriesPage', () => {
                     .getAttribute('aria-pressed'),
             ).toBe('true'),
         );
+    });
+
+    it('shows a one-shot without its volume', async () => {
+        vi.spyOn(globalThis, 'fetch').mockImplementation(
+            async () =>
+                new Response(
+                    JSON.stringify({
+                        ...SERIES,
+                        volumes: [
+                            {
+                                ...volume(1, null),
+                                number: null,
+                                kind: 'one-shot',
+                            },
+                        ],
+                    }),
+                    { headers: { 'Content-Type': 'application/json' } },
+                ),
+        );
+        render(
+            <MantineProvider>
+                <UserContext.Provider value={READER}>
+                    <MemoryRouter initialEntries={['/series/3']}>
+                        <Routes>
+                            <Route
+                                path="/series/:id"
+                                element={<SeriesPage />}
+                            />
+                        </Routes>
+                    </MemoryRouter>
+                </UserContext.Provider>
+            </MantineProvider>,
+        );
+
+        expect(await screen.findByText('One-shot')).toBeTruthy();
+        // « Lire », sans « tome 1 » ; pas de carte de tome.
+        expect(screen.getByRole('link', { name: 'Lire' })).toBeTruthy();
+        expect(
+            screen.queryByRole('button', { name: /^Actions pour/ }),
+        ).toBeNull();
+    });
+
+    it('offers a menu on each volume', async () => {
+        const requests: [string, string, unknown][] = [];
+        vi.spyOn(globalThis, 'fetch').mockImplementation(
+            async (input, init) => {
+                requests.push([
+                    init?.method ?? 'GET',
+                    String(input),
+                    init?.body ? JSON.parse(String(init.body)) : undefined,
+                ]);
+                const body = String(input).endsWith('/read')
+                    ? { volumes: 2, read: true, previous: [] }
+                    : SERIES;
+                return new Response(JSON.stringify(body), {
+                    headers: { 'Content-Type': 'application/json' },
+                });
+            },
+        );
+
+        render(
+            <MantineProvider>
+                <UserContext.Provider value={READER}>
+                    <MemoryRouter initialEntries={['/series/3']}>
+                        <Routes>
+                            <Route
+                                path="/series/:id"
+                                element={<SeriesPage />}
+                            />
+                        </Routes>
+                    </MemoryRouter>
+                </UserContext.Provider>
+            </MantineProvider>,
+        );
+
+        // Tome 1, déjà lu : « Relire », pas de « jusqu'à » (premier tome).
+        fireEvent.click(
+            await screen.findByRole('button', {
+                name: 'Actions pour Tome 1',
+            }),
+        );
+        expect(await screen.findByText('Relire')).toBeTruthy();
+        expect(screen.getByText('Marquer comme non lu')).toBeTruthy();
+        expect(
+            screen.queryByText('Marquer comme lu jusqu’à ce tome'),
+        ).toBeNull();
+        // Lecteur : pas de couverture à changer.
+        expect(
+            screen.queryByText('Utiliser comme couverture de la série'),
+        ).toBeNull();
+        fireEvent.keyDown(document.activeElement!, { key: 'Escape' });
+
+        // Tome 2 : lu jusqu'à lui.
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Actions pour Tome 2' }),
+        );
+        await act(async () => {
+            fireEvent.click(
+                await screen.findByText('Marquer comme lu jusqu’à ce tome'),
+            );
+        });
+        expect(requests).toContainEqual([
+            'PUT',
+            '/api/series/3/read',
+            { read: true, upTo: 2 },
+        ]);
     });
 });

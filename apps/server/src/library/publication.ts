@@ -1,6 +1,6 @@
 // Sans dépendance à Node : partagé avec le client (via `@server/types`).
 import type { ComicInfo } from '../archive/comicInfo';
-import { KIND_PREFIXES, volumeNumbering } from './volumeKind';
+import { KIND_PREFIXES, isStandalone, volumeNumbering } from './volumeKind';
 
 /**
  * Nom de série utilisable comme nom de dossier : pas de séparateur, ni de
@@ -28,11 +28,15 @@ export const publicationPathOf = (
 ): string | undefined => {
     const series = comicInfo.Series ? folderName(comicInfo.Series) : '';
     const { kind, number } = volumeNumbering(comicInfo);
+    const year = comicInfo.Year ? ` (${comicInfo.Year})` : '';
+    // One-shot, intégrale sans numéro : « Spirale/Spirale (2021).cbz ».
+    if (kind === 'one-shot' || isStandalone({ kind, number })) {
+        return series ? `${series}/${series}${year}.cbz` : undefined;
+    }
     if (!series || !number) return undefined;
     const padded = number.replace(/^\d+/, (digits) => digits.padStart(2, '0'));
     const label =
         kind === 'volume' ? `#${padded}` : `${KIND_PREFIXES[kind]}${padded}`;
-    const year = comicInfo.Year ? ` (${comicInfo.Year})` : '';
     return `${series}/${series} ${label}${year}.cbz`;
 };
 
@@ -42,7 +46,9 @@ export const publicationPathOf = (
  * numérotation).
  */
 export const volumeNumberOf = (fileName: string): string | undefined => {
-    const found = /(#|\b(?:HS|SP))(\d+(?:\.\d+)?)(?!\d|\.\d)/i.exec(fileName);
+    const found = /(#|\b(?:HS|SP|INT))(\d+(?:\.\d+)?)(?!\d|\.\d)/i.exec(
+        fileName,
+    );
     if (!found) return undefined;
     const prefix = found[1] === '#' ? '' : found[1]!.toUpperCase();
     return `${prefix}${Number(found[2])}`;

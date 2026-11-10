@@ -28,7 +28,7 @@ import {
     IconList,
     IconPlayerPlayFilled,
 } from '@tabler/icons-react';
-import { type ReactNode, useContext } from 'react';
+import { type ReactNode, useContext, useEffect } from 'react';
 import { useSearchParams } from 'react-router';
 
 import { SeriesCardMenu, VolumeCardMenu } from '@/components/CardMenus';
@@ -41,7 +41,11 @@ import {
     gridColumns,
     useLibraryDisplay,
 } from '@/components/libraryDisplay';
-import { volumeLabel, volumeShortLabel } from '@/components/readingStatus';
+import {
+    seriesVolumesLabel,
+    volumeLabel,
+    volumeShortLabel,
+} from '@/components/readingStatus';
 import {
     SERIES_SORTS,
     STATUS_FILTERS,
@@ -135,8 +139,51 @@ const seriesProgress = (volume: InProgressVolume) =>
           volume.volumeCount
         : 0;
 
+// Dernière bibliothèque ouverte, gardée sur l'appareil.
+const LIBRARY_KEY = 'bento:library';
+
+const rememberedLibrary = () => {
+    try {
+        return Number(localStorage.getItem(LIBRARY_KEY)) || undefined;
+    } catch {
+        return undefined;
+    }
+};
+
+const rememberLibrary = (id: number) => {
+    try {
+        localStorage.setItem(LIBRARY_KEY, String(id));
+    } catch {
+        // Stockage refusé : la première bibliothèque, comme avant.
+    }
+};
+
 /** Genres montrés en pastilles ; les autres sont dans « Plus ». */
-const GENRE_CHIPS = 5;
+const GENRE_CHIPS = 3;
+
+/** Bloc de l'accueil, sous un titre très discret (petites capitales). */
+const HomeSection = ({
+    title,
+    count,
+    children,
+}: {
+    title: string;
+    count: number;
+    children: ReactNode;
+}) => (
+    <Stack gap={8} component="section" aria-label={title}>
+        <Text
+            size="xs"
+            c="dimmed"
+            fw={600}
+            tt="uppercase"
+            style={{ letterSpacing: '0.08em' }}
+        >
+            {title} · {count}
+        </Text>
+        {children}
+    </Stack>
+);
 
 /** Pastille d'un filtre : un clic la choisit, un autre la retire. */
 const FilterChip = ({
@@ -191,8 +238,9 @@ const ChipRow = ({
 );
 
 /**
- * Accueil : une seule grille, sans titre. D'abord les tomes à reprendre
- * (tomes en cours et suite des séries entamées), puis les autres séries ;
+ * Accueil : la grille en trois blocs, chacun sous un titre discret :
+ * les tomes à reprendre (tomes en cours et suite des séries entamées), les
+ * séries pas lues (« à lire » d'abord), puis les séries terminées ;
  * les filtres sont en bas de l'écran. La recherche est dans l'en-tête, qui
  * la met dans l'adresse (`q`).
  */
@@ -212,8 +260,21 @@ export const LibraryPage = () => {
     const libraries = useQuery(fetchLibraries, []);
     const inProgress = useQuery(fetchInProgress, []);
     const readers = useQuery(fetchFamilyReaders, []);
+    // Bibliothèque : celle de l'adresse, sinon la dernière ouverte sur
+    // l'appareil (les séries se chargent sans attendre la liste des
+    // bibliothèques), sinon la première.
+    const remembered = rememberedLibrary();
     const libraryId =
-        Number(params.get('library')) || libraries.data?.[0]?.id || undefined;
+        Number(params.get('library')) ||
+        (libraries.data
+            ? libraries.data.some((l) => l.id === remembered)
+                ? remembered
+                : libraries.data[0]?.id
+            : remembered) ||
+        undefined;
+    useEffect(() => {
+        if (libraries.data && libraryId) rememberLibrary(libraryId);
+    }, [libraries.data, libraryId]);
     const series = useQuery(
         () =>
             libraryId
@@ -257,7 +318,9 @@ export const LibraryPage = () => {
     const readByActive = readBy !== null && readers.data !== undefined;
     const visible = filterSeries(
         (series.data ?? []).filter(
-            (s) => !readByActive || readBySeries.has(s.id),
+            (s) =>
+                (!readByActive || readBySeries.has(s.id)) &&
+                !(display.hideRead && readingStateOf(s) === 'read'),
         ),
         { sort, genre, status },
     );
@@ -270,6 +333,11 @@ export const LibraryPage = () => {
     );
     const resumed = new Set(resume.map((v) => v.seriesId));
     const others = visible.filter((s) => !resumed.has(s.id));
+    // Trois blocs, séparés par un espace : en cours, pas lues, terminées.
+    const unread = others.filter((s) => readingStateOf(s) !== 'read');
+    const done = others.filter((s) => readingStateOf(s) === 'read');
+    const cols =
+        display.layout === 'list' ? LIST_COLUMNS : gridColumns(display.size);
     // Pastilles : les genres les plus fréquents, et celui choisi.
     const genres = genresByCount(series.data ?? []);
     const shownGenres = genres.slice(0, GENRE_CHIPS).map((g) => g.name);
@@ -326,76 +394,111 @@ export const LibraryPage = () => {
                         )}
                     </Stack>
                 )}
-                <SimpleGrid
-                    cols={
-                        display.layout === 'list'
-                            ? LIST_COLUMNS
-                            : gridColumns(display.size)
-                    }
-                    spacing="sm"
-                    data-testid="series-grid"
-                >
-                    {resume.map((volume) => (
-                        <ResumeCard
-                            key={volume.volumeId}
-                            volume={volume}
-                            // Court : tient sur une ligne de la carte.
-                            subtitle={`${volumeShortLabel(volume)} · ${volume.readCount}/${volume.volumeCount} lus`}
-                            progress={seriesProgress(volume)}
-                            onChanged={reloadHome}
-                            display={display}
-                            details={
-                                display.layout === 'list'
-                                    ? seriesDetails(
-                                          visible.find(
-                                              (s) => s.id === volume.seriesId,
-                                          )!,
-                                      )
-                                    : undefined
-                            }
-                        />
-                    ))}
-                    {others.map((item) => {
-                        const state = readingStateOf(item);
-                        return (
-                            <CoverCard
-                                key={item.id}
-                                to={`/series/${item.id}`}
-                                menu={
-                                    <SeriesCardMenu
-                                        series={item}
-                                        isAdmin={isAdmin}
+                <Stack gap="xl" data-testid="series-grid">
+                    {resume.length > 0 && (
+                        <HomeSection title="En cours" count={resume.length}>
+                            <SimpleGrid
+                                cols={cols}
+                                spacing="sm"
+                                data-testid="resume-grid"
+                            >
+                                {resume.map((volume) => (
+                                    <ResumeCard
+                                        key={volume.volumeId}
+                                        volume={volume}
+                                        // Court : tient sur une ligne de la carte.
+                                        subtitle={`${volumeShortLabel(volume)} · ${volume.readCount}/${volume.volumeCount} lus`}
+                                        progress={seriesProgress(volume)}
                                         onChanged={reloadHome}
+                                        display={display}
+                                        details={
+                                            display.layout === 'list'
+                                                ? seriesDetails(
+                                                      visible.find(
+                                                          (s) =>
+                                                              s.id ===
+                                                              volume.seriesId,
+                                                      )!,
+                                                  )
+                                                : undefined
+                                        }
                                     />
-                                }
-                                cover={seriesCoverUrl(item, 'small')}
-                                // Déjà lue : à la fin, grisée.
-                                dimmed={state === 'read'}
-                                title={item.name}
-                                subtitle={
-                                    state === 'started'
-                                        ? `${item.readCount} / ${item.volumeCount} lus`
-                                        : `${item.volumeCount} tome${item.volumeCount > 1 ? 's' : ''}`
-                                }
-                                progress={
-                                    state === 'started'
-                                        ? item.readCount / item.volumeCount
-                                        : undefined
-                                }
-                                badge={seriesBadge(state, !!item.toRead)}
-                                layout={
-                                    display.layout === 'list' ? 'row' : 'card'
-                                }
-                                coversOnly={display.coversOnly}
-                                details={
-                                    display.layout === 'list'
-                                        ? seriesDetails(item)
-                                        : undefined
-                                }
-                            />
-                        );
-                    })}
-                </SimpleGrid>
+                                ))}
+                            </SimpleGrid>
+                        </HomeSection>
+                    )}
+                    {[
+                        { key: 'unread', title: 'À découvrir', list: unread },
+                        { key: 'read', title: 'Déjà lues', list: done },
+                    ]
+                        .filter((group) => group.list.length > 0)
+                        .map((group) => (
+                            <HomeSection
+                                key={group.key}
+                                title={group.title}
+                                count={group.list.length}
+                            >
+                                <SimpleGrid
+                                    cols={cols}
+                                    spacing="sm"
+                                    data-testid={`${group.key}-grid`}
+                                >
+                                    {group.list.map((item) => {
+                                        const state = readingStateOf(item);
+                                        return (
+                                            <CoverCard
+                                                key={item.id}
+                                                to={`/series/${item.id}`}
+                                                menu={
+                                                    <SeriesCardMenu
+                                                        series={item}
+                                                        isAdmin={isAdmin}
+                                                        onChanged={reloadHome}
+                                                    />
+                                                }
+                                                cover={seriesCoverUrl(
+                                                    item,
+                                                    'small',
+                                                )}
+                                                // Déjà lue : à la fin, grisée.
+                                                dimmed={state === 'read'}
+                                                title={item.name}
+                                                subtitle={
+                                                    state === 'started'
+                                                        ? `${item.readCount} / ${item.volumeCount} lus`
+                                                        : seriesVolumesLabel(
+                                                              item.volumeCount,
+                                                              item.volumeKinds,
+                                                          )
+                                                }
+                                                progress={
+                                                    state === 'started'
+                                                        ? item.readCount /
+                                                          item.volumeCount
+                                                        : undefined
+                                                }
+                                                badge={seriesBadge(
+                                                    state,
+                                                    !!item.toRead,
+                                                )}
+                                                layout={
+                                                    display.layout === 'list'
+                                                        ? 'row'
+                                                        : 'card'
+                                                }
+                                                coversOnly={display.coversOnly}
+                                                details={
+                                                    display.layout === 'list'
+                                                        ? seriesDetails(item)
+                                                        : undefined
+                                                }
+                                            />
+                                        );
+                                    })}
+                                </SimpleGrid>
+                            </HomeSection>
+                        ))}
+                </Stack>
             </Stack>
 
             {/* Filtres : toujours visibles en bas de l'écran. */}
@@ -462,7 +565,10 @@ export const LibraryPage = () => {
                                     <Indicator
                                         size={8}
                                         offset={4}
-                                        disabled={status === 'all'}
+                                        disabled={
+                                            status === 'all' &&
+                                            !display.hideRead
+                                        }
                                     >
                                         <Button
                                             size="compact-md"
@@ -495,6 +601,29 @@ export const LibraryPage = () => {
                                                     { sort: option.value },
                                                     'name',
                                                 )
+                                            }
+                                        >
+                                            {option.label}
+                                        </Menu.Item>
+                                    ))}
+                                    <Menu.Divider />
+                                    <Menu.Label>Séries lues</Menu.Label>
+                                    {[
+                                        { hide: false, label: 'Afficher' },
+                                        { hide: true, label: 'Masquer' },
+                                    ].map((option) => (
+                                        <Menu.Item
+                                            key={option.label}
+                                            rightSection={
+                                                option.hide ===
+                                                    display.hideRead && (
+                                                    <IconCheck size={14} />
+                                                )
+                                            }
+                                            onClick={() =>
+                                                display.set({
+                                                    hideRead: option.hide,
+                                                })
                                             }
                                         >
                                             {option.label}

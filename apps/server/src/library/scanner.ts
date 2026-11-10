@@ -92,7 +92,8 @@ export const seriesKeyOf = (file: string, seriesName?: string) => {
 };
 
 /** Tomes d'abord, puis hors-séries, puis spéciaux. */
-export const kindOrder = sql`case ${volumes.kind} when 'volume' then 0 when 'hors-serie' then 1 else 2 end`;
+// La série (tomes, one-shots, intégrales), hors-séries, spéciaux.
+export const kindOrder = sql`case ${volumes.kind} when 'hors-serie' then 1 when 'special' then 2 else 0 end`;
 
 const toSortNumber = (number?: string) => {
     const value = number === undefined ? NaN : Number.parseFloat(number);

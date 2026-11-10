@@ -46,10 +46,12 @@ const Location = () => {
     return null;
 };
 
-const titles = () =>
-    within(screen.getByTestId('series-grid'))
-        .getAllByRole('link')
+/** Cartes de l'accueil dans l'ordre (les trois blocs de la grille). */
+const hrefs = (zone: HTMLElement) =>
+    within(zone)
+        .queryAllByRole('link')
         .map((link) => link.getAttribute('href'));
+const titles = () => hrefs(screen.getByTestId('series-grid'));
 
 beforeEach(() => {
     localStorage.clear();
@@ -140,6 +142,45 @@ describe('LibraryPage', () => {
         expect(screen.queryByRole('button', { name: /scanner/i })).toBeNull();
     });
 
+    it('splits the grid: in progress, not read, finished', async () => {
+        // Série 2 lue en entier : elle passe dans le dernier bloc.
+        show();
+
+        expect(hrefs(await screen.findByTestId('resume-grid'))).toEqual([
+            '/read/42',
+            '/read/51',
+        ]);
+        expect(screen.queryByTestId('unread-grid')).toBeNull();
+        expect(hrefs(screen.getByTestId('read-grid'))).toEqual(['/series/2']);
+        // Un titre discret par bloc, avec son nombre de cartes.
+        expect(screen.getByText('En cours · 2')).toBeTruthy();
+        expect(screen.getByText('Déjà lues · 1')).toBeTruthy();
+        expect(screen.queryByText(/À découvrir/)).toBeNull();
+    });
+
+    it('hides the series already read, on this device', async () => {
+        show();
+        await vi.waitFor(() =>
+            expect(titles()).toEqual(['/read/42', '/read/51', '/series/2']),
+        );
+
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Trier les séries' }),
+        );
+        fireEvent.click(
+            await screen.findByRole('menuitem', { name: 'Masquer' }),
+        );
+
+        await vi.waitFor(() =>
+            expect(titles()).toEqual(['/read/42', '/read/51']),
+        );
+        expect(
+            JSON.parse(localStorage.getItem('bento:display')!),
+        ).toMatchObject({
+            hideRead: true,
+        });
+    });
+
     it('keeps the series read by someone of the family', async () => {
         readers = [{ id: 7, name: 'Léa', avatarSeed: null, seriesIds: [3] }];
         show();
@@ -156,6 +197,27 @@ describe('LibraryPage', () => {
             screen.getByRole('button', { name: 'Filtrer par lecteur' })
                 .textContent,
         ).toContain('Léa');
+    });
+
+    it('loads the series of the last library without waiting', async () => {
+        localStorage.setItem('bento:library', '1');
+        // Liste des bibliothèques qui ne répond pas : les séries viennent
+        // quand même.
+        const answer = vi.mocked(fetch).getMockImplementation()!;
+        vi.mocked(fetch).mockImplementation((input, init) =>
+            String(input) === '/api/libraries'
+                ? new Promise<Response>(() => undefined)
+                : answer(input, init),
+        );
+        show();
+        await vi.waitFor(() => expect(titles()).toHaveLength(3));
+    });
+
+    it('remembers the library on this device', async () => {
+        show();
+        await vi.waitFor(() =>
+            expect(localStorage.getItem('bento:library')).toBe('1'),
+        );
     });
 
     it('hides the Lu par filter when nobody else read anything', async () => {
@@ -240,27 +302,22 @@ describe('LibraryPage', () => {
         await screen.findByTestId('series-grid');
         await vi.waitFor(() => expect(titles()).toHaveLength(3));
 
-        // Cinq pastilles, les genres aux plus de séries d'abord ; les autres
+        // Trois pastilles, les genres aux plus de séries d'abord ; les autres
         // dans « Plus », avec leur nombre de séries.
         const genres = within(screen.getByLabelText('Genres'))
             .getAllByRole('button')
             .map((button) => button.textContent);
-        expect(genres).toEqual([
-            'Action',
-            'Horreur',
-            'Aventure',
-            'Comédie',
-            'Drame',
-            'Plus',
-        ]);
+        expect(genres).toEqual(['Action', 'Horreur', 'Aventure', 'Plus']);
 
         fireEvent.click(screen.getByRole('button', { name: 'Plus' }));
         const more = await screen.findAllByRole('menuitem');
         expect(more.map((item) => item.textContent)).toEqual([
+            'Comédie1',
+            'Drame1',
             'Fantasy1',
             'Sport1',
         ]);
-        fireEvent.click(more[1]!);
+        fireEvent.click(more[3]!);
         await vi.waitFor(() => expect(titles()).toEqual(['/read/42']));
         expect(location).toBe('?genre=Sport');
         // Genre choisi dans « Plus » : montré en pastille, qui le retire.

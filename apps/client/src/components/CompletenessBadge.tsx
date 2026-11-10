@@ -21,15 +21,18 @@ const colorOf = (percent: number) =>
 export const CompletenessBadge = ({
     completeness: { percent, missing },
     action,
+    short,
 }: {
     completeness: Completeness;
     action?: ReactNode;
+    /** « 72 % » seul (tableau des séries). */
+    short?: boolean;
 }) => (
     <Popover position="bottom-start" withArrow shadow="md" width={260}>
         <Popover.Target>
             <UnstyledButton aria-label={`Fiche complète à ${percent} %`}>
                 <Badge variant="light" color={colorOf(percent)}>
-                    Fiche à {percent} %
+                    {short ? `${percent} %` : `Fiche à ${percent} %`}
                 </Badge>
             </UnstyledButton>
         </Popover.Target>

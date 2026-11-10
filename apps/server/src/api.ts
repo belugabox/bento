@@ -60,6 +60,7 @@ import {
     updateGenre,
 } from './library/genres';
 import { setSeriesLists } from './library/lists';
+import { countToClassify, listManagedSeries } from './library/management';
 import {
     getProgress,
     listContinue,
@@ -1048,6 +1049,13 @@ export const createApi = ({
         )
         // Comptes et contrôle parental (admin).
         .get('/users', requireAdmin, (c) => c.json(listUsers(db)))
+        // Gestion des séries (admin) : toutes, et le nombre à classer.
+        .get('/manage/series', requireAdmin, (c) =>
+            c.json(listManagedSeries(db)),
+        )
+        .get('/manage/series/to-classify', requireAdmin, (c) =>
+            c.json({ count: countToClassify(db) }),
+        )
         .patch(
             '/users/:id',
             requireAdmin,
@@ -1152,6 +1160,7 @@ export const createApi = ({
                     addedDates: z.boolean(),
                     readingTime: z.boolean(),
                     estimatedSessions: z.boolean(),
+                    fillGaps: z.boolean().default(false),
                 }),
             ),
             async (c) => {

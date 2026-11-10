@@ -1280,7 +1280,12 @@ export const MetadataEditor = ({
                                     <Table.Td>
                                         <TextInput
                                             size="xs"
-                                            disabled={!!volume.error}
+                                            // One-shot : sans numéro.
+                                            disabled={
+                                                !!volume.error ||
+                                                volumeKindOf(info) ===
+                                                    'one-shot'
+                                            }
                                             aria-label={`Numéro de ${volume.name}`}
                                             {...volumeField(
                                                 volume.path,

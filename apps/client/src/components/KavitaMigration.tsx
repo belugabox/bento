@@ -101,6 +101,11 @@ const ReportAlert = ({ report }: { report: Report }) => (
                 {report.toRead} série{report.toRead > 1 ? 's' : ''} ajoutée
                 {report.toRead > 1 ? 's' : ''} à « À lire »
             </List.Item>
+            {report.gapsFilled > 0 && (
+                <List.Item>
+                    {formatNumber(report.gapsFilled)} tomes sautés marqués lus
+                </List.Item>
+            )}
             <List.Item>
                 {formatNumber(report.addedDates)} dates d’ajout reprises
             </List.Item>
@@ -126,6 +131,7 @@ export const KavitaMigration = () => {
     const [addedDates, setAddedDates] = useState(true);
     const [readingTime, setReadingTime] = useState(true);
     const [estimated, setEstimated] = useState(false);
+    const [fillGaps, setFillGaps] = useState(false);
     const [busy, setBusy] = useState<'upload' | 'apply' | 'clear'>();
     const [actionError, setActionError] = useState<string>();
     const [report, setReport] = useState<Report>();
@@ -200,6 +206,7 @@ export const KavitaMigration = () => {
                 addedDates,
                 readingTime,
                 estimatedSessions: estimated,
+                fillGaps,
             });
             setReport(result);
             bentoUsers.reload();
@@ -212,6 +219,10 @@ export const KavitaMigration = () => {
 
     const estimatedCount = current?.accounts.reduce(
         (n, a) => n + a.sessions.estimated,
+        0,
+    );
+    const skipped = current?.accounts.reduce(
+        (n, a) => n + a.skipped.volumes,
         0,
     );
     const estimatedHours = current?.accounts.reduce(
@@ -347,6 +358,19 @@ export const KavitaMigration = () => {
                                                         {account.matched}{' '}
                                                         retrouvés
                                                     </Text>
+                                                    {account.skipped.volumes >
+                                                        0 && (
+                                                        <Text
+                                                            size="xs"
+                                                            c="dimmed"
+                                                        >
+                                                            {
+                                                                account.skipped
+                                                                    .volumes
+                                                            }{' '}
+                                                            sautés
+                                                        </Text>
+                                                    )}
                                                 </Table.Td>
                                                 <Table.Td>
                                                     <Text size="sm">
@@ -459,6 +483,16 @@ export const KavitaMigration = () => {
                                 setAddedDates(e.currentTarget.checked)
                             }
                         />
+                        {skipped !== undefined && skipped > 0 && (
+                            <Checkbox
+                                label="Tomes sautés marqués lus"
+                                description={`${formatNumber(skipped)} tomes jamais ouverts ou pas finis dans Kavita, mais placés avant le dernier tome fini de leur série (par exemple les premiers tomes lus ailleurs).`}
+                                checked={fillGaps}
+                                onChange={(e) =>
+                                    setFillGaps(e.currentTarget.checked)
+                                }
+                            />
+                        )}
                         <Checkbox
                             label="Temps de lecture"
                             description="Les séances de lecture de Kavita, pour le temps de lecture des statistiques."

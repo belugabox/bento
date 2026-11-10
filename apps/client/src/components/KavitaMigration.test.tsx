@@ -14,6 +14,7 @@ const ANALYSIS = {
             completed: 441,
             inProgress: 15,
             matched: 450,
+            skipped: { volumes: 0, series: 0 },
             wantToRead: 0,
             sessions: {
                 measured: 143,
@@ -30,6 +31,7 @@ const ANALYSIS = {
             completed: 363,
             inProgress: 54,
             matched: 400,
+            skipped: { volumes: 7, series: 1 },
             wantToRead: 0,
             sessions: {
                 measured: 253,
@@ -121,6 +123,14 @@ describe('KavitaMigration', () => {
                 }) as HTMLInputElement
             ).value,
         ).toMatch(/10 ans/);
+        // Tomes sautés : décochés par défaut.
+        expect(
+            (
+                screen.getByRole('checkbox', {
+                    name: /Tomes sautés marqués lus/,
+                }) as HTMLInputElement
+            ).checked,
+        ).toBe(false);
         // Séances estimées : décochées par défaut.
         const estimated = screen.getByRole('checkbox', {
             name: /Avec les séances estimées/,
@@ -147,6 +157,7 @@ describe('KavitaMigration', () => {
                 addedDates: true,
                 readingTime: true,
                 estimatedSessions: false,
+                fillGaps: false,
             },
         ]);
         expect(await screen.findByText('Migration faite')).toBeTruthy();

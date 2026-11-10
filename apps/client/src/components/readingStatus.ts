@@ -2,6 +2,9 @@ import {
     VOLUME_KINDS,
     VOLUME_KIND_LABELS,
     type VolumeKind,
+    isMainKind,
+    isStandalone,
+    kindTitle,
 } from '@server/types';
 
 type Progress = { page: number; completed: boolean } | null;
@@ -15,18 +18,22 @@ export type VolumeWithProgress = {
 };
 
 /**
- * « Tome 12 », « Hors-série 1 », « Spécial 2 » ; sans numéro, le titre, ou
- * « Spécial » pour un spécial et « Hors-série » sinon.
+ * « Tome 12 », « Intégrale 2 », « Hors-série 1 », « Spécial 2 », « One-shot »
+ * (jamais de numéro) ; sans numéro, le titre, ou le nom du type.
  */
 export const volumeLabel = (volume: {
     number: string | null;
     title: string | null;
     kind?: VolumeKind;
-}) =>
-    volume.number
-        ? `${VOLUME_KIND_LABELS[volume.kind ?? 'volume']} ${volume.number}`
+}) => {
+    const kind = volume.kind ?? 'volume';
+    // One-shot, intégrale sans numéro : le nom du type.
+    if (isStandalone(volume)) return VOLUME_KIND_LABELS[kind];
+    return volume.number
+        ? kindTitle(kind, volume.number)
         : (volume.title ??
-          (volume.kind === 'special' ? 'Spécial' : 'Hors-série'));
+              VOLUME_KIND_LABELS[kind === 'volume' ? 'hors-serie' : kind]);
+};
 
 /** Libellé court, pour une carte étroite : « T2 », « HS1 », « SP2 ». */
 export const volumeShortLabel = (volume: {
@@ -34,43 +41,71 @@ export const volumeShortLabel = (volume: {
     title: string | null;
     kind?: VolumeKind;
 }) =>
-    volume.number
+    volume.number && !isStandalone(volume)
         ? `${SHORT_PREFIXES[volume.kind ?? 'volume']}${volume.number}`
         : volumeLabel(volume);
 
 const SHORT_PREFIXES: Record<VolumeKind, string> = {
     volume: 'T',
+    'one-shot': 'One-shot',
+    integrale: 'INT',
     'hors-serie': 'HS',
     special: 'SP',
 };
 
 const KIND_COUNTS: Record<VolumeKind, [string, string]> = {
     volume: ['tome', 'tomes'],
+    'one-shot': ['one-shot', 'one-shots'],
+    integrale: ['intégrale', 'intégrales'],
     'hors-serie': ['hors-série', 'hors-séries'],
     special: ['spécial', 'spéciaux'],
 };
 
 /**
- * Tomes comptés (« 3 lus » sur 12) : sans hors-séries ni spéciaux, sauf
- * pour une série qui n'a que ceux-là (comme `countedVolume` du serveur).
+ * Tomes comptés (« 3 lus » sur 12) : tomes, one-shots et intégrales, sans
+ * hors-séries ni spéciaux, sauf pour une série qui n'a que ceux-là (comme
+ * `countedVolume` du serveur).
  */
 export const countedVolumes = <T extends { kind?: VolumeKind }>(
     volumes: T[],
 ) => {
-    const regular = volumes.filter((v) => (v.kind ?? 'volume') === 'volume');
+    const regular = volumes.filter((v) => isMainKind(v.kind));
     return regular.length > 0 ? regular : volumes;
 };
 
-/** « 12 tomes · 1 spécial » : chaque type compté à part. */
-export const volumeCountLabel = (volumes: { kind?: VolumeKind }[]) =>
-    VOLUME_KINDS.flatMap((kind) => {
-        const count = volumes.filter(
-            (v) => (v.kind ?? 'volume') === kind,
-        ).length;
-        return count
-            ? [`${count} ${KIND_COUNTS[kind][count > 1 ? 1 : 0]}`]
-            : [];
-    }).join(' · ') || '0 tome';
+/**
+ * « 12 tomes · 1 spécial » : chaque type compté à part ; « One-shot » pour
+ * un one-shot seul.
+ */
+export const volumeCountLabel = (
+    volumes: { kind?: VolumeKind; number?: string | null }[],
+) =>
+    volumes.length === 1 && isStandalone(volumes[0]!)
+        ? VOLUME_KIND_LABELS[volumes[0]!.kind!]
+        : VOLUME_KINDS.flatMap((kind) => {
+              const count = volumes.filter(
+                  (v) => (v.kind ?? 'volume') === kind,
+              ).length;
+              return count
+                  ? [`${count} ${KIND_COUNTS[kind][count > 1 ? 1 : 0]}`]
+                  : [];
+          }).join(' · ') || '0 tome';
+
+/**
+ * Tomes d'une carte de série, d'après leur nombre et leurs types
+ * (`volumeKinds` de la liste : « volume,integrale ») : « 12 tomes »,
+ * « One-shot », « 2 intégrales ».
+ */
+export const seriesVolumesLabel = (count: number, kinds?: string | null) => {
+    const list = (kinds ?? '').split(',').filter(Boolean) as VolumeKind[];
+    const only = list.length === 1 ? list[0]! : 'volume';
+    // Un one-shot, une intégrale : le nom du type seul.
+    if ((only === 'one-shot' || only === 'integrale') && count === 1) {
+        return VOLUME_KIND_LABELS[only];
+    }
+    const [one, many] = KIND_COUNTS[isMainKind(only) ? only : 'volume'];
+    return `${count} ${count > 1 ? many : one}`;
+};
 
 /**
  * Titre propre d'un tome, à afficher sous son libellé ; null s'il n'en a
@@ -83,12 +118,14 @@ export const volumeTitleOf = (volume: {
 }) => {
     const title = volume.title?.trim();
     if (!title || !volume.number) return null;
+    // « One-shot » : le libellé lui-même.
+    if (/^one[- ]?shot$/i.test(title)) return null;
     // « 03 » comme « 3 » : les zéros initiaux sont facultatifs dans le titre.
     const number = volume.number
         .replace(/^0+(?=\d)/, '')
         .replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const repeated = new RegExp(
-        `^(tome|vol(ume)?\\.?|hors[- ]s[ée]rie|hs|sp[ée]cial|sp)\\s*0*${number}$`,
+        `^(tome|vol(ume)?\\.?|int[ée]grale|int|hors[- ]s[ée]rie|hs|sp[ée]cial|sp)\\s*0*${number}$`,
         'i',
     );
     return repeated.test(title) ? null : title;

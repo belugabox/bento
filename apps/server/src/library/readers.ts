@@ -80,7 +80,9 @@ export const seriesReaders = (
         from read_progress
         join volumes on volumes.id = read_progress.volume_id
         where volumes.series_id = ${seriesId}
-        order by read_progress.updated_at desc
+        -- Même instant (deux tomes enregistrés ensemble) : le plus loin.
+        order by read_progress.updated_at desc, volumes.sort_number desc,
+            volumes.id desc
     `)) {
         if (latest.has(row.userId)) continue;
         latest.set(row.userId, {

@@ -173,6 +173,21 @@ describe('reading progress', () => {
         expect((await call('/continue', bob)).body).toEqual([]);
     });
 
+    it('lists every series in progress, not only twelve', async () => {
+        for (let n = 1; n <= 12; n++) {
+            await writeCbz(ctx.file(`Série ${n}/Série ${n} T01.cbz`));
+        }
+        await ctx.scanner.scan(ctx.library.id);
+        const series = (await call('/series', alice)).body as {
+            coverVolumeId: number;
+        }[];
+        for (const s of series) await save(s.coverVolumeId, { page: 0 });
+
+        const resume = (await call('/continue', alice)).body;
+        // 12 séries ajoutées, plus Gantz et Spirale.
+        expect(resume).toHaveLength(14);
+    });
+
     it('keeps only the latest volume of each series to resume', async () => {
         await save(gantz[0]!, { page: 1 });
         await save(gantz[1]!, { page: 1 });

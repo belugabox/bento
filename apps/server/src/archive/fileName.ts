@@ -19,8 +19,9 @@ const NUMBER =
     /(?:^|[\s._\-[(])(?:t(?:ome)?|vol(?:ume)?)[\s.]*(\d{1,3}(?:\.\d+)?)(?=$|[\s._\-\])])|#(\d{1,3}(?:\.\d+)?)\b/i;
 // Hors-série et spéciaux : « HS01 », « HS 1 », « Hors-série 1 », « SP01 »,
 // « Spécial 2 ».
+// Intégrales : « INT01 », « Intégrale 2 » (pas « Intégrale 10 tomes »).
 const SPECIAL =
-    /(?:^|[\s._\-[(])(hs|sp|hors[\s-]?s[ée]ries?|sp[ée]cial)[\s.\-]*(\d{1,3}(?:\.\d+)?)(?=$|[\s._\-\])])/i;
+    /(?:^|[\s._\-[(])(hs|sp|int|int[ée]grale|hors[\s-]?s[ée]ries?|sp[ée]cial)[\s.\-]*(\d{1,3}(?:\.\d+)?)(?=$|[\s._\-\])])(?!\s*tomes?\b)/i;
 // Année seule entre crochets ou parenthèses : « (2021) », « [2020] ».
 // « [Digital-1920] » n'est pas une année.
 const YEAR = /[[(]((?:19|20)\d{2})[\])]/;

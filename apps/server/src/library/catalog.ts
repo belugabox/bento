@@ -28,6 +28,7 @@ import { publicationPathOf } from './paths';
 import { coverFile, kindOrder } from './scanner';
 import { compareNames } from './sortName';
 import { type Viewer, visibleTo } from './visibility';
+import { MAIN_KINDS } from './volumeKind';
 
 /**
  * Version d'un tome : la date de son fichier, qui change à chaque réécriture.
@@ -35,14 +36,18 @@ import { type Viewer, visibleTo } from './visibility';
  */
 export const volumeVersion = sql<number>`cast(${volumes.mtimeMs} as integer)`;
 
+// Types de la série elle-même, en SQL : `('volume', 'one-shot', …)`.
+const MAIN_KINDS_SQL = `(${MAIN_KINDS.map((k) => `'${k}'`).join(', ')})`;
+
 /**
  * Tome compté d'une série (« 12 tomes », « 3 / 12 lus », série lue) : un
- * tome, pas un hors-série ni un spécial ; tous si la série n'a que ceux-là.
- * `alias` : nom de la table des tomes dans la requête.
+ * tome, un one-shot ou une intégrale, pas un hors-série ni un spécial ;
+ * tous si la série n'a que ceux-là. `alias` : nom de la table des tomes
+ * dans la requête.
  */
 export const countedVolume = (alias: string) =>
     sql.raw(
-        `(${alias}.kind = 'volume' or not exists (select 1 from volumes w where w.series_id = ${alias}.series_id and w.kind = 'volume'))`,
+        `(${alias}.kind in ${MAIN_KINDS_SQL} or not exists (select 1 from volumes w where w.series_id = ${alias}.series_id and w.kind in ${MAIN_KINDS_SQL}))`,
     );
 
 // Tomes, hors-séries puis spéciaux ; sans numéro en dernier, puis par
@@ -134,6 +139,16 @@ export const seriesAgeSql = sql<
  * Séries, filtrées par bibliothèque et par texte (nom, genres et thèmes,
  * auteurs, sans tenir compte de la casse).
  */
+/**
+ * Couverture d'une série : celle de son premier tome, et sa version.
+ * Sous-requêtes en SQL brut : Drizzle n'y préfixe pas les colonnes par leur
+ * table.
+ */
+export const coverVolumeSql = {
+    coverVolumeId: sql<number>`(select v.id from volumes v where v.series_id = series.id order by v.kind != 'volume', v.kind, v.sort_number is null, v.sort_number, v.file limit 1)`,
+    coverVolumeVersion: sql<number>`(select cast(v.mtime_ms as integer) from volumes v where v.series_id = series.id order by v.kind != 'volume', v.kind, v.sort_number is null, v.sort_number, v.file limit 1)`,
+};
+
 export const listSeries = (
     db: Db,
     viewer: Viewer,
@@ -156,6 +171,9 @@ export const listSeries = (
             age: seriesAgeSql,
             status: series.status,
             volumeCount: sql<number>`(select count(*) from volumes v where v.series_id = series.id and ${countedVolume('v')})`,
+            // Types des tomes comptés (« volume,integrale ») : carte de
+            // l'accueil (« One-shot »).
+            volumeKinds: sql<string>`(select group_concat(distinct v.kind) from volumes v where v.series_id = series.id and ${countedVolume('v')})`,
             // Dernier tome ajouté (tri « ajouts récents »).
             lastAddedAt: sql<number>`max(${volumes.addedAt})`.mapWith(
                 (value: number) => new Date(value * 1000),
@@ -170,12 +188,14 @@ export const listSeries = (
             penciller: sql<
                 string | null
             >`(select json_extract(v.comic_info, '$.Penciller') from volumes v where v.series_id = series.id order by v.kind != 'volume', v.kind, v.sort_number is null, v.sort_number, v.file limit 1)`,
-            coverVolumeId: sql<number>`(select v.id from volumes v where v.series_id = series.id order by v.kind != 'volume', v.kind, v.sort_number is null, v.sort_number, v.file limit 1)`,
-            coverVolumeVersion: sql<number>`(select cast(v.mtime_ms as integer) from volumes v where v.series_id = series.id order by v.kind != 'volume', v.kind, v.sort_number is null, v.sort_number, v.file limit 1)`,
+            ...coverVolumeSql,
             // Tomes lus par la personne.
-            readCount: sql<number>`(select count(*) from read_progress rp join volumes v on v.id = rp.volume_id where v.series_id = series.id and rp.user_id = ${viewer.id} and rp.completed = 1 and ${countedVolume('v')})`,
+            // Tomes de la série d'abord (`cross join` : SQLite garde cet ordre), puis la
+            // lecture de chacun : sinon SQLite parcourt toutes les lectures de la
+            // personne pour chaque série (lent dès quelques centaines de séries).
+            readCount: sql<number>`(select count(*) from volumes v cross join read_progress rp on rp.volume_id = v.id and rp.user_id = ${viewer.id} where v.series_id = series.id and rp.completed = 1 and ${countedVolume('v')})`,
             // Tomes ouverts (lus ou en cours) : série commencée.
-            startedCount: sql<number>`(select count(*) from read_progress rp join volumes v on v.id = rp.volume_id where v.series_id = series.id and rp.user_id = ${viewer.id})`,
+            startedCount: sql<number>`(select count(*) from volumes v cross join read_progress rp on rp.volume_id = v.id and rp.user_id = ${viewer.id} where v.series_id = series.id)`,
             ...listsOf(viewer),
             // Auteurs des tomes (scénario, dessin), seulement pour chercher.
             authors: text

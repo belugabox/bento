@@ -17,7 +17,9 @@ import {
     IconDotsVertical,
     IconEye,
     IconPencil,
+    IconPhoto,
     IconPlayerPlay,
+    IconPlayerSkipBack,
     IconRotate,
     IconX,
 } from '@tabler/icons-react';
@@ -31,6 +33,7 @@ import {
     markSeriesRead,
     restoreProgress,
     saveProgress,
+    setSeriesCover,
     setSeriesLists,
 } from '@/services/api';
 import { useReadOnly } from '@/services/auth';
@@ -50,7 +53,8 @@ const notifyDone = (
 ) => {
     const id = notifications.show({
         autoClose: UNDO_MS,
-        withCloseButton: !undo,
+        // Croix toujours là : le message se ferme tout de suite.
+        withCloseButton: true,
         message: (
             <Group justify="space-between" wrap="nowrap" gap="sm">
                 <Text size="sm">{message}</Text>
@@ -384,6 +388,148 @@ export const VolumeCardMenu = ({
                 >
                     Voir la série
                 </Menu.Item>
+            </Menu.Dropdown>
+        </Menu>
+    );
+};
+
+type SeriesVolume = Awaited<ReturnType<typeof fetchSeries>>['volumes'][number];
+
+/**
+ * Menu ⋮ d'un tome de la fiche série : lecture, « lu », « lu jusqu'à ce
+ * tome » ; pour l'admin, couverture de la série.
+ */
+export const SeriesVolumeMenu = ({
+    volume,
+    series,
+    upTo,
+    isAdmin,
+    onChanged,
+}: {
+    volume: SeriesVolume;
+    series: { id: number; name: string };
+    /** « Lu jusqu'à ce tome » : il y a des tomes avant celui-ci. */
+    upTo: boolean;
+    isAdmin: boolean;
+    onChanged: () => void;
+}) => {
+    const navigate = useNavigate();
+    const readOnly = useReadOnly();
+    const label = volumeLabel(volume);
+    const read = volume.progress?.completed ?? false;
+    // Commencé, pas fini : « Continuer », et « Lire depuis le début ».
+    const started = !read && (volume.progress?.page ?? 0) > 0;
+
+    const mark = (
+        completed: boolean,
+        message = `${label} marqué comme ${completed ? 'lu' : 'non lu'}.`,
+    ) =>
+        void runAction(async () => {
+            const { previous } = await saveProgress(volume.id, { completed });
+            return {
+                message,
+                undo: undoProgress([previous]),
+            };
+        }, onChanged);
+
+    const markUpTo = () =>
+        void runAction(async () => {
+            const result = await markSeriesRead(series.id, true, volume.id);
+            return {
+                message: `${result.volumes} tome${result.volumes > 1 ? 's' : ''} marqué${result.volumes > 1 ? 's' : ''} comme lu${result.volumes > 1 ? 's' : ''}.`,
+                undo: undoProgress(result.previous),
+            };
+        }, onChanged);
+
+    const setAsCover = () =>
+        void runAction(async () => {
+            await setSeriesCover(series.id, {
+                type: 'volume',
+                volumeId: volume.id,
+            });
+            return {
+                message: `Couverture de la série : ${label.toLowerCase()}.`,
+            };
+        }, onChanged);
+
+    return (
+        <Menu position="bottom-end" withinPortal>
+            <Menu.Target>{dots(`Actions pour ${label}`)}</Menu.Target>
+            <Menu.Dropdown>
+                <Menu.Item
+                    leftSection={<IconPlayerPlay size={14} />}
+                    onClick={() =>
+                        navigate(`/read/${volume.id}${read ? '?page=1' : ''}`)
+                    }
+                >
+                    {read ? 'Relire' : started ? 'Continuer' : 'Lire'}
+                </Menu.Item>
+                {started && (
+                    <Menu.Item
+                        leftSection={<IconPlayerSkipBack size={14} />}
+                        onClick={() => navigate(`/read/${volume.id}?page=1`)}
+                    >
+                        Lire depuis le début
+                    </Menu.Item>
+                )}
+                <Menu.Divider />
+                {read ? (
+                    <Menu.Item
+                        leftSection={<IconRotate size={14} />}
+                        disabled={readOnly}
+                        onClick={() => mark(false)}
+                    >
+                        Marquer comme non lu
+                    </Menu.Item>
+                ) : (
+                    <Menu.Item
+                        leftSection={<IconCheck size={14} />}
+                        disabled={readOnly}
+                        onClick={() => mark(true)}
+                    >
+                        Marquer comme lu
+                    </Menu.Item>
+                )}
+                {upTo && (
+                    <Menu.Item
+                        leftSection={<IconChecks size={14} />}
+                        disabled={readOnly}
+                        onClick={markUpTo}
+                    >
+                        Marquer comme lu jusqu’à ce tome
+                    </Menu.Item>
+                )}
+                {started && (
+                    <Menu.Item
+                        leftSection={<IconX size={14} />}
+                        disabled={readOnly}
+                        onClick={() =>
+                            mark(false, `${label} : progression effacée.`)
+                        }
+                    >
+                        Effacer la progression
+                    </Menu.Item>
+                )}
+                {isAdmin && (
+                    <>
+                        <Menu.Divider />
+                        <Menu.Item
+                            leftSection={<IconPhoto size={14} />}
+                            disabled={readOnly}
+                            onClick={setAsCover}
+                        >
+                            Utiliser comme couverture de la série
+                        </Menu.Item>
+                        <Menu.Item
+                            leftSection={<IconPencil size={14} />}
+                            onClick={() =>
+                                navigate(`/series/${series.id}/edit`)
+                            }
+                        >
+                            Modifier la série
+                        </Menu.Item>
+                    </>
+                )}
             </Menu.Dropdown>
         </Menu>
     );
