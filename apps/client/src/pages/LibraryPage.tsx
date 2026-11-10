@@ -41,7 +41,11 @@ import {
     gridColumns,
     useLibraryDisplay,
 } from '@/components/libraryDisplay';
-import { volumeLabel, volumeShortLabel } from '@/components/readingStatus';
+import {
+    seriesVolumesLabel,
+    volumeLabel,
+    volumeShortLabel,
+} from '@/components/readingStatus';
 import {
     SERIES_SORTS,
     STATUS_FILTERS,
@@ -430,7 +434,10 @@ export const LibraryPage = () => {
                                                 subtitle={
                                                     state === 'started'
                                                         ? `${item.readCount} / ${item.volumeCount} lus`
-                                                        : `${item.volumeCount} tome${item.volumeCount > 1 ? 's' : ''}`
+                                                        : seriesVolumesLabel(
+                                                              item.volumeCount,
+                                                              item.volumeKinds,
+                                                          )
                                                 }
                                                 progress={
                                                     state === 'started'

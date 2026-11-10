@@ -122,3 +122,103 @@ describe('scanning special volumes', () => {
         ).toMatchObject({ volumeCount: 1 });
     });
 });
+
+describe('one-shots and omnibus volumes', () => {
+    it('are named by Format, a prefixed number or the file name', () => {
+        expect(volumeNumbering({ Format: 'One-shot' })).toEqual({
+            kind: 'one-shot',
+            number: undefined,
+        });
+        expect(volumeNumbering({ Format: 'Intégrale', Number: '2' })).toEqual({
+            kind: 'integrale',
+            number: '2',
+        });
+        expect(volumeNumbering({ Number: 'INT01' })).toEqual({
+            kind: 'integrale',
+            number: '1',
+        });
+        expect(parseVolumeFileName('Origin INT02 (2020)')).toMatchObject({
+            series: 'Origin',
+            number: '2',
+            kind: 'integrale',
+        });
+        expect(parseVolumeFileName('Origin Intégrale 1')).toMatchObject({
+            kind: 'integrale',
+            number: '1',
+        });
+        // « Intégrale 10 tomes » : le nombre de tomes, pas un numéro.
+        expect(
+            parseVolumeFileName('Origin [Intégrale 10 tomes]').kind,
+        ).toBeUndefined();
+    });
+
+    it('are published without number, or as Series INTNN', () => {
+        expect(
+            publicationPathOf({
+                Series: 'Spirale',
+                Format: 'One-shot',
+                Number: '1',
+                Year: 2021,
+            }),
+        ).toBe('Spirale/Spirale (2021).cbz');
+        expect(
+            publicationPathOf({ Series: 'Spirale', Format: 'One-shot' }),
+        ).toBe('Spirale/Spirale.cbz');
+        expect(
+            publicationPathOf({
+                Series: 'Origin',
+                Format: 'Intégrale',
+                Number: '2',
+            }),
+        ).toBe('Origin/Origin INT02.cbz');
+        expect(volumeNumberOf('Origin INT02.cbz')).toBe('INT2');
+    });
+
+    describe('in the library', () => {
+        let ctx: Awaited<ReturnType<typeof setup>>;
+        beforeEach(async () => {
+            ctx = await setup();
+        });
+        afterEach(async () => {
+            await ctx.cleanup();
+        });
+
+        it('count as volumes of the series', async () => {
+            await writeCbz(ctx.file('Spirale/Spirale.cbz'), {
+                comicInfo: '<Series>Spirale</Series><Format>One-shot</Format>',
+            });
+            for (const n of [1, 2]) {
+                await writeCbz(ctx.file(`Origin/Origin INT0${n}.cbz`), {
+                    comicInfo: `<Series>Origin</Series><Number>INT0${n}</Number>`,
+                });
+            }
+            await writeCbz(ctx.file('Origin/Origin HS01.cbz'), {
+                comicInfo: '<Series>Origin</Series><Number>HS01</Number>',
+            });
+            await ctx.scanner.scan(ctx.library.id);
+
+            const viewer = { id: 0, role: 'admin' as const, maxAge: null };
+            const list = listSeries(ctx.db, viewer);
+            expect(list.find((s) => s.name === 'Spirale')).toMatchObject({
+                volumeCount: 1,
+                volumeKinds: 'one-shot',
+            });
+            const origin = list.find((s) => s.name === 'Origin')!;
+            // Les intégrales comptent, le hors-série non.
+            expect(origin).toMatchObject({
+                volumeCount: 2,
+                volumeKinds: 'integrale',
+            });
+            expect(
+                getSeries(ctx.db, viewer, origin.id).volumes.map((v) => [
+                    v.kind,
+                    v.number,
+                ]),
+            ).toEqual([
+                ['integrale', '1'],
+                ['integrale', '2'],
+                ['hors-serie', '1'],
+            ]);
+        });
+    });
+});

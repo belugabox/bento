@@ -5,6 +5,7 @@ import {
     countedVolumes,
     nextToRead,
     progressRatio,
+    seriesVolumesLabel,
     volumeCountLabel,
     volumeLabel,
     volumeShortLabel,
@@ -154,5 +155,42 @@ describe('volumeTitleOf', () => {
         // Sans numéro, le titre sert déjà de libellé.
         expect(volumeTitleOf({ number: null, title: 'Bonus' })).toBeNull();
         expect(volumeTitleOf({ number: '1', title: null })).toBeNull();
+    });
+});
+
+describe('one-shots and omnibus volumes', () => {
+    it('are labelled without number for a one-shot', () => {
+        const oneShot = {
+            number: '1',
+            title: 'One-shot',
+            kind: 'one-shot' as const,
+        };
+        expect(volumeLabel(oneShot)).toBe('One-shot');
+        expect(volumeShortLabel(oneShot)).toBe('One-shot');
+        expect(volumeTitleOf(oneShot)).toBeNull();
+        expect(
+            volumeLabel({ number: '2', title: null, kind: 'integrale' }),
+        ).toBe('Intégrale 2');
+        expect(
+            volumeShortLabel({ number: '2', title: null, kind: 'integrale' }),
+        ).toBe('INT2');
+    });
+
+    it('are counted with the series', () => {
+        expect(volumeCountLabel([{ kind: 'one-shot' }])).toBe('One-shot');
+        expect(
+            volumeCountLabel([
+                { kind: 'integrale' },
+                { kind: 'integrale' },
+                { kind: 'hors-serie' },
+            ]),
+        ).toBe('2 intégrales · 1 hors-série');
+        expect(
+            countedVolumes([{ kind: 'integrale' }, { kind: 'special' }]),
+        ).toEqual([{ kind: 'integrale' }]);
+        expect(seriesVolumesLabel(1, 'one-shot')).toBe('One-shot');
+        expect(seriesVolumesLabel(3, 'integrale')).toBe('3 intégrales');
+        expect(seriesVolumesLabel(12, 'volume,integrale')).toBe('12 tomes');
+        expect(seriesVolumesLabel(1, null)).toBe('1 tome');
     });
 });

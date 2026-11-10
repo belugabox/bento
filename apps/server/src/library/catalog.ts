@@ -28,6 +28,7 @@ import { publicationPathOf } from './paths';
 import { coverFile, kindOrder } from './scanner';
 import { compareNames } from './sortName';
 import { type Viewer, visibleTo } from './visibility';
+import { MAIN_KINDS } from './volumeKind';
 
 /**
  * Version d'un tome : la date de son fichier, qui change à chaque réécriture.
@@ -35,14 +36,18 @@ import { type Viewer, visibleTo } from './visibility';
  */
 export const volumeVersion = sql<number>`cast(${volumes.mtimeMs} as integer)`;
 
+// Types de la série elle-même, en SQL : `('volume', 'one-shot', …)`.
+const MAIN_KINDS_SQL = `(${MAIN_KINDS.map((k) => `'${k}'`).join(', ')})`;
+
 /**
  * Tome compté d'une série (« 12 tomes », « 3 / 12 lus », série lue) : un
- * tome, pas un hors-série ni un spécial ; tous si la série n'a que ceux-là.
- * `alias` : nom de la table des tomes dans la requête.
+ * tome, un one-shot ou une intégrale, pas un hors-série ni un spécial ;
+ * tous si la série n'a que ceux-là. `alias` : nom de la table des tomes
+ * dans la requête.
  */
 export const countedVolume = (alias: string) =>
     sql.raw(
-        `(${alias}.kind = 'volume' or not exists (select 1 from volumes w where w.series_id = ${alias}.series_id and w.kind = 'volume'))`,
+        `(${alias}.kind in ${MAIN_KINDS_SQL} or not exists (select 1 from volumes w where w.series_id = ${alias}.series_id and w.kind in ${MAIN_KINDS_SQL}))`,
     );
 
 // Tomes, hors-séries puis spéciaux ; sans numéro en dernier, puis par
@@ -166,6 +171,9 @@ export const listSeries = (
             age: seriesAgeSql,
             status: series.status,
             volumeCount: sql<number>`(select count(*) from volumes v where v.series_id = series.id and ${countedVolume('v')})`,
+            // Types des tomes comptés (« volume,integrale ») : carte de
+            // l'accueil (« One-shot »).
+            volumeKinds: sql<string>`(select group_concat(distinct v.kind) from volumes v where v.series_id = series.id and ${countedVolume('v')})`,
             // Dernier tome ajouté (tri « ajouts récents »).
             lastAddedAt: sql<number>`max(${volumes.addedAt})`.mapWith(
                 (value: number) => new Date(value * 1000),

@@ -1,8 +1,8 @@
 import {
     ActionIcon,
     Alert,
-    Badge,
     Anchor,
+    Badge,
     Button,
     CloseButton,
     Group,

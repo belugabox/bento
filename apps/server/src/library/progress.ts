@@ -5,6 +5,7 @@ import { readProgress, series, volumes } from '../db/schema';
 import { notFound } from '../tools/errors';
 import { countedVolume, volumeOrder, volumeVersion } from './catalog';
 import { type Viewer, visibleTo } from './visibility';
+import { isMainKind } from './volumeKind';
 
 export type Progress = { page: number; completed: boolean };
 
@@ -324,7 +325,7 @@ export const listNextVolumes = (db: Db, viewer: Viewer, limit = 12) => {
         } = unread;
         // Comptés : les tomes, sans hors-séries ni spéciaux (voir
         // `countedVolume`).
-        const regular = items.filter((v) => v.kind === 'volume');
+        const regular = items.filter((v) => isMainKind(v.kind));
         const counted = regular.length > 0 ? regular : items;
         next.push({
             ...volume,

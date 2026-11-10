@@ -29,7 +29,7 @@ import {
 import { useState } from 'react';
 import { Link, useParams } from 'react-router';
 
-import { VOLUME_KINDS } from '@server/types';
+import { isMainKind } from '@server/types';
 
 import { SeriesVolumeMenu } from '@/components/CardMenus';
 import { CompletenessBadge } from '@/components/CompletenessBadge';
@@ -65,7 +65,12 @@ const ACTION_LABELS = {
 
 /** Fiche d'une série : informations, tomes et où en est la personne. */
 // Titre des sections de la fiche, sous les tomes.
-const KIND_SECTIONS = { 'hors-serie': 'Hors-séries', special: 'Spéciaux' };
+// La série (tomes, one-shots, intégrales) d'abord, sans titre.
+const KIND_SECTIONS = [
+    { key: 'main', title: null },
+    { key: 'hors-serie', title: 'Hors-séries' },
+    { key: 'special', title: 'Spéciaux' },
+] as const;
 
 export const SeriesPage = () => {
     const seriesId = Number(useParams().id);
@@ -266,8 +271,10 @@ export const SeriesPage = () => {
                                     leftSection={<IconPlayerPlay size={16} />}
                                     w="fit-content"
                                 >
-                                    {ACTION_LABELS[next.action]}{' '}
-                                    {volumeLabel(next.volume).toLowerCase()}
+                                    {ACTION_LABELS[next.action]}
+                                    {/* One-shot : « Lire » seul. */}
+                                    {next.volume.kind !== 'one-shot' &&
+                                        ` ${volumeLabel(next.volume).toLowerCase()}`}
                                 </Button>
                             )}
                             <Tooltip
@@ -333,14 +340,14 @@ export const SeriesPage = () => {
                 </Stack>
             </Flex>
 
-            {VOLUME_KINDS.map((kind) => {
-                const group = series.volumes.filter((v) => v.kind === kind);
+            {KIND_SECTIONS.map(({ key, title }) => {
+                const group = series.volumes.filter((v) =>
+                    key === 'main' ? isMainKind(v.kind) : v.kind === key,
+                );
                 if (group.length === 0) return null;
                 return (
-                    <Stack key={kind} gap="xs">
-                        {kind !== 'volume' && (
-                            <Title order={4}>{KIND_SECTIONS[kind]}</Title>
-                        )}
+                    <Stack key={key} gap="xs">
+                        {title && <Title order={4}>{title}</Title>}
                         <SimpleGrid cols={gridColumns(size)}>
                             {group.map((volume, index) => {
                                 const read =
@@ -377,8 +384,7 @@ export const SeriesPage = () => {
                                                 // Tomes seulement : « jusqu'à »
                                                 // suit l'ordre des tomes.
                                                 upTo={
-                                                    kind === 'volume' &&
-                                                    index > 0
+                                                    key === 'main' && index > 0
                                                 }
                                                 isAdmin={isAdmin}
                                                 onChanged={reload}

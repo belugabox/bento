@@ -7,11 +7,11 @@ import {
     SHEET_FIELDS,
     type SheetField,
     type SourcePriority,
-    VOLUME_KIND_LABELS,
     type VolumeKind,
     classify,
     genreKey,
     kindOfWord,
+    kindTitle,
     parseVolumeFileName,
     volumeNumbering,
 } from '@server/types';
@@ -164,14 +164,14 @@ export const fillFromFileNames = (
         if (parsed.kind && (overwrite || !kindOfWord(info.Format))) {
             next = setVolumeKind(next, volume.path, parsed.kind);
         }
-        // Titre par défaut : « Tome N », « Hors-série N ».
+        // Titre par défaut : « Tome N », « Hors-série N », « One-shot ».
         const { kind, number } = volumeNumbering(next[volume.path] ?? {});
         if (number && fillable(info.Title, overwrite)) {
             next = setVolumeField(
                 next,
                 volume.path,
                 'Title',
-                `${VOLUME_KIND_LABELS[kind]} ${number}`,
+                kindTitle(kind, number),
             );
         }
         if (parsed.year && fillable(info.Year, overwrite)) {

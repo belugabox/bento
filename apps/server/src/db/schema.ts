@@ -11,6 +11,7 @@ import {
 
 import type { ComicInfo } from '../archive/comicInfo';
 import { READING_MODES } from '../classification';
+import { VOLUME_KINDS } from '../library/volumeKind';
 
 /**
  * Compte Bento, créé par une invitation. Les comptes venus de Pocket ID
@@ -128,9 +129,7 @@ export const volumes = sqliteTable(
         sortNumber: real('sort_number'),
         // Tome, hors-série ou spécial (`library/volumeKind.ts`) : chaque type
         // a sa numérotation, hors-séries et spéciaux viennent après les tomes.
-        kind: text('kind', { enum: ['volume', 'hors-serie', 'special'] })
-            .notNull()
-            .default('volume'),
+        kind: text('kind', { enum: VOLUME_KINDS }).notNull().default('volume'),
         title: text('title'),
         // ComicInfo.xml complet du tome ({} s'il n'en a pas).
         comicInfo: text('comic_info', { mode: 'json' })
