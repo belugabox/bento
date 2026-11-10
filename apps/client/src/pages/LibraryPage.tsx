@@ -29,8 +29,14 @@ import {
     IconList,
     IconPlayerPlayFilled,
 } from '@tabler/icons-react';
-import { type ReactNode, useContext, useEffect } from 'react';
-import { useSearchParams } from 'react-router';
+import {
+    type ReactNode,
+    useContext,
+    useEffect,
+    useLayoutEffect,
+    useRef,
+} from 'react';
+import { useLocation, useSearchParams } from 'react-router';
 
 import { SeriesCardMenu, VolumeCardMenu } from '@/components/CardMenus';
 import { CoverCard } from '@/components/CoverCard';
@@ -139,6 +145,31 @@ const seriesProgress = (volume: InProgressVolume) =>
                   : (volume.page + 1) / volume.pageCount)) /
           volume.volumeCount
         : 0;
+
+// Position dans la page de chaque passage sur l'accueil (clé de
+// l'historique), le temps de l'onglet.
+const scrollPositions = new Map<string, number>();
+
+/**
+ * Garde la position dans la page en partant, et la rend au retour arrière
+ * (même entrée de l'historique) dès que le contenu est là.
+ */
+const useScrollMemory = (ready: boolean) => {
+    const { key } = useLocation();
+    const restored = useRef(false);
+    useLayoutEffect(() => {
+        if (!ready || restored.current) return;
+        restored.current = true;
+        const saved = scrollPositions.get(key);
+        if (saved) window.scrollTo(0, saved);
+    }, [ready, key]);
+    useEffect(
+        () => () => {
+            scrollPositions.set(key, window.scrollY);
+        },
+        [key],
+    );
+};
 
 // Dernière bibliothèque ouverte, gardée sur l'appareil.
 const LIBRARY_KEY = 'bento:library';
@@ -306,9 +337,14 @@ export const LibraryPage = () => {
 
     const isAdmin = useContext(UserContext)?.role === 'admin';
     const display = useLibraryDisplay();
-    const libraries = useQuery(fetchLibraries, []);
-    const inProgress = useQuery(fetchInProgress, []);
-    const readers = useQuery(fetchFamilyReaders, []);
+    // Gardées en mémoire : revenir à l'accueil l'affiche tout de suite.
+    const libraries = useQuery(fetchLibraries, [], { cacheKey: 'libraries' });
+    const inProgress = useQuery(fetchInProgress, [], {
+        cacheKey: 'continue',
+    });
+    const readers = useQuery(fetchFamilyReaders, [], {
+        cacheKey: 'readers',
+    });
     // Bibliothèque : celle de l'adresse, sinon la dernière ouverte sur
     // l'appareil (les séries se chargent sans attendre la liste des
     // bibliothèques), sinon la première.
@@ -330,7 +366,10 @@ export const LibraryPage = () => {
                 ? fetchSeriesList({ libraryId, search: debouncedSearch })
                 : Promise.resolve(undefined),
         [libraryId, debouncedSearch],
+        { cacheKey: `series:${libraryId}:${debouncedSearch}` },
     );
+    // Retour arrière : la page revient où elle était.
+    useScrollMemory(!!series.data);
 
     /** Après une action d'un menu ⋮ : reprises et séries à jour. */
     const reloadHome = () => {
