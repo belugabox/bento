@@ -61,6 +61,7 @@ import {
     setSeriesLists,
 } from '@/services/api';
 import { useCurrentUser, useReadOnly } from '@/services/auth';
+import { NetworkError } from '@/services/network';
 import { useQuery } from '@/services/useQuery';
 
 const ACTION_LABELS = {
@@ -93,6 +94,18 @@ export const SeriesPage = () => {
     // Liste en cours d'enregistrement (bouton désactivé).
     const [savingList, setSavingList] = useState(false);
 
+    // Sans réseau : la fiche n'est pas sur l'appareil, ses tomes
+    // téléchargés si.
+    if (error instanceof NetworkError) {
+        return (
+            <Alert color="gray" title="Pas de réseau">
+                Cette fiche n’est pas disponible hors ligne.{' '}
+                <Anchor component={Link} to="/">
+                    Voir les tomes de l’appareil
+                </Anchor>
+            </Alert>
+        );
+    }
     if (error) return <Alert color="red">{error.message}</Alert>;
     if (!series) return <Loader mx="auto" />;
 

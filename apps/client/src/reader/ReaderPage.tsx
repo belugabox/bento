@@ -143,7 +143,12 @@ export const ReaderPage = () => {
         );
     }
 
-    const seriesUrl = `/series/${volume.seriesId}`;
+    // Sans réseau, la fiche série n'est pas là : retour aux tomes de
+    // l'appareil (accueil hors ligne).
+    const exitUrl = online ? `/series/${volume.seriesId}` : '/';
+    const exitLabel = online
+        ? 'Retour à la série'
+        : 'Retour aux téléchargements';
     return (
         <Reader
             title={`${volume.seriesName} — ${volumeLabel(volume)}`}
@@ -164,9 +169,9 @@ export const ReaderPage = () => {
             }
             modeLabel="Mode de lecture (cette série)"
             exit={{
-                to: seriesUrl,
-                onExit: () => navigate(seriesUrl),
-                label: 'Retour à la série',
+                to: exitUrl,
+                onExit: () => navigate(exitUrl),
+                label: exitLabel,
             }}
             end={
                 <>
@@ -185,8 +190,8 @@ export const ReaderPage = () => {
                             Dernier tome de la série
                         </Text>
                     )}
-                    <Button variant="default" component={Link} to={seriesUrl}>
-                        Retour à la série
+                    <Button variant="default" component={Link} to={exitUrl}>
+                        {exitLabel}
                     </Button>
                 </>
             }
