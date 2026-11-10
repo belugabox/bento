@@ -121,7 +121,14 @@ Bento est le serveur de lecture et de gestion des mangas et BD de la maison. Il 
    - **« Pour toi »** sur l'accueil, ensuite : d'après les genres et thèmes des séries lues ou commencées (pondérés par les tomes lus), séries pas commencées, avec la raison (« Parce que tu as lu Spy × Family »).
    - Plus tard : 👍 / 👎 dans le menu ⋮ pour affiner, nouveautés dans les genres préférés, séries courtes ou terminées pour une lecture rapide.
    - Toujours dans la limite d'âge du compte.
-9. **Hors ligne** : téléchargements, lecture sans réseau, synchronisation de la progression.
+9. **Hors ligne** (commencé le 10 novembre 2026, branche `feat/offline` ; appareil visé : tablette Android). Avec le reste de l'étape 5 :
+   1. **Pages à la taille de l'écran** : le serveur sert chaque page réduite à quelques largeurs fixes (WebP), calculée une fois et gardée sur disque (cache plafonné, les plus anciennes effacées) ; le lecteur choisit la largeur d'après l'écran. Tomes téléchargés trois fois plus légers.
+   2. **Bento sans réseau** : service worker (application gardée sur l'appareil), bandeau « Hors ligne ».
+   3. **Téléchargements** : « Télécharger » dans le menu ⋮ d'un tome, « Télécharger les tomes suivants » sur la fiche série ; pages et infos de lecture dans le stockage du navigateur (rendu persistant) ; page « Téléchargements » (place prise et libre, suppression, tomes lus) ; icône sur les cartes.
+   4. **Lecture hors ligne** : pages téléchargées d'abord ; accueil hors ligne réduit aux tomes téléchargés.
+   5. **Progression hors ligne** : file sur l'appareil (pages, tomes finis, temps de lecture), envoyée au retour du réseau ; la lecture la plus récente gagne (heure réelle envoyée).
+   6. **Automatique** (option de l'appareil) : les tomes suivants des séries en cours téléchargés en Wi-Fi ; tomes lus effacés après 30 jours.
+   - Téléchargements liés au compte : effacés à la déconnexion (appareil partagé, contrôle parental). Pas de téléchargement en vue lecteur (simulation).
 10. **Tomes manquants et sorties** : trous dans la numérotation, tomes parus (Wikipédia, puis manga-news) absents de la bibliothèque.
 11. **Bascule** : retirer le module manga de beluga-box (la synchro vers `_draft` reste en place), arrêter Kavita.
 

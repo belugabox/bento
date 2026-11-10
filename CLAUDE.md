@@ -6,7 +6,7 @@ Serveur de lecture et de gestion de mangas et BD, qui remplace Kavita pour la fa
 
 - Il parle français et on le tutoie. Réponses en français, concises, sans jargon inutile. Le code, les commentaires et l'interface sont en français ; les messages de commit sont en anglais.
 - Il donne souvent plusieurs demandes à la suite. Traite-les toutes, puis récapitule point par point.
-- **Branche de travail : `feat/reading-foundation`** (poussée, pas encore de PR). Commit et push sur cette branche à la fin de chaque demande terminée et testée : c'est acquis. Ne pas fusionner dans `main`, ne pas ouvrir de PR sans qu'il le demande.
+- **Branches de travail** : `feat/reading-foundation` (prête à fusionner) et, depuis le 10 novembre 2026, `feat/offline` (mode hors ligne, partie de la première ; demandé : « tu peux créer une nouvelle branche »). Commit et push sur la branche du travail en cours à la fin de chaque demande terminée et testée : c'est acquis. Ne pas fusionner dans `main`, ne pas ouvrir de PR sans qu'il le demande.
 - Le déploiement est reporté (« on déploiera plus tard »).
 - Il a refusé un nom de tri modifiable par série (« oublie »), et le 10 novembre 2026 un champ « Édition » de série (Deluxe, Perfect, Kanzenban… : « oublie »).
 - Classement décidé le 6 novembre 2026 : format, âge, genres, thèmes. Formats, grille d'âges et genres sont gérés par l'admin (Réglages, onglet Classement). Le format est obligatoire, sans valeur par défaut ; format et âge exact restent dans Bento (le ComicInfo reçoit la classification la plus proche, plus stricte). Le « public » (shonen, seinen…) a été retiré : « je ne l'utiliserai pas » (migration 0015).
