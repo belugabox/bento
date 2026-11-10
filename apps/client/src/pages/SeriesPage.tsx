@@ -50,6 +50,7 @@ import {
     volumeLabel,
     volumeTitleOf,
 } from '@/components/readingStatus';
+import { NEXT_VOLUME_COUNTS, nextVolumesLabel } from '@/offline/auto';
 import { queueDownloads, useDownloads } from '@/offline/downloads';
 import {
     coverUrl,
@@ -365,12 +366,12 @@ export const SeriesPage = () => {
                                         Marquer toute la série comme non lue
                                     </Menu.Item>
                                     <Menu.Divider />
-                                    <Menu.Label>
-                                        Télécharger les tomes suivants
-                                    </Menu.Label>
+                                    <Menu.Label>Télécharger</Menu.Label>
                                     {[
-                                        { count: 3, label: 'Les 3 suivants' },
-                                        { count: 5, label: 'Les 5 suivants' },
+                                        ...NEXT_VOLUME_COUNTS.map((count) => ({
+                                            count,
+                                            label: nextVolumesLabel(count),
+                                        })),
                                         {
                                             count: Infinity,
                                             label: 'Tous les tomes pas lus',

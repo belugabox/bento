@@ -36,6 +36,17 @@ export const DEFAULT_AUTO: AutoSettings = {
     clean: true,
 };
 
+/**
+ * « Le prochain tome », « Les 3 prochains tomes » : tomes à télécharger à
+ * partir de celui à lire (compris). Mêmes mots sur la fiche série et dans
+ * « Téléchargements ».
+ */
+export const nextVolumesLabel = (count: number) =>
+    count === 1 ? 'Le prochain tome' : `Les ${count} prochains tomes`;
+
+/** Nombres de tomes proposés au choix (fiche série, réglage automatique). */
+export const NEXT_VOLUME_COUNTS = [1, 2, 3, 5];
+
 const KEY = 'bento:offline';
 // Séries prises en compte : les plus récemment lues.
 export const AUTO_SERIES = 5;

@@ -1,4 +1,9 @@
-import { ActionIcon, RingProgress, Tooltip } from '@mantine/core';
+import {
+    ActionIcon,
+    RingProgress,
+    Tooltip,
+    useMantineTheme,
+} from '@mantine/core';
 import { IconDownload } from '@tabler/icons-react';
 import { Link } from 'react-router';
 
@@ -11,21 +16,27 @@ export const DownloadRing = ({
 }: {
     ratio: number;
     size?: number;
-}) => (
-    <RingProgress
-        size={size}
-        thickness={3}
-        roundCaps
-        sections={[{ value: Math.max(ratio * 100, 4), color: 'blue' }]}
-        aria-label={`Téléchargement : ${Math.round(ratio * 100)} %`}
-        styles={{
-            root: {
-                background: 'var(--mantine-color-body)',
-                borderRadius: '50%',
-            },
-        }}
-    />
-);
+}) => {
+    // Couleur principale du thème (« Thème et affichage »).
+    const { primaryColor } = useMantineTheme();
+    return (
+        <RingProgress
+            size={size}
+            thickness={3}
+            roundCaps
+            sections={[
+                { value: Math.max(ratio * 100, 4), color: primaryColor },
+            ]}
+            aria-label={`Téléchargement : ${Math.round(ratio * 100)} %`}
+            styles={{
+                root: {
+                    background: 'var(--mantine-color-body)',
+                    borderRadius: '50%',
+                },
+            }}
+        />
+    );
+};
 
 /**
  * En-tête : téléchargements en cours sur l'appareil, en anneau autour de
@@ -33,6 +44,7 @@ export const DownloadRing = ({
  */
 export const DownloadIndicator = () => {
     const { jobs } = useDownloads();
+    const { primaryColor } = useMantineTheme();
     const progress = jobsProgress(jobs);
     if (!progress) return null;
     const percent = Math.round(progress.ratio * 100);
@@ -52,7 +64,9 @@ export const DownloadIndicator = () => {
                     size={34}
                     thickness={3}
                     roundCaps
-                    sections={[{ value: Math.max(percent, 4), color: 'blue' }]}
+                    sections={[
+                        { value: Math.max(percent, 4), color: primaryColor },
+                    ]}
                     label={
                         <IconDownload
                             size={16}

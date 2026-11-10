@@ -36,8 +36,10 @@ import {
     AUTO_SERIES,
     type AutoSettings,
     CLEAN_DAYS,
+    NEXT_VOLUME_COUNTS,
     type Proposal,
     fetchProposals,
+    nextVolumesLabel,
     runAutoDownloads,
     useAutoSettings,
 } from '@/offline/auto';
@@ -180,14 +182,6 @@ export const DownloadedVolumes = () => {
         </Stack>
     );
 };
-
-/** « Le tome en cours et les 2 suivants » : les tomes proposés par série. */
-const proposedLabel = (count: number) =>
-    count === 1
-        ? 'Le tome en cours'
-        : count === 2
-          ? 'Le tome en cours et le suivant'
-          : `Le tome en cours et les ${count - 1} suivants`;
 
 /** Titre d'une partie de la page, avec ses boutons à droite. */
 const Section = ({
@@ -447,7 +441,7 @@ const Proposals = () => {
     return (
         <Section
             title="Propositions"
-            description={`${proposedLabel(auto.count)}, pour tes ${AUTO_SERIES} séries lues le plus récemment.`}
+            description={`${nextVolumesLabel(auto.count)} de tes ${AUTO_SERIES} séries lues le plus récemment.`}
             actions={
                 list.length > 1 && (
                     <Button
@@ -543,9 +537,9 @@ const AutoDownloads = () => {
                         w={260}
                         label="Tomes proposés par série"
                         allowDeselect={false}
-                        data={[1, 2, 3, 5].map((n) => ({
+                        data={NEXT_VOLUME_COUNTS.map((n) => ({
                             value: String(n),
-                            label: proposedLabel(n),
+                            label: nextVolumesLabel(n),
                         }))}
                         value={String(auto.count)}
                         onChange={(value) => change({ count: Number(value) })}
