@@ -4,14 +4,11 @@ import { useCallback, useEffect, useRef } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 
 import { volumeLabel } from '@/components/readingStatus';
-import {
-    fetchPageSizes,
-    fetchVolume,
-    pageUrl,
-    saveProgress,
-    screenPageWidth,
-} from '@/services/api';
+import { saveLocalProgress, useDownloads } from '@/offline/downloads';
+import { loadPageSizes, loadVolume } from '@/offline/reading';
+import { pageUrl, saveProgress, screenPageWidth } from '@/services/api';
 import { useReadOnly } from '@/services/auth';
+import { useOnline } from '@/services/network';
 import { useQuery } from '@/services/useQuery';
 
 import { Reader } from './Reader';
@@ -33,7 +30,10 @@ export const ReaderPage = () => {
     const readOnly = useReadOnly();
     const navigate = useNavigate();
     const [params, setParams] = useSearchParams();
-    const { data, error } = useQuery(() => fetchVolume(volumeId), [volumeId]);
+    // Sans réseau : la fiche du tome téléchargé.
+    const { data, error } = useQuery(() => loadVolume(volumeId), [volumeId]);
+    const online = useOnline();
+    const { downloads } = useDownloads();
     // Tome précédent encore en mémoire pendant le chargement du suivant :
     // l'ignorer, sinon sa page (et son défilement) passent au nouveau tome.
     const volume = data?.id === volumeId ? data : undefined;
@@ -96,6 +96,11 @@ export const ReaderPage = () => {
             savedPage.current = key;
             // Simulation d'un compte : rien n'est enregistré.
             if (readOnly) return;
+            // Tome téléchargé : sa lecture est aussi gardée sur l'appareil.
+            void saveLocalProgress(volume.id, {
+                page: lastShown,
+                completed: lastShown >= volume.pageCount - 1,
+            });
             saveProgress(volume.id, { page: lastShown }).catch(() => {
                 // Sans réseau, la lecture continue ; la page suivante réessaiera.
                 savedPage.current = undefined;
@@ -110,7 +115,7 @@ export const ReaderPage = () => {
             pageUrl(volumeId, volume?.version ?? 0, index, screenPageWidth()),
         [volumeId, volume?.version],
     );
-    const loadSizes = useCallback(() => fetchPageSizes(volumeId), [volumeId]);
+    const loadSizes = useCallback(() => loadPageSizes(volumeId), [volumeId]);
     const onBeforeFirst = useCallback(() => {
         if (volume?.previousId) {
             navigate(`/read/${volume.previousId}?page=${LAST_PAGE}`);
@@ -159,7 +164,13 @@ export const ReaderPage = () => {
             }}
             end={
                 <>
-                    {volume.nextId ? (
+                    {volume.nextId &&
+                    !online &&
+                    !downloads.some((d) => d.id === volume.nextId) ? (
+                        <Text c="dimmed" size="sm">
+                            Tome suivant pas téléchargé
+                        </Text>
+                    ) : volume.nextId ? (
                         <Button component={Link} to={`/read/${volume.nextId}`}>
                             Tome suivant
                         </Button>

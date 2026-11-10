@@ -1,6 +1,7 @@
 import { Center, Loader } from '@mantine/core';
 import { type ReactNode, useCallback, useEffect, useState } from 'react';
 
+import { keepOnlyDownloadsOf } from '@/offline/downloads';
 import {
     type CurrentUser,
     RefreshUserContext,
@@ -24,6 +25,8 @@ export const RequireUser = ({ children }: { children: ReactNode }) => {
         () =>
             fetchMe().then((me) => {
                 saveUser(me);
+                // Tomes téléchargés par un autre compte : effacés.
+                if (!me.preview) void keepOnlyDownloadsOf(me.id);
                 setUser(me);
             }),
         [],

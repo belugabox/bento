@@ -26,6 +26,7 @@ import { useDisclosure } from '@mantine/hooks';
 import {
     IconActivity,
     IconChartBar,
+    IconDownload,
     IconEye,
     IconInbox,
     IconLogout,
@@ -428,6 +429,13 @@ const UserMenu = () => {
                         onClick={appearanceModal.open}
                     >
                         Thème et affichage…
+                    </Menu.Item>
+                    <Menu.Item
+                        component={Link}
+                        to="/downloads"
+                        leftSection={<IconDownload size={14} />}
+                    >
+                        Téléchargements
                     </Menu.Item>
                     {/* Partie admin : sans elle, pas de séparation en double. */}
                     {isAdmin && <Menu.Divider />}
