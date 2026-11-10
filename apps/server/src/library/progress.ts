@@ -137,6 +137,11 @@ export const saveProgress = (
     userId: number,
     volumeId: number,
     update: { page?: number; completed?: boolean },
+    /**
+     * Heure réelle de la lecture (faite hors ligne, envoyée plus tard) : une
+     * progression enregistrée après elle n'est pas remplacée.
+     */
+    at?: Date,
 ): Progress | null => {
     const volume = db
         .select({ pageCount: volumes.pageCount })
@@ -148,6 +153,22 @@ export const saveProgress = (
         eq(readProgress.userId, userId),
         eq(readProgress.volumeId, volumeId),
     );
+
+    // Lecture plus récente déjà enregistrée (autre appareil) : gardée.
+    const stored = db
+        .select({
+            page: readProgress.page,
+            completed: readProgress.completed,
+            updatedAt: readProgress.updatedAt,
+        })
+        .from(readProgress)
+        .where(where)
+        .get();
+    if (at && stored && stored.updatedAt.getTime() > at.getTime()) {
+        return { page: stored.page, completed: stored.completed };
+    }
+    // Jamais dans le futur (horloge de l'appareil en avance).
+    const updatedAt = at && at.getTime() < Date.now() ? at : new Date();
 
     if (update.completed === false) {
         db.delete(readProgress).where(where).run();
@@ -168,10 +189,10 @@ export const saveProgress = (
             page >= lastPage,
     };
     db.insert(readProgress)
-        .values({ userId, volumeId, ...progress, updatedAt: new Date() })
+        .values({ userId, volumeId, ...progress, updatedAt })
         .onConflictDoUpdate({
             target: [readProgress.userId, readProgress.volumeId],
-            set: { ...progress, updatedAt: new Date() },
+            set: { ...progress, updatedAt },
         })
         .run();
     return progress;

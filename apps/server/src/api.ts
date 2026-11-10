@@ -61,6 +61,7 @@ import {
 } from './library/genres';
 import { setSeriesLists } from './library/lists';
 import { countToClassify, listManagedSeries } from './library/management';
+import { isPageWidth } from './library/pageWidths';
 import {
     getProgress,
     listContinue,
@@ -72,6 +73,7 @@ import {
 } from './library/progress';
 import { familyReaders, seriesReaders } from './library/readers';
 import { addReadingTime } from './library/readingTime';
+import { ResizedPages } from './library/resizedPages';
 import { type LibraryScanner, coverFile } from './library/scanner';
 import { readCover } from './library/smallCovers';
 import { getStats } from './library/stats';
@@ -106,6 +108,8 @@ export type ApiDeps = {
     kavita?: KavitaImport;
     /** File des compressions (créée avec `files` si absente). */
     compression?: CompressionQueue;
+    /** Pages réduites à la largeur d'un écran (à côté des couvertures). */
+    resizedPages?: ResizedPages;
     auth: Omit<AuthDeps, 'db' | 'logger'>;
 };
 
@@ -228,6 +232,9 @@ export const createApi = ({
         logger,
         () => settings.get().compression,
         scanner.tasks,
+    ),
+    resizedPages = new ResizedPages(
+        path.join(path.dirname(coversPath), 'pages'),
     ),
     auth,
 }: ApiDeps) =>
@@ -635,6 +642,8 @@ export const createApi = ({
                 z.object({
                     page: z.number().int().min(0).optional(),
                     completed: z.boolean().optional(),
+                    // Lecture hors ligne : son heure réelle (ms).
+                    at: z.number().int().positive().optional(),
                 }),
             ),
             (c) => {
@@ -652,6 +661,9 @@ export const createApi = ({
                         c.var.user.id,
                         id,
                         c.req.valid('json'),
+                        c.req.valid('json').at
+                            ? new Date(c.req.valid('json').at!)
+                            : undefined,
                     ),
                     previous: previous!,
                 });
@@ -666,6 +678,8 @@ export const createApi = ({
                 z.object({
                     seconds: z.number().int().min(1).max(600),
                     pages: z.number().int().min(0).max(2000),
+                    // Lecture hors ligne : l'heure de fin réelle (ms).
+                    at: z.number().int().positive().optional(),
                 }),
             ),
             (c) => {
@@ -674,7 +688,14 @@ export const createApi = ({
                     c.var.user,
                     c.req.valid('param').id,
                 );
-                addReadingTime(db, c.var.user.id, id, c.req.valid('json'));
+                const { at, ...time } = c.req.valid('json');
+                addReadingTime(
+                    db,
+                    c.var.user.id,
+                    id,
+                    time,
+                    at && at < Date.now() ? new Date(at) : new Date(),
+                );
                 return c.json({ ok: true as const });
             },
         )
@@ -720,10 +741,20 @@ export const createApi = ({
             ),
             async (c) => {
                 const { id, index } = c.req.valid('param');
-                const { data, type } = await pages.page(
-                    getVolume(db, c.var.user, id).fullPath,
-                    index,
-                );
+                const volume = getVolume(db, c.var.user, id);
+                const original = () => pages.page(volume.fullPath, index);
+                // `?w=` : réduite à la largeur de l'écran (une des largeurs
+                // prévues ; sinon la page d'origine).
+                const width = Number(c.req.query('w'));
+                const { data, type } = isPageWidth(width)
+                    ? await resizedPages.get(
+                          volume.id,
+                          volume.version,
+                          index,
+                          width,
+                          original,
+                      )
+                    : await original();
                 return c.body(new Uint8Array(data), 200, {
                     'Content-Type': type,
                     'Cache-Control': imageCache(c.req.query('v')),

@@ -72,3 +72,9 @@ export {
     volumeNumbering,
 } from './library/volumeKind';
 export { articleFirst, compareNames, sortKeyOf } from './library/sortName';
+export {
+    PAGE_WIDTHS,
+    type PageWidth,
+    isPageWidth,
+    pageWidthFor,
+} from './library/pageWidths';

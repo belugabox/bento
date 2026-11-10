@@ -17,6 +17,7 @@ import {
     Stack,
     Text,
     ThemeIcon,
+    Title,
     VisuallyHidden,
 } from '@mantine/core';
 import { useDebouncedValue } from '@mantine/hooks';
@@ -64,6 +65,7 @@ import {
     readingStateOf,
     seriesDetails,
 } from '@/components/seriesFilters';
+import { DownloadedVolumes } from '@/pages/DownloadsPage';
 import {
     type InProgressVolume,
     coverUrl,
@@ -74,6 +76,7 @@ import {
     seriesCoverUrl,
 } from '@/services/api';
 import { UserContext } from '@/services/auth';
+import { useOnline } from '@/services/network';
 import { useQuery } from '@/services/useQuery';
 
 /**
@@ -354,6 +357,7 @@ export const LibraryPage = () => {
     const status = (params.get('status') as StatusFilter | null) ?? 'all';
 
     const isAdmin = useContext(UserContext)?.role === 'admin';
+    const online = useOnline();
     const display = useLibraryDisplay();
     // Gardées en mémoire : revenir à l'accueil l'affiche tout de suite.
     const libraries = useQuery(fetchLibraries, [], { cacheKey: 'libraries' });
@@ -406,6 +410,15 @@ export const LibraryPage = () => {
             },
             { replace: true },
         );
+    // Hors ligne (et rien en mémoire) : les tomes téléchargés.
+    if (!online && !series.data) {
+        return (
+            <Stack>
+                <Title order={2}>Sur cet appareil</Title>
+                <DownloadedVolumes />
+            </Stack>
+        );
+    }
     if (libraries.error) {
         return <Alert color="red">{libraries.error.message}</Alert>;
     }

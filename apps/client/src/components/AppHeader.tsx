@@ -26,6 +26,7 @@ import { useDisclosure } from '@mantine/hooks';
 import {
     IconActivity,
     IconChartBar,
+    IconDownload,
     IconEye,
     IconInbox,
     IconLogout,
@@ -41,6 +42,7 @@ import { Link, useLocation, useNavigate } from 'react-router';
 
 import logo from '@/assets/logo.svg';
 import { AppearanceModal } from '@/components/AppearanceModal';
+import { DownloadIndicator } from '@/components/DownloadIndicator';
 import { UserAvatar } from '@/components/accounts/UserAvatar';
 import {
     ageLimitLabel,
@@ -429,6 +431,13 @@ const UserMenu = () => {
                     >
                         Thème et affichage…
                     </Menu.Item>
+                    <Menu.Item
+                        component={Link}
+                        to="/downloads"
+                        leftSection={<IconDownload size={14} />}
+                    >
+                        Téléchargements
+                    </Menu.Item>
                     {/* Partie admin : sans elle, pas de séparation en double. */}
                     {isAdmin && <Menu.Divider />}
                     {isAdmin && (
@@ -581,6 +590,7 @@ export const AppHeader = () => {
             </Anchor>
             <HeaderSearch />
             <Group gap="sm" wrap="nowrap">
+                <DownloadIndicator />
                 {user.role === 'admin' && <TasksIndicator />}
                 {user.role === 'admin' && <DraftsIndicator />}
                 <UserMenu />

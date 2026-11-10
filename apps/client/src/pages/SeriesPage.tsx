@@ -12,9 +12,11 @@ import {
     SimpleGrid,
     Stack,
     Text,
+    ThemeIcon,
     Title,
     Tooltip,
 } from '@mantine/core';
+import { notifications } from '@mantine/notifications';
 import {
     IconArrowLeft,
     IconBookmark,
@@ -22,6 +24,7 @@ import {
     IconCheck,
     IconChecks,
     IconDots,
+    IconDownload,
     IconPencil,
     IconPlayerPlay,
     IconRestore,
@@ -34,6 +37,7 @@ import { isMainKind, isStandalone } from '@server/types';
 import { SeriesVolumeMenu } from '@/components/CardMenus';
 import { CompletenessBadge } from '@/components/CompletenessBadge';
 import { CoverCard } from '@/components/CoverCard';
+import { DownloadRing } from '@/components/DownloadIndicator';
 import { SeriesReaders } from '@/components/SeriesReaders';
 import { ageLabel, seriesAgeOf } from '@/components/ageLimits';
 import { completenessOf } from '@/components/completeness';
@@ -46,6 +50,8 @@ import {
     volumeLabel,
     volumeTitleOf,
 } from '@/components/readingStatus';
+import { NEXT_VOLUME_COUNTS, nextVolumesLabel } from '@/offline/auto';
+import { queueDownloads, useDownloads } from '@/offline/downloads';
 import {
     coverUrl,
     fetchSeries,
@@ -74,7 +80,9 @@ const KIND_SECTIONS = [
 
 export const SeriesPage = () => {
     const seriesId = Number(useParams().id);
-    const isAdmin = useCurrentUser().role === 'admin';
+    const user = useCurrentUser();
+    const isAdmin = user.role === 'admin';
+    const { downloads, jobs } = useDownloads();
     const readOnly = useReadOnly();
     const { size } = useLibraryDisplay();
     const {
@@ -135,6 +143,31 @@ export const SeriesPage = () => {
         }
         await markSeriesRead(series.id, read);
         reload();
+    };
+
+    // Tomes à télécharger : la série (sans hors-séries ni spéciaux), à
+    // partir du tome à lire, pas encore lus ni téléchargés.
+    const downloadedIds = new Set(downloads.map((d) => d.id));
+    const main = series.volumes.filter((v) => isMainKind(v.kind));
+    const from = next ? Math.max(main.indexOf(next.volume), 0) : 0;
+    const toDownload = main
+        .slice(from)
+        .filter((v) => !v.progress?.completed && !downloadedIds.has(v.id));
+
+    /** Télécharge les `count` tomes suivants sur l'appareil. */
+    const downloadNext = (count: number) => {
+        const added = queueDownloads(
+            toDownload.slice(0, count).map((v) => ({
+                id: v.id,
+                label: `${series.name}, ${volumeLabel(v).toLowerCase()}`,
+            })),
+            user.id,
+        );
+        notifications.show({
+            message: added
+                ? `${added} tome${added > 1 ? 's' : ''} en téléchargement (voir « Téléchargements »).`
+                : 'Ces tomes sont déjà téléchargés.',
+        });
     };
 
     /** Ajoute ou retire la série de la liste « à lire ». */
@@ -334,6 +367,45 @@ export const SeriesPage = () => {
                                     </Menu.Item>
                                 </Menu.Dropdown>
                             </Menu>
+                            {/* Télécharger : son propre petit menu. */}
+                            <Menu position="bottom-start">
+                                <Tooltip label="Télécharger sur l’appareil">
+                                    <Menu.Target>
+                                        <ActionIcon
+                                            variant="default"
+                                            size="lg"
+                                            aria-label="Télécharger"
+                                            disabled={
+                                                readOnly ||
+                                                toDownload.length === 0
+                                            }
+                                        >
+                                            <IconDownload size={18} />
+                                        </ActionIcon>
+                                    </Menu.Target>
+                                </Tooltip>
+                                <Menu.Dropdown>
+                                    {[
+                                        ...NEXT_VOLUME_COUNTS.map((count) => ({
+                                            count,
+                                            label: nextVolumesLabel(count),
+                                        })),
+                                        {
+                                            count: Infinity,
+                                            label: 'Tous les tomes pas lus',
+                                        },
+                                    ].map((option) => (
+                                        <Menu.Item
+                                            key={option.label}
+                                            onClick={() =>
+                                                downloadNext(option.count)
+                                            }
+                                        >
+                                            {option.label}
+                                        </Menu.Item>
+                                    ))}
+                                </Menu.Dropdown>
+                            </Menu>
                         </Group>
                         <SeriesReaders seriesId={series.id} />
                     </Group>
@@ -360,6 +432,12 @@ export const SeriesPage = () => {
                             {group.map((volume, index) => {
                                 const read =
                                     volume.progress?.completed ?? false;
+                                const downloaded = downloadedIds.has(volume.id);
+                                const job = jobs.find(
+                                    (j) =>
+                                        j.volumeId === volume.id &&
+                                        j.state !== 'failed',
+                                );
                                 return (
                                     <CoverCard
                                         key={volume.id}
@@ -397,6 +475,29 @@ export const SeriesPage = () => {
                                                 isAdmin={isAdmin}
                                                 onChanged={reload}
                                             />
+                                        }
+                                        // Gardé sur l'appareil (lecture sans réseau).
+                                        tag={
+                                            // En téléchargement : son avancement.
+                                            job ? (
+                                                <DownloadRing
+                                                    ratio={
+                                                        job.total
+                                                            ? job.done /
+                                                              job.total
+                                                            : 0
+                                                    }
+                                                />
+                                            ) : downloaded ? (
+                                                <ThemeIcon
+                                                    size="sm"
+                                                    radius="xl"
+                                                    color="gray"
+                                                    aria-label="Téléchargé"
+                                                >
+                                                    <IconDownload size={12} />
+                                                </ThemeIcon>
+                                            ) : undefined
                                         }
                                         corner={
                                             <Tooltip

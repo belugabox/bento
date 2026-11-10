@@ -15,18 +15,25 @@ import {
     IconCheck,
     IconChecks,
     IconDotsVertical,
+    IconDownload,
     IconEye,
     IconPencil,
     IconPhoto,
     IconPlayerPlay,
     IconPlayerSkipBack,
     IconRotate,
+    IconTrash,
     IconX,
 } from '@tabler/icons-react';
 import { useContext, useState } from 'react';
 import { useNavigate } from 'react-router';
 
 import { nextToRead, volumeLabel } from '@/components/readingStatus';
+import {
+    deleteDownload,
+    queueDownloads,
+    useDownloads,
+} from '@/offline/downloads';
 import {
     type SavedProgress,
     fetchSeries,
@@ -38,6 +45,50 @@ import {
 } from '@/services/api';
 import { UserContext, useReadOnly } from '@/services/auth';
 import { useQuery } from '@/services/useQuery';
+
+/**
+ * « Télécharger » un tome sur l'appareil, son avancement, ou « Supprimer de
+ * l'appareil » ; pas en simulation d'un compte.
+ */
+const DownloadItem = ({
+    volume,
+}: {
+    volume: { id: number; label: string };
+}) => {
+    const readOnly = useReadOnly();
+    const user = useContext(UserContext);
+    const { downloads, jobs } = useDownloads();
+    const job = jobs.find((j) => j.volumeId === volume.id);
+    if (downloads.some((d) => d.id === volume.id)) {
+        return (
+            <Menu.Item
+                leftSection={<IconTrash size={14} />}
+                onClick={() => void deleteDownload(volume.id)}
+            >
+                Supprimer de l’appareil
+            </Menu.Item>
+        );
+    }
+    if (job && job.state !== 'failed') {
+        return (
+            <Menu.Item leftSection={<IconDownload size={14} />} disabled>
+                Téléchargement…
+                {job.total
+                    ? ` ${Math.round((job.done / job.total) * 100)} %`
+                    : ''}
+            </Menu.Item>
+        );
+    }
+    return (
+        <Menu.Item
+            leftSection={<IconDownload size={14} />}
+            disabled={readOnly || !user}
+            onClick={() => user && queueDownloads([volume], user.id)}
+        >
+            Télécharger
+        </Menu.Item>
+    );
+};
 
 /** Durée du message « Annuler » après une action. */
 const UNDO_MS = 6000;
@@ -551,6 +602,13 @@ export const SeriesVolumeMenu = ({
                         Effacer la progression
                     </Menu.Item>
                 )}
+                <Menu.Divider />
+                <DownloadItem
+                    volume={{
+                        id: volume.id,
+                        label: `${series.name}, ${label}`,
+                    }}
+                />
                 {isAdmin && (
                     <>
                         <Menu.Divider />

@@ -1,16 +1,15 @@
 import { Alert, Button, Center, Loader, Text } from '@mantine/core';
 import { useLocalStorage } from '@mantine/hooks';
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useContext, useEffect, useRef } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 
 import { volumeLabel } from '@/components/readingStatus';
-import {
-    fetchPageSizes,
-    fetchVolume,
-    pageUrl,
-    saveProgress,
-} from '@/services/api';
-import { useReadOnly } from '@/services/auth';
+import { saveLocalProgress, useDownloads } from '@/offline/downloads';
+import { loadPageSizes, loadVolume } from '@/offline/reading';
+import { saveProgressOrQueue } from '@/offline/syncQueue';
+import { pageUrl, saveProgress, screenPageWidth } from '@/services/api';
+import { UserContext, useReadOnly } from '@/services/auth';
+import { useOnline } from '@/services/network';
 import { useQuery } from '@/services/useQuery';
 
 import { Reader } from './Reader';
@@ -30,9 +29,13 @@ const PAGES_BEFORE_SAVE = 3;
 export const ReaderPage = () => {
     const volumeId = Number(useParams().id);
     const readOnly = useReadOnly();
+    const userId = useContext(UserContext)?.id;
     const navigate = useNavigate();
     const [params, setParams] = useSearchParams();
-    const { data, error } = useQuery(() => fetchVolume(volumeId), [volumeId]);
+    // Sans réseau : la fiche du tome téléchargé.
+    const { data, error } = useQuery(() => loadVolume(volumeId), [volumeId]);
+    const online = useOnline();
+    const { downloads } = useDownloads();
     // Tome précédent encore en mémoire pendant le chargement du suivant :
     // l'ignorer, sinon sa page (et son défilement) passent au nouveau tome.
     const volume = data?.id === volumeId ? data : undefined;
@@ -95,19 +98,30 @@ export const ReaderPage = () => {
             savedPage.current = key;
             // Simulation d'un compte : rien n'est enregistré.
             if (readOnly) return;
-            saveProgress(volume.id, { page: lastShown }).catch(() => {
-                // Sans réseau, la lecture continue ; la page suivante réessaiera.
+            // Tome téléchargé : sa lecture est aussi gardée sur l'appareil.
+            void saveLocalProgress(volume.id, {
+                page: lastShown,
+                completed: lastShown >= volume.pageCount - 1,
+            });
+            // Sans réseau : gardée sur l'appareil, envoyée au retour du réseau.
+            const save = userId
+                ? saveProgressOrQueue(userId, volume.id, { page: lastShown })
+                : saveProgress(volume.id, { page: lastShown });
+            save.catch(() => {
+                // Refusée : la page suivante réessaiera.
                 savedPage.current = undefined;
             });
         },
-        [volume, urlReady, readOnly, readingActivity],
+        [volume, urlReady, readOnly, readingActivity, userId],
     );
 
     const pageSrc = useCallback(
-        (index: number) => pageUrl(volumeId, volume?.version ?? 0, index),
+        // Réduite à la largeur de l'écran : trois fois plus légère.
+        (index: number) =>
+            pageUrl(volumeId, volume?.version ?? 0, index, screenPageWidth()),
         [volumeId, volume?.version],
     );
-    const loadSizes = useCallback(() => fetchPageSizes(volumeId), [volumeId]);
+    const loadSizes = useCallback(() => loadPageSizes(volumeId), [volumeId]);
     const onBeforeFirst = useCallback(() => {
         if (volume?.previousId) {
             navigate(`/read/${volume.previousId}?page=${LAST_PAGE}`);
@@ -156,7 +170,13 @@ export const ReaderPage = () => {
             }}
             end={
                 <>
-                    {volume.nextId ? (
+                    {volume.nextId &&
+                    !online &&
+                    !downloads.some((d) => d.id === volume.nextId) ? (
+                        <Text c="dimmed" size="sm">
+                            Tome suivant pas téléchargé
+                        </Text>
+                    ) : volume.nextId ? (
                         <Button component={Link} to={`/read/${volume.nextId}`}>
                             Tome suivant
                         </Button>

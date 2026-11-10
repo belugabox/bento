@@ -1,5 +1,11 @@
 import { MantineProvider } from '@mantine/core';
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import {
+    act,
+    fireEvent,
+    render,
+    screen,
+    waitFor,
+} from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -236,6 +242,52 @@ describe('SeriesPage', () => {
         expect(
             screen.queryByRole('button', { name: /^Actions pour/ }),
         ).toBeNull();
+    });
+
+    it('offers the downloads in their own small menu', async () => {
+        vi.spyOn(globalThis, 'fetch').mockImplementation(
+            async () =>
+                new Response(JSON.stringify(SERIES), {
+                    headers: { 'Content-Type': 'application/json' },
+                }),
+        );
+        render(
+            <MantineProvider>
+                <UserContext.Provider value={READER}>
+                    <MemoryRouter initialEntries={['/series/3']}>
+                        <Routes>
+                            <Route
+                                path="/series/:id"
+                                element={<SeriesPage />}
+                            />
+                        </Routes>
+                    </MemoryRouter>
+                </UserContext.Provider>
+            </MantineProvider>,
+        );
+
+        fireEvent.click(
+            await screen.findByRole('button', { name: 'Télécharger' }),
+        );
+        expect(
+            (await screen.findAllByRole('menuitem')).map((i) => i.textContent),
+        ).toEqual([
+            'Le prochain tome',
+            'Les 2 prochains tomes',
+            'Les 3 prochains tomes',
+            'Les 5 prochains tomes',
+            'Tous les tomes pas lus',
+        ]);
+        // Plus dans le menu de lecture.
+        fireEvent.click(screen.getByRole('button', { name: 'Télécharger' }));
+        await waitFor(() =>
+            expect(screen.queryByText('Le prochain tome')).toBeNull(),
+        );
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Lecture de la série' }),
+        );
+        await screen.findByText('Marquer toute la série comme lue');
+        expect(screen.queryByText('Le prochain tome')).toBeNull();
     });
 
     it('offers a menu on each volume', async () => {

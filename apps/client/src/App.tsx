@@ -7,7 +7,9 @@ import {
     AppHeader,
     PreviewBanner,
 } from '@/components/AppHeader';
+import { OfflineBanner } from '@/components/OfflineBanner';
 import { RequireUser } from '@/components/RequireUser';
+import { DownloadsPage } from '@/pages/DownloadsPage';
 import { JoinPage } from '@/pages/JoinPage';
 import { LibraryPage } from '@/pages/LibraryPage';
 import { LoginPage } from '@/pages/LoginPage';
@@ -61,6 +63,7 @@ const Layout = () => (
         </AppShell.Header>
         <AppShell.Main>
             <Container size="xl">
+                <OfflineBanner />
                 <PreviewBanner />
                 <ActivationBanner />
                 <Outlet />
@@ -84,6 +87,8 @@ export const App = () => (
             <Route element={<Layout />}>
                 <Route index element={<LibraryPage />} />
                 <Route path="series/:id" element={<SeriesPage />} />
+                {/* Pas chargée à la demande : sert aussi hors ligne. */}
+                <Route path="downloads" element={<DownloadsPage />} />
                 <Route
                     path="account"
                     element={

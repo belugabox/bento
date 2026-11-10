@@ -5,8 +5,11 @@ import {
     type ReadingMode,
     type SourceLink,
     formatAvatar,
+    pageWidthFor,
     randomAvatar,
 } from '@server/types';
+
+import { reachServer } from './network';
 
 /** Client typé de l'API (`/api`, servie par le même domaine). */
 export const api = hc<ApiType>('/api');
@@ -20,7 +23,8 @@ export const loginUrl = (
 export const json = async <T>(
     call: Promise<{ ok: boolean; status: number; json(): Promise<T> }>,
 ): Promise<T> => {
-    const response = await call;
+    // Sans réponse du serveur : `NetworkError`, et l'appli passe hors ligne.
+    const response = await reachServer(() => call);
     // Session absente ou expirée : passer par la page de connexion.
     if (response.status === 401) {
         window.location.assign(loginUrl());
@@ -67,7 +71,8 @@ export const fetchSeriesReaders = (seriesId: number) =>
 /** Temps passé dans le lecteur sur un tome (statistiques). */
 export const sendReadingTime = (
     volumeId: number,
-    time: { seconds: number; pages: number },
+    // `at` : heure réelle d'une lecture faite hors ligne (ms).
+    time: { seconds: number; pages: number; at?: number },
 ) =>
     json(
         api.volumes[':id']['reading-time'].$post({
@@ -136,12 +141,34 @@ export type Volume = Awaited<ReturnType<typeof fetchVolume>>;
 // des grilles), plus légère.
 export const coverUrl = (volumeId: number, version: number, size?: 'small') =>
     `/api/volumes/${volumeId}/cover?v=${version}${size ? `&size=${size}` : ''}`;
-export const pageUrl = (volumeId: number, version: number, index: number) =>
-    `/api/volumes/${volumeId}/pages/${index}?v=${version}`;
+/**
+ * Page d'un tome ; avec `width`, réduite à cette largeur par le serveur
+ * (une des largeurs prévues, voir `screenPageWidth`).
+ */
+export const pageUrl = (
+    volumeId: number,
+    version: number,
+    index: number,
+    width?: number,
+) =>
+    `/api/volumes/${volumeId}/pages/${index}?v=${version}${width ? `&w=${width}` : ''}`;
+
+/**
+ * Largeur des pages pour cet écran (petit côté en pixels réels), ou
+ * `undefined` pour la page d'origine (écran plus grand que les largeurs
+ * prévues).
+ */
+export const screenPageWidth = () =>
+    pageWidthFor({
+        width: window.screen.width,
+        height: window.screen.height,
+        pixelRatio: window.devicePixelRatio,
+    });
 
 export const saveProgress = (
     volumeId: number,
-    progress: { page?: number; completed?: boolean },
+    // `at` : heure réelle d'une lecture faite hors ligne (ms).
+    progress: { page?: number; completed?: boolean; at?: number },
 ) =>
     json(
         api.volumes[':id'].progress.$put({

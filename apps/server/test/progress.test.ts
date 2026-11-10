@@ -332,6 +332,33 @@ describe('series readers', () => {
     });
 });
 
+describe('reading done offline', () => {
+    it('keeps a more recent reading over an older one sent later', async () => {
+        // Sur un autre appareil, maintenant : page 2.
+        await save(gantz[0]!, { page: 2 });
+        // Envoyée au retour du réseau, une lecture d'il y a une heure.
+        const anHourAgo = Date.now() - 3_600_000;
+        const late = await save(gantz[0]!, { page: 1, at: anHourAgo });
+        expect(late.body.progress).toEqual({ page: 2, completed: true });
+        expect(await progressOf(gantz[0]!)).toEqual({
+            page: 2,
+            completed: true,
+        });
+
+        // Plus récente que celle du serveur : enregistrée, à son heure.
+        await save(gantz[1]!, { page: 0, at: anHourAgo });
+        await save(gantz[1]!, { page: 1, at: anHourAgo + 60_000 });
+        expect(await progressOf(gantz[1]!)).toEqual({
+            page: 1,
+            completed: false,
+        });
+        const continued = (await call('/continue', alice)).body;
+        expect(new Date(continued[0].updatedAt).getTime()).toBe(
+            anHourAgo + 60_000,
+        );
+    });
+});
+
 describe('new volumes', () => {
     it('counts the volumes added since the last reading of the series', async () => {
         // Alice a lu le T01 ; le T03 arrive après.
