@@ -138,6 +138,30 @@ const seriesProgress = (volume: InProgressVolume) =>
 /** Genres montrés en pastilles ; les autres sont dans « Plus ». */
 const GENRE_CHIPS = 3;
 
+/** Bloc de l'accueil, sous un titre très discret (petites capitales). */
+const HomeSection = ({
+    title,
+    count,
+    children,
+}: {
+    title: string;
+    count: number;
+    children: ReactNode;
+}) => (
+    <Stack gap={8} component="section" aria-label={title}>
+        <Text
+            size="xs"
+            c="dimmed"
+            fw={600}
+            tt="uppercase"
+            style={{ letterSpacing: '0.08em' }}
+        >
+            {title} · {count}
+        </Text>
+        {children}
+    </Stack>
+);
+
 /** Pastille d'un filtre : un clic la choisit, un autre la retire. */
 const FilterChip = ({
     active,
@@ -191,7 +215,7 @@ const ChipRow = ({
 );
 
 /**
- * Accueil : la grille, sans titre, en trois blocs séparés par un espace :
+ * Accueil : la grille en trois blocs, chacun sous un titre discret :
  * les tomes à reprendre (tomes en cours et suite des séries entamées), les
  * séries pas lues (« à lire » d'abord), puis les séries terminées ;
  * les filtres sont en bas de l'écran. La recherche est dans l'en-tête, qui
@@ -336,97 +360,104 @@ export const LibraryPage = () => {
                 )}
                 <Stack gap="xl" data-testid="series-grid">
                     {resume.length > 0 && (
-                        <SimpleGrid
-                            cols={cols}
-                            spacing="sm"
-                            data-testid="resume-grid"
-                        >
-                            {resume.map((volume) => (
-                                <ResumeCard
-                                    key={volume.volumeId}
-                                    volume={volume}
-                                    // Court : tient sur une ligne de la carte.
-                                    subtitle={`${volumeShortLabel(volume)} · ${volume.readCount}/${volume.volumeCount} lus`}
-                                    progress={seriesProgress(volume)}
-                                    onChanged={reloadHome}
-                                    display={display}
-                                    details={
-                                        display.layout === 'list'
-                                            ? seriesDetails(
-                                                  visible.find(
-                                                      (s) =>
-                                                          s.id ===
-                                                          volume.seriesId,
-                                                  )!,
-                                              )
-                                            : undefined
-                                    }
-                                />
-                            ))}
-                        </SimpleGrid>
+                        <HomeSection title="En cours" count={resume.length}>
+                            <SimpleGrid
+                                cols={cols}
+                                spacing="sm"
+                                data-testid="resume-grid"
+                            >
+                                {resume.map((volume) => (
+                                    <ResumeCard
+                                        key={volume.volumeId}
+                                        volume={volume}
+                                        // Court : tient sur une ligne de la carte.
+                                        subtitle={`${volumeShortLabel(volume)} · ${volume.readCount}/${volume.volumeCount} lus`}
+                                        progress={seriesProgress(volume)}
+                                        onChanged={reloadHome}
+                                        display={display}
+                                        details={
+                                            display.layout === 'list'
+                                                ? seriesDetails(
+                                                      visible.find(
+                                                          (s) =>
+                                                              s.id ===
+                                                              volume.seriesId,
+                                                      )!,
+                                                  )
+                                                : undefined
+                                        }
+                                    />
+                                ))}
+                            </SimpleGrid>
+                        </HomeSection>
                     )}
                     {[
-                        { key: 'unread', list: unread },
-                        { key: 'read', list: done },
+                        { key: 'unread', title: 'À découvrir', list: unread },
+                        { key: 'read', title: 'Déjà lues', list: done },
                     ]
                         .filter((group) => group.list.length > 0)
                         .map((group) => (
-                            <SimpleGrid
+                            <HomeSection
                                 key={group.key}
-                                cols={cols}
-                                spacing="sm"
-                                data-testid={`${group.key}-grid`}
+                                title={group.title}
+                                count={group.list.length}
                             >
-                                {group.list.map((item) => {
-                                    const state = readingStateOf(item);
-                                    return (
-                                        <CoverCard
-                                            key={item.id}
-                                            to={`/series/${item.id}`}
-                                            menu={
-                                                <SeriesCardMenu
-                                                    series={item}
-                                                    isAdmin={isAdmin}
-                                                    onChanged={reloadHome}
-                                                />
-                                            }
-                                            cover={seriesCoverUrl(
-                                                item,
-                                                'small',
-                                            )}
-                                            // Déjà lue : à la fin, grisée.
-                                            dimmed={state === 'read'}
-                                            title={item.name}
-                                            subtitle={
-                                                state === 'started'
-                                                    ? `${item.readCount} / ${item.volumeCount} lus`
-                                                    : `${item.volumeCount} tome${item.volumeCount > 1 ? 's' : ''}`
-                                            }
-                                            progress={
-                                                state === 'started'
-                                                    ? item.readCount /
-                                                      item.volumeCount
-                                                    : undefined
-                                            }
-                                            badge={seriesBadge(
-                                                state,
-                                                !!item.toRead,
-                                            )}
-                                            layout={
-                                                display.layout === 'list'
-                                                    ? 'row'
-                                                    : 'card'
-                                            }
-                                            coversOnly={display.coversOnly}
-                                            details={
-                                                display.layout === 'list'
-                                                    ? seriesDetails(item)
-                                                    : undefined
-                                            }
-                                        />
-                                    );
-                                })}
-                            </SimpleGrid>
+                                <SimpleGrid
+                                    cols={cols}
+                                    spacing="sm"
+                                    data-testid={`${group.key}-grid`}
+                                >
+                                    {group.list.map((item) => {
+                                        const state = readingStateOf(item);
+                                        return (
+                                            <CoverCard
+                                                key={item.id}
+                                                to={`/series/${item.id}`}
+                                                menu={
+                                                    <SeriesCardMenu
+                                                        series={item}
+                                                        isAdmin={isAdmin}
+                                                        onChanged={reloadHome}
+                                                    />
+                                                }
+                                                cover={seriesCoverUrl(
+                                                    item,
+                                                    'small',
+                                                )}
+                                                // Déjà lue : à la fin, grisée.
+                                                dimmed={state === 'read'}
+                                                title={item.name}
+                                                subtitle={
+                                                    state === 'started'
+                                                        ? `${item.readCount} / ${item.volumeCount} lus`
+                                                        : `${item.volumeCount} tome${item.volumeCount > 1 ? 's' : ''}`
+                                                }
+                                                progress={
+                                                    state === 'started'
+                                                        ? item.readCount /
+                                                          item.volumeCount
+                                                        : undefined
+                                                }
+                                                badge={seriesBadge(
+                                                    state,
+                                                    !!item.toRead,
+                                                )}
+                                                layout={
+                                                    display.layout === 'list'
+                                                        ? 'row'
+                                                        : 'card'
+                                                }
+                                                coversOnly={display.coversOnly}
+                                                details={
+                                                    display.layout === 'list'
+                                                        ? seriesDetails(item)
+                                                        : undefined
+                                                }
+                                            />
+                                        );
+                                    })}
+                                </SimpleGrid>
+                            </HomeSection>
                         ))}
                 </Stack>
             </Stack>

@@ -152,8 +152,10 @@ describe('LibraryPage', () => {
         ]);
         expect(screen.queryByTestId('unread-grid')).toBeNull();
         expect(hrefs(screen.getByTestId('read-grid'))).toEqual(['/series/2']);
-        // Pas de titre de bloc.
-        expect(screen.queryByText('Reprendre')).toBeNull();
+        // Un titre discret par bloc, avec son nombre de cartes.
+        expect(screen.getByText('En cours · 2')).toBeTruthy();
+        expect(screen.getByText('Déjà lues · 1')).toBeTruthy();
+        expect(screen.queryByText(/À découvrir/)).toBeNull();
     });
 
     it('hides the series already read, on this device', async () => {
