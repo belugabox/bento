@@ -23,7 +23,7 @@ import {
     IconRotate,
     IconX,
 } from '@tabler/icons-react';
-import { useState } from 'react';
+import { useContext, useState } from 'react';
 import { useNavigate } from 'react-router';
 
 import { nextToRead, volumeLabel } from '@/components/readingStatus';
@@ -36,7 +36,7 @@ import {
     setSeriesCover,
     setSeriesLists,
 } from '@/services/api';
-import { useReadOnly } from '@/services/auth';
+import { UserContext, useReadOnly } from '@/services/auth';
 import { useQuery } from '@/services/useQuery';
 
 /** Durée du message « Annuler » après une action. */
@@ -321,7 +321,10 @@ export const SeriesCardMenu = ({
     );
 };
 
-/** Menu ⋮ d'un tome de « Reprendre la lecture ». */
+/**
+ * Menu ⋮ d'un tome à reprendre (accueil) : ce tome, la série (lue en entier
+ * ou jusqu'à ce tome), « Reprendre », et la fiche.
+ */
 export const VolumeCardMenu = ({
     volume,
     onChanged,
@@ -339,7 +342,21 @@ export const VolumeCardMenu = ({
 }) => {
     const navigate = useNavigate();
     const readOnly = useReadOnly();
+    const isAdmin = useContext(UserContext)?.role === 'admin';
     const label = volumeLabel(volume).toLowerCase();
+
+    /** Série lue en entier, ou jusqu'à ce tome. */
+    const markSeries = (upTo?: number) =>
+        void runAction(async () => {
+            const result = await markSeriesRead(volume.seriesId, true, upTo);
+            return {
+                message:
+                    upTo === undefined
+                        ? `${volume.seriesName} : série marquée comme lue.`
+                        : `${volume.seriesName} : ${result.volumes} tome${result.volumes > 1 ? 's' : ''} marqué${result.volumes > 1 ? 's' : ''} comme lu${result.volumes > 1 ? 's' : ''}.`,
+                undo: undoProgress(result.previous),
+            };
+        }, onChanged);
 
     const save = (completed: boolean, message: string) =>
         void runAction(async () => {
@@ -367,6 +384,20 @@ export const VolumeCardMenu = ({
                 >
                     Marquer ce tome comme lu
                 </Menu.Item>
+                <Menu.Item
+                    leftSection={<IconChecks size={14} />}
+                    disabled={readOnly}
+                    onClick={() => markSeries(volume.volumeId)}
+                >
+                    Marquer lue jusqu’à ce tome
+                </Menu.Item>
+                <Menu.Item
+                    leftSection={<IconChecks size={14} />}
+                    disabled={readOnly}
+                    onClick={() => markSeries()}
+                >
+                    Marquer la série comme lue
+                </Menu.Item>
                 {volume.page !== null && (
                     <Menu.Item
                         leftSection={<IconX size={14} />}
@@ -388,6 +419,16 @@ export const VolumeCardMenu = ({
                 >
                     Voir la série
                 </Menu.Item>
+                {isAdmin && (
+                    <Menu.Item
+                        leftSection={<IconPencil size={14} />}
+                        onClick={() =>
+                            navigate(`/series/${volume.seriesId}/edit`)
+                        }
+                    >
+                        Modifier la série
+                    </Menu.Item>
+                )}
             </Menu.Dropdown>
         </Menu>
     );

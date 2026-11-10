@@ -7,10 +7,19 @@ import { volumeLabel } from '@/components/readingStatus';
 import { fetchSeries, fetchSeriesList } from '@/services/api';
 import { useQuery } from '@/services/useQuery';
 
+/** Réglages de Bento d'une série publiée, repris par ses nouveaux tomes. */
+export type JoinedSeries = {
+    formatId: number | null;
+    age: number | null;
+    status: 'ongoing' | 'completed' | null;
+    readingMode: string | null;
+};
+
 /**
  * Choix d'une série déjà publiée, pour y ajouter les tomes d'un dossier de
- * brouillons : `onJoin` reçoit son nom et le ComicInfo de son premier tome,
- * `onLeave` est appelé quand le choix est effacé.
+ * brouillons : `onJoin` reçoit son nom, le ComicInfo de son premier tome et
+ * ses réglages de Bento (format, âge, statut, mode de lecture) ; `onLeave`
+ * est appelé quand le choix est effacé.
  */
 export const ExistingSeriesPicker = ({
     libraryId,
@@ -18,7 +27,7 @@ export const ExistingSeriesPicker = ({
     onLeave,
 }: {
     libraryId: number;
-    onJoin: (name: string, source: ComicInfo) => void;
+    onJoin: (name: string, source: ComicInfo, settings: JoinedSeries) => void;
     onLeave: () => void;
 }) => {
     // Liste chargée à la première ouverture seulement.
@@ -53,7 +62,12 @@ export const ExistingSeriesPicker = ({
                 `${details.volumes.length} tome(s) publié(s)` +
                     (last ? `, le dernier : ${volumeLabel(last)}` : ''),
             );
-            onJoin(details.name, details.volumes[0]?.admin?.comicInfo ?? {});
+            onJoin(details.name, details.volumes[0]?.admin?.comicInfo ?? {}, {
+                formatId: details.formatId,
+                age: details.age,
+                status: details.status,
+                readingMode: details.readingMode,
+            });
         } catch (e) {
             if (latest.current === value) setError((e as Error).message);
         }

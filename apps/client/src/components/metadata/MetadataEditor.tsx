@@ -311,8 +311,15 @@ export const MetadataEditor = ({
     const readable = useMemo(() => volumes.filter((v) => !v.error), [dataKey]);
     const paths = readable.map((v) => v.path);
     const [edits, setEdits] = useState<Edits>(() => initialEdits(readable));
-    // Modifications d'avant le choix d'une série existante (pour l'annuler).
+    // Modifications d'avant le choix d'une série existante (pour l'annuler),
+    // et les réglages de Bento d'alors (format, âge, statut, mode).
     const beforeJoin = useRef<Edits>(undefined);
+    const settingsBeforeJoin = useRef<{
+        format: string | null;
+        age: string;
+        status: string;
+        mode: string;
+    }>(undefined);
     const [pickerKey, setPickerKey] = useState(0);
     // Après une fiche en ligne, compléter numéros, titres et années des tomes.
     const [alsoFileNames, setAlsoFileNames] = useState(true);
@@ -873,7 +880,7 @@ export const MetadataEditor = ({
                         <ExistingSeriesPicker
                             key={pickerKey}
                             libraryId={libraryId}
-                            onJoin={(name, source) =>
+                            onJoin={(name, source, joined) => {
                                 // Toujours depuis l'état d'avant le premier
                                 // choix : une autre série ne garde rien de la
                                 // précédente.
@@ -884,13 +891,50 @@ export const MetadataEditor = ({
                                         name,
                                         source,
                                     );
-                                })
-                            }
+                                });
+                                // Format, âge, statut et mode de la série :
+                                // repris (le format est obligatoire).
+                                settingsBeforeJoin.current ??= {
+                                    format: formatValue,
+                                    age: ageValue,
+                                    status,
+                                    mode: modeValue,
+                                };
+                                const before = settingsBeforeJoin.current;
+                                if (classification) {
+                                    setFormatValue(
+                                        joined.formatId == null
+                                            ? before.format
+                                            : String(joined.formatId),
+                                    );
+                                    setAgeValue(
+                                        joined.age == null
+                                            ? before.age
+                                            : String(joined.age),
+                                    );
+                                }
+                                if (seriesStatus) {
+                                    setStatus(joined.status ?? before.status);
+                                }
+                                if (seriesMode) {
+                                    setModeValue(
+                                        joined.readingMode ?? before.mode,
+                                    );
+                                }
+                            }}
                             onLeave={() => {
                                 if (beforeJoin.current) {
                                     setEdits(beforeJoin.current);
                                 }
                                 beforeJoin.current = undefined;
+                                const before = settingsBeforeJoin.current;
+                                if (before) {
+                                    setFormatValue(before.format);
+                                    setAgeValue(before.age);
+                                    setStatus(before.status);
+                                    setModeValue(before.mode);
+                                }
+                                settingsBeforeJoin.current = undefined;
                             }}
                         />
                     )}

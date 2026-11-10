@@ -53,7 +53,6 @@ export const CoverCard = ({
     corner,
     badge,
     menu,
-    dimmed = false,
     layout = 'card',
     coversOnly = false,
     details = [],
@@ -79,8 +78,6 @@ export const CoverCard = ({
     badge?: ReactNode;
     /** Menu d'actions (⋮), en bas à droite, à côté du titre. */
     menu?: ReactNode;
-    /** Grisée (série déjà lue). */
-    dimmed?: boolean;
     layout?: 'card' | 'row';
     /** Sans titre ni légende sous la couverture (grille). */
     coversOnly?: boolean;
@@ -90,7 +87,7 @@ export const CoverCard = ({
     const shown = progress !== undefined && progress > 0;
     if (layout === 'row') {
         return (
-            <Box pos="relative" style={dimmed ? { opacity: 0.5 } : undefined}>
+            <Box pos="relative">
                 <Card
                     component={Link}
                     to={to}
@@ -167,7 +164,7 @@ export const CoverCard = ({
     }
     return (
         // Le coin est hors du lien : un bouton ne peut pas être dans un lien.
-        <Box pos="relative" style={dimmed ? { opacity: 0.5 } : undefined}>
+        <Box pos="relative">
             <Card component={Link} to={to} padding={0} radius="md" withBorder>
                 <Box pos="relative">
                     <Cover cover={cover} title={title} iconSize={32} />

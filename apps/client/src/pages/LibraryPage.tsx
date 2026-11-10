@@ -460,8 +460,6 @@ export const LibraryPage = () => {
                                                     item,
                                                     'small',
                                                 )}
-                                                // Déjà lue : à la fin, grisée.
-                                                dimmed={state === 'read'}
                                                 title={item.name}
                                                 subtitle={
                                                     state === 'started'

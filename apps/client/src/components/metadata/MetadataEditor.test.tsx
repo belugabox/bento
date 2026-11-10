@@ -785,6 +785,80 @@ describe('MetadataEditor', () => {
         expect(save).not.toHaveBeenCalled();
     });
 
+    it('takes the format and age of the published series it joins', async () => {
+        vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+            const url = String(input);
+            const body = url.startsWith('/api/series?')
+                ? [{ id: 5, name: 'Gantz Perfect' }]
+                : url.startsWith('/api/series/5')
+                  ? {
+                        name: 'Gantz Perfect',
+                        formatId: 2,
+                        age: 16,
+                        status: 'completed',
+                        readingMode: null,
+                        volumes: [
+                            {
+                                number: '1',
+                                title: null,
+                                admin: {
+                                    comicInfo: { Series: 'Gantz Perfect' },
+                                },
+                            },
+                        ],
+                    }
+                  : { updated: [], failures: [] };
+            return new Response(JSON.stringify(body), {
+                headers: { 'Content-Type': 'application/json' },
+            });
+        });
+        const save = vi.fn().mockResolvedValue({});
+        render(
+            <MantineProvider>
+                <MetadataEditor
+                    libraryId={1}
+                    kind="manga"
+                    mode="drafts"
+                    volumes={volumes()}
+                    classification={{ formatId: null, age: null, save }}
+                    onChanged={() => {}}
+                />
+            </MantineProvider>,
+        );
+        const format = () =>
+            (
+                screen.getByRole('textbox', {
+                    name: /Format/,
+                }) as HTMLInputElement
+            ).value;
+        expect(await screen.findByText('Format à choisir')).toBeTruthy();
+
+        fireEvent.click(
+            screen.getByRole('textbox', {
+                name: 'Ajouter à une série existante',
+            }),
+        );
+        fireEvent.click(await screen.findByText('Gantz Perfect'));
+        // Le format de la série (obligatoire) et son âge sont repris.
+        await waitFor(() => expect(format()).toBe(DEFAULT_FORMATS[1]!.name));
+        await act(async () => {
+            fireEvent.click(
+                screen.getByRole('button', { name: /Enregistrer/ }),
+            );
+        });
+        expect(save).toHaveBeenCalledWith(
+            expect.objectContaining({ formatId: 2, age: 16 }),
+        );
+
+        // Effacer le choix rend le format d'avant (aucun).
+        fireEvent.click(
+            screen.getByRole('button', {
+                name: 'Ne pas ajouter à cette série',
+            }),
+        );
+        expect(format()).toBe('');
+    });
+
     it('adds the drafts to a published series, with its series fields', async () => {
         vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
             const url = String(input);
