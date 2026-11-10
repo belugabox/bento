@@ -120,6 +120,29 @@ export type ApplyOptions = {
     addedDates: boolean;
     readingTime: boolean;
     estimatedSessions: boolean;
+    /** Tomes sautés (avant le dernier tome fini d'une série) marqués lus. */
+    fillGaps: boolean;
+};
+
+type SeriesVolume = {
+    id: number;
+    sortNumber: number | null;
+    pageCount: number;
+};
+
+/**
+ * Tomes « sautés » d'une série : ceux (tomes, pas hors-séries ni spéciaux)
+ * placés avant le dernier tome fini, mais pas finis eux-mêmes.
+ */
+const skippedIn = (list: SeriesVolume[], done: Set<number>) => {
+    const last = Math.max(
+        ...list
+            .filter((v) => done.has(v.id) && v.sortNumber !== null)
+            .map((v) => v.sortNumber!),
+    );
+    return list.filter(
+        (v) => v.sortNumber !== null && v.sortNumber < last && !done.has(v.id),
+    );
 };
 
 const hoursOf = (ms: number) => Math.round((ms / 3_600_000) * 10) / 10;
@@ -279,6 +302,26 @@ export class KavitaImport {
         return map;
     };
 
+    /** Tomes de chaque série de Bento, pour les tomes sautés. */
+    private seriesVolumes = () => {
+        const map = new Map<number, SeriesVolume[]>();
+        for (const v of this.db
+            .select({
+                id: volumes.id,
+                seriesId: volumes.seriesId,
+                sortNumber: volumes.sortNumber,
+                pageCount: volumes.pageCount,
+            })
+            .from(volumes)
+            .where(eq(volumes.kind, 'volume'))
+            .all()) {
+            const list = map.get(v.seriesId) ?? [];
+            list.push(v);
+            map.set(v.seriesId, list);
+        }
+        return map;
+    };
+
     /** Lecture complète, avec chaque fichier de Kavita relié à son tome. */
     private load = () => {
         const data = this.read();
@@ -329,6 +372,7 @@ export class KavitaImport {
             if (volume && date && date < volume.addedAt) olderDates++;
         }
 
+        const bySeries = this.seriesVolumes();
         const accounts = data.accounts.map((account) => {
             const progress = data.progress.filter(
                 (p) => p.userId === account.id && p.pagesRead > 0,
@@ -336,6 +380,24 @@ export class KavitaImport {
             const matched = progress.filter((p) =>
                 data.volumeOf(p.filePath, p.libraryId),
             );
+            // Tomes sautés, d'après Kavita seul.
+            const done = new Set<number>();
+            const touched = new Set<number>();
+            for (const p of matched) {
+                const volume = data.volumeOf(p.filePath, p.libraryId)!;
+                touched.add(volume.seriesId);
+                if (p.pagesRead >= p.pages) done.add(volume.id);
+            }
+            let skipped = 0;
+            let skippedSeries = 0;
+            for (const seriesId of touched) {
+                const count = skippedIn(
+                    bySeries.get(seriesId) ?? [],
+                    done,
+                ).length;
+                skipped += count;
+                if (count) skippedSeries++;
+            }
             const sessions = data.sessions.filter(
                 (s) => s.userId === account.id && s.end,
             );
@@ -369,6 +431,7 @@ export class KavitaImport {
                 inProgress: progress.filter((p) => p.pagesRead < p.pages)
                     .length,
                 matched: matched.length,
+                skipped: { volumes: skipped, series: skippedSeries },
                 wantToRead: data.wantToRead.filter(
                     (w) => w.userId === account.id,
                 ).length,
@@ -414,6 +477,7 @@ export class KavitaImport {
             toRead: 0,
             addedDates: 0,
             sessions: 0,
+            gapsFilled: 0,
         };
 
         this.db.transaction((tx) => {
@@ -484,6 +548,68 @@ export class KavitaImport {
                     })
                     .run();
                 report.progress++;
+            }
+
+            // Tomes sautés : marqués lus, à la date du plus ancien tome fini
+            // de la série (ils ne remontent pas dans « Reprendre »).
+            if (options.fillGaps) {
+                const bySeries = this.seriesVolumes();
+                const touched = new Map<number, Set<number>>();
+                for (const p of data.progress) {
+                    const userId = target.get(p.userId);
+                    const volume = data.volumeOf(p.filePath, p.libraryId);
+                    if (!userId || !volume || p.pagesRead <= 0) continue;
+                    const set = touched.get(userId) ?? new Set<number>();
+                    set.add(volume.seriesId);
+                    touched.set(userId, set);
+                }
+                for (const [userId, seriesIds] of touched) {
+                    const rows = tx
+                        .select({
+                            volumeId: readProgress.volumeId,
+                            completed: readProgress.completed,
+                            updatedAt: readProgress.updatedAt,
+                        })
+                        .from(readProgress)
+                        .where(eq(readProgress.userId, userId))
+                        .all();
+                    const done = new Map(
+                        rows
+                            .filter((r) => r.completed)
+                            .map((r) => [r.volumeId, r.updatedAt]),
+                    );
+                    for (const seriesId of seriesIds) {
+                        const list = bySeries.get(seriesId) ?? [];
+                        const doneIds = new Set(done.keys());
+                        const gaps = skippedIn(list, doneIds);
+                        if (!gaps.length) continue;
+                        const date = new Date(
+                            Math.min(
+                                ...list
+                                    .filter((v) => done.has(v.id))
+                                    .map((v) => done.get(v.id)!.getTime()),
+                            ),
+                        );
+                        for (const gap of gaps) {
+                            const values = {
+                                page: gap.pageCount - 1,
+                                completed: true,
+                                updatedAt: date,
+                            };
+                            tx.insert(readProgress)
+                                .values({ userId, volumeId: gap.id, ...values })
+                                .onConflictDoUpdate({
+                                    target: [
+                                        readProgress.userId,
+                                        readProgress.volumeId,
+                                    ],
+                                    set: values,
+                                })
+                                .run();
+                            report.gapsFilled++;
+                        }
+                    }
+                }
             }
 
             // « Want to read » → « À lire » (série reliée par ses fichiers).

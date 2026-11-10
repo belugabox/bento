@@ -46,9 +46,11 @@ const Location = () => {
     return null;
 };
 
+/** Cartes de l'accueil dans l'ordre : rangée « Reprendre », puis la grille. */
 const titles = () =>
-    within(screen.getByTestId('series-grid'))
-        .getAllByRole('link')
+    [screen.queryByTestId('resume-row'), screen.getByTestId('series-grid')]
+        .filter((zone): zone is HTMLElement => zone !== null)
+        .flatMap((zone) => within(zone).queryAllByRole('link'))
         .map((link) => link.getAttribute('href'));
 
 beforeEach(() => {
@@ -138,6 +140,43 @@ describe('LibraryPage', () => {
         expect(read.closest('[style*="opacity"]')).toBeTruthy();
         // Le scan n'est plus sur l'accueil.
         expect(screen.queryByRole('button', { name: /scanner/i })).toBeNull();
+    });
+
+    it('puts the volumes to resume in their own row', async () => {
+        show();
+
+        const row = await screen.findByTestId('resume-row');
+        await vi.waitFor(() =>
+            expect(
+                within(row)
+                    .getAllByRole('link')
+                    .map((link) => link.getAttribute('href')),
+            ).toEqual(['/read/42', '/read/51']),
+        );
+        expect(screen.getByText('Reprendre')).toBeTruthy();
+    });
+
+    it('hides the series already read, on this device', async () => {
+        show();
+        await vi.waitFor(() =>
+            expect(titles()).toEqual(['/read/42', '/read/51', '/series/2']),
+        );
+
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Trier les séries' }),
+        );
+        fireEvent.click(
+            await screen.findByRole('menuitem', { name: 'Masquer' }),
+        );
+
+        await vi.waitFor(() =>
+            expect(titles()).toEqual(['/read/42', '/read/51']),
+        );
+        expect(
+            JSON.parse(localStorage.getItem('bento:display')!),
+        ).toMatchObject({
+            hideRead: true,
+        });
     });
 
     it('keeps the series read by someone of the family', async () => {

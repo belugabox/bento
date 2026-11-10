@@ -65,7 +65,9 @@ const kavitaDb = (file: string) => {
             (1, 2, 30, 10, 3, '2026-01-02 10:00:00.0000000'),
             (2, 2, 31, 10, 2, '2026-01-03 10:00:00.0000000'),
             (3, 2, 99, 10, 3, '2026-01-03 10:00:00.0000000'),
-            (4, 3, 30, 10, 0, '2026-01-03 10:00:00.0000000');
+            (4, 3, 30, 10, 0, '2026-01-03 10:00:00.0000000'),
+            -- Zoé : T2 fini sans avoir ouvert le T1 (tome sauté).
+            (5, 3, 31, 10, 3, '2026-01-04 10:00:00.0000000');
         insert into AppUserWantToRead values (1, 2, 10);
         -- Une séance mesurée (30 min), une estimée (minuit pile, 1 h).
         insert into AppUserReadingSession values
@@ -172,7 +174,11 @@ describe('Kavita migration', () => {
                 },
                 suggestedUserId: null,
             }),
-            expect.objectContaining({ name: 'Zoé', completed: 0 }),
+            expect.objectContaining({
+                name: 'Zoé',
+                completed: 1,
+                skipped: { volumes: 1, series: 1 },
+            }),
         ]);
         // Toujours là au retour sur la page.
         const again = await api.request('/migration/kavita', {
@@ -208,6 +214,7 @@ describe('Kavita migration', () => {
             toRead: 1,
             addedDates: 2,
             sessions: 1,
+            gapsFilled: 0,
         });
 
         const lea = ctx.db
@@ -275,6 +282,40 @@ describe('Kavita migration', () => {
             addedDates: 0,
             sessions: 1,
         });
+    });
+
+    it('marks the skipped volumes read, on demand', async () => {
+        await upload();
+        const response = await apply({
+            accounts: [
+                { kavitaId: 3, action: 'create', name: 'Zoé', maxAge: null },
+            ],
+            addedDates: false,
+            readingTime: false,
+            estimatedSessions: false,
+            fillGaps: true,
+        });
+        expect(await response.json()).toMatchObject({
+            progress: 1,
+            gapsFilled: 1,
+        });
+        const zoe = ctx.db
+            .select()
+            .from(users)
+            .where(eq(users.name, 'Zoé'))
+            .get()!;
+        const progress = ctx.db
+            .select()
+            .from(readProgress)
+            .where(eq(readProgress.userId, zoe.id))
+            .orderBy(readProgress.volumeId)
+            .all();
+        // T1 lu, à la date du T2.
+        expect(progress.map((p) => [p.volumeId, p.completed])).toEqual([
+            [naruto[0]!.id, true],
+            [naruto[1]!.id, true],
+        ]);
+        expect(progress[0]!.updatedAt).toEqual(progress[1]!.updatedAt);
     });
 
     it('keeps a more recent reading done in Bento', async () => {

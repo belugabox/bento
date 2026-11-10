@@ -1152,6 +1152,7 @@ export const createApi = ({
                     addedDates: z.boolean(),
                     readingTime: z.boolean(),
                     estimatedSessions: z.boolean(),
+                    fillGaps: z.boolean().default(false),
                 }),
             ),
             async (c) => {

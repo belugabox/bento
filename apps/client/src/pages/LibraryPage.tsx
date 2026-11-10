@@ -17,6 +17,7 @@ import {
     Text,
     ThemeIcon,
     VisuallyHidden,
+    useMatches,
 } from '@mantine/core';
 import { useDebouncedValue } from '@mantine/hooks';
 import {
@@ -34,6 +35,7 @@ import { useSearchParams } from 'react-router';
 import { SeriesCardMenu, VolumeCardMenu } from '@/components/CardMenus';
 import { CoverCard } from '@/components/CoverCard';
 import { ReadByFilter } from '@/components/ReadByFilter';
+import { ResumeRow } from '@/components/ResumeRow';
 import {
     LIST_COLUMNS,
     type LibraryDisplay,
@@ -209,6 +211,11 @@ export const LibraryPage = () => {
 
     const isAdmin = useContext(UserContext)?.role === 'admin';
     const display = useLibraryDisplay();
+    // Colonnes de la grille à cette largeur : la rangée « Reprendre » prend
+    // la même largeur de carte.
+    const columns = useMatches(
+        display.layout === 'list' ? LIST_COLUMNS : gridColumns(display.size),
+    );
     const libraries = useQuery(fetchLibraries, []);
     const inProgress = useQuery(fetchInProgress, []);
     const readers = useQuery(fetchFamilyReaders, []);
@@ -257,7 +264,9 @@ export const LibraryPage = () => {
     const readByActive = readBy !== null && readers.data !== undefined;
     const visible = filterSeries(
         (series.data ?? []).filter(
-            (s) => !readByActive || readBySeries.has(s.id),
+            (s) =>
+                (!readByActive || readBySeries.has(s.id)) &&
+                !(display.hideRead && readingStateOf(s) === 'read'),
         ),
         { sort, genre, status },
     );
@@ -326,6 +335,31 @@ export const LibraryPage = () => {
                         )}
                     </Stack>
                 )}
+                {resume.length > 0 && (
+                    <ResumeRow columns={columns} layout={display.layout}>
+                        {resume.map((volume) => (
+                            <ResumeCard
+                                key={volume.volumeId}
+                                volume={volume}
+                                // Court : tient sur une ligne de la carte.
+                                subtitle={`${volumeShortLabel(volume)} · ${volume.readCount}/${volume.volumeCount} lus`}
+                                progress={seriesProgress(volume)}
+                                onChanged={reloadHome}
+                                display={display}
+                                details={
+                                    display.layout === 'list'
+                                        ? seriesDetails(
+                                              visible.find(
+                                                  (s) =>
+                                                      s.id === volume.seriesId,
+                                              )!,
+                                          )
+                                        : undefined
+                                }
+                            />
+                        ))}
+                    </ResumeRow>
+                )}
                 <SimpleGrid
                     cols={
                         display.layout === 'list'
@@ -335,26 +369,6 @@ export const LibraryPage = () => {
                     spacing="sm"
                     data-testid="series-grid"
                 >
-                    {resume.map((volume) => (
-                        <ResumeCard
-                            key={volume.volumeId}
-                            volume={volume}
-                            // Court : tient sur une ligne de la carte.
-                            subtitle={`${volumeShortLabel(volume)} · ${volume.readCount}/${volume.volumeCount} lus`}
-                            progress={seriesProgress(volume)}
-                            onChanged={reloadHome}
-                            display={display}
-                            details={
-                                display.layout === 'list'
-                                    ? seriesDetails(
-                                          visible.find(
-                                              (s) => s.id === volume.seriesId,
-                                          )!,
-                                      )
-                                    : undefined
-                            }
-                        />
-                    ))}
                     {others.map((item) => {
                         const state = readingStateOf(item);
                         return (
@@ -462,7 +476,10 @@ export const LibraryPage = () => {
                                     <Indicator
                                         size={8}
                                         offset={4}
-                                        disabled={status === 'all'}
+                                        disabled={
+                                            status === 'all' &&
+                                            !display.hideRead
+                                        }
                                     >
                                         <Button
                                             size="compact-md"
@@ -495,6 +512,29 @@ export const LibraryPage = () => {
                                                     { sort: option.value },
                                                     'name',
                                                 )
+                                            }
+                                        >
+                                            {option.label}
+                                        </Menu.Item>
+                                    ))}
+                                    <Menu.Divider />
+                                    <Menu.Label>Séries lues</Menu.Label>
+                                    {[
+                                        { hide: false, label: 'Afficher' },
+                                        { hide: true, label: 'Masquer' },
+                                    ].map((option) => (
+                                        <Menu.Item
+                                            key={option.label}
+                                            rightSection={
+                                                option.hide ===
+                                                    display.hideRead && (
+                                                    <IconCheck size={14} />
+                                                )
+                                            }
+                                            onClick={() =>
+                                                display.set({
+                                                    hideRead: option.hide,
+                                                })
                                             }
                                         >
                                             {option.label}

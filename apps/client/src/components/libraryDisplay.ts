@@ -9,12 +9,15 @@ export type LibraryDisplay = {
     size: number;
     /** Grille de couvertures, sans titre dessous. */
     coversOnly: boolean;
+    /** Accueil : séries entièrement lues masquées (menu de tri). */
+    hideRead: boolean;
 };
 
 export const DEFAULT_DISPLAY: LibraryDisplay = {
     layout: 'grid',
     size: 2,
     coversOnly: false,
+    hideRead: false,
 };
 
 export const LAYOUT_OPTIONS: { value: LibraryLayout; label: string }[] = [
@@ -67,6 +70,10 @@ export const useLibraryDisplay = () => {
             typeof saved?.coversOnly === 'boolean'
                 ? saved.coversOnly
                 : DEFAULT_DISPLAY.coversOnly,
+        hideRead:
+            typeof saved?.hideRead === 'boolean'
+                ? saved.hideRead
+                : DEFAULT_DISPLAY.hideRead,
     };
     return {
         ...display,

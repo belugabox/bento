@@ -106,6 +106,7 @@ export const applyKavita = (choices: {
     addedDates: boolean;
     readingTime: boolean;
     estimatedSessions: boolean;
+    fillGaps: boolean;
 }) => json(api.migration.kavita.apply.$post({ json: choices }));
 
 export const clearKavita = () => json(api.migration.kavita.$delete());
