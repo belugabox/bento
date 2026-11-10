@@ -22,12 +22,15 @@ const PUBLIC_FILES = [
 const serviceWorker = (): Plugin => ({
     name: 'bento-service-worker',
     apply: 'build',
+    // Après les autres : tous les fichiers sont là (index.html compris).
+    enforce: 'post',
     generateBundle(_options, bundle) {
         const files = Object.keys(bundle)
             .filter((name) => !name.endsWith('.map') && !name.startsWith('.'))
             .map((name) => (name === 'index.html' ? '/' : `/${name}`))
             .sort();
-        const assets = [...files, ...PUBLIC_FILES];
+        // `/` (index.html) toujours : c'est lui qui ouvre Bento hors ligne.
+        const assets = [...new Set(['/', ...files, ...PUBLIC_FILES])];
         const version = createHash('sha256')
             .update(assets.join('\n'))
             .digest('hex')
@@ -36,8 +39,18 @@ const serviceWorker = (): Plugin => ({
             new URL('./sw/sw.js', import.meta.url),
             'utf-8',
         )
-            .replace('__VERSION__', version)
-            .replace('__ASSETS__', JSON.stringify(assets));
+            .replace(
+                "const VERSION = '__VERSION__';",
+                `const VERSION = '${version}';`,
+            )
+            .replace(
+                'const ASSETS = __ASSETS__;',
+                `const ASSETS = ${JSON.stringify(assets)};`,
+            );
+        // Une marque oubliée : service worker cassé, Bento sans hors ligne.
+        if (source.includes('__VERSION__') || source.includes('__ASSETS__')) {
+            this.error('sw/sw.js : marques VERSION ou ASSETS introuvables');
+        }
         this.emitFile({ type: 'asset', fileName: 'sw.js', source });
     },
 });

@@ -1,6 +1,6 @@
 // Service worker de Bento, généré au build (`vite.config.ts`, plugin
-// `serviceWorker`) : `__VERSION__` et `__ASSETS__` y sont remplacés par la
-// version et la liste des fichiers de l'application.
+// `serviceWorker`) : les deux marques de VERSION et ASSETS ci-dessous y sont
+// remplacées par la version et la liste des fichiers de l'application.
 //
 // - Application (scripts, styles, icônes, index.html) gardée sur l'appareil :
 //   Bento s'ouvre sans réseau.
