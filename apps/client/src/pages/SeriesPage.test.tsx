@@ -196,4 +196,70 @@ describe('SeriesPage', () => {
             ).toBe('true'),
         );
     });
+
+    it('offers a menu on each volume', async () => {
+        const requests: [string, string, unknown][] = [];
+        vi.spyOn(globalThis, 'fetch').mockImplementation(
+            async (input, init) => {
+                requests.push([
+                    init?.method ?? 'GET',
+                    String(input),
+                    init?.body ? JSON.parse(String(init.body)) : undefined,
+                ]);
+                const body = String(input).endsWith('/read')
+                    ? { volumes: 2, read: true, previous: [] }
+                    : SERIES;
+                return new Response(JSON.stringify(body), {
+                    headers: { 'Content-Type': 'application/json' },
+                });
+            },
+        );
+
+        render(
+            <MantineProvider>
+                <UserContext.Provider value={READER}>
+                    <MemoryRouter initialEntries={['/series/3']}>
+                        <Routes>
+                            <Route
+                                path="/series/:id"
+                                element={<SeriesPage />}
+                            />
+                        </Routes>
+                    </MemoryRouter>
+                </UserContext.Provider>
+            </MantineProvider>,
+        );
+
+        // Tome 1, déjà lu : « Relire », pas de « jusqu'à » (premier tome).
+        fireEvent.click(
+            await screen.findByRole('button', {
+                name: 'Actions pour Tome 1',
+            }),
+        );
+        expect(await screen.findByText('Relire')).toBeTruthy();
+        expect(screen.getByText('Marquer comme non lu')).toBeTruthy();
+        expect(
+            screen.queryByText('Marquer comme lu jusqu’à ce tome'),
+        ).toBeNull();
+        // Lecteur : pas de couverture à changer.
+        expect(
+            screen.queryByText('Utiliser comme couverture de la série'),
+        ).toBeNull();
+        fireEvent.keyDown(document.activeElement!, { key: 'Escape' });
+
+        // Tome 2 : lu jusqu'à lui.
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Actions pour Tome 2' }),
+        );
+        await act(async () => {
+            fireEvent.click(
+                await screen.findByText('Marquer comme lu jusqu’à ce tome'),
+            );
+        });
+        expect(requests).toContainEqual([
+            'PUT',
+            '/api/series/3/read',
+            { read: true, upTo: 2 },
+        ]);
+    });
 });

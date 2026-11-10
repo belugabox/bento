@@ -31,6 +31,7 @@ import { Link, useParams } from 'react-router';
 
 import { VOLUME_KINDS } from '@server/types';
 
+import { SeriesVolumeMenu } from '@/components/CardMenus';
 import { CompletenessBadge } from '@/components/CompletenessBadge';
 import { CoverCard } from '@/components/CoverCard';
 import { SeriesReaders } from '@/components/SeriesReaders';
@@ -344,7 +345,7 @@ export const SeriesPage = () => {
                             <Title order={4}>{KIND_SECTIONS[kind]}</Title>
                         )}
                         <SimpleGrid cols={gridColumns(size)}>
-                            {group.map((volume) => {
+                            {group.map((volume, index) => {
                                 const read =
                                     volume.progress?.completed ?? false;
                                 return (
@@ -371,6 +372,20 @@ export const SeriesPage = () => {
                                             read
                                                 ? undefined
                                                 : progressRatio(volume)
+                                        }
+                                        menu={
+                                            <SeriesVolumeMenu
+                                                volume={volume}
+                                                series={series}
+                                                // Tomes seulement : « jusqu'à »
+                                                // suit l'ordre des tomes.
+                                                upTo={
+                                                    kind === 'volume' &&
+                                                    index > 0
+                                                }
+                                                isAdmin={isAdmin}
+                                                onChanged={reload}
+                                            />
                                         }
                                         corner={
                                             <Tooltip
