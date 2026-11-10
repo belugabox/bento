@@ -346,8 +346,14 @@ export const listNextVolumes = (db: Db, viewer: Viewer, limit = 12) => {
 /**
  * « Reprendre la lecture » : dans chaque série entamée, le tome en cours ou,
  * à défaut, le suivant à ouvrir. Du plus récemment lu au plus ancien.
+ * Toutes par défaut : l'accueil les met en tête de sa grille (12 au plus
+ * laissait les autres séries entamées au milieu des autres).
  */
-export const listContinue = (db: Db, viewer: Viewer, limit = 12) =>
+export const listContinue = (
+    db: Db,
+    viewer: Viewer,
+    limit = Number.MAX_SAFE_INTEGER,
+) =>
     [
         ...listInProgress(db, viewer, limit),
         ...listNextVolumes(db, viewer, limit),
