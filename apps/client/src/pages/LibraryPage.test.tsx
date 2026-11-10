@@ -46,12 +46,12 @@ const Location = () => {
     return null;
 };
 
-/** Cartes de l'accueil dans l'ordre : rangée « Reprendre », puis la grille. */
-const titles = () =>
-    [screen.queryByTestId('resume-row'), screen.getByTestId('series-grid')]
-        .filter((zone): zone is HTMLElement => zone !== null)
-        .flatMap((zone) => within(zone).queryAllByRole('link'))
+/** Cartes de l'accueil dans l'ordre (les trois blocs de la grille). */
+const hrefs = (zone: HTMLElement) =>
+    within(zone)
+        .queryAllByRole('link')
         .map((link) => link.getAttribute('href'));
+const titles = () => hrefs(screen.getByTestId('series-grid'));
 
 beforeEach(() => {
     localStorage.clear();
@@ -142,18 +142,18 @@ describe('LibraryPage', () => {
         expect(screen.queryByRole('button', { name: /scanner/i })).toBeNull();
     });
 
-    it('puts the volumes to resume in their own row', async () => {
+    it('splits the grid: in progress, not read, finished', async () => {
+        // Série 2 lue en entier : elle passe dans le dernier bloc.
         show();
 
-        const row = await screen.findByTestId('resume-row');
-        await vi.waitFor(() =>
-            expect(
-                within(row)
-                    .getAllByRole('link')
-                    .map((link) => link.getAttribute('href')),
-            ).toEqual(['/read/42', '/read/51']),
-        );
-        expect(screen.getByText('Reprendre')).toBeTruthy();
+        expect(hrefs(await screen.findByTestId('resume-grid'))).toEqual([
+            '/read/42',
+            '/read/51',
+        ]);
+        expect(screen.queryByTestId('unread-grid')).toBeNull();
+        expect(hrefs(screen.getByTestId('read-grid'))).toEqual(['/series/2']);
+        // Pas de titre de bloc.
+        expect(screen.queryByText('Reprendre')).toBeNull();
     });
 
     it('hides the series already read, on this device', async () => {
@@ -279,27 +279,22 @@ describe('LibraryPage', () => {
         await screen.findByTestId('series-grid');
         await vi.waitFor(() => expect(titles()).toHaveLength(3));
 
-        // Cinq pastilles, les genres aux plus de séries d'abord ; les autres
+        // Trois pastilles, les genres aux plus de séries d'abord ; les autres
         // dans « Plus », avec leur nombre de séries.
         const genres = within(screen.getByLabelText('Genres'))
             .getAllByRole('button')
             .map((button) => button.textContent);
-        expect(genres).toEqual([
-            'Action',
-            'Horreur',
-            'Aventure',
-            'Comédie',
-            'Drame',
-            'Plus',
-        ]);
+        expect(genres).toEqual(['Action', 'Horreur', 'Aventure', 'Plus']);
 
         fireEvent.click(screen.getByRole('button', { name: 'Plus' }));
         const more = await screen.findAllByRole('menuitem');
         expect(more.map((item) => item.textContent)).toEqual([
+            'Comédie1',
+            'Drame1',
             'Fantasy1',
             'Sport1',
         ]);
-        fireEvent.click(more[1]!);
+        fireEvent.click(more[3]!);
         await vi.waitFor(() => expect(titles()).toEqual(['/read/42']));
         expect(location).toBe('?genre=Sport');
         // Genre choisi dans « Plus » : montré en pastille, qui le retire.
