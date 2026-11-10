@@ -1,6 +1,7 @@
 import { Center, Loader } from '@mantine/core';
 import { type ReactNode, useCallback, useEffect, useState } from 'react';
 
+import { runAutoDownloads } from '@/offline/auto';
 import { keepOnlyDownloadsOf } from '@/offline/downloads';
 import { flushQueue } from '@/offline/syncQueue';
 import {
@@ -12,6 +13,9 @@ import {
     savedUser,
 } from '@/services/auth';
 import { NetworkError, useOnline } from '@/services/network';
+
+// Passage des téléchargements automatiques, l'appli ouverte.
+const AUTO_CHECK_MS = 30 * 60 * 1000;
 
 /**
  * N'affiche son contenu qu'une fois la personne connue ; sans session,
@@ -45,7 +49,18 @@ export const RequireUser = ({ children }: { children: ReactNode }) => {
     // l'ouverture, si elle attendait).
     const online = useOnline();
     useEffect(() => {
-        if (online && user && !user.preview) void flushQueue(user.id);
+        if (!online || !user || user.preview) return;
+        const sync = () =>
+            void flushQueue(user.id)
+                // Puis les téléchargements automatiques (réglage de
+                // l'appareil), au plus une fois par demi-heure.
+                .then(() => runAutoDownloads(user.id))
+                .catch(() => {
+                    // Réessayé au prochain passage.
+                });
+        sync();
+        const timer = setInterval(sync, AUTO_CHECK_MS);
+        return () => clearInterval(timer);
     }, [online, user]);
 
     if (error) {

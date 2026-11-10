@@ -5,8 +5,10 @@ import {
     Group,
     Menu,
     Progress,
+    Select,
     SimpleGrid,
     Stack,
+    Switch,
     Text,
     Title,
 } from '@mantine/core';
@@ -18,6 +20,13 @@ import { formatSize } from '@/components/format';
 import { gridColumns, useLibraryDisplay } from '@/components/libraryDisplay';
 import { volumeLabel, volumeShortLabel } from '@/components/readingStatus';
 import {
+    AUTO_SERIES,
+    type AutoSettings,
+    CLEAN_DAYS,
+    runAutoDownloads,
+    useAutoSettings,
+} from '@/offline/auto';
+import {
     type DownloadedVolume,
     deleteDownload,
     progressOf,
@@ -26,7 +35,7 @@ import {
     useDownloads,
 } from '@/offline/downloads';
 import { coverUrl } from '@/services/api';
-import { useCurrentUser } from '@/services/auth';
+import { useCurrentUser, useReadOnly } from '@/services/auth';
 
 /** État de lecture d'un tome téléchargé (sur l'appareil ou le serveur). */
 const stateOf = (volume: DownloadedVolume) => {
@@ -211,9 +220,67 @@ const DownloadJobs = () => {
     );
 };
 
+/** Réglages des téléchargements automatiques (propres à l'appareil). */
+const AutoDownloads = () => {
+    const auto = useAutoSettings();
+    const user = useCurrentUser();
+    const readOnly = useReadOnly();
+    // Lancé tout de suite après un changement (le prochain passage
+    // attendrait une demi-heure).
+    const change = (changes: Partial<AutoSettings>) => {
+        auto.set(changes);
+        setTimeout(
+            () => void runAutoDownloads(user.id, true).catch(() => undefined),
+        );
+    };
+    return (
+        <Stack gap="xs">
+            <Text size="sm" fw={500}>
+                Automatique, sur cet appareil
+            </Text>
+            <Switch
+                label="Garder d’avance les tomes suivants de mes séries en cours"
+                description={`Les ${AUTO_SERIES} séries lues le plus récemment.`}
+                checked={auto.enabled}
+                disabled={readOnly}
+                onChange={(e) => change({ enabled: e.currentTarget.checked })}
+            />
+            {auto.enabled && (
+                <Group gap="md" pl={54}>
+                    <Select
+                        size="xs"
+                        w={140}
+                        aria-label="Tomes d’avance par série"
+                        allowDeselect={false}
+                        data={[1, 2, 3, 5].map((n) => ({
+                            value: String(n),
+                            label: `${n} tome${n > 1 ? 's' : ''} d’avance`,
+                        }))}
+                        value={String(auto.count)}
+                        onChange={(value) => change({ count: Number(value) })}
+                    />
+                    <Switch
+                        size="xs"
+                        label="En Wi-Fi seulement"
+                        checked={auto.wifiOnly}
+                        onChange={(e) =>
+                            change({ wifiOnly: e.currentTarget.checked })
+                        }
+                    />
+                </Group>
+            )}
+            <Switch
+                label={`Effacer les tomes lus depuis ${CLEAN_DAYS} jours`}
+                checked={auto.clean}
+                onChange={(e) => change({ clean: e.currentTarget.checked })}
+            />
+        </Stack>
+    );
+};
+
 /**
  * Téléchargements de l'appareil : en cours, place prise et libre, tomes
- * gardés ; suppression des tomes lus, ou de tout.
+ * gardés ; suppression des tomes lus, ou de tout ; réglages automatiques.
  */
 export const DownloadsPage = () => {
     const { downloads } = useDownloads();
@@ -248,6 +315,7 @@ export const DownloadsPage = () => {
                     Ce navigateur ne permet pas de télécharger des tomes.
                 </Alert>
             )}
+            <AutoDownloads />
             <DownloadJobs />
             <DownloadedVolumes />
             {downloads.length > 0 && (
