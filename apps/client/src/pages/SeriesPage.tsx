@@ -365,8 +365,26 @@ export const SeriesPage = () => {
                                     >
                                         Marquer toute la série comme non lue
                                     </Menu.Item>
-                                    <Menu.Divider />
-                                    <Menu.Label>Télécharger</Menu.Label>
+                                </Menu.Dropdown>
+                            </Menu>
+                            {/* Télécharger : son propre petit menu. */}
+                            <Menu position="bottom-start">
+                                <Tooltip label="Télécharger sur l’appareil">
+                                    <Menu.Target>
+                                        <ActionIcon
+                                            variant="default"
+                                            size="lg"
+                                            aria-label="Télécharger"
+                                            disabled={
+                                                readOnly ||
+                                                toDownload.length === 0
+                                            }
+                                        >
+                                            <IconDownload size={18} />
+                                        </ActionIcon>
+                                    </Menu.Target>
+                                </Tooltip>
+                                <Menu.Dropdown>
                                     {[
                                         ...NEXT_VOLUME_COUNTS.map((count) => ({
                                             count,
@@ -379,10 +397,6 @@ export const SeriesPage = () => {
                                     ].map((option) => (
                                         <Menu.Item
                                             key={option.label}
-                                            leftSection={
-                                                <IconDownload size={14} />
-                                            }
-                                            disabled={toDownload.length === 0}
                                             onClick={() =>
                                                 downloadNext(option.count)
                                             }
