@@ -190,9 +190,12 @@ export const listSeries = (
             >`(select json_extract(v.comic_info, '$.Penciller') from volumes v where v.series_id = series.id order by v.kind != 'volume', v.kind, v.sort_number is null, v.sort_number, v.file limit 1)`,
             ...coverVolumeSql,
             // Tomes lus par la personne.
-            readCount: sql<number>`(select count(*) from read_progress rp join volumes v on v.id = rp.volume_id where v.series_id = series.id and rp.user_id = ${viewer.id} and rp.completed = 1 and ${countedVolume('v')})`,
+            // Tomes de la série d'abord (`cross join` : SQLite garde cet ordre), puis la
+            // lecture de chacun : sinon SQLite parcourt toutes les lectures de la
+            // personne pour chaque série (lent dès quelques centaines de séries).
+            readCount: sql<number>`(select count(*) from volumes v cross join read_progress rp on rp.volume_id = v.id and rp.user_id = ${viewer.id} where v.series_id = series.id and rp.completed = 1 and ${countedVolume('v')})`,
             // Tomes ouverts (lus ou en cours) : série commencée.
-            startedCount: sql<number>`(select count(*) from read_progress rp join volumes v on v.id = rp.volume_id where v.series_id = series.id and rp.user_id = ${viewer.id})`,
+            startedCount: sql<number>`(select count(*) from volumes v cross join read_progress rp on rp.volume_id = v.id and rp.user_id = ${viewer.id} where v.series_id = series.id)`,
             ...listsOf(viewer),
             // Auteurs des tomes (scénario, dessin), seulement pour chercher.
             authors: text

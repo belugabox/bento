@@ -191,7 +191,7 @@ export const listInProgress = (db: Db, viewer: Viewer, limit = 12) => {
             updatedAt: readProgress.updatedAt,
             // SQL brut : Drizzle ne préfixerait pas les colonnes par leur table.
             volumeCount: sql<number>`(select count(*) from volumes v where v.series_id = series.id and ${countedVolume('v')})`,
-            readCount: sql<number>`(select count(*) from read_progress rp join volumes v on v.id = rp.volume_id where v.series_id = series.id and rp.user_id = ${viewer.id} and rp.completed = 1 and ${countedVolume('v')})`,
+            readCount: sql<number>`(select count(*) from volumes v cross join read_progress rp on rp.volume_id = v.id and rp.user_id = ${viewer.id} where v.series_id = series.id and rp.completed = 1 and ${countedVolume('v')})`,
         })
         .from(readProgress)
         .innerJoin(volumes, eq(volumes.id, readProgress.volumeId))
@@ -203,7 +203,7 @@ export const listInProgress = (db: Db, viewer: Viewer, limit = 12) => {
                 visibleTo(viewer),
                 // Seul le tome en cours le plus récent de sa série : les
                 // comptes ci-dessus ne sont faits que pour les lignes gardées.
-                sql`not exists (select 1 from read_progress rp join volumes v on v.id = rp.volume_id where v.series_id = series.id and rp.user_id = ${viewer.id} and rp.completed = 0 and (rp.updated_at > read_progress.updated_at or (rp.updated_at = read_progress.updated_at and rp.volume_id > read_progress.volume_id)))`,
+                sql`not exists (select 1 from volumes v cross join read_progress rp on rp.volume_id = v.id and rp.user_id = ${viewer.id} where v.series_id = series.id and rp.completed = 0 and (rp.updated_at > read_progress.updated_at or (rp.updated_at = read_progress.updated_at and rp.volume_id > read_progress.volume_id)))`,
             ),
         )
         .orderBy(desc(readProgress.updatedAt))

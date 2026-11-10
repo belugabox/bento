@@ -28,7 +28,7 @@ import {
     IconList,
     IconPlayerPlayFilled,
 } from '@tabler/icons-react';
-import { type ReactNode, useContext } from 'react';
+import { type ReactNode, useContext, useEffect } from 'react';
 import { useSearchParams } from 'react-router';
 
 import { SeriesCardMenu, VolumeCardMenu } from '@/components/CardMenus';
@@ -139,6 +139,25 @@ const seriesProgress = (volume: InProgressVolume) =>
           volume.volumeCount
         : 0;
 
+// Dernière bibliothèque ouverte, gardée sur l'appareil.
+const LIBRARY_KEY = 'bento:library';
+
+const rememberedLibrary = () => {
+    try {
+        return Number(localStorage.getItem(LIBRARY_KEY)) || undefined;
+    } catch {
+        return undefined;
+    }
+};
+
+const rememberLibrary = (id: number) => {
+    try {
+        localStorage.setItem(LIBRARY_KEY, String(id));
+    } catch {
+        // Stockage refusé : la première bibliothèque, comme avant.
+    }
+};
+
 /** Genres montrés en pastilles ; les autres sont dans « Plus ». */
 const GENRE_CHIPS = 3;
 
@@ -241,8 +260,21 @@ export const LibraryPage = () => {
     const libraries = useQuery(fetchLibraries, []);
     const inProgress = useQuery(fetchInProgress, []);
     const readers = useQuery(fetchFamilyReaders, []);
+    // Bibliothèque : celle de l'adresse, sinon la dernière ouverte sur
+    // l'appareil (les séries se chargent sans attendre la liste des
+    // bibliothèques), sinon la première.
+    const remembered = rememberedLibrary();
     const libraryId =
-        Number(params.get('library')) || libraries.data?.[0]?.id || undefined;
+        Number(params.get('library')) ||
+        (libraries.data
+            ? libraries.data.some((l) => l.id === remembered)
+                ? remembered
+                : libraries.data[0]?.id
+            : remembered) ||
+        undefined;
+    useEffect(() => {
+        if (libraries.data && libraryId) rememberLibrary(libraryId);
+    }, [libraries.data, libraryId]);
     const series = useQuery(
         () =>
             libraryId

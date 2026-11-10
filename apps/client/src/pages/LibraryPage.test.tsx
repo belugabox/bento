@@ -199,6 +199,27 @@ describe('LibraryPage', () => {
         ).toContain('Léa');
     });
 
+    it('loads the series of the last library without waiting', async () => {
+        localStorage.setItem('bento:library', '1');
+        // Liste des bibliothèques qui ne répond pas : les séries viennent
+        // quand même.
+        const answer = vi.mocked(fetch).getMockImplementation()!;
+        vi.mocked(fetch).mockImplementation((input, init) =>
+            String(input) === '/api/libraries'
+                ? new Promise<Response>(() => undefined)
+                : answer(input, init),
+        );
+        show();
+        await vi.waitFor(() => expect(titles()).toHaveLength(3));
+    });
+
+    it('remembers the library on this device', async () => {
+        show();
+        await vi.waitFor(() =>
+            expect(localStorage.getItem('bento:library')).toBe('1'),
+        );
+    });
+
     it('hides the Lu par filter when nobody else read anything', async () => {
         show();
 

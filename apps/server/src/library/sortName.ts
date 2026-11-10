@@ -24,9 +24,11 @@ export const articleFirst = (name: string) => {
 export const sortKeyOf = (name: string) =>
     articleFirst(name).replace(LEADING_ARTICLE, '');
 
+// Comparateurs créés une fois : `localeCompare` avec options en recrée un à
+// chaque appel (10 à 50 ms pour trier quelques centaines de séries).
+const BY_KEY = new Intl.Collator('fr', { numeric: true, sensitivity: 'base' });
+const BY_NAME = new Intl.Collator('fr');
+
 /** Ordre alphabétique des séries (articles ignorés, numéros dans l'ordre). */
 export const compareNames = (a: string, b: string) =>
-    sortKeyOf(a).localeCompare(sortKeyOf(b), 'fr', {
-        numeric: true,
-        sensitivity: 'base',
-    }) || a.localeCompare(b, 'fr');
+    BY_KEY.compare(sortKeyOf(a), sortKeyOf(b)) || BY_NAME.compare(a, b);
