@@ -28,6 +28,7 @@ describe('SourcePrioritySettings', () => {
             <MantineProvider>
                 <SourcePrioritySettings
                     priority={DEFAULT_SOURCE_PRIORITY}
+                    disabled={[]}
                     onSaved={onSaved}
                 />
             </MantineProvider>,
@@ -45,5 +46,53 @@ describe('SourcePrioritySettings', () => {
 
         expect(puts).toEqual([{ sourcePriority: { Writer: 'wikipedia' } }]);
         expect(onSaved).toHaveBeenCalled();
+    });
+
+    it('turns a site off, but keeps at least one', async () => {
+        const puts: unknown[] = [];
+        vi.spyOn(globalThis, 'fetch').mockImplementation(
+            async (_input, init) => {
+                const body = JSON.parse(String(init?.body));
+                puts.push(body);
+                return new Response(
+                    JSON.stringify({ settings: body, defaults: body }),
+                    { headers: { 'Content-Type': 'application/json' } },
+                );
+            },
+        );
+        const { rerender } = render(
+            <MantineProvider>
+                <SourcePrioritySettings
+                    priority={DEFAULT_SOURCE_PRIORITY}
+                    disabled={['wikipedia']}
+                    onSaved={() => {}}
+                />
+            </MantineProvider>,
+        );
+
+        await act(async () => {
+            fireEvent.click(screen.getByRole('switch', { name: /Manga-news/ }));
+        });
+        expect(puts).toEqual([
+            { disabledSources: ['wikipedia', 'manga-news'] },
+        ]);
+
+        // Plus qu'un site : son interrupteur est bloqué.
+        rerender(
+            <MantineProvider>
+                <SourcePrioritySettings
+                    priority={DEFAULT_SOURCE_PRIORITY}
+                    disabled={['wikipedia', 'manga-news']}
+                    onSaved={() => {}}
+                />
+            </MantineProvider>,
+        );
+        expect(
+            (
+                screen.getByRole('switch', {
+                    name: /Bedetheque/,
+                }) as HTMLInputElement
+            ).disabled,
+        ).toBe(true);
     });
 });

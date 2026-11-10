@@ -18,7 +18,13 @@ import { type FormEvent, type ReactNode, useEffect, useState } from 'react';
 
 import { type MetadataSource, SOURCE_LABELS, genreKey } from '@server/types';
 
-import { searchMangaNews, searchWikipedia } from '@/services/api';
+import {
+    fetchSettings,
+    searchBedetheque,
+    searchMangaNews,
+    searchWikipedia,
+} from '@/services/api';
+import { useQuery } from '@/services/useQuery';
 
 import {
     type FoundSeries,
@@ -40,10 +46,12 @@ type Column = {
 const EMPTY: Record<MetadataSource, Column> = {
     'manga-news': { loading: false },
     wikipedia: { loading: false },
+    bedetheque: { loading: false },
 };
 
 /**
- * Recherche d'une série en ligne, sur Manga-news et Wikipédia FR à la fois.
+ * Recherche d'une série en ligne, sur Manga-news, Wikipédia FR et
+ * Bedetheque à la fois (sauf les sites désactivés dans les réglages).
  * Une fiche ouverte de chaque côté, au plus : `onCompare` les reçoit
  * ensemble (éditeur), ou `onPick` en reçoit une (image de couverture).
  */
@@ -70,7 +78,12 @@ export const SeriesSearch = ({
     /** Lancer la recherche dès l'ouverture (série à classer). */
     autoSearch?: boolean;
 }) => {
-    const sites = sitesFor(kind);
+    // Sites désactivés dans les réglages : ni cherchés, ni montrés.
+    const settings = useQuery(
+        () => (opened ? fetchSettings() : Promise.resolve(undefined)),
+        [opened],
+    );
+    const sites = sitesFor(kind, settings.data?.settings.disabledSources);
     const [query, setQuery] = useState(initialQuery);
     const [columns, setColumns] = useState(EMPTY);
 
@@ -106,13 +119,19 @@ export const SeriesSearch = ({
                           key: String(r.id),
                           title: r.title,
                       }))
-                    : (await searchMangaNews(text)).map((r) => ({
-                          key: r.id,
-                          title: r.title,
-                          subtitle: [r.year, r.authors]
-                              .filter(Boolean)
-                              .join(' · '),
-                      }));
+                    : site === 'bedetheque'
+                      ? (await searchBedetheque(text)).map((r) => ({
+                            key: r.id,
+                            title: r.title,
+                            subtitle: r.country,
+                        }))
+                      : (await searchMangaNews(text)).map((r) => ({
+                            key: r.id,
+                            title: r.title,
+                            subtitle: [r.year, r.authors]
+                                .filter(Boolean)
+                                .join(' · '),
+                        }));
             update(site, { loading: false, results });
             // Un seul résultat au nom exact : sa fiche s'ouvre d'elle-même.
             const exact = results.filter(
@@ -172,7 +191,10 @@ export const SeriesSearch = ({
                     </Group>
                 </form>
 
-                <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="lg">
+                <SimpleGrid
+                    cols={{ base: 1, sm: 2, md: Math.max(sites.length, 1) }}
+                    spacing="lg"
+                >
                     {sites.map((site) => (
                         <SiteColumn
                             key={site}
@@ -202,7 +224,7 @@ export const SeriesSearch = ({
                             }}
                         >
                             {chosen.length > 1
-                                ? 'Comparer les 2 fiches'
+                                ? `Comparer les ${chosen.length} fiches`
                                 : 'Comparer la fiche'}
                         </Button>
                     </Group>

@@ -299,6 +299,7 @@ describe('settings', () => {
                 compression: { quality: 90, maxHeight: 2400 },
                 scanIntervalMinutes: 30,
                 readByPercent: 10,
+                disabledSources: [],
                 appearance: { colorScheme: 'auto', accent: 'violet' },
                 ages: [0, 8, 10, 12, 14, 16, 18],
                 sourcePriority: DEFAULT_SOURCE_PRIORITY,
@@ -307,6 +308,7 @@ describe('settings', () => {
                 compression: { quality: 90, maxHeight: 2400 },
                 scanIntervalMinutes: 30,
                 readByPercent: 10,
+                disabledSources: [],
                 appearance: { colorScheme: 'auto', accent: 'violet' },
                 ages: [0, 8, 10, 12, 14, 16, 18],
                 sourcePriority: DEFAULT_SOURCE_PRIORITY,
@@ -326,6 +328,8 @@ describe('settings', () => {
             appearance: { accent: 'teal' },
             // Un champ seulement : les autres gardent leur site.
             sourcePriority: { Writer: 'wikipedia' },
+            // Un site désactivé (en double : gardé une fois).
+            disabledSources: ['manga-news', 'manga-news'],
         });
         expect((await changed.json()).settings).toEqual({
             compression: { quality: 70, maxHeight: 2400 },
@@ -334,7 +338,11 @@ describe('settings', () => {
             appearance: { colorScheme: 'auto', accent: 'teal' },
             ages: [0, 8, 10, 12, 14, 16, 18],
             sourcePriority: { ...DEFAULT_SOURCE_PRIORITY, Writer: 'wikipedia' },
+            disabledSources: ['manga-news'],
         });
+        expect((await put({ disabledSources: ['nautiljon'] })).status).toBe(
+            400,
+        );
         expect((await put({ readByPercent: 0 })).status).toBe(400);
         expect((await put({ sourcePriority: { Writer: 'imdb' } })).status).toBe(
             400,

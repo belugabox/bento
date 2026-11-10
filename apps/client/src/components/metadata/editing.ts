@@ -208,6 +208,18 @@ export const searchNameOf = (
     return '';
 };
 
+/** Fiche Bedetheque, telle que renvoyée par le serveur. */
+export type BedethequeSeries = {
+    title: string;
+    summary: string;
+    genres: string[];
+    origin: string;
+    writer: string;
+    penciller: string;
+    publisher: string;
+    ongoing?: boolean;
+};
+
 /** Fiche Wikipédia, telle que renvoyée par le serveur. */
 export type WikipediaSeries = {
     title: string;
@@ -291,6 +303,35 @@ export const sheetFromMangaNews = (series: MangaNewsSeries): SeriesSheet => ({
               : 'completed',
     format: series.format ?? undefined,
     age: series.age,
+});
+
+/**
+ * Format d'après l'origine Bedetheque : « Franco-Belge » est une BD,
+ * « Comics » des comics, « Manga » un manga ; une autre origine telle quelle.
+ */
+const formatFromOrigin = (origin: string) =>
+    /franco|europ/i.test(origin)
+        ? 'BD'
+        : /comics/i.test(origin)
+          ? 'Comics'
+          : /manga|asie/i.test(origin)
+            ? 'Manga'
+            : origin || undefined;
+
+export const sheetFromBedetheque = (series: BedethequeSeries): SeriesSheet => ({
+    title: series.title,
+    summary: series.summary,
+    genre: series.genres.join(', '),
+    writer: series.writer,
+    penciller: series.penciller,
+    publisher: series.publisher,
+    status:
+        series.ongoing === undefined
+            ? undefined
+            : series.ongoing
+              ? 'ongoing'
+              : 'completed',
+    format: formatFromOrigin(series.origin),
 });
 
 /**

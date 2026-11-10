@@ -360,6 +360,7 @@ export const saveSettings = (changes: {
     appearance?: Partial<Settings['appearance']>;
     ages?: number[];
     sourcePriority?: Partial<Settings['sourcePriority']>;
+    disabledSources?: Settings['disabledSources'];
     readByPercent?: number;
 }) => json(api.settings.$put({ json: changes }));
 
@@ -383,6 +384,18 @@ export const fileCoverUrl = (library: number, path: string, version = '') =>
 /** Séries de Wikipédia FR (mangas et bandes dessinées) pour ce texte. */
 export const searchWikipedia = (q: string) =>
     json(api.metadata.wikipedia.search.$get({ query: { q } }));
+
+/** Séries de Bedetheque (BD, comics, romans graphiques) pour ce texte. */
+export const searchBedetheque = (q: string) =>
+    json(api.metadata.bedetheque.search.$get({ query: { q } }));
+
+/** Fiche d'une série sur Bedetheque, par son identifiant. */
+export const fetchBedethequeSeries = (bedethequeId: string) =>
+    json(api.metadata.bedetheque.series.$get({ query: { id: bedethequeId } }));
+
+export type BedethequeDetails = Awaited<
+    ReturnType<typeof fetchBedethequeSeries>
+>;
 
 export const fetchWikipediaSeries = (wikiId: number) =>
     json(api.metadata.wikipedia[':id'].$get(id(wikiId)));

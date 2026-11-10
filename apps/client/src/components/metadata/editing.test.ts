@@ -20,6 +20,7 @@ import {
     seriesValue,
     setSeriesField,
     setVolumeKind,
+    sheetFromBedetheque,
     sheetFromWikipedia,
     sheetValues,
     statusFromWikipedia,
@@ -351,5 +352,41 @@ describe('statusFromWikipedia', () => {
         );
         expect(statusFromWikipedia({ ongoing: true })).toBe('ongoing');
         expect(statusFromWikipedia({ ongoing: false })).toBeUndefined();
+    });
+});
+
+describe('sheetFromBedetheque', () => {
+    it('takes the format from the origin, and a one shot is finished', () => {
+        expect(
+            sheetFromBedetheque({
+                title: 'Asterios Polyp',
+                summary: 'Un architecte…',
+                genres: ['Roman graphique'],
+                origin: 'Comics',
+                writer: 'David Mazzucchelli',
+                penciller: 'David Mazzucchelli',
+                publisher: 'Casterman',
+                ongoing: false,
+            }),
+        ).toMatchObject({
+            genre: 'Roman graphique',
+            format: 'Comics',
+            status: 'completed',
+            publisher: 'Casterman',
+        });
+        const blacksad = {
+            title: 'Blacksad',
+            summary: '',
+            genres: ['Policier'],
+            origin: 'Franco-Belge',
+            writer: '',
+            penciller: '',
+            publisher: 'Dargaud',
+            ongoing: true,
+        };
+        expect(sheetFromBedetheque(blacksad)).toMatchObject({
+            format: 'BD',
+            status: 'ongoing',
+        });
     });
 });
