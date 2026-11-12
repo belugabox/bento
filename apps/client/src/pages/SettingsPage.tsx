@@ -278,20 +278,23 @@ const SettingsForm = ({
     );
 };
 
-type Tab = 'general' | 'classement' | 'kavita';
+// Onglets ; un onglet absent d'ici n'apparaîtrait jamais (« Général »).
+const TABS = ['general', 'classement', 'fiches', 'kavita'] as const;
+type Tab = (typeof TABS)[number];
 
 /**
- * Réglages de Bento (admin), en deux onglets : « Général » (compression,
- * scan, apparence ; enregistrés ensemble) et « Classement » (formats, âges,
- * genres, sites des fiches en ligne ; enregistrés à chaque changement). L'onglet reste dans l'adresse.
+ * Réglages de Bento (admin) : « Général » (compression, scan, apparence ;
+ * enregistrés ensemble), « Classement » (formats, âges, genres), « Fiches
+ * en ligne » (mise à jour automatique, sites) et « Kavita » ; les autres
+ * réglages sont enregistrés à chaque changement. L'onglet reste dans
+ * l'adresse.
  */
 export const SettingsPage = () => {
     const { data, error } = useQuery(fetchSettings, []);
     const [saved, setSaved] = useState<SettingsResponse>();
     const [params, setParams] = useSearchParams();
     const asked = params.get('tab');
-    const tab: Tab =
-        asked === 'classement' || asked === 'kavita' ? asked : 'general';
+    const tab: Tab = TABS.find((t) => t === asked) ?? 'general';
     const current = saved ?? data;
 
     if (error) return <Alert color="red">{error.message}</Alert>;

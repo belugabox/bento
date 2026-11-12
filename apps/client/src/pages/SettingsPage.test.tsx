@@ -86,4 +86,65 @@ describe('SettingsPage', () => {
                 .hasAttribute('disabled'),
         ).toBe(false);
     });
+
+    it('opens each tab, the online sheets one included', async () => {
+        vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+            const url = String(input);
+            const body = url.startsWith('/api/settings')
+                ? {
+                      settings: {
+                          ...DEFAULTS,
+                          ages: [0, 12, 16],
+                          sourcePriority: {},
+                          disabledSources: [],
+                          sheetRefresh: false,
+                          sheetRefreshMinutes: 10,
+                      },
+                      defaults: DEFAULTS,
+                  }
+                : url.startsWith('/api/metadata/refresh')
+                  ? {
+                        enabled: false,
+                        running: false,
+                        linked: 0,
+                        due: 0,
+                        toSearch: 0,
+                        proposed: 0,
+                        lastCheckedAt: null,
+                        pauses: [],
+                        intervalMinutes: 10,
+                        night: { start: 2, end: 6 },
+                    }
+                  : [];
+            return new Response(JSON.stringify(body), {
+                headers: { 'Content-Type': 'application/json' },
+            });
+        });
+        render(
+            <MantineProvider>
+                <MemoryRouter>
+                    <SettingsPage />
+                </MemoryRouter>
+            </MantineProvider>,
+        );
+
+        fireEvent.click(
+            await screen.findByRole('tab', { name: 'Fiches en ligne' }),
+        );
+        expect(await screen.findByText('Mise à jour des fiches')).toBeTruthy();
+        expect(
+            screen
+                .getByRole('tab', { name: 'Fiches en ligne' })
+                .getAttribute('aria-selected'),
+        ).toBe('true');
+
+        fireEvent.click(screen.getByRole('tab', { name: 'Kavita' }));
+        await vi.waitFor(() =>
+            expect(
+                screen
+                    .getByRole('tab', { name: 'Kavita' })
+                    .getAttribute('aria-selected'),
+            ).toBe('true'),
+        );
+    });
 });
