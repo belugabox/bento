@@ -33,7 +33,11 @@ import { compareNames, genreKey } from '@server/types';
 import { CompletenessBadge } from '@/components/CompletenessBadge';
 import { ageLabel } from '@/components/ageLimits';
 import { completenessOf } from '@/components/completeness';
-import { formatSize, ratingLabel } from '@/components/format';
+import {
+    formatSize,
+    missingVolumesLabel,
+    ratingLabel,
+} from '@/components/format';
 import {
     type ManagedSeries,
     fetchFormats,
@@ -49,6 +53,8 @@ const FILTERS = [
     { value: 'no-summary', label: 'Sans résumé' },
     { value: 'no-genre', label: 'Sans genre' },
     { value: 'incomplete', label: 'Fiche < 80 %' },
+    // Numéros absents de Bento (trous, ou tomes parus d'après les fiches).
+    { value: 'missing-volumes', label: 'Tomes manquants' },
     // Ajoutée depuis : à lier (« Remplir ») pour sa note et sa relecture.
     { value: 'no-bedetheque', label: 'Sans fiche Bedetheque' },
     // Fiches changées en ligne (mise à jour de nuit).
@@ -127,6 +133,8 @@ const matches = (row: Row, filter: Filter) => {
             return row.percent < 80;
         case 'to-review':
             return row.sheetChanges.length > 0;
+        case 'missing-volumes':
+            return row.volumesStatus.missing.length > 0;
         case 'no-bedetheque':
             return !row.sheetSites.includes('bedetheque');
         default:
@@ -506,6 +514,17 @@ export const SeriesManagementPage = () => {
                                                 .filter(Boolean)
                                                 .join(' · ')}
                                         </Text>
+                                        {s.volumesStatus.missing.length > 0 && (
+                                            <Text
+                                                size="xs"
+                                                c="orange"
+                                                lineClamp={2}
+                                            >
+                                                {missingVolumesLabel(
+                                                    s.volumesStatus,
+                                                )}
+                                            </Text>
+                                        )}
                                         {/* Changé sur le site depuis la
                                             dernière visite : rien
                                             d'appliqué, à revoir. */}

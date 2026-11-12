@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import { formatNumber, formatRelative, formatSize } from './format';
+import {
+    formatNumber,
+    formatRelative,
+    formatSize,
+    missingVolumesLabel,
+    numbersLabel,
+} from './format';
 
 describe('format', () => {
     it('formats sizes', () => {
@@ -21,5 +27,19 @@ describe('format', () => {
         expect(formatRelative('2026-11-04T12:00:00Z', now)).toBe('hier');
         expect(formatRelative('2026-11-05T11:59:50Z', now)).toBe('à l’instant');
         expect(formatRelative(null, now)).toBe('jamais');
+    });
+});
+
+describe('volume numbers', () => {
+    it('groups the runs of three numbers or more', () => {
+        expect(numbersLabel([12, 3, 7, 8, 9, 5, 6])).toBe('3, 5 à 9, 12');
+        expect(numbersLabel([5, 6])).toBe('5, 6');
+        expect(numbersLabel([4])).toBe('4');
+        expect(missingVolumesLabel({ published: 14, missing: [7] })).toBe(
+            'Tome manquant : 7 (14 parus)',
+        );
+        expect(missingVolumesLabel({ published: null, missing: [1, 2] })).toBe(
+            'Tomes manquants : 1, 2',
+        );
     });
 });

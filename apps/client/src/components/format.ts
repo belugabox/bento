@@ -53,3 +53,33 @@ export const ratingLabel = (rating: number) =>
 /** Nombre d'avis : « 96 avis », « 1 avis ». */
 export const reviewsLabel = (count: number) =>
     `${count.toLocaleString('fr-FR')} avis`;
+
+/**
+ * Numéros de tomes, les suites regroupées : « 3, 7 à 9, 12 » (deux numéros
+ * qui se suivent restent séparés : « 5, 6 »).
+ */
+export const numbersLabel = (numbers: number[]) => {
+    const parts: string[] = [];
+    const sorted = [...numbers].sort((a, b) => a - b);
+    for (let i = 0; i < sorted.length;) {
+        let j = i;
+        while (j + 1 < sorted.length && sorted[j + 1] === sorted[j]! + 1) j++;
+        parts.push(
+            j - i >= 2
+                ? `${sorted[i]} à ${sorted[j]}`
+                : sorted.slice(i, j + 1).join(', '),
+        );
+        i = j + 1;
+    }
+    return parts.join(', ');
+};
+
+/** « Tomes manquants : 7, 13 à 15 (15 parus) ». */
+export const missingVolumesLabel = ({
+    published,
+    missing,
+}: {
+    published: number | null;
+    missing: number[];
+}) =>
+    `${missing.length > 1 ? 'Tomes manquants' : 'Tome manquant'} : ${numbersLabel(missing)}${published ? ` (${published} parus)` : ''}`;

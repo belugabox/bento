@@ -69,7 +69,11 @@ const saveSheet = (
     db: Db,
     site: MetadataSource,
     sourceId: string,
-    values: { snapshot: Snapshot; changes: string[] | null },
+    values: {
+        snapshot: Snapshot;
+        changes: string[] | null;
+        volumeCount?: number | null;
+    },
 ) => {
     const row = { ...values, checkedAt: new Date() };
     db.insert(sourceSheets)
@@ -94,6 +98,7 @@ export const sheetSeen = (
     saveSheet(db, site, sourceId, {
         snapshot: snapshotOf(sheet),
         changes: null,
+        volumeCount: sheet.volumeCount ?? null,
     });
 
 /**
@@ -124,6 +129,7 @@ export const sheetChecked = (
     saveSheet(db, site, sourceId, {
         snapshot,
         changes: changes.length > 0 ? changes : null,
+        volumeCount: sheet.volumeCount ?? null,
     });
 };
 
@@ -136,6 +142,7 @@ export const sourceSheetsMap = (db: Db) =>
                 sourceId: sourceSheets.sourceId,
                 checkedAt: sourceSheets.checkedAt,
                 changes: sourceSheets.changes,
+                volumeCount: sourceSheets.volumeCount,
             })
             .from(sourceSheets)
             .all()

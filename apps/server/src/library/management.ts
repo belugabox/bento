@@ -6,6 +6,7 @@ import { formats, libraries, series, volumes } from '../db/schema';
 import { parseSources } from '../metadata/sourceLink';
 import { coverVolumeSql, ratingFields } from './catalog';
 import { genreCatalog } from './genres';
+import { publishedCount, volumesStatus } from './missingVolumes';
 import { seriesRatingOf, sourceRatingsMap } from './ratings';
 import { sourceSheetsMap } from './sheets';
 import { compareNames } from './sortName';
@@ -63,6 +64,11 @@ export const listManagedSeries = (db: Db) => {
             coverUpdatedAt: series.coverUpdatedAt,
             ...coverVolumeSql,
             sources: series.sources,
+            // Tomes numérotés (« 1|2|5 ») et intégrales : tomes manquants.
+            volumeNumbers: sql<
+                string | null
+            >`(select group_concat(v.number, '|') from volumes v where v.series_id = series.id and v.kind = 'volume')`,
+            integrales: sql<number>`count(case when ${volumes.kind} = 'integrale' then 1 end)`,
         })
         .from(series)
         .innerJoin(libraries, eq(libraries.id, series.libraryId))
@@ -71,8 +77,20 @@ export const listManagedSeries = (db: Db) => {
         .groupBy(series.id)
         .all()
         .sort((a, b) => compareNames(a.name, b.name))
-        .map(({ genre, tags, sources, ...row }) => ({
+        .map(({ genre, tags, sources, volumeNumbers, integrales, ...row }) => ({
             ...row,
+            volumesStatus: volumesStatus(
+                [
+                    ...(volumeNumbers ?? '')
+                        .split('|')
+                        .filter(Boolean)
+                        .map((number) => ({ kind: 'volume', number })),
+                    ...(integrales > 0
+                        ? [{ kind: 'integrale', number: null }]
+                        : []),
+                ],
+                publishedCount(parseSources(sources), sheets),
+            ),
             ...ratingFields(seriesRatingOf(parseSources(sources), ratings)),
             // Fiches changées depuis que l'admin les a vues (mise à jour
             // de nuit) : « Fiche à revoir ».

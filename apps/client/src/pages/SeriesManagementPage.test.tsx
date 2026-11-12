@@ -41,6 +41,10 @@ const managed = (
     ratingCount: 0,
     sheetChanges: [] as string[],
     sheetSites: [] as string[],
+    volumesStatus: {
+        published: null as number | null,
+        missing: [] as number[],
+    },
     ...changes,
 });
 
@@ -57,6 +61,7 @@ beforeEach(() => {
             // Fiche changée en ligne depuis la dernière visite.
             sheetChanges: ['Tomes : 37 → 38'],
             sheetSites: ['manga-news', 'bedetheque'],
+            volumesStatus: { published: 4, missing: [3, 4] },
         }),
     ];
     vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
@@ -185,5 +190,19 @@ describe('SeriesManagementPage', () => {
         await vi.waitFor(() =>
             expect(names()).toEqual(['Coq de combat', 'Spirale']),
         );
+    });
+
+    it('finds the series with missing volumes', async () => {
+        show();
+        await screen.findByText('Gantz');
+        expect(
+            screen.getByText('Tomes manquants : 3, 4 (4 parus)'),
+        ).toBeTruthy();
+        fireEvent.click(screen.getByRole('button', { name: 'Filtres' }));
+        fireEvent.click(await screen.findByRole('textbox', { name: 'Fiches' }));
+        fireEvent.click(
+            await screen.findByRole('option', { name: 'Tomes manquants (1)' }),
+        );
+        await vi.waitFor(() => expect(names()).toEqual(['Gantz']));
     });
 });

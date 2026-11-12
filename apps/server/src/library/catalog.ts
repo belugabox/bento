@@ -24,9 +24,11 @@ import {
 } from '../metadata/sourceLink';
 import { notFound } from '../tools/errors';
 import { genreCatalog } from './genres';
+import { publishedCount, volumesStatus } from './missingVolumes';
 import { publicationPathOf } from './paths';
 import { seriesRatingOf, sourceRatingsMap } from './ratings';
 import { coverFile, kindOrder } from './scanner';
+import { sourceSheetsMap } from './sheets';
 import { compareNames } from './sortName';
 import { type Viewer, visibleTo } from './visibility';
 import { MAIN_KINDS } from './volumeKind';
@@ -351,6 +353,11 @@ export const getSeries = (db: Db, viewer: Viewer, id: number) => {
         sources: parseSources(sources),
         // Note des lecteurs : moyenne des fiches, et le détail par site.
         rating: seriesRatingOf(parseSources(sources), sourceRatingsMap(db)),
+        // Tomes parus (fiches) et tomes absents de Bento.
+        volumesStatus: volumesStatus(
+            items,
+            publishedCount(parseSources(sources), sourceSheetsMap(db)),
+        ),
         ...classify(genre, tags, genreCatalog(db)),
         defaultReadingMode: defaultReadingMode(
             row.library.type,

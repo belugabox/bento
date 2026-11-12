@@ -371,6 +371,8 @@ export const sourceSheets = sqliteTable(
             .$type<Record<string, string | number | boolean | null>>()
             .notNull(),
         changes: text('changes', { mode: 'json' }).$type<string[]>(),
+        // Tomes parus d'après la dernière lecture (tomes manquants).
+        volumeCount: integer('volume_count'),
     },
     (t) => [primaryKey({ columns: [t.site, t.sourceId] })],
 );
