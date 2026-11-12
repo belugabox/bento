@@ -6,6 +6,7 @@ import {
     formatSize,
     missingVolumesLabel,
     numbersLabel,
+    publishedLabel,
 } from './format';
 
 describe('format', () => {
@@ -51,5 +52,17 @@ describe('volume numbers', () => {
                 missing: [1, 2],
             }),
         ).toBe('Tomes manquants : 1, 2');
+    });
+});
+
+describe('published volumes', () => {
+    it('says which sheet gives the count, and what the others say', () => {
+        expect(
+            publishedLabel({
+                published: { site: 'bedetheque', count: 18 },
+                others: [{ site: 'manga-news', count: 37 }],
+            }),
+        ).toBe('18 tomes parus d’après Bedetheque ; Manga-news : 37');
+        expect(publishedLabel({ published: null, others: [] })).toBe('');
     });
 });

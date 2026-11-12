@@ -2,7 +2,10 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { series } from '../src/db/schema';
 import { getSeries, listSeries } from '../src/library/catalog';
-import { listManagedSeries } from '../src/library/management';
+import {
+    listManagedSeries,
+    setVolumeCountSite,
+} from '../src/library/management';
 import { publishedCounts, volumesStatus } from '../src/library/missingVolumes';
 import { sheetSeen } from '../src/library/sheets';
 import { setup, writeCbz } from './helpers';
@@ -16,7 +19,12 @@ describe('missing volumes', () => {
     it('lists the numbers absent from 1 to the last published volume', () => {
         expect(
             volumesStatus([volume('1'), volume('2'), volume('5')], [mn(7)]),
-        ).toEqual({ published: mn(7), others: [], missing: [3, 4, 6, 7] });
+        ).toEqual({
+            published: mn(7),
+            others: [],
+            missing: [3, 4, 6, 7],
+            chosen: null,
+        });
         // Plus de tomes que la fiche n'en connaît : les trous seulement.
         expect(
             volumesStatus([volume('1'), volume('3')], [bdt(2)]).missing,
@@ -26,6 +34,7 @@ describe('missing volumes', () => {
             published: null,
             others: [],
             missing: [1],
+            chosen: null,
         });
         // Numéros non entiers : à part.
         expect(
@@ -52,11 +61,35 @@ describe('missing volumes', () => {
             published: bdt(18),
             others: [mn(37)],
             missing: [],
+            chosen: null,
         });
         // Une série incomplète : les deux sites d'accord.
         expect(
             volumesStatus([volume('1'), volume('2')], [mn(4), bdt(4)]),
-        ).toEqual({ published: mn(4), others: [], missing: [3, 4] });
+        ).toEqual({
+            published: mn(4),
+            others: [],
+            missing: [3, 4],
+            chosen: null,
+        });
+    });
+
+    it('follows the sheet chosen by the admin, if it gives a count', () => {
+        const twelve = Array.from({ length: 12 }, (_, i) =>
+            volume(String(i + 1)),
+        );
+        // Bedetheque en retard : l'automatique le prend (le plus proche).
+        expect(volumesStatus(twelve, [mn(14), bdt(12)]).missing).toEqual([]);
+        expect(volumesStatus(twelve, [mn(14), bdt(12)], 'manga-news')).toEqual({
+            published: mn(14),
+            others: [bdt(12)],
+            missing: [13, 14],
+            chosen: 'manga-news',
+        });
+        // Fiche choisie sans nombre : l'automatique.
+        expect(
+            volumesStatus(twelve, [bdt(12)], 'manga-news').published,
+        ).toEqual(bdt(12));
     });
 
     it('counts the specials of Bento in the Manga-news count, not in the Bedetheque one', () => {
@@ -120,6 +153,7 @@ describe('missing volumes of a series', () => {
             published: null,
             others: [],
             missing: [3],
+            chosen: null,
         });
         // Réservé à l'admin (page Séries) : pas sur la fiche série.
         expect(getSeries(ctx.db, ADMIN, gantz!.id)).not.toHaveProperty(
@@ -138,6 +172,18 @@ describe('missing volumes of a series', () => {
             published: { site: 'manga-news', count: 6 },
             others: [],
             missing: [3, 5, 6],
+            chosen: null,
         });
+
+        // Choix de l'admin : gardé avec la série (puis de nouveau automatique).
+        setVolumeCountSite(ctx.db, gantz!.id, 'manga-news');
+        expect(listManagedSeries(ctx.db)[0]!.volumesStatus.chosen).toBe(
+            'manga-news',
+        );
+        setVolumeCountSite(ctx.db, gantz!.id, null);
+        expect(listManagedSeries(ctx.db)[0]!.volumesStatus.chosen).toBeNull();
+        expect(() => setVolumeCountSite(ctx.db, 999, null)).toThrow(
+            'Série introuvable',
+        );
     });
 });

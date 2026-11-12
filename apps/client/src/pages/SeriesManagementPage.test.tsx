@@ -49,6 +49,7 @@ const managed = (
         published: null as { site: string; count: number } | null,
         others: [] as unknown[],
         missing: [] as number[],
+        chosen: null as string | null,
     },
     ...changes,
 });
@@ -94,6 +95,7 @@ beforeEach(() => {
                 published: { site: 'bedetheque', count: 4 },
                 others: [],
                 missing: [3, 4],
+                chosen: null,
             },
         }),
     ];
@@ -286,6 +288,44 @@ describe('SeriesManagementPage', () => {
             expect(
                 requests.filter(([, url]) => url === '/api/manage/series'),
             ).toHaveLength(2),
+        );
+    });
+
+    it('lets the admin choose the sheet that gives the number of volumes', async () => {
+        // Spirale : Manga-news et Bedetheque ne disent pas le même nombre.
+        series[0] = {
+            ...series[0]!,
+            volumesStatus: {
+                published: { site: 'bedetheque', count: 2 },
+                others: [{ site: 'manga-news', count: 3 }],
+                missing: [],
+                chosen: null,
+            },
+        };
+        show();
+        const spirale = (await screen.findAllByTestId('managed-card')).find(
+            (card) => within(card).queryByText('Spirale'),
+        )!;
+        expect(
+            within(spirale).getByText(
+                '2 tomes parus d’après Bedetheque ; Manga-news : 3',
+            ),
+        ).toBeTruthy();
+
+        fireEvent.click(
+            within(spirale).getByRole('button', {
+                name: 'Fiche qui donne le nombre de tomes',
+            }),
+        );
+        fireEvent.click(
+            await screen.findByRole('menuitem', { name: 'Manga-news : 3' }),
+        );
+        await vi.waitFor(() =>
+            expect(requests).toContainEqual([
+                'PUT',
+                '/api/manage/series/1/volume-count-site',
+                { site: 'manga-news' },
+            ]),
         );
     });
 });

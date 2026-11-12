@@ -513,6 +513,18 @@ export const setSeriesStatus = (
 /** Gestion des séries (admin) : toutes, avec taille, pages et fiche. */
 export const fetchManagedSeries = () => json(api.manage.series.$get());
 
+/** Fiche qui donne le nombre de tomes parus ; null : automatique. */
+export const setVolumeCountSite = (
+    seriesId: number,
+    site: 'manga-news' | 'bedetheque' | null,
+) =>
+    json(
+        api.manage.series[':id']['volume-count-site'].$put({
+            param: { id: String(seriesId) },
+            json: { site },
+        }),
+    );
+
 /** Fiche proposée (trouvée la nuit) : liée à la série, ou refusée. */
 export const answerSheetProposal = (
     seriesId: number,

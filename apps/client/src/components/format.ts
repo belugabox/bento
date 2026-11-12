@@ -99,3 +99,21 @@ export const missingVolumesLabel = ({
         : '';
     return `${missing.length > 1 ? 'Tomes manquants' : 'Tome manquant'} : ${numbersLabel(missing)}${sources}`;
 };
+
+/**
+ * Tomes parus quand les fiches ne disent pas le même nombre, sans tome
+ * manquant : « 18 tomes parus d'après Bedetheque ; Manga-news : 37 ».
+ */
+export const publishedLabel = ({
+    published,
+    others,
+}: {
+    published: PublishedCount | null;
+    others: PublishedCount[];
+}) =>
+    published
+        ? [
+              `${published.count} tome${published.count > 1 ? 's' : ''} parus d’après ${SOURCE_LABELS[published.site]}`,
+              ...others.map((o) => `${SOURCE_LABELS[o.site]} : ${o.count}`),
+          ].join(' ; ')
+        : '';

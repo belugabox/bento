@@ -99,6 +99,11 @@ export const series = sqliteTable(
         // (« manga-news:Dr-Stone wikipedia:123 », voir
         // `metadata/sourceLink.ts`) ; null = aucune.
         sources: text('source'),
+        // Fiche qui donne le nombre de tomes parus (tomes manquants), choisie
+        // par l'admin ; null = la plus proche des tomes de Bento.
+        volumeCountSite: text('volume_count_site', {
+            enum: ['manga-news', 'bedetheque'],
+        }),
         writer: text('writer'),
         publisher: text('publisher'),
         createdAt: integer('created_at', { mode: 'timestamp' })

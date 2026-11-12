@@ -60,7 +60,11 @@ import {
     updateGenre,
 } from './library/genres';
 import { setSeriesLists } from './library/lists';
-import { countToClassify, listManagedSeries } from './library/management';
+import {
+    countToClassify,
+    listManagedSeries,
+    setVolumeCountSite,
+} from './library/management';
 import { isPageWidth } from './library/pageWidths';
 import {
     getProgress,
@@ -1156,6 +1160,23 @@ export const createApi = ({
         )
         .get('/manage/series/to-classify', requireAdmin, (c) =>
             c.json({ count: countToClassify(db) }),
+        )
+        // Fiche qui donne le nombre de tomes parus ; null : automatique.
+        .put(
+            '/manage/series/:id/volume-count-site',
+            requireAdmin,
+            zValidator('param', idParam),
+            zValidator(
+                'json',
+                z.object({
+                    site: z.enum(['manga-news', 'bedetheque']).nullable(),
+                }),
+            ),
+            (c) => {
+                const { site } = c.req.valid('json');
+                setVolumeCountSite(db, c.req.valid('param').id, site);
+                return c.json({ site });
+            },
         )
         // Fiche proposée (trouvée la nuit) : liée, ou refusée pour de bon.
         .post(

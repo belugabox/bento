@@ -1,0 +1,1 @@
+ALTER TABLE `series` ADD `volume_count_site` text;

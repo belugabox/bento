@@ -5,6 +5,7 @@ import { classify } from '../classification';
 import type { Db } from '../db';
 import { formats, libraries, series, volumes } from '../db/schema';
 import { parseSources } from '../metadata/sourceLink';
+import { notFound } from '../tools/errors';
 import { coverVolumeSql, ratingFields, volumeOrder } from './catalog';
 import { completenessOf, fieldsFromVolumes } from './completeness';
 import { genreCatalog } from './genres';
@@ -90,6 +91,7 @@ export const listManagedSeries = (db: Db) => {
             coverUpdatedAt: series.coverUpdatedAt,
             ...coverVolumeSql,
             sources: series.sources,
+            volumeCountSite: series.volumeCountSite,
             // Tomes numérotés (« 1|2|5 ») et intégrales : tomes manquants.
             volumeNumbers: sql<
                 string | null
@@ -148,6 +150,7 @@ export const listManagedSeries = (db: Db) => {
                             })),
                         ],
                         publishedCounts(parseSources(sources), sheets),
+                        row.volumeCountSite,
                     ),
                     ...ratingFields(rating),
                     // Sites des fiches liées (filtre « Sans fiche Bedetheque »).
@@ -177,3 +180,21 @@ export const countToClassify = (db: Db) =>
     db.get<{ count: number }>(
         sql`select count(*) as count from series where ${toClassifySql}`,
     ).count;
+
+/**
+ * Fiche qui donne le nombre de tomes parus d'une série (tomes manquants) ;
+ * null : la plus proche des tomes de Bento.
+ */
+export const setVolumeCountSite = (
+    db: Db,
+    seriesId: number,
+    site: 'manga-news' | 'bedetheque' | null,
+) => {
+    const updated = db
+        .update(series)
+        .set({ volumeCountSite: site })
+        .where(eq(series.id, seriesId))
+        .returning({ id: series.id })
+        .get();
+    if (!updated) throw notFound('Série introuvable');
+};

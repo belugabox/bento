@@ -28,6 +28,8 @@ export type VolumesStatus = {
     published: PublishedCount | null;
     others: PublishedCount[];
     missing: number[];
+    /** Fiche choisie par l'admin ; null : la plus proche (automatique). */
+    chosen: PublishedCount['site'] | null;
 };
 
 /**
@@ -40,10 +42,12 @@ export type VolumesStatus = {
  * est la plus proche des tomes de Bento est retenue. Manga-news compte dans
  * la série ses hors-séries et spéciaux (Death Note : « How to Read », le
  * 13e) : ceux de Bento en sont retirés ; Bedetheque les compte à part.
+ * L'admin peut choisir la fiche (`chosen`), si elle donne un nombre.
  */
 export const volumesStatus = (
     volumes: { kind: string; number: string | null }[],
     counts: PublishedCount[],
+    chosen: PublishedCount['site'] | null = null,
 ): VolumesStatus => {
     const numbers = new Set(
         volumes
@@ -58,21 +62,23 @@ export const volumesStatus = (
     const mainCount = ({ site, count }: PublishedCount) =>
         site === 'manga-news' ? Math.max(count - extras, 0) : count;
     const published =
+        counts.find((c) => c.site === chosen) ??
         [...counts].sort(
             (a, b) =>
                 Math.abs(mainCount(a) - numbers.size) -
                 Math.abs(mainCount(b) - numbers.size),
-        )[0] ?? null;
+        )[0] ??
+        null;
     const others = counts.filter(
         (c) => published && c.count !== published.count,
     );
     const withIntegrales = volumes.some((v) => v.kind === 'integrale');
     if (numbers.size === 0 || withIntegrales) {
-        return { published, others, missing: [] };
+        return { published, others, missing: [], chosen };
     }
     const last = Math.max(published ? mainCount(published) : 0, ...numbers);
-    if (last > MAX_VOLUMES) return { published, others, missing: [] };
+    if (last > MAX_VOLUMES) return { published, others, missing: [], chosen };
     const missing: number[] = [];
     for (let n = 1; n <= last; n++) if (!numbers.has(n)) missing.push(n);
-    return { published, others, missing };
+    return { published, others, missing, chosen };
 };

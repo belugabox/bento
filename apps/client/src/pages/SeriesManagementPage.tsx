@@ -8,6 +8,7 @@ import {
     Image,
     Indicator,
     Loader,
+    Menu,
     Paper,
     Popover,
     Select,
@@ -20,6 +21,7 @@ import {
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import {
+    IconCheck,
     IconFilter,
     IconPencil,
     IconSearch,
@@ -42,6 +44,7 @@ import { ageLabel } from '@/components/ageLimits';
 import {
     formatSize,
     missingVolumesLabel,
+    publishedLabel,
     ratingLabel,
 } from '@/components/format';
 import {
@@ -50,6 +53,7 @@ import {
     fetchFormats,
     fetchManagedSeries,
     seriesCoverUrl,
+    setVolumeCountSite,
 } from '@/services/api';
 import { useQuery } from '@/services/useQuery';
 
@@ -222,6 +226,90 @@ const formatDay = (iso: string | null) =>
               year: 'numeric',
           })
         : '—';
+
+/**
+ * Tomes manquants (ou fiches en désaccord sur le nombre de tomes parus),
+ * et le choix de la fiche qui donne ce nombre : automatique (la plus proche
+ * des tomes de Bento), ou celle d'un site.
+ */
+const VolumesCountLine = ({
+    seriesId,
+    status,
+    onChanged,
+}: {
+    seriesId: number;
+    status: ManagedSeries['volumesStatus'];
+    onChanged: () => void;
+}) => {
+    const counts = status.published ? [status.published, ...status.others] : [];
+    const choosable = counts.length > 1 || status.chosen !== null;
+    if (status.missing.length === 0 && !choosable) return null;
+    const choose = async (site: 'manga-news' | 'bedetheque' | null) => {
+        try {
+            await setVolumeCountSite(seriesId, site);
+            onChanged();
+        } catch (e) {
+            notifications.show({ color: 'red', message: (e as Error).message });
+        }
+    };
+    return (
+        <Group gap={6} wrap="nowrap" align="flex-start">
+            <Text
+                size="xs"
+                c={status.missing.length > 0 ? 'orange' : 'dimmed'}
+                lineClamp={2}
+            >
+                {status.missing.length > 0
+                    ? missingVolumesLabel(status)
+                    : publishedLabel(status)}
+            </Text>
+            {choosable && (
+                <Menu position="bottom-end" withinPortal>
+                    <Menu.Target>
+                        <Anchor
+                            component="button"
+                            size="xs"
+                            style={{ flexShrink: 0 }}
+                            aria-label="Fiche qui donne le nombre de tomes"
+                        >
+                            Changer
+                        </Anchor>
+                    </Menu.Target>
+                    <Menu.Dropdown>
+                        <Menu.Label>Nombre de tomes parus</Menu.Label>
+                        <Menu.Item
+                            leftSection={
+                                status.chosen === null ? (
+                                    <IconCheck size={14} />
+                                ) : (
+                                    <span style={{ width: 14 }} />
+                                )
+                            }
+                            onClick={() => void choose(null)}
+                        >
+                            Automatique (la plus proche)
+                        </Menu.Item>
+                        {counts.map((count) => (
+                            <Menu.Item
+                                key={count.site}
+                                leftSection={
+                                    status.chosen === count.site ? (
+                                        <IconCheck size={14} />
+                                    ) : (
+                                        <span style={{ width: 14 }} />
+                                    )
+                                }
+                                onClick={() => void choose(count.site)}
+                            >
+                                {SOURCE_LABELS[count.site]} : {count.count}
+                            </Menu.Item>
+                        ))}
+                    </Menu.Dropdown>
+                </Menu>
+            )}
+        </Group>
+    );
+};
 
 /** Ce que dit une fiche proposée : auteurs, tomes, année, même auteur. */
 const proposalDetails = ({ details }: ManagedSeries['proposals'][number]) =>
@@ -641,17 +729,11 @@ export const SeriesManagementPage = () => {
                                                 .filter(Boolean)
                                                 .join(' · ')}
                                         </Text>
-                                        {s.volumesStatus.missing.length > 0 && (
-                                            <Text
-                                                size="xs"
-                                                c="orange"
-                                                lineClamp={2}
-                                            >
-                                                {missingVolumesLabel(
-                                                    s.volumesStatus,
-                                                )}
-                                            </Text>
-                                        )}
+                                        <VolumesCountLine
+                                            seriesId={s.id}
+                                            status={s.volumesStatus}
+                                            onChanged={reload}
+                                        />
                                         {/* Fiches en ligne liées. */}
                                         <Text size="xs" c="dimmed">
                                             {s.sheetSites.length
