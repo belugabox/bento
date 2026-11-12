@@ -4,6 +4,7 @@ import {
     type CompletenessInput,
     completenessOf,
     fieldsFromVolumes,
+    missingHint,
 } from './completeness';
 
 const FULL: CompletenessInput = {
@@ -116,5 +117,14 @@ describe('fieldsFromVolumes', () => {
             'Résumé',
             'Année de 2 tomes',
         ]);
+    });
+});
+
+describe('missingHint', () => {
+    it('says how to fill what is missing', () => {
+        expect(missingHint('Note')).toMatch(/Manga-news ou Bedetheque/);
+        expect(missingHint('Année de 3 tomes')).toMatch(/noms de fichiers/);
+        expect(missingHint('Format')).toMatch(/éditeur/);
+        expect(missingHint('Résumé')).toMatch(/Remplir/);
     });
 });

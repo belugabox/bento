@@ -399,6 +399,38 @@ describe('MetadataEditor', () => {
         expect(numberOf(1).value).toBe('');
     });
 
+    it('shows whether a readers rating was found', async () => {
+        mockServer();
+        const show = (rating: { value: number; count: number } | null) =>
+            render(
+                <MantineProvider>
+                    <MetadataEditor
+                        libraryId={1}
+                        kind="manga"
+                        mode="series"
+                        volumes={volumes()}
+                        classification={{
+                            formatId: 1,
+                            age: 16,
+                            rating,
+                            save: vi.fn(),
+                        }}
+                        onChanged={() => {}}
+                    />
+                </MantineProvider>,
+            );
+        const first = show({ value: 4.3, count: 209 });
+        expect(
+            (await screen.findByLabelText('Note des lecteurs')).textContent,
+        ).toBe('★ 4,3 (209 avis)');
+        first.unmount();
+
+        show(null);
+        expect(
+            (await screen.findByLabelText('Note des lecteurs')).textContent,
+        ).toBe('☆ Pas de note');
+    });
+
     it('requires a format, and keeps the exact age in Bento', async () => {
         mockServer();
         const save = vi.fn().mockResolvedValue({});

@@ -116,3 +116,15 @@ export const fieldsFromVolumes = (infos: ComicInfo[]) => ({
         };
     }),
 });
+
+/** Comment remplir ce qui manque (« Résumé », « Année de 3 tomes »…). */
+export const missingHint = (item: string) =>
+    /^Format|^Âge|^Statut/.test(item)
+        ? 'À choisir dans l’éditeur.'
+        : /^Note/.test(item)
+          ? 'Relevée sur Manga-news ou Bedetheque par « Remplir » ou « Mettre à jour ».'
+          : /^Numéro/.test(item)
+            ? 'Dans l’éditeur, ou lu dans les noms de fichiers (« T01 », « #01 »).'
+            : /^Année/.test(item)
+              ? 'Dans l’éditeur, ou lue dans les noms de fichiers (« (2021) »).'
+              : 'À saisir, ou avec « Remplir » depuis une fiche en ligne.';

@@ -6,9 +6,10 @@ import {
     Text,
     UnstyledButton,
 } from '@mantine/core';
+import { IconInfoCircle } from '@tabler/icons-react';
 import type { ReactNode } from 'react';
 
-import type { Completeness } from '@/components/completeness';
+import { type Completeness, missingHint } from '@/components/completeness';
 
 /** Couleur d'une complétude : verte, orange, puis rouge. */
 const colorOf = (percent: number) =>
@@ -31,7 +32,15 @@ export const CompletenessBadge = ({
     <Popover position="bottom-start" withArrow shadow="md" width={260}>
         <Popover.Target>
             <UnstyledButton aria-label={`Fiche complète à ${percent} %`}>
-                <Badge variant="light" color={colorOf(percent)}>
+                <Badge
+                    variant="light"
+                    color={colorOf(percent)}
+                    // On voit qu'elle s'ouvre (ce qui manque).
+                    rightSection={
+                        missing.length > 0 && <IconInfoCircle size={12} />
+                    }
+                    style={{ cursor: 'pointer' }}
+                >
                     {short ? `${percent} %` : `Fiche à ${percent} %`}
                 </Badge>
             </UnstyledButton>
@@ -47,9 +56,14 @@ export const CompletenessBadge = ({
                         <Text size="sm" fw={500}>
                             À compléter
                         </Text>
-                        <List size="sm" spacing={2}>
+                        <List size="sm" spacing={4}>
                             {missing.map((item) => (
-                                <List.Item key={item}>{item}</List.Item>
+                                <List.Item key={item}>
+                                    {item}
+                                    <Text size="xs" c="dimmed">
+                                        {missingHint(item)}
+                                    </Text>
+                                </List.Item>
                             ))}
                         </List>
                     </>

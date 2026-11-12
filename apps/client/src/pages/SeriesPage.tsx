@@ -124,12 +124,6 @@ const SeriesRatingBadge = ({
                         </Text>
                     </Group>
                 ))}
-                {rating.sources.length > 1 && (
-                    <Text size="xs" c="dimmed">
-                        Moyenne de {reviewsLabel(rating.count)}, chaque site
-                        selon son nombre d’avis.
-                    </Text>
-                )}
             </Stack>
         </Popover.Dropdown>
     </Popover>

@@ -56,7 +56,7 @@ import {
     useAgeSteps,
 } from '@/components/ageLimits';
 import { completenessOf, fieldsFromVolumes } from '@/components/completeness';
-import { formatSize } from '@/components/format';
+import { formatSize, ratingLabel, reviewsLabel } from '@/components/format';
 import { volumeCountLabel } from '@/components/readingStatus';
 import { ReaderPreview } from '@/reader/ReaderPreview';
 import {
@@ -290,8 +290,8 @@ export const MetadataEditor = ({
         age: number | null;
         /** Fiches en ligne choisies (Manga-news, Wikipédia). */
         sources?: SourceLink[];
-        /** La série a déjà une note des lecteurs (complétude). */
-        hasRating?: boolean;
+        /** Note des lecteurs déjà relevée (moyenne des fiches), ou null. */
+        rating?: { value: number; count: number } | null;
         save: (changes: ClassificationChanges) => Promise<unknown>;
     };
     /** Couverture de la série, et son choix. */
@@ -328,9 +328,9 @@ export const MetadataEditor = ({
     // Fiches trouvées, en cours de comparaison.
     const [comparing, setComparing] = useState<FoundSeries[]>();
     const [refreshing, setRefreshing] = useState(false);
-    // Une fiche comparée a apporté une note des lecteurs (gardée par le
-    // serveur à sa lecture) : comptée dans la complétude.
-    const [rated, setRated] = useState(false);
+    // Fiches comparées avec une note des lecteurs (gardée par le serveur à
+    // leur lecture) : la note montrée, et comptée dans la complétude.
+    const [rated, setRated] = useState<FoundSeries[]>([]);
     // Statut de la série (publiée) : « unknown » pour « inconnu ».
     const savedStatus = seriesStatus?.value ?? UNKNOWN;
     const [status, setStatus] = useState<string>(savedStatus);
@@ -545,7 +545,7 @@ export const MetadataEditor = ({
 
     /** Valeurs choisies dans la comparaison, et les fiches gardées. */
     const applyComparison = (values: SheetValues, found: FoundSeries[]) => {
-        if (found.some((f) => f.rating)) setRated(true);
+        if (found.some((f) => f.rating)) setRated(found);
         setEdits((current) => {
             const filled = applySheetValues(current, paths, values, catalog);
             return alsoFileNames
@@ -596,6 +596,25 @@ export const MetadataEditor = ({
     }, []);
 
     // Complétude de la fiche, avec ce qui est saisi (pas encore enregistré).
+    // Note montrée : celle des fiches comparées ici (moyenne pondérée par
+    // leurs avis), sinon celle déjà relevée.
+    const ratedCount = rated.reduce((t, f) => t + (f.rating?.count ?? 0), 0);
+    const shownRating = ratedCount
+        ? {
+              value:
+                  Math.round(
+                      (rated.reduce(
+                          (t, f) =>
+                              t +
+                              (f.rating?.value ?? 0) * (f.rating?.count ?? 0),
+                          0,
+                      ) /
+                          ratedCount) *
+                          10,
+                  ) / 10,
+              count: ratedCount,
+          }
+        : (classification?.rating ?? null);
     const completeness = completenessOf({
         // Lus dans les tomes (première valeur remplie), comme la fiche
         // série : même pourcentage.
@@ -606,7 +625,7 @@ export const MetadataEditor = ({
             ageOfRating(String(series('AgeRating') ?? '')) !== null,
         hasStatus: !seriesStatus || status !== UNKNOWN,
         // Note déjà relevée, ou apportée par une fiche comparée ici.
-        hasRating: !classification || !!classification.hasRating || rated,
+        hasRating: !classification || !!shownRating,
         // Sans `String(undefined)` : « undefined » serait un genre rempli.
         genreCount: classify(
             String(series('Genre') ?? ''),
@@ -853,6 +872,26 @@ export const MetadataEditor = ({
                             )}
                             {totalSize > 0 && ` · ${formatSize(totalSize)}`}
                         </Text>
+                        {/* Note des lecteurs : relevée, ou non. */}
+                        {classification && (
+                            <Tooltip
+                                label={
+                                    shownRating
+                                        ? 'Note des lecteurs, relevée sur les fiches en ligne'
+                                        : 'Aucune note relevée : « Remplir » ou « Mettre à jour » la lit sur Manga-news ou Bedetheque'
+                                }
+                            >
+                                <Text
+                                    size="xs"
+                                    c={shownRating ? 'yellow' : 'dimmed'}
+                                    aria-label="Note des lecteurs"
+                                >
+                                    {shownRating
+                                        ? `${ratingLabel(shownRating.value)} (${reviewsLabel(shownRating.count)})`
+                                        : '☆ Pas de note'}
+                                </Text>
+                            </Tooltip>
+                        )}
                         {sourcesValue.length > 0 && (
                             <Group gap={6}>
                                 <Text size="xs" c="dimmed">

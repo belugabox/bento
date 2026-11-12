@@ -98,7 +98,7 @@ export const SeriesEditPage = () => {
                     formatId: series.formatId,
                     age: series.age,
                     sources: series.sources,
-                    hasRating: series.rating !== null,
+                    rating: series.rating,
                     save: (changes) =>
                         setSeriesClassification(series.id, changes),
                 }}
