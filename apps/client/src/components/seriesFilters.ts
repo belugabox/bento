@@ -14,6 +14,8 @@ export type ListedSeries = {
     format?: string | null;
     status?: 'ongoing' | 'completed' | null;
     toRead?: boolean;
+    // Note des lecteurs, sur 5 (tri « Mieux notées »).
+    rating?: number | null;
     // Tomes ajoutés depuis la dernière lecture (pastille « +2 »).
     newCount?: number;
     year?: number | null;
@@ -47,12 +49,13 @@ export const creditsOf = (s: Pick<ListedSeries, 'writer' | 'penciller'>) => {
 
 /** État de lecture d'une série pour la personne. */
 export type ReadingState = 'unread' | 'started' | 'read';
-export type SeriesSort = 'name' | 'recent';
+export type SeriesSort = 'name' | 'recent' | 'rating';
 export type StatusFilter = 'all' | 'ongoing' | 'completed';
 
 export const SERIES_SORTS: { value: SeriesSort; label: string }[] = [
     { value: 'name', label: 'Nom' },
     { value: 'recent', label: 'Ajouts récents' },
+    { value: 'rating', label: 'Mieux notées' },
 ];
 
 export const STATUS_FILTERS: { value: StatusFilter; label: string }[] = [
@@ -144,6 +147,9 @@ export const filterSeries = <T extends ListedSeries>(
             (sort === 'recent'
                 ? (b.lastAddedAt ?? '').localeCompare(a.lastAddedAt ?? '') ||
                   compareNames(a.name, b.name)
-                : 0),
+                : sort === 'rating'
+                  ? // Sans note à la fin.
+                    (b.rating ?? -1) - (a.rating ?? -1)
+                  : 0),
     );
 };

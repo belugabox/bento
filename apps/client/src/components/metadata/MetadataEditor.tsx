@@ -56,7 +56,7 @@ import {
     useAgeSteps,
 } from '@/components/ageLimits';
 import { completenessOf, fieldsFromVolumes } from '@/components/completeness';
-import { formatSize } from '@/components/format';
+import { formatSize, ratingLabel } from '@/components/format';
 import { volumeCountLabel } from '@/components/readingStatus';
 import { ReaderPreview } from '@/reader/ReaderPreview';
 import {
@@ -536,7 +536,9 @@ export const MetadataEditor = ({
               ? ageLabel(Number(value))
               : field === 'Status'
                 ? labelOf(STATUS_OPTIONS, value)
-                : value;
+                : field === 'Rating'
+                  ? ratingLabel(Number(value))
+                  : value;
 
     /** Valeurs choisies dans la comparaison, et les fiches gardées. */
     const applyComparison = (values: SheetValues, found: FoundSeries[]) => {
@@ -1050,6 +1052,30 @@ export const MetadataEditor = ({
                                     />
                                 </Grid.Col>
                             ))}
+                            <Grid.Col span={{ base: 12, xs: 6, sm: 4 }}>
+                                <NumberInput
+                                    label="Note des lecteurs (sur 5)"
+                                    min={0}
+                                    max={5}
+                                    step={0.1}
+                                    decimalScale={1}
+                                    allowNegative={false}
+                                    {...seriesField('CommunityRating')}
+                                    value={
+                                        series('CommunityRating') === ''
+                                            ? ''
+                                            : Number(series('CommunityRating'))
+                                    }
+                                    onChange={(value) =>
+                                        setSeries(
+                                            'CommunityRating',
+                                            value === ''
+                                                ? undefined
+                                                : Number(value),
+                                        )
+                                    }
+                                />
+                            </Grid.Col>
                             {seriesStatus && (
                                 <Grid.Col span={{ base: 12, xs: 6, sm: 4 }}>
                                     <Select

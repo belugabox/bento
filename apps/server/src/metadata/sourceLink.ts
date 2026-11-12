@@ -70,6 +70,16 @@ export const sourceUrl = ({ site, id }: SourceLink) =>
           ? bedethequeSeriesUrl(id)
           : `https://fr.wikipedia.org/?curid=${id}`;
 
+/**
+ * Note des lecteurs d'une série, ramenée sur 5 (comme `CommunityRating` du
+ * ComicInfo), et le nombre d'avis ou de votes.
+ */
+export type SeriesRating = { value: number; count: number };
+
+/** Note sur `best` ramenée sur 5, à un chiffre après la virgule. */
+export const ratingOutOf5 = (value: number, best: number) =>
+    Math.round((value / best) * 5 * 10) / 10;
+
 /** Champs d'une fiche de série, comparés aux fiches en ligne, dans l'ordre. */
 export const SHEET_FIELDS = [
     'Series',
@@ -81,6 +91,7 @@ export const SHEET_FIELDS = [
     'Writer',
     'Penciller',
     'Publisher',
+    'Rating',
     'Summary',
 ] as const;
 
@@ -96,6 +107,7 @@ export const SHEET_FIELD_LABELS: Record<SheetField, string> = {
     Writer: 'Scénario',
     Penciller: 'Dessin',
     Publisher: 'Éditeur',
+    Rating: 'Note',
     Summary: 'Résumé',
 };
 

@@ -7,6 +7,7 @@ import { ratingForAge } from '../src/library/ageRating';
 import {
     MangaNews,
     decodePage,
+    parseRating,
     parseSearchPage,
     parseSeriesPage,
 } from '../src/metadata/mangaNews';
@@ -23,6 +24,26 @@ const fakeSite = (respond: (url: string) => unknown) =>
 
 const fakeFetch = (status: number, body: string) =>
     fakeSite(() => new Response(body, { status }));
+
+describe('Manga-news rating', () => {
+    it('reads the readers rating from the structured data, out of 5', () => {
+        // 17,5/20 sur 96 avis ; le nom n'y est pas du JSON valide.
+        expect(
+            parseRating(
+                readFileSync(
+                    path.join(
+                        __dirname,
+                        'fixtures',
+                        'manga-news',
+                        'rating-spy-x-family.html',
+                    ),
+                    'utf-8',
+                ),
+            ),
+        ).toEqual({ value: 4.4, count: 96 });
+        expect(parseRating('<p>Sans note</p>')).toBeUndefined();
+    });
+});
 
 describe('parseSeriesPage', () => {
     it('reads a manga sheet', () => {

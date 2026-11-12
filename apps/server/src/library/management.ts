@@ -3,7 +3,7 @@ import { eq, sql } from 'drizzle-orm';
 import { classify } from '../classification';
 import type { Db } from '../db';
 import { formats, libraries, series, volumes } from '../db/schema';
-import { coverVolumeSql } from './catalog';
+import { coverVolumeSql, ratingSql } from './catalog';
 import { genreCatalog } from './genres';
 import { compareNames } from './sortName';
 
@@ -57,6 +57,7 @@ export const listManagedSeries = (db: Db) => {
             ),
             coverUpdatedAt: series.coverUpdatedAt,
             ...coverVolumeSql,
+            rating: ratingSql,
         })
         .from(series)
         .innerJoin(libraries, eq(libraries.id, series.libraryId))

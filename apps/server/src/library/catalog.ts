@@ -168,6 +168,14 @@ export const seriesAgeSql = sql<
  * Sous-requêtes en SQL brut : Drizzle n'y préfixe pas les colonnes par leur
  * table.
  */
+/**
+ * Note des lecteurs d'une série (sur 5) : le `CommunityRating` du ComicInfo
+ * de son premier tome, rempli depuis les fiches en ligne.
+ */
+export const ratingSql = sql<
+    number | null
+>`(select json_extract(v.comic_info, '$.CommunityRating') from volumes v where v.series_id = series.id order by v.kind != 'volume', v.kind, v.sort_number is null, v.sort_number, v.file limit 1)`;
+
 export const coverVolumeSql = {
     coverVolumeId: sql<number>`(select v.id from volumes v where v.series_id = series.id order by v.kind != 'volume', v.kind, v.sort_number is null, v.sort_number, v.file limit 1)`,
     coverVolumeVersion: sql<number>`(select cast(v.mtime_ms as integer) from volumes v where v.series_id = series.id order by v.kind != 'volume', v.kind, v.sort_number is null, v.sort_number, v.file limit 1)`,
@@ -215,6 +223,8 @@ export const listSeries = (
                 string | null
             >`(select json_extract(v.comic_info, '$.Penciller') from volumes v where v.series_id = series.id order by v.kind != 'volume', v.kind, v.sort_number is null, v.sort_number, v.file limit 1)`,
             ...coverVolumeSql,
+            // Note des lecteurs (tri « Mieux notées »).
+            rating: ratingSql,
             // Tomes lus par la personne.
             // Tomes de la série d'abord (`cross join` : SQLite garde cet ordre), puis la
             // lecture de chacun : sinon SQLite parcourt toutes les lectures de la
@@ -289,6 +299,7 @@ export const getSeries = (db: Db, viewer: Viewer, id: number) => {
             sources: series.sources,
             writer: series.writer,
             publisher: series.publisher,
+            rating: ratingSql,
             ...listsOf(viewer),
             library: {
                 id: libraries.id,

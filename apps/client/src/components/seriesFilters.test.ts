@@ -147,3 +147,22 @@ describe('seriesDetails', () => {
         ).toEqual(['Katsuhiro Otomo']);
     });
 });
+
+describe('sort by rating', () => {
+    it('puts the best rated first, the unrated last', () => {
+        const series = [
+            { name: 'A', rating: 3.9 },
+            { name: 'B', rating: null },
+            { name: 'C', rating: 4.6 },
+        ].map((s) => ({
+            ...s,
+            volumeCount: 2,
+            readCount: 0,
+            startedCount: 0,
+            lastAddedAt: null,
+        }));
+        expect(
+            filterSeries(series, { sort: 'rating' }).map((s) => s.name),
+        ).toEqual(['C', 'A', 'B']);
+    });
+});

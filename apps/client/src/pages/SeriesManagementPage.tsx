@@ -31,7 +31,7 @@ import { compareNames, genreKey } from '@server/types';
 import { CompletenessBadge } from '@/components/CompletenessBadge';
 import { ageLabel, ageOptions, useAgeSteps } from '@/components/ageLimits';
 import { completenessOf } from '@/components/completeness';
-import { formatSize } from '@/components/format';
+import { formatSize, ratingLabel } from '@/components/format';
 import {
     type ManagedSeries,
     fetchFormats,
@@ -66,7 +66,8 @@ type SortKey =
     | 'volumes'
     | 'size'
     | 'perPage'
-    | 'added';
+    | 'added'
+    | 'rating';
 
 /** Une série du tableau, avec sa complétude et ses moyennes. */
 type Row = ManagedSeries & {
@@ -137,6 +138,8 @@ const sortValue = (row: Row, key: SortKey): string | number | null => {
             return row.size;
         case 'perPage':
             return row.perPage;
+        case 'rating':
+            return row.rating ?? null;
         case 'added':
             return row.lastAddedAt ? new Date(row.lastAddedAt).getTime() : null;
         default:
@@ -173,6 +176,7 @@ const SORTS: { value: SortKey; label: string }[] = [
     { value: 'size', label: 'Taille' },
     { value: 'perPage', label: 'Taille par page' },
     { value: 'added', label: 'Dernier ajout' },
+    { value: 'rating', label: 'Note' },
 ];
 
 const formatDay = (iso: string | null) =>
@@ -408,7 +412,11 @@ export const SeriesManagementPage = () => {
                                                 formatSize(s.size),
                                                 `${formatSize(s.perVolume)} / tome`,
                                                 `${formatSize(s.perPage)} / page`,
-                                            ].join(' · ')}
+                                                s.rating != null &&
+                                                    ratingLabel(s.rating),
+                                            ]
+                                                .filter(Boolean)
+                                                .join(' · ')}
                                         </Text>
                                         <Text
                                             size="xs"

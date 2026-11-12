@@ -27,6 +27,7 @@ export const SERIES_FIELDS = [
     'Penciller',
     'Publisher',
     'AgeRating',
+    'CommunityRating',
 ] as const;
 
 export type SeriesField = (typeof SERIES_FIELDS)[number];
@@ -218,6 +219,7 @@ export type BedethequeSeries = {
     penciller: string;
     publisher: string;
     ongoing?: boolean;
+    rating?: { value: number; count: number };
 };
 
 /** Fiche Wikipédia, telle que renvoyée par le serveur. */
@@ -254,6 +256,7 @@ export type MangaNewsSeries = {
     age?: number;
     ageRating?: string;
     ongoing?: boolean;
+    rating?: { value: number; count: number };
 };
 
 /**
@@ -274,6 +277,8 @@ export type SeriesSheet = {
     format?: string;
     /** Âge conseillé (« 12+ » : 12). */
     age?: number;
+    /** Note des lecteurs, sur 5. */
+    rating?: number;
 };
 
 export const sheetFromWikipedia = (wiki: WikipediaSeries): SeriesSheet => ({
@@ -303,6 +308,7 @@ export const sheetFromMangaNews = (series: MangaNewsSeries): SeriesSheet => ({
               : 'completed',
     format: series.format ?? undefined,
     age: series.age,
+    rating: series.rating?.value,
 });
 
 /**
@@ -332,6 +338,7 @@ export const sheetFromBedetheque = (series: BedethequeSeries): SeriesSheet => ({
               ? 'ongoing'
               : 'completed',
     format: formatFromOrigin(series.origin),
+    rating: series.rating?.value,
 });
 
 /**
@@ -369,6 +376,7 @@ export const sheetValues = (
         Writer: cleanNames(sheet.writer, known.people),
         Penciller: cleanNames(sheet.penciller, known.people),
         Publisher: cleanNames(sheet.publisher, known.publishers),
+        Rating: sheet.rating === undefined ? undefined : String(sheet.rating),
         Summary: sheet.summary,
     });
 };
@@ -393,6 +401,7 @@ export const editedValues = (
         Writer: text('Writer'),
         Penciller: text('Penciller'),
         Publisher: text('Publisher'),
+        Rating: text('CommunityRating'),
         Summary: first ? edits[first]?.Summary : undefined,
     });
 };
@@ -518,6 +527,9 @@ export const applySheetValues = (
         if (values[field] !== undefined) {
             next = setSeriesField(next, field, values[field]);
         }
+    }
+    if (values.Rating !== undefined) {
+        next = setSeriesField(next, 'CommunityRating', Number(values.Rating));
     }
     if (values.Genre !== undefined || values.Tags !== undefined) {
         const now = editedValues(next, paths, catalog);

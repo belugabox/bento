@@ -46,6 +46,7 @@ import { DownloadRing } from '@/components/DownloadIndicator';
 import { SeriesReaders } from '@/components/SeriesReaders';
 import { ageLabel, seriesAgeOf } from '@/components/ageLimits';
 import { completenessOf, fieldsFromVolumes } from '@/components/completeness';
+import { ratingLabel } from '@/components/format';
 import { gridColumns, useLibraryDisplay } from '@/components/libraryDisplay';
 import {
     countedVolumes,
@@ -254,6 +255,16 @@ export const SeriesPage = () => {
                         <Badge variant="light">
                             {volumeCountLabel(series.volumes)}
                         </Badge>
+                        {/* Note des lecteurs (fiches en ligne), sur 5. */}
+                        {series.rating != null && (
+                            <Badge
+                                variant="light"
+                                color="yellow"
+                                title="Note des lecteurs, sur 5"
+                            >
+                                {ratingLabel(series.rating)}
+                            </Badge>
+                        )}
                         {series.status && (
                             <Badge
                                 variant="light"

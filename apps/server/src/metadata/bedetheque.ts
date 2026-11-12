@@ -2,7 +2,7 @@ import { load as cheerioLoad } from 'cheerio';
 
 import { articleFirst } from '../library/sortName';
 import { badGateway, notFound } from '../tools/errors';
-import { bedethequeSeriesUrl } from './sourceLink';
+import { type SeriesRating, bedethequeSeriesUrl } from './sourceLink';
 
 // Métadonnées de séries depuis Bedetheque (BD, comics, romans graphiques,
 // mangas). Le site n'a pas d'API : la recherche passe par son
@@ -46,6 +46,27 @@ export type BedethequeSeries = {
     ongoing?: boolean;
     oneShot: boolean;
     coverUrl?: string;
+    /** Note des lecteurs (moyenne des albums), sur 5. */
+    rating?: SeriesRating;
+};
+
+/**
+ * Note de la série : celles des lecteurs pour chaque album (« Note : 4.3/5
+ * (127 votes) »), en moyenne pondérée par leurs votes.
+ */
+export const parseAlbumRatings = (html: string): SeriesRating | undefined => {
+    let sum = 0;
+    let count = 0;
+    for (const match of html.matchAll(
+        /Note\s*:\s*<strong>([\d.]+)<\/strong>\s*\/\s*5\s*\((\d+)\s*votes?\)/g,
+    )) {
+        const votes = Number(match[2]);
+        sum += Number(match[1]) * votes;
+        count += votes;
+    }
+    return count > 0
+        ? { value: Math.round((sum / count) * 10) / 10, count }
+        : undefined;
 };
 
 const clean = (text: string | undefined) =>
@@ -148,6 +169,7 @@ export const parseSeriesPage = (
                 : undefined,
         oneShot,
         coverUrl: $('img[itemprop="image"]').first().attr('src'),
+        ...(parseAlbumRatings(html) && { rating: parseAlbumRatings(html) }),
     };
 };
 

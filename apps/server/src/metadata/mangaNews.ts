@@ -3,7 +3,11 @@ import { type CheerioAPI, load as cheerioLoad } from 'cheerio';
 import { genreKey } from '../classification';
 import { type AgeRating, ratingForAge } from '../library/ageRating';
 import { badGateway, badRequest, notFound } from '../tools/errors';
-import { mangaNewsSeriesUrl } from './sourceLink';
+import {
+    type SeriesRating,
+    mangaNewsSeriesUrl,
+    ratingOutOf5,
+} from './sourceLink';
 
 // Métadonnées de séries depuis Manga-news. Le site n'a pas d'API : ses
 // pages sont lues à la demande de l'admin, une à la fois, jamais en masse.
@@ -48,9 +52,29 @@ export type MangaNewsSeries = {
     volumeCount?: number;
     ongoing?: boolean;
     coverUrl?: string;
+    /** Note des lecteurs, sur 5. */
+    rating?: SeriesRating;
 };
 
 const seriesUrl = mangaNewsSeriesUrl;
+
+/**
+ * Note des lecteurs, dans les données structurées de la page
+ * (`aggregateRating`, sur 20). Lue par motif : le bloc n'est pas toujours
+ * du JSON valide (guillemets doublés dans le nom).
+ */
+export const parseRating = (html: string): SeriesRating | undefined => {
+    const block = /"aggregateRating"\s*:\s*\{([^}]*)\}/.exec(html)?.[1];
+    if (!block) return undefined;
+    const number = (key: string) =>
+        Number(new RegExp(`"${key}"\\s*:\\s*"?([\\d.]+)`).exec(block)?.[1]);
+    const value = number('ratingValue');
+    const best = number('bestRating') || 20;
+    const count = number('reviewCount') || number('ratingCount') || 0;
+    return value > 0 && count > 0
+        ? { value: ratingOutOf5(value, best), count }
+        : undefined;
+};
 
 // Octets 0x80 à 0x9f de Windows-1252 (le reste est ISO-8859-1). Le
 // TextDecoder de Node 22 les lit en ISO-8859-1 : « ’ » y serait perdu.
@@ -183,6 +207,7 @@ export const parseSeriesPage = (
                 ongoing: !/termin/i.test(volumes[2]),
             }),
         }),
+        ...(parseRating(html) && { rating: parseRating(html) }),
         // Image en grand (le lien), sinon celle affichée.
         coverUrl: absolute(
             $('#picinfo a.cpModal').attr('href') ??

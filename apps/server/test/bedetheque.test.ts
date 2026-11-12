@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 import {
     Bedetheque,
     authorName,
+    parseAlbumRatings,
     parseSearch,
     parseSeriesPage,
 } from '../src/metadata/bedetheque';
@@ -73,6 +74,18 @@ describe('Bedetheque pages', () => {
         });
         expect(series.lastYear).toBeUndefined();
         expect(series.summary).toMatch(/^Fils d.immigrant, Asterios Polyp/);
+    });
+
+    it('rates a series from its albums, weighted by their votes', () => {
+        // Un album : 4.3/5 sur 127 votes.
+        expect(
+            parseSeriesPage(fixture('asterios-polyp.html'), '25654')!.rating,
+        ).toEqual({ value: 4.3, count: 127 });
+        const blacksad = parseSeriesPage(fixture('blacksad.html'), '500')!;
+        expect(blacksad.rating!.count).toBeGreaterThan(1000);
+        expect(blacksad.rating!.value).toBeGreaterThan(4);
+        expect(blacksad.rating!.value).toBeLessThanOrEqual(5);
+        expect(parseAlbumRatings('<p>Pas de note</p>')).toBeUndefined();
     });
 
     it('puts first names first', () => {
