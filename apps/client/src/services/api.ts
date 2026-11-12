@@ -395,6 +395,14 @@ export const searchWikipedia = (q: string) =>
 export const searchBedetheque = (q: string) =>
     json(api.metadata.bedetheque.search.$get({ query: { q } }));
 
+/** Albums d'une série sur Bedetheque : numéro, titre, année. */
+export const fetchBedethequeVolumes = (bedethequeId: string) =>
+    json(api.metadata.bedetheque.volumes.$get({ query: { id: bedethequeId } }));
+
+/** Tomes d'une série sur Wikipédia : numéro, année de sortie en France. */
+export const fetchWikipediaVolumes = (wikiId: number) =>
+    json(api.metadata.wikipedia[':id'].volumes.$get(id(wikiId)));
+
 /** Fiche d'une série sur Bedetheque, par son identifiant. */
 export const fetchBedethequeSeries = (bedethequeId: string) =>
     json(api.metadata.bedetheque.series.$get({ query: { id: bedethequeId } }));
@@ -504,6 +512,31 @@ export const setSeriesStatus = (
 
 /** Gestion des séries (admin) : toutes, avec taille, pages et fiche. */
 export const fetchManagedSeries = () => json(api.manage.series.$get());
+
+/** Fiche qui donne le nombre de tomes parus ; null : automatique. */
+export const setVolumeCountSite = (
+    seriesId: number,
+    site: 'manga-news' | 'bedetheque' | null,
+) =>
+    json(
+        api.manage.series[':id']['volume-count-site'].$put({
+            param: { id: String(seriesId) },
+            json: { site },
+        }),
+    );
+
+/** Fiche proposée (trouvée la nuit) : liée à la série, ou refusée. */
+export const answerSheetProposal = (
+    seriesId: number,
+    proposal: { site: 'manga-news' | 'bedetheque'; id: string },
+    accept: boolean,
+) =>
+    json(
+        api.manage.series[':id'].proposals.$post({
+            param: { id: String(seriesId) },
+            json: { site: proposal.site, id: proposal.id, accept },
+        }),
+    );
 
 export type ManagedSeries = Awaited<
     ReturnType<typeof fetchManagedSeries>

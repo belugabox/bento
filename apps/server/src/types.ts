@@ -50,6 +50,7 @@ export {
     SHEET_FIELD_LABELS,
     SHEET_FIELDS,
     type SheetField,
+    type SheetVolume,
     SOURCE_LABELS,
     type SourceLink,
     type SourcePriority,
@@ -59,6 +60,13 @@ export {
 export { parseVolumeFileName } from './archive/fileName';
 export type { ComicInfo } from './archive/comicInfo';
 export { publicationPathOf } from './library/publication';
+export {
+    type Completeness,
+    type CompletenessInput,
+    type VolumeCounts,
+    completenessOf,
+    fieldsFromVolumes,
+} from './library/completeness';
 export {
     KIND_FORMATS,
     VOLUME_KIND_LABELS,
@@ -72,6 +80,11 @@ export {
     volumeNumbering,
 } from './library/volumeKind';
 export { articleFirst, compareNames, sortKeyOf } from './library/sortName';
+export {
+    nameVariant,
+    sameSeriesName,
+    seriesNameKey,
+} from './metadata/seriesNames';
 export {
     PAGE_WIDTHS,
     type PageWidth,

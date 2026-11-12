@@ -8,6 +8,8 @@ import {
     Image,
     Indicator,
     Loader,
+    Menu,
+    Paper,
     Popover,
     Select,
     SimpleGrid,
@@ -17,7 +19,9 @@ import {
     Title,
     Tooltip,
 } from '@mantine/core';
+import { notifications } from '@mantine/notifications';
 import {
+    IconCheck,
     IconFilter,
     IconPencil,
     IconSearch,
@@ -28,17 +32,28 @@ import {
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 
-import { compareNames, genreKey } from '@server/types';
+import {
+    SOURCE_LABELS,
+    compareNames,
+    genreKey,
+    sourceUrl,
+} from '@server/types';
 
 import { CompletenessBadge } from '@/components/CompletenessBadge';
 import { ageLabel } from '@/components/ageLimits';
-import { completenessOf } from '@/components/completeness';
-import { formatSize, ratingLabel } from '@/components/format';
+import {
+    formatSize,
+    missingVolumesLabel,
+    publishedLabel,
+    ratingLabel,
+} from '@/components/format';
 import {
     type ManagedSeries,
+    answerSheetProposal,
     fetchFormats,
     fetchManagedSeries,
     seriesCoverUrl,
+    setVolumeCountSite,
 } from '@/services/api';
 import { useQuery } from '@/services/useQuery';
 
@@ -49,12 +64,36 @@ const FILTERS = [
     { value: 'no-summary', label: 'Sans résumé' },
     { value: 'no-genre', label: 'Sans genre' },
     { value: 'incomplete', label: 'Fiche < 80 %' },
-    // Ajoutée depuis : à lier (« Remplir ») pour sa note et sa relecture.
-    { value: 'no-bedetheque', label: 'Sans fiche Bedetheque' },
+    // Numéros absents de Bento (trous, ou tomes parus d'après les fiches).
+    { value: 'missing-volumes', label: 'Tomes manquants' },
     // Fiches changées en ligne (mise à jour de nuit).
     { value: 'to-review', label: 'Fiches à revoir' },
+    // Fiches trouvées la nuit pour une série qui n'en avait pas.
+    { value: 'proposed', label: 'Fiches proposées' },
 ] as const;
 type Filter = (typeof FILTERS)[number]['value'];
+
+/**
+ * Fiches en ligne liées : aucune, ou pas celle d'un site (Manga-news : les
+ * mangas seulement, il n'a pas les BD).
+ */
+const SHEET_FILTERS = [
+    { value: 'none', label: 'Aucune fiche' },
+    { value: 'manga-news', label: 'Sans Manga-news (mangas)' },
+    { value: 'bedetheque', label: 'Sans Bedetheque' },
+    { value: 'wikipedia', label: 'Sans Wikipédia' },
+] as const;
+type SheetFilter = (typeof SHEET_FILTERS)[number]['value'];
+
+const matchesSheets = (
+    row: Pick<ManagedSeries, 'sheetSites' | 'libraryType'>,
+    filter: SheetFilter,
+) =>
+    filter === 'none'
+        ? row.sheetSites.length === 0
+        : filter === 'manga-news'
+          ? row.libraryType === 'manga' && !row.sheetSites.includes(filter)
+          : !row.sheetSites.includes(filter);
 
 const STATUSES = [
     { value: 'ongoing', label: 'En cours' },
@@ -88,23 +127,8 @@ type Row = ManagedSeries & {
 
 const toRow = (s: ManagedSeries): Row => {
     const effectiveAge = s.age ?? s.fileAge;
-    const { percent, missing } = completenessOf({
-        name: s.name,
-        hasFormat: !!s.formatId,
-        hasAge: effectiveAge !== null,
-        hasStatus: !!s.status,
-        hasRating: s.rating !== null,
-        genreCount: s.genres.length,
-        writer: s.writer,
-        penciller: s.penciller,
-        publisher: s.publisher,
-        summary: s.hasSummary ? 'oui' : '',
-        volumes: {
-            total: s.volumeCount,
-            withNumber: s.withNumber,
-            withYear: s.withYear,
-        },
-    });
+    // Calculée par le serveur, comme l'éditeur et la fiche série.
+    const { percent, missing } = s.completeness;
     return {
         ...s,
         percent,
@@ -127,8 +151,10 @@ const matches = (row: Row, filter: Filter) => {
             return row.percent < 80;
         case 'to-review':
             return row.sheetChanges.length > 0;
-        case 'no-bedetheque':
-            return !row.sheetSites.includes('bedetheque');
+        case 'proposed':
+            return row.proposals.length > 0;
+        case 'missing-volumes':
+            return row.volumesStatus.missing.length > 0;
         default:
             return true;
     }
@@ -202,6 +228,175 @@ const formatDay = (iso: string | null) =>
         : '—';
 
 /**
+ * Tomes manquants (ou fiches en désaccord sur le nombre de tomes parus),
+ * et le choix de la fiche qui donne ce nombre : automatique (la plus proche
+ * des tomes de Bento), ou celle d'un site.
+ */
+const VolumesCountLine = ({
+    seriesId,
+    status,
+    onChanged,
+}: {
+    seriesId: number;
+    status: ManagedSeries['volumesStatus'];
+    onChanged: () => void;
+}) => {
+    const counts = status.published ? [status.published, ...status.others] : [];
+    const choosable = counts.length > 1 || status.chosen !== null;
+    if (status.missing.length === 0 && !choosable) return null;
+    const choose = async (site: 'manga-news' | 'bedetheque' | null) => {
+        try {
+            await setVolumeCountSite(seriesId, site);
+            onChanged();
+        } catch (e) {
+            notifications.show({ color: 'red', message: (e as Error).message });
+        }
+    };
+    return (
+        <Group gap={6} wrap="nowrap" align="flex-start">
+            <Text
+                size="xs"
+                c={status.missing.length > 0 ? 'orange' : 'dimmed'}
+                lineClamp={2}
+            >
+                {status.missing.length > 0
+                    ? missingVolumesLabel(status)
+                    : publishedLabel(status)}
+            </Text>
+            {choosable && (
+                <Menu position="bottom-end" withinPortal>
+                    <Menu.Target>
+                        <Anchor
+                            component="button"
+                            size="xs"
+                            style={{ flexShrink: 0 }}
+                            aria-label="Fiche qui donne le nombre de tomes"
+                        >
+                            Changer
+                        </Anchor>
+                    </Menu.Target>
+                    <Menu.Dropdown>
+                        <Menu.Label>Nombre de tomes parus</Menu.Label>
+                        <Menu.Item
+                            leftSection={
+                                status.chosen === null ? (
+                                    <IconCheck size={14} />
+                                ) : (
+                                    <span style={{ width: 14 }} />
+                                )
+                            }
+                            onClick={() => void choose(null)}
+                        >
+                            Automatique (la plus proche)
+                        </Menu.Item>
+                        {counts.map((count) => (
+                            <Menu.Item
+                                key={count.site}
+                                leftSection={
+                                    status.chosen === count.site ? (
+                                        <IconCheck size={14} />
+                                    ) : (
+                                        <span style={{ width: 14 }} />
+                                    )
+                                }
+                                onClick={() => void choose(count.site)}
+                            >
+                                {SOURCE_LABELS[count.site]} : {count.count}
+                            </Menu.Item>
+                        ))}
+                    </Menu.Dropdown>
+                </Menu>
+            )}
+        </Group>
+    );
+};
+
+/** Ce que dit une fiche proposée : auteurs, tomes, année, même auteur. */
+const proposalDetails = ({ details }: ManagedSeries['proposals'][number]) =>
+    [
+        details.writer,
+        details.penciller !== details.writer && details.penciller,
+        details.publisher,
+        details.volumeCount &&
+            `${details.volumeCount} tome${details.volumeCount > 1 ? 's' : ''}`,
+        details.year && `depuis ${details.year}`,
+        details.sameAuthor === true
+            ? 'même auteur'
+            : details.sameAuthor === false
+              ? 'autre auteur'
+              : null,
+    ]
+        .filter(Boolean)
+        .join(' · ');
+
+/**
+ * Fiche trouvée la nuit pour la série : son site, son nom (lien vers la
+ * fiche), ce qu'elle dit, et « Lier » ou « Ce n'est pas elle ».
+ */
+const ProposalLine = ({
+    seriesId,
+    proposal,
+    onAnswered,
+}: {
+    seriesId: number;
+    proposal: ManagedSeries['proposals'][number];
+    onAnswered: () => void;
+}) => {
+    const [busy, setBusy] = useState(false);
+    const answer = async (accept: boolean) => {
+        setBusy(true);
+        try {
+            await answerSheetProposal(seriesId, proposal, accept);
+            onAnswered();
+        } catch (e) {
+            notifications.show({ color: 'red', message: (e as Error).message });
+            setBusy(false);
+        }
+    };
+    return (
+        <Paper withBorder radius="sm" p={8} data-testid="proposal">
+            <Stack gap={4}>
+                <Text size="xs">
+                    Fiche {SOURCE_LABELS[proposal.site]} proposée :{' '}
+                    <Anchor
+                        href={sourceUrl({
+                            site: proposal.site,
+                            id: proposal.id,
+                        })}
+                        target="_blank"
+                        size="xs"
+                    >
+                        {proposal.title}
+                    </Anchor>
+                </Text>
+                <Text size="xs" c="dimmed">
+                    {proposalDetails(proposal)}
+                </Text>
+                <Group gap={6}>
+                    <Button
+                        size="compact-xs"
+                        variant="light"
+                        disabled={busy}
+                        onClick={() => void answer(true)}
+                    >
+                        Lier
+                    </Button>
+                    <Button
+                        size="compact-xs"
+                        variant="subtle"
+                        color="gray"
+                        disabled={busy}
+                        onClick={() => void answer(false)}
+                    >
+                        Ce n’est pas elle
+                    </Button>
+                </Group>
+            </Stack>
+        </Paper>
+    );
+};
+
+/**
  * Gestion des séries (admin) : toutes les séries en cartes, les fiches les
  * moins complètes d'abord, à trier et à filtrer ; chaque carte dit ce qui
  * manque et mène à l'éditeur (« Remplir », « Modifier »).
@@ -214,8 +409,9 @@ export const SeriesManagementPage = () => {
     const desc = params.get('dir') === 'desc';
     const formatFilter = params.get('format');
     const statusFilter = params.get('status');
+    const sheetFilter = params.get('sheet') as SheetFilter | null;
     const [search, setSearch] = useState('');
-    const { data, error } = useQuery(fetchManagedSeries, []);
+    const { data, error, reload } = useQuery(fetchManagedSeries, []);
     const formats = useQuery(fetchFormats, []);
 
     const update = (changes: Record<string, string | null>) =>
@@ -253,7 +449,8 @@ export const SeriesManagementPage = () => {
                 (!statusFilter ||
                     (statusFilter === 'none'
                         ? !r.status
-                        : r.status === statusFilter)),
+                        : r.status === statusFilter)) &&
+                (!sheetFilter || matchesSheets(r, sheetFilter)),
         )
         .filter((r) => !text || genreKey(r.name).includes(text))
         .sort(compareRows(sort, desc));
@@ -265,7 +462,8 @@ export const SeriesManagementPage = () => {
     const extraFilters =
         (filter !== 'all' ? 1 : 0) +
         (formatFilter ? 1 : 0) +
-        (statusFilter ? 1 : 0);
+        (statusFilter ? 1 : 0) +
+        (sheetFilter ? 1 : 0);
     const chooseFilter = (value: Filter) =>
         update({ filter: value === 'all' ? null : value });
 
@@ -390,6 +588,20 @@ export const SeriesManagementPage = () => {
                                         update({ status: value })
                                     }
                                 />
+                                <Select
+                                    label="Fiches en ligne"
+                                    placeholder="Toutes"
+                                    clearable
+                                    comboboxProps={{ withinPortal: false }}
+                                    data={SHEET_FILTERS.map((f) => ({
+                                        value: f.value,
+                                        label: `${f.label} (${rows.filter((r) => matchesSheets(r, f.value)).length})`,
+                                    }))}
+                                    value={sheetFilter}
+                                    onChange={(value) =>
+                                        update({ sheet: value })
+                                    }
+                                />
                             </Stack>
                         </Popover.Dropdown>
                     </Popover>
@@ -409,6 +621,17 @@ export const SeriesManagementPage = () => {
                             >
                                 {counts['to-review']} fiche
                                 {counts['to-review'] > 1 ? 's' : ''} à revoir
+                            </Anchor>
+                        )}
+                        {counts.proposed > 0 && filter !== 'proposed' && (
+                            <Anchor
+                                component="button"
+                                size="xs"
+                                onClick={() => chooseFilter('proposed')}
+                            >
+                                {counts.proposed} série
+                                {counts.proposed > 1 ? 's' : ''} avec une fiche
+                                proposée
                             </Anchor>
                         )}
                         {filter !== 'all' && (
@@ -506,6 +729,17 @@ export const SeriesManagementPage = () => {
                                                 .filter(Boolean)
                                                 .join(' · ')}
                                         </Text>
+                                        <VolumesCountLine
+                                            seriesId={s.id}
+                                            status={s.volumesStatus}
+                                            onChanged={reload}
+                                        />
+                                        {/* Fiches en ligne liées. */}
+                                        <Text size="xs" c="dimmed">
+                                            {s.sheetSites.length
+                                                ? `Fiches : ${s.sheetSites.map((site) => SOURCE_LABELS[site]).join(' · ')}`
+                                                : 'Aucune fiche en ligne'}
+                                        </Text>
                                         {/* Changé sur le site depuis la
                                             dernière visite : rien
                                             d'appliqué, à revoir. */}
@@ -517,6 +751,16 @@ export const SeriesManagementPage = () => {
                                         )}
                                     </Stack>
                                 </Group>
+                                {/* Fiches trouvées la nuit : liées
+                                    seulement par l'admin. */}
+                                {s.proposals.map((proposal) => (
+                                    <ProposalLine
+                                        key={`${proposal.site}:${proposal.id}`}
+                                        seriesId={s.id}
+                                        proposal={proposal}
+                                        onAnswered={reload}
+                                    />
+                                ))}
                                 <Group
                                     justify="space-between"
                                     wrap="nowrap"

@@ -99,6 +99,11 @@ export const series = sqliteTable(
         // (« manga-news:Dr-Stone wikipedia:123 », voir
         // `metadata/sourceLink.ts`) ; null = aucune.
         sources: text('source'),
+        // Fiche qui donne le nombre de tomes parus (tomes manquants), choisie
+        // par l'admin ; null = la plus proche des tomes de Bento.
+        volumeCountSite: text('volume_count_site', {
+            enum: ['manga-news', 'bedetheque'],
+        }),
         writer: text('writer'),
         publisher: text('publisher'),
         createdAt: integer('created_at', { mode: 'timestamp' })
@@ -371,8 +376,54 @@ export const sourceSheets = sqliteTable(
             .$type<Record<string, string | number | boolean | null>>()
             .notNull(),
         changes: text('changes', { mode: 'json' }).$type<string[]>(),
+        // Tomes parus d'après la dernière lecture (tomes manquants).
+        volumeCount: integer('volume_count'),
     },
     (t) => [primaryKey({ columns: [t.site, t.sourceId] })],
+);
+
+/**
+ * Recherche de nuit d'une fiche manquante (Manga-news, Bedetheque) pour une
+ * série : le nom cherché (une autre recherche s'il change) et ses écritures
+ * déjà essayées (« et », « & »).
+ */
+export const sheetSearches = sqliteTable(
+    'sheet_searches',
+    {
+        seriesId: integer('series_id')
+            .notNull()
+            .references(() => series.id, { onDelete: 'cascade' }),
+        site: text('site').notNull(),
+        name: text('name').notNull(),
+        tried: text('tried', { mode: 'json' }).$type<string[]>().notNull(),
+        searchedAt: integer('searched_at', { mode: 'timestamp_ms' }).notNull(),
+    },
+    (t) => [primaryKey({ columns: [t.seriesId, t.site] })],
+);
+
+/**
+ * Fiche trouvée pour une série, à lier par l'admin : « pending » (à lire),
+ * « proposed » (montrée dans Séries), « refused » (jamais reproposée).
+ */
+export const sheetProposals = sqliteTable(
+    'sheet_proposals',
+    {
+        seriesId: integer('series_id')
+            .notNull()
+            .references(() => series.id, { onDelete: 'cascade' }),
+        site: text('site').notNull(),
+        sourceId: text('source_id').notNull(),
+        title: text('title').notNull(),
+        status: text('status', {
+            enum: ['pending', 'proposed', 'refused'],
+        }).notNull(),
+        // Ce que la fiche dit (auteurs, tomes, année), pour juger.
+        details: text('details', { mode: 'json' }).$type<
+            Record<string, string | number | boolean | null>
+        >(),
+        createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+    },
+    (t) => [primaryKey({ columns: [t.seriesId, t.site, t.sourceId] })],
 );
 
 /** Réglages de l'admin (clé → valeur JSON). */

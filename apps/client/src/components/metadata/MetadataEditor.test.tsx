@@ -85,8 +85,12 @@ const mockServer = (online: Record<string, unknown> = {}) => {
         const site = Object.keys(online).find((key) =>
             url.includes(`/metadata/${key}`),
         );
+        // Une réponse, ou une fonction de l'adresse (selon la recherche).
+        const answer = site ? online[site] : undefined;
         const response = site
-            ? online[site]
+            ? typeof answer === 'function'
+                ? (answer as (url: string) => unknown)(url)
+                : answer
             : url.endsWith('/publish')
               ? {
                     published: body.paths.map((p: string) => ({
@@ -449,6 +453,15 @@ describe('MetadataEditor', () => {
             'manga-news/search': [],
             'wikipedia/search': [],
             'bedetheque/search': [{ id: '25654', title: 'Gantz' }],
+            // Albums : titre et année du tome 1 seulement.
+            'bedetheque/volumes': [
+                {
+                    kind: 'volume',
+                    number: 1,
+                    title: 'Le début',
+                    year: 2002,
+                },
+            ],
             'bedetheque/series': {
                 id: '25654',
                 title: 'Gantz',
@@ -510,6 +523,31 @@ describe('MetadataEditor', () => {
 
         // (3,9 × 39 + 4,3 × 127) / 166, avant même d'enregistrer.
         await vi.waitFor(() => expect(badge()).toBe('★ 4,2'));
+        // Le titre et l'année du tome 1, d'après les albums (l'année lue
+        // dans le nom de fichier, déjà là, est gardée).
+        await vi.waitFor(() =>
+            expect(
+                (
+                    screen.getByLabelText(
+                        'Titre de Gantz T01 (2017).cbz',
+                    ) as HTMLInputElement
+                ).value,
+            ).toBe('Le début'),
+        );
+        expect(
+            (
+                screen.getByLabelText(
+                    'Année de Gantz T01 (2017).cbz',
+                ) as HTMLInputElement
+            ).value,
+        ).toBe('2017');
+        expect(
+            (
+                screen.getByLabelText(
+                    'Titre de Gantz T02 (2017).cbz',
+                ) as HTMLInputElement
+            ).value,
+        ).toBe('');
         fireEvent.click(screen.getByRole('button', { name: /Enregistrer/ }));
         await vi.waitFor(() =>
             expect(save).toHaveBeenCalledWith(
@@ -521,6 +559,62 @@ describe('MetadataEditor', () => {
                 }),
             ),
         );
+    });
+
+    it('finds a sheet written with « & » instead of « et », and keeps the sheet already chosen', async () => {
+        mockServer({
+            'manga-news/search': [],
+            'wikipedia/search': [],
+            // « Gloutons et Dragons » : rien ; « Gloutons & Dragons » : la série.
+            'bedetheque/search': (url: string) =>
+                decodeURIComponent(url).includes('&') || url.includes('%26')
+                    ? [{ id: '61000', title: 'Gloutons & Dragons' }]
+                    : [],
+            'bedetheque/series': {
+                id: '61000',
+                title: 'Gloutons & Dragons',
+                url: 'https://www.bedetheque.com/serie_61000.html',
+                genres: [],
+                origin: 'Manga',
+                writer: '',
+                penciller: '',
+                publisher: '',
+                summary: '',
+                oneShot: false,
+            },
+        });
+        render(<Editor />);
+        fireEvent.click(screen.getByRole('button', { name: /Remplir/ }));
+        const query = (await screen.findByPlaceholderText(
+            'Nom de la série',
+        )) as HTMLInputElement;
+        fireEvent.change(query, { target: { value: 'Gloutons et Dragons' } });
+        fireEvent.click(screen.getByRole('button', { name: 'Rechercher' }));
+
+        // Ouverte d'elle-même : même nom, à l'écriture près.
+        const bedetheque = await screen.findByRole('region', {
+            name: 'Bedetheque',
+        });
+        expect(
+            await within(bedetheque).findByText('Gloutons & Dragons'),
+        ).toBeTruthy();
+        expect(
+            screen.getByRole('button', { name: 'Comparer la fiche' }),
+        ).toBeTruthy();
+
+        // Nouvelle recherche : la fiche choisie reste.
+        fireEvent.change(query, { target: { value: 'Gloutons' } });
+        fireEvent.click(screen.getByRole('button', { name: 'Rechercher' }));
+        await vi.waitFor(() =>
+            expect(
+                screen.getByRole('button', { name: 'Comparer la fiche' }),
+            ).toBeTruthy(),
+        );
+        expect(
+            within(
+                screen.getByRole('region', { name: 'Bedetheque' }),
+            ).getByText('Gloutons & Dragons'),
+        ).toBeTruthy();
     });
 
     it('requires a format, and keeps the exact age in Bento', async () => {

@@ -1,3 +1,5 @@
+import { SOURCE_LABELS } from '@server/types';
+
 /** Taille lisible : « 12,4 Go », « 820 Mo ». */
 export const formatSize = (bytes: number) => {
     const units = ['o', 'Ko', 'Mo', 'Go', 'To'];
@@ -53,3 +55,65 @@ export const ratingLabel = (rating: number) =>
 /** Nombre d'avis : « 96 avis », « 1 avis ». */
 export const reviewsLabel = (count: number) =>
     `${count.toLocaleString('fr-FR')} avis`;
+
+/**
+ * Numéros de tomes, les suites regroupées : « 3, 7 à 9, 12 » (deux numéros
+ * qui se suivent restent séparés : « 5, 6 »).
+ */
+export const numbersLabel = (numbers: number[]) => {
+    const parts: string[] = [];
+    const sorted = [...numbers].sort((a, b) => a - b);
+    for (let i = 0; i < sorted.length;) {
+        let j = i;
+        while (j + 1 < sorted.length && sorted[j + 1] === sorted[j]! + 1) j++;
+        parts.push(
+            j - i >= 2
+                ? `${sorted[i]} à ${sorted[j]}`
+                : sorted.slice(i, j + 1).join(', '),
+        );
+        i = j + 1;
+    }
+    return parts.join(', ');
+};
+
+type PublishedCount = { site: 'manga-news' | 'bedetheque'; count: number };
+
+/**
+ * « Tomes manquants : 7, 13 à 15 (15 parus d'après Manga-news) », avec le
+ * nombre des autres fiches s'il diffère (« ; Bedetheque : 18 »).
+ */
+export const missingVolumesLabel = ({
+    published,
+    others,
+    missing,
+}: {
+    published: PublishedCount | null;
+    others: PublishedCount[];
+    missing: number[];
+}) => {
+    const sources = published
+        ? ` (${[
+              `${published.count} parus d’après ${SOURCE_LABELS[published.site]}`,
+              ...others.map((o) => `${SOURCE_LABELS[o.site]} : ${o.count}`),
+          ].join(' ; ')})`
+        : '';
+    return `${missing.length > 1 ? 'Tomes manquants' : 'Tome manquant'} : ${numbersLabel(missing)}${sources}`;
+};
+
+/**
+ * Tomes parus quand les fiches ne disent pas le même nombre, sans tome
+ * manquant : « 18 tomes parus d'après Bedetheque ; Manga-news : 37 ».
+ */
+export const publishedLabel = ({
+    published,
+    others,
+}: {
+    published: PublishedCount | null;
+    others: PublishedCount[];
+}) =>
+    published
+        ? [
+              `${published.count} tome${published.count > 1 ? 's' : ''} parus d’après ${SOURCE_LABELS[published.site]}`,
+              ...others.map((o) => `${SOURCE_LABELS[o.site]} : ${o.count}`),
+          ].join(' ; ')
+        : '';

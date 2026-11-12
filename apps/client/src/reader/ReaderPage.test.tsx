@@ -1,6 +1,12 @@
 import { MantineProvider } from '@mantine/core';
 import { act, fireEvent, render, screen } from '@testing-library/react';
-import { MemoryRouter, Route, Routes, useLocation } from 'react-router';
+import {
+    MemoryRouter,
+    Route,
+    Routes,
+    useLocation,
+    useNavigate,
+} from 'react-router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ReaderPage } from './ReaderPage';
@@ -39,6 +45,12 @@ let location = '';
 const Location = () => {
     location = useLocation().pathname + useLocation().search;
     return null;
+};
+
+/** Ouvre une autre adresse, comme le ferait un lien. */
+const GoTo = ({ to }: { to: string }) => {
+    const navigate = useNavigate();
+    return <button onClick={() => navigate(to)}>Aller</button>;
 };
 
 const open = async (
@@ -173,17 +185,13 @@ describe('ReaderPage', () => {
         );
     });
 
-    it('offers the next volume after the last page', async () => {
+    it('opens the next volume by turning the last page, without an end screen', async () => {
         await open('rtl', '/read/7?page=3');
 
         press(' ');
 
-        expect(screen.getByText('Fin du tome')).toBeTruthy();
-        expect(
-            screen
-                .getByRole('link', { name: 'Tome suivant' })
-                .getAttribute('href'),
-        ).toBe('/read/8');
+        expect(screen.queryByText('Fin du tome')).toBeNull();
+        await vi.waitFor(() => expect(location).toBe('/read/8'));
     });
 
     it('goes back to the series with Escape', async () => {
@@ -371,7 +379,13 @@ describe('ReaderPage', () => {
             ]),
         );
         expect(screen.queryByRole('slider')).toBeNull();
-        expect(screen.getByText('Fin du tome')).toBeTruthy();
+        // Sous la dernière page : le tome suivant, sans « Fin du tome ».
+        expect(screen.queryByText('Fin du tome')).toBeNull();
+        expect(
+            screen
+                .getByRole('link', { name: 'Tome suivant' })
+                .getAttribute('href'),
+        ).toBe('/read/8');
         // Les flèches ne tournent pas de page : le défilement reste natif.
         await vi.waitFor(() => expect(location).toBe('/read/7?page=1'));
         press('ArrowRight');
@@ -413,6 +427,7 @@ describe('ReaderPage', () => {
                         <Route path="/read/:id" element={<ReaderPage />} />
                     </Routes>
                     <Location />
+                    <GoTo to="/read/8" />
                 </MemoryRouter>
             </MantineProvider>,
         );
@@ -422,7 +437,8 @@ describe('ReaderPage', () => {
             ),
         );
 
-        fireEvent.click(await screen.findByText('Tome suivant'));
+        // Tome suivant ouvert (plus de bouton en fin de webtoon).
+        fireEvent.click(screen.getByRole('button', { name: 'Aller' }));
 
         await vi.waitFor(() =>
             expect(scrolled.at(-1)).toBe(

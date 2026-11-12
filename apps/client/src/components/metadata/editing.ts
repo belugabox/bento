@@ -6,6 +6,7 @@ import {
     type MetadataSource,
     SHEET_FIELDS,
     type SheetField,
+    type SheetVolume,
     type SourcePriority,
     type VolumeKind,
     articleFirst,
@@ -183,6 +184,47 @@ export const fillFromFileNames = (
         }
     }
     return next;
+};
+
+/**
+ * Titre et année de chaque tome d'après les tomes des fiches (Bedetheque,
+ * Wikipédia), rapprochés par type et numéro (un one-shot : celui de la
+ * fiche). Seuls les champs vides sont remplis, par la première fiche qui
+ * donne une valeur. Renvoie aussi le nombre de champs remplis.
+ */
+export const fillFromSheetVolumes = (
+    edits: Edits,
+    volumes: Pick<EditableVolume, 'path'>[],
+    lists: SheetVolume[][],
+): { edits: Edits; filled: number } => {
+    let next = edits;
+    let filled = 0;
+    for (const volume of volumes) {
+        const info = next[volume.path] ?? {};
+        const { kind, number } = volumeNumbering(info);
+        const wanted = number === undefined ? null : Number(number);
+        const matches = lists.flatMap((list) =>
+            list.filter(
+                (v) =>
+                    v.kind === kind &&
+                    (kind === 'one-shot' ||
+                        (v.number === null
+                            ? wanted === null
+                            : v.number === wanted)),
+            ),
+        );
+        const title = matches.find((v) => v.title)?.title;
+        if (title && isEmpty(info.Title)) {
+            next = setVolumeField(next, volume.path, 'Title', title);
+            filled++;
+        }
+        const year = matches.find((v) => v.year)?.year;
+        if (year && isEmpty(info.Year)) {
+            next = setVolumeField(next, volume.path, 'Year', year);
+            filled++;
+        }
+    }
+    return { edits: next, filled };
 };
 
 /**

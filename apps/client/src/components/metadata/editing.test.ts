@@ -4,6 +4,7 @@ import { DEFAULT_SOURCE_PRIORITY } from '@server/types';
 
 import {
     type EditableVolume,
+    type Edits,
     applySheetValues,
     changesOf,
     chosenValues,
@@ -11,6 +12,7 @@ import {
     defaultChoice,
     editedValues,
     fillFromFileNames,
+    fillFromSheetVolumes,
     initialEdits,
     isFieldChanged,
     isMixed,
@@ -465,5 +467,82 @@ describe('rating from the online sheets', () => {
             [],
         );
         expect(values).toEqual({ Series: 'Spy x Family' });
+    });
+});
+
+describe('fillFromSheetVolumes', () => {
+    const paths = ['T01.cbz', 'T02.cbz', 'HS01.cbz', 'T03.cbz'].map((path) => ({
+        path,
+    }));
+    const edits: Edits = {
+        'T01.cbz': { Series: 'Blacksad', Number: '1' },
+        // Déjà rempli : gardé.
+        'T02.cbz': { Series: 'Blacksad', Number: '2', Title: 'Mon titre' },
+        'HS01.cbz': { Series: 'Blacksad', Number: '1', Format: 'Hors-série' },
+        'T03.cbz': { Series: 'Blacksad', Number: '3' },
+    };
+
+    it('fills the empty titles and years, matching kind and number', () => {
+        const { edits: next, filled } = fillFromSheetVolumes(edits, paths, [
+            [
+                {
+                    kind: 'volume',
+                    number: 1,
+                    title: 'Quelque part',
+                    year: 2000,
+                },
+                {
+                    kind: 'volume',
+                    number: 2,
+                    title: 'Arctic-Nation',
+                    year: 2003,
+                },
+                {
+                    kind: 'hors-serie',
+                    number: 1,
+                    title: 'Aquarelles',
+                    year: 2005,
+                },
+            ],
+            // Wikipédia : l'année seule, après Bedetheque.
+            [
+                { kind: 'volume', number: 1, year: 1999 },
+                { kind: 'volume', number: 3, year: 2005 },
+            ],
+        ]);
+        expect(next['T01.cbz']).toMatchObject({
+            Title: 'Quelque part',
+            Year: 2000,
+        });
+        expect(next['T02.cbz']).toMatchObject({
+            Title: 'Mon titre',
+            Year: 2003,
+        });
+        expect(next['HS01.cbz']).toMatchObject({
+            Title: 'Aquarelles',
+            Year: 2005,
+        });
+        expect(next['T03.cbz']).toMatchObject({ Year: 2005 });
+        expect(next['T03.cbz']?.Title).toBeUndefined();
+        expect(filled).toBe(6);
+    });
+
+    it('matches a one-shot with the one of the sheet', () => {
+        expect(
+            fillFromSheetVolumes(
+                { 'A.cbz': { Series: 'Asterios Polyp', Format: 'One-shot' } },
+                [{ path: 'A.cbz' }],
+                [
+                    [
+                        {
+                            kind: 'one-shot',
+                            number: null,
+                            title: 'Asterios Polyp',
+                            year: 2010,
+                        },
+                    ],
+                ],
+            ).edits['A.cbz'],
+        ).toMatchObject({ Title: 'Asterios Polyp', Year: 2010 });
     });
 });

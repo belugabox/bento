@@ -1,5 +1,6 @@
 import { Alert, Button, Center, Loader, Text } from '@mantine/core';
 import { useLocalStorage } from '@mantine/hooks';
+import { notifications } from '@mantine/notifications';
 import { useCallback, useContext, useEffect, useRef } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 
@@ -149,6 +150,20 @@ export const ReaderPage = () => {
     const exitLabel = online
         ? 'Retour à la série'
         : 'Retour aux téléchargements';
+    // Tome suivant lisible : en ligne, ou téléchargé sur l'appareil.
+    const nextReadable =
+        !!volume.nextId &&
+        (online || downloads.some((d) => d.id === volume.nextId));
+    // Rien après le dernier tome (ou le suivant pas téléchargé) : un
+    // simple message, sans écran de fin.
+    const noNext = volume.nextId
+        ? 'Tome suivant pas téléchargé'
+        : 'Dernier tome de la série';
+    const openNext = () =>
+        nextReadable
+            ? navigate(`/read/${volume.nextId}`)
+            : notifications.show({ id: 'reader-end', message: noNext });
+    const mode = modes[volume.seriesId] ?? volume.readingMode ?? 'ltr';
     return (
         <Reader
             title={`${volume.seriesName} — ${volumeLabel(volume)}`}
@@ -160,7 +175,7 @@ export const ReaderPage = () => {
             goTo={goTo}
             onShown={onShown}
             onBeforeFirst={onBeforeFirst}
-            mode={modes[volume.seriesId] ?? volume.readingMode ?? 'ltr'}
+            mode={mode}
             onModeChange={(mode) =>
                 setModes((current) => ({
                     ...current,
@@ -173,27 +188,19 @@ export const ReaderPage = () => {
                 onExit: () => navigate(exitUrl),
                 label: exitLabel,
             }}
+            // Page par page : la page suivante ouvre le tome suivant ;
+            // webtoon : un bouton sous la dernière page.
+            onAfterLast={openNext}
             end={
-                <>
-                    {volume.nextId &&
-                    !online &&
-                    !downloads.some((d) => d.id === volume.nextId) ? (
-                        <Text c="dimmed" size="sm">
-                            Tome suivant pas téléchargé
-                        </Text>
-                    ) : volume.nextId ? (
-                        <Button component={Link} to={`/read/${volume.nextId}`}>
-                            Tome suivant
-                        </Button>
-                    ) : (
-                        <Text c="dimmed" size="sm">
-                            Dernier tome de la série
-                        </Text>
-                    )}
-                    <Button variant="default" component={Link} to={exitUrl}>
-                        {exitLabel}
+                nextReadable ? (
+                    <Button component={Link} to={`/read/${volume.nextId}`}>
+                        Tome suivant
                     </Button>
-                </>
+                ) : (
+                    <Text c="dimmed" size="sm">
+                        {noNext}
+                    </Text>
+                )
             }
         />
     );

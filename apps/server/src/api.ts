@@ -60,7 +60,11 @@ import {
     updateGenre,
 } from './library/genres';
 import { setSeriesLists } from './library/lists';
-import { countToClassify, listManagedSeries } from './library/management';
+import {
+    countToClassify,
+    listManagedSeries,
+    setVolumeCountSite,
+} from './library/management';
 import { isPageWidth } from './library/pageWidths';
 import {
     getProgress,
@@ -76,6 +80,7 @@ import { familyReaders, seriesReaders } from './library/readers';
 import { addReadingTime } from './library/readingTime';
 import { ResizedPages } from './library/resizedPages';
 import { type LibraryScanner, coverFile } from './library/scanner';
+import { SEARCHED_SITES, answerProposal } from './library/sheetProposals';
 import { SheetRefresher } from './library/sheetRefresh';
 import { sheetSeen } from './library/sheets';
 import { readCover } from './library/smallCovers';
@@ -613,6 +618,15 @@ export const createApi = ({
             async (c) =>
                 c.json(await wikipedia.series(c.req.valid('param').id)),
         )
+        // Tomes de la série (année de sortie en France), pour remplir ceux
+        // de Bento.
+        .get(
+            '/metadata/wikipedia/:id/volumes',
+            requireAdmin,
+            zValidator('param', idParam),
+            async (c) =>
+                c.json(await wikipedia.volumes(c.req.valid('param').id)),
+        )
         // --- Métadonnées Manga-news (admin), lues à la demande.
         .get(
             '/metadata/manga-news/search',
@@ -658,6 +672,17 @@ export const createApi = ({
                 sheetSeen(db, 'bedetheque', id, series);
                 return c.json(series);
             },
+        )
+        // Albums de la série (numéro, titre, année).
+        .get(
+            '/metadata/bedetheque/volumes',
+            requireAdmin,
+            zValidator(
+                'query',
+                z.object({ id: z.string().regex(/^\d{1,12}$/) }),
+            ),
+            async (c) =>
+                c.json(await bedetheque.volumes(c.req.valid('query').id)),
         )
         // --- Mise à jour des fiches liées, la nuit (admin).
         .get('/metadata/refresh', requireAdmin, (c) =>
@@ -1135,6 +1160,42 @@ export const createApi = ({
         )
         .get('/manage/series/to-classify', requireAdmin, (c) =>
             c.json({ count: countToClassify(db) }),
+        )
+        // Fiche qui donne le nombre de tomes parus ; null : automatique.
+        .put(
+            '/manage/series/:id/volume-count-site',
+            requireAdmin,
+            zValidator('param', idParam),
+            zValidator(
+                'json',
+                z.object({
+                    site: z.enum(['manga-news', 'bedetheque']).nullable(),
+                }),
+            ),
+            (c) => {
+                const { site } = c.req.valid('json');
+                setVolumeCountSite(db, c.req.valid('param').id, site);
+                return c.json({ site });
+            },
+        )
+        // Fiche proposée (trouvée la nuit) : liée, ou refusée pour de bon.
+        .post(
+            '/manage/series/:id/proposals',
+            requireAdmin,
+            zValidator('param', idParam),
+            zValidator(
+                'json',
+                z.object({
+                    site: z.enum(SEARCHED_SITES),
+                    id: z.string().min(1).max(200),
+                    accept: z.boolean(),
+                }),
+            ),
+            (c) => {
+                const { site, id, accept } = c.req.valid('json');
+                answerProposal(db, c.req.valid('param').id, site, id, accept);
+                return c.json({ ok: true });
+            },
         )
         .patch(
             '/users/:id',

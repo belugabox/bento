@@ -79,7 +79,9 @@ export const SheetRefreshSettings = ({
                         Relit chaque mois les fiches Manga-news et Bedetheque
                         des séries : la note des lecteurs est mise à jour, les
                         autres changements (tomes, statut, résumé…) sont
-                        signalés dans Séries, sans rien modifier.
+                        signalés dans Séries, sans rien modifier. Cherche aussi
+                        la fiche des séries qui n’en ont pas sur un site : elle
+                        est proposée dans Séries, à lier ou non.
                     </Text>
                 </div>
                 <Switch
@@ -123,9 +125,22 @@ export const SheetRefreshSettings = ({
                                   ? `${status.linked} fiches liées, toutes relues ce mois-ci.`
                                   : `${status.due} fiches à relire sur ${status.linked}.`}
                         </Text>
+                        {(status.toSearch > 0 || status.proposed > 0) && (
+                            <Text size="sm">
+                                {[
+                                    status.toSearch > 0 &&
+                                        `${status.toSearch} recherche${status.toSearch > 1 ? 's' : ''} de fiche à faire`,
+                                    status.proposed > 0 &&
+                                        `${status.proposed} fiche${status.proposed > 1 ? 's' : ''} proposée${status.proposed > 1 ? 's' : ''} dans Séries`,
+                                ]
+                                    .filter(Boolean)
+                                    .join(' · ')}
+                                .
+                            </Text>
+                        )}
                         {status.lastCheckedAt && (
                             <Text size="xs" c="dimmed">
-                                Dernière fiche relue{' '}
+                                Dernière requête{' '}
                                 {formatRelative(status.lastCheckedAt)}.
                             </Text>
                         )}
@@ -139,7 +154,7 @@ export const SheetRefreshSettings = ({
                         )}
                     </Stack>
                 )}
-                {status && status.due > 0 && (
+                {status && status.due + status.toSearch > 0 && (
                     <Group>
                         <Button
                             size="xs"

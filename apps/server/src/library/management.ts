@@ -1,17 +1,48 @@
 import { eq, sql } from 'drizzle-orm';
 
+import type { ComicInfo } from '../archive/comicInfo';
 import { classify } from '../classification';
 import type { Db } from '../db';
 import { formats, libraries, series, volumes } from '../db/schema';
 import { parseSources } from '../metadata/sourceLink';
-import { coverVolumeSql, ratingFields } from './catalog';
+import { notFound } from '../tools/errors';
+import { coverVolumeSql, ratingFields, volumeOrder } from './catalog';
+import { completenessOf, fieldsFromVolumes } from './completeness';
 import { genreCatalog } from './genres';
+import { publishedCounts, volumesStatus } from './missingVolumes';
 import { seriesRatingOf, sourceRatingsMap } from './ratings';
+import { proposalsBySeries } from './sheetProposals';
 import { sourceSheetsMap } from './sheets';
 import { compareNames } from './sortName';
 
 /** Séries à classer : sans format, ou sans âge (choisi ou déduit des tomes). */
 const toClassifySql = sql`(series.format_id is null or coalesce(series.age, series.min_age) is null)`;
+
+/**
+ * ComicInfo de chaque tome (ce que la complétude regarde), série par série,
+ * dans l'ordre des tomes : celui de l'éditeur et de la fiche série.
+ */
+const volumeInfos = (db: Db) => {
+    const bySeries = new Map<number, ComicInfo[]>();
+    const rows = db
+        .select({
+            seriesId: volumes.seriesId,
+            info: sql<string>`json_object('Series', json_extract(${volumes.comicInfo}, '$.Series'), 'Writer', json_extract(${volumes.comicInfo}, '$.Writer'), 'Penciller', json_extract(${volumes.comicInfo}, '$.Penciller'), 'Publisher', json_extract(${volumes.comicInfo}, '$.Publisher'), 'Genre', json_extract(${volumes.comicInfo}, '$.Genre'), 'Tags', json_extract(${volumes.comicInfo}, '$.Tags'), 'Summary', json_extract(${volumes.comicInfo}, '$.Summary'), 'Year', json_extract(${volumes.comicInfo}, '$.Year'), 'Number', json_extract(${volumes.comicInfo}, '$.Number'), 'Format', json_extract(${volumes.comicInfo}, '$.Format'))`,
+        })
+        .from(volumes)
+        .orderBy(volumes.seriesId, ...volumeOrder)
+        .all();
+    for (const { seriesId, info } of rows) {
+        // Champs absents : null dans json_object, absents du ComicInfo.
+        const parsed = Object.fromEntries(
+            Object.entries(JSON.parse(info) as Record<string, unknown>).filter(
+                ([, value]) => value !== null,
+            ),
+        ) as ComicInfo;
+        bySeries.set(seriesId, [...(bySeries.get(seriesId) ?? []), parsed]);
+    }
+    return bySeries;
+};
 
 /**
  * Gestion des séries (admin) : toutes les séries, avec ce qu'il faut pour
@@ -22,11 +53,15 @@ export const listManagedSeries = (db: Db) => {
     const catalog = genreCatalog(db);
     const ratings = sourceRatingsMap(db);
     const sheets = sourceSheetsMap(db);
+    const infos = volumeInfos(db);
+    const proposals = proposalsBySeries(db);
     return db
         .select({
             id: series.id,
             libraryId: series.libraryId,
             libraryName: libraries.name,
+            // Mangas : Manga-news a leur fiche (filtre « Sans Manga-news »).
+            libraryType: libraries.type,
             name: series.name,
             genre: series.genre,
             tags: series.tags,
@@ -42,14 +77,7 @@ export const listManagedSeries = (db: Db) => {
                 ),
             writer: series.writer,
             publisher: series.publisher,
-            penciller: sql<
-                string | null
-            >`(select json_extract(v.comic_info, '$.Penciller') from volumes v where v.series_id = series.id order by v.kind != 'volume', v.kind, v.sort_number is null, v.sort_number, v.file limit 1)`,
             volumeCount: sql<number>`count(${volumes.id})`,
-            // Tomes au numéro et à l'année renseignés (complétude).
-            // Un one-shot, une intégrale sans numéro : rien à numéroter.
-            withNumber: sql<number>`count(case when coalesce(trim(${volumes.number}), '') != '' or ${volumes.kind} in ('one-shot', 'integrale') then 1 end)`,
-            withYear: sql<number>`count(json_extract(${volumes.comicInfo}, '$.Year'))`,
             pageCount: sql<number>`coalesce(sum(${volumes.pageCount}), 0)`,
             size: sql<number>`coalesce(sum(${volumes.size}), 0)`,
             firstAddedAt: sql<number | null>`min(${volumes.addedAt})`.mapWith(
@@ -63,6 +91,14 @@ export const listManagedSeries = (db: Db) => {
             coverUpdatedAt: series.coverUpdatedAt,
             ...coverVolumeSql,
             sources: series.sources,
+            volumeCountSite: series.volumeCountSite,
+            // Tomes numérotés (« 1|2|5 ») et intégrales : tomes manquants.
+            volumeNumbers: sql<
+                string | null
+            >`(select group_concat(v.number, '|') from volumes v where v.series_id = series.id and v.kind = 'volume')`,
+            integrales: sql<number>`count(case when ${volumes.kind} = 'integrale' then 1 end)`,
+            // Hors-séries et spéciaux (que Manga-news compte dans la série).
+            extras: sql<number>`count(case when ${volumes.kind} in ('hors-serie', 'special') then 1 end)`,
         })
         .from(series)
         .innerJoin(libraries, eq(libraries.id, series.libraryId))
@@ -71,18 +107,72 @@ export const listManagedSeries = (db: Db) => {
         .groupBy(series.id)
         .all()
         .sort((a, b) => compareNames(a.name, b.name))
-        .map(({ genre, tags, sources, ...row }) => ({
-            ...row,
-            ...ratingFields(seriesRatingOf(parseSources(sources), ratings)),
-            // Fiches changées depuis que l'admin les a vues (mise à jour
-            // de nuit) : « Fiche à revoir ».
-            // Sites des fiches liées (filtre « Sans fiche Bedetheque »).
-            sheetSites: parseSources(sources).map((link) => link.site),
-            sheetChanges: parseSources(sources).flatMap(
-                (link) => sheets.get(`${link.site}:${link.id}`)?.changes ?? [],
-            ),
-            ...classify(genre, tags, catalog),
-        }));
+        .map(
+            ({
+                genre,
+                tags,
+                sources,
+                volumeNumbers,
+                integrales,
+                extras,
+                ...row
+            }) => {
+                const rating = seriesRatingOf(parseSources(sources), ratings);
+                // Comme l'éditeur et la fiche série : la première valeur
+                // remplie de chaque champ, dans l'ordre des tomes.
+                const fields = fieldsFromVolumes(infos.get(row.id) ?? []);
+                return {
+                    ...row,
+                    completeness: completenessOf({
+                        ...fields,
+                        hasFormat: !!row.formatId,
+                        hasAge: (row.age ?? row.fileAge) !== null,
+                        hasStatus: !!row.status,
+                        hasRating: rating !== null,
+                        genreCount: classify(
+                            fields.genre ?? '',
+                            fields.tags ?? '',
+                            catalog,
+                        ).genres.length,
+                    }),
+                    volumesStatus: volumesStatus(
+                        [
+                            ...(volumeNumbers ?? '')
+                                .split('|')
+                                .filter(Boolean)
+                                .map((number) => ({ kind: 'volume', number })),
+                            ...(integrales > 0
+                                ? [{ kind: 'integrale', number: null }]
+                                : []),
+                            ...Array.from({ length: extras }, () => ({
+                                kind: 'special',
+                                number: null,
+                            })),
+                        ],
+                        publishedCounts(parseSources(sources), sheets),
+                        row.volumeCountSite,
+                    ),
+                    ...ratingFields(rating),
+                    // Sites des fiches liées (filtre « Sans fiche Bedetheque »).
+                    sheetSites: parseSources(sources).map((link) => link.site),
+                    // Fiches trouvées la nuit, à lier (sites encore sans fiche).
+                    proposals: (proposals.get(row.id) ?? []).filter(
+                        (p) =>
+                            !parseSources(sources).some(
+                                (link) => link.site === p.site,
+                            ),
+                    ),
+                    // Fiches changées depuis que l'admin les a vues (mise à jour
+                    // de nuit) : « Fiche à revoir ».
+                    sheetChanges: parseSources(sources).flatMap(
+                        (link) =>
+                            sheets.get(`${link.site}:${link.id}`)?.changes ??
+                            [],
+                    ),
+                    ...classify(genre, tags, catalog),
+                };
+            },
+        );
 };
 
 /** Nombre de séries à classer (compteur du menu). */
@@ -90,3 +180,21 @@ export const countToClassify = (db: Db) =>
     db.get<{ count: number }>(
         sql`select count(*) as count from series where ${toClassifySql}`,
     ).count;
+
+/**
+ * Fiche qui donne le nombre de tomes parus d'une série (tomes manquants) ;
+ * null : la plus proche des tomes de Bento.
+ */
+export const setVolumeCountSite = (
+    db: Db,
+    seriesId: number,
+    site: 'manga-news' | 'bedetheque' | null,
+) => {
+    const updated = db
+        .update(series)
+        .set({ volumeCountSite: site })
+        .where(eq(series.id, seriesId))
+        .returning({ id: series.id })
+        .get();
+    if (!updated) throw notFound('Série introuvable');
+};

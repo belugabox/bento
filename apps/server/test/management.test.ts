@@ -53,17 +53,46 @@ describe('series management', () => {
         expect(gantz).toMatchObject({
             volumeCount: 2,
             pageCount: 6,
-            withNumber: 2,
             formatId: null,
             hasSummary: false,
         });
+        // Comme l'éditeur : le numéro et l'année des ComicInfo.
+        expect(gantz.completeness.missing).toContain('Numéro de 2 tomes');
         expect(gantz.size).toBeGreaterThan(0);
         // Un one-shot n'a pas de numéro à donner : compté comme numéroté.
-        expect(body[1]).toMatchObject({ volumeCount: 1, withNumber: 1 });
+        expect(body[1].volumeCount).toBe(1);
+        expect(body[1].completeness.missing).not.toContainEqual(
+            expect.stringMatching(/^Numéro/),
+        );
         expect(gantz.coverVolumeId).toBeTypeOf('number');
         // Sans format ni âge : les deux sont à classer.
         expect((await get('/manage/series/to-classify', admin)).body).toEqual({
             count: 2,
+        });
+    });
+
+    it('reads the fields like the editor: the first volume that has one', async () => {
+        // Tome 1 sans auteur ni genre ; le tome 2 les a.
+        await writeCbz(ctx.file('Gantz/Gantz T01.cbz'), {
+            comicInfo: '<Series>Gantz</Series><Number>1</Number>',
+        });
+        await writeCbz(ctx.file('Gantz/Gantz T02.cbz'), {
+            comicInfo:
+                '<Series>Gantz</Series><Number>2</Number><Writer>Hiroya Oku</Writer><Penciller>Hiroya Oku</Penciller><Publisher>Delcourt</Publisher><Genre>Action</Genre>',
+        });
+        await ctx.scanner.scan(ctx.library.id);
+        const admin = sessionCookie(ctx.db, 'admin', 'admin');
+        const [gantz] = (await get('/manage/series', admin)).body;
+
+        expect(gantz.completeness.missing).not.toContain('Scénario');
+        expect(gantz.completeness.missing).not.toContain('Dessin');
+        expect(gantz.completeness.missing).not.toContain('Éditeur');
+        expect(gantz.completeness.missing).not.toContain('Genres');
+        // La série elle-même prend aussi la première valeur remplie.
+        expect(gantz).toMatchObject({
+            writer: 'Hiroya Oku',
+            publisher: 'Delcourt',
+            genres: ['Action'],
         });
     });
 

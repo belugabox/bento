@@ -2,7 +2,11 @@ import { load as cheerioLoad } from 'cheerio';
 
 import { articleFirst } from '../library/sortName';
 import { badGateway, notFound, refused } from '../tools/errors';
-import { type SeriesRating, bedethequeSeriesUrl } from './sourceLink';
+import {
+    type SeriesRating,
+    type SheetVolume,
+    bedethequeSeriesUrl,
+} from './sourceLink';
 
 // Métadonnées de séries depuis Bedetheque (BD, comics, romans graphiques,
 // mangas). Le site n'a pas d'API : la recherche passe par son
@@ -98,6 +102,64 @@ export const parseSearch = (json: unknown): BedethequeResult[] =>
             ];
         })
         .slice(0, MAX_RESULTS);
+
+/**
+ * Albums d'une page de série : « 1. Quelque part entre les ombres »,
+ * « HS1. … », « INT2. … », sans numéro pour un one shot ; année du dépôt
+ * légal. Les autres (« 1a », éditions spéciales…) sont laissés de côté.
+ */
+export const parseAlbums = (html: string): SheetVolume[] => {
+    const $ = cheerioLoad(html);
+    return $('article.bdt-edition')
+        .map((_, article) => {
+            const name = $(article).find('[itemprop="name"]').first();
+            const suffix = clean(name.find('.bdt-numa').text());
+            const text = clean(name.text());
+            // « 1. Titre » : numéro (et suffixe) avant le premier point.
+            const dot = /^([^.]*?)\s*\.\s*(.*)$/.exec(text);
+            const main = clean((dot?.[1] ?? '').replace(suffix, ''));
+            const title = dot ? clean(dot[2]) : text;
+            const date = $(article)
+                .find('meta[itemprop="datePublished"]')
+                .attr('content');
+            const year = Number(date?.slice(0, 4)) || undefined;
+            const kindOf = (): Pick<SheetVolume, 'kind' | 'number'> | null => {
+                if (!main && !suffix) return { kind: 'one-shot', number: null };
+                if (/^\d+$/.test(main) && !suffix) {
+                    return { kind: 'volume', number: Number(main) };
+                }
+                const special = /^(HS|INT)(\d*)$/i.exec(suffix || main);
+                if (!special) return null;
+                return {
+                    kind: /^HS$/i.test(special[1]!)
+                        ? 'hors-serie'
+                        : 'integrale',
+                    number: special[2] ? Number(special[2]) : null,
+                };
+            };
+            const kind = kindOf();
+            return kind
+                ? [
+                      {
+                          ...kind,
+                          ...(title && { title }),
+                          ...(year && { year }),
+                      },
+                  ]
+                : [];
+        })
+        .get()
+        .flat() as SheetVolume[];
+};
+
+/** Lien « Tout » d'une page de série (plus d'albums que ceux affichés). */
+const allAlbumsUrl = (html: string) => {
+    const $ = cheerioLoad(html);
+    return $('a')
+        .filter((_, a) => clean($(a).text()) === 'Tout')
+        .first()
+        .attr('href');
+};
 
 /**
  * Fiche d'une série : en-tête (genres, parution, années, tomes, origine),
@@ -267,9 +329,10 @@ export class Bedetheque {
     };
 
     /** Séries dont le nom correspond au texte (autocomplétion du site). */
-    search = async (text: string) => {
+    search = async (text: string, options?: { retry?: boolean }) => {
         const body = await this.get(
             `${BASE_URL}/ajax/series?term=${encodeURIComponent(text)}`,
+            options,
         );
         if (!body) return [];
         try {
@@ -277,6 +340,21 @@ export class Bedetheque {
         } catch {
             throw badGateway('Bedetheque a répondu autre chose que prévu');
         }
+    };
+
+    /**
+     * Albums d'une série (numéro, titre, année) ; une page de série en
+     * montre 10, la page « Tout » est demandée seulement s'il y en a plus.
+     */
+    volumes = async (id: string) => {
+        const html = await this.get(bedethequeSeriesUrl(id));
+        if (!html || !parseSeriesPage(html, id)) {
+            throw notFound(`Série introuvable sur Bedetheque (${id})`);
+        }
+        const all = allAlbumsUrl(html);
+        const full =
+            all && all.startsWith(BASE_URL) ? await this.get(all) : undefined;
+        return parseAlbums(full ?? html);
     };
 
     /** Fiche d'une série, par son identifiant. */

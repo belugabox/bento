@@ -1,0 +1,75 @@
+{{TomeBD/Entête
+ | langage_unique = non
+ | langue_1       = Japonais
+ | langue_2       = Français
+}}
+{{TomeBD
+ | langage_unique = non
+ | volume         = 1
+ | sortie_1       = {{date|11|décembre|2000}}<ref group="ja" name="v1ja"/>
+ | isbn_1         = 4-08-876105-7 | isbn_1_note = <ref group="ja" name="v1ja"/>
+ | sortie_2       = {{date|13|juillet|2003}}<ref group="fr" name="v1fr"/>
+ | isbn_2         = 2-84580-245-5 | isbn_2_note = <ref group="fr" name="v1fr"/>
+ | chapitre       = <div>
+* Ch. 001 : {{japonais|Incident|ある事故|Aru Jiko}}
+* Ch. 002 : {{japonais|No exit|不可解な部屋|Fukakai na Heya}}
+* Ch. 003 : {{japonais|La nudité suicidée|裸の自殺少女|Hadaka no Jisatsu Shōjo}}
+* Ch. 004 : {{japonais|Aux ordres de la sphère noire|黒球の指令|Kuro Tama no Shirei}}
+* Ch. 005 : {{japonais|Illusions|イリュージョン|Iryūjon}}
+* Ch. 006 : {{japonais|Rencontre avec l'Homme poireau|ねぎ星人との遭遇|Negi Seijin to no Sōkū}}
+* Ch. 007 : {{japonais|Repos inattendu|非予定調和|Hi-yotei Chōwa}}
+* Ch. 008 : {{japonais|Massacre|惨殺|Zansatsu}}
+* Ch. 009 : {{japonais|Test psychologique|アイヒマンテスト|Aihiman Tesuto}}
+* Ch. 010 : {{japonais|Colère|激憤|Gekifun}}
+</div>
+ | extra          = 
+ | résumé         = 
+}}
+{{TomeBD
+ | langage_unique = non
+ | volume         = 2
+ | sortie_1       = {{date|19|mars|2001}}<ref group="ja" name="v2ja"/>
+ | isbn_1         = 4-08-876139-1 | isbn_1_note = <ref group="ja" name="v2ja"/>
+ | sortie_2       = {{date|13|juillet|2003}}<ref group="fr" name="v2fr"/>
+ | isbn_2         = 2-84580-246-3 | isbn_2_note = <ref group="fr" name="v2fr"/>
+ | chapitre       = <div>
+* Ch. 011 : {{japonais|Mort générale|全員死亡|Zen'in Shibō}}
+* Ch. 012 : {{japonais|Hypnose et réveil|催眠と覚醒|Saimin to Kakusei}}
+* Ch. 013 : {{japonais|Regard|眼|Me}}
+* Ch. 014 : {{japonais|Sans peur|怖いもの知らず|Kowaimono Shirazu}}
+* Ch. 015 : {{japonais|Bondir ou mourir|跳躍か死か|Chōyaku ka Shi ka}}
+* Ch. 016 : {{japonais|Mutation physique|肉体の変貌|Nikutai no Henbō}}
+* Ch. 017 : {{japonais|Premier feu|発弾|Hatsudan}}
+* Ch. 018 : {{japonais|Conditions de survie|生還の条件|Seikan no Jōken}}
+* Ch. 019 : {{japonais|Gantz|ガンツ|Gantsu}}
+* Ch. 020 : {{japonais|Score|採点|Saiten}}
+* Ch. 021 : {{japonais|Copie humaine|コピー人間|Copī Ningen}}
+* Ch. 022 : {{japonais|Répétition|重複|Chōfuku}}
+</div>
+ | extra          = 
+ | résumé         = 
+}}
+{{TomeBD
+ | langage_unique = non
+ | volume         = 3
+ | sortie_1       = {{date|19|juin|2001}}<ref group="ja" name="v3ja"/>
+ | isbn_1         = 4-08-876163-4 | isbn_1_note = <ref group="ja" name="v3ja"/>
+ | sortie_2       = {{date|13|juillet|2003}}<ref group="fr" name="v3fr"/>
+ | isbn_2         = 2-84580-324-9 | isbn_2_note = <ref group="fr" name="v3fr"/>
+ | chapitre       = <div>
+* Ch. 023 : {{japonais|Quotidien|日常|Nichijō}}
+* Ch. 024 : {{japonais|Puissance|強力|Kyōryoku}}
+* Ch. 025 : {{japonais|Un type chanceux|ラッキーな男|Rakkī na Otoko}}
+* Ch. 026 : {{japonais|Animal apprivoisé|愛玩動物|Aigandōbutsu}}
+* Ch. 027 : {{japonais|Potentiel|潜在能力|Senzai Nōryoku}}
+* Ch. 028 : {{japonais|Recommencement|再送|Saisō}}
+* Ch. 029 : {{japonais|Bosozoku|族|Zoku}}
+* Ch. 030 : {{japonais|Disparition publique|路上消失|Rojō Shōshitsu}}
+* Ch. 031 : {{japonais|Incommunicabilité et incompréhension|解説不可能意味不明|Kaisetsu Fukanō Imi Fumei}}
+* Ch. 032 : {{japonais|Oubli|忘れ物|Wasuremono}}
+* Ch. 033 : {{japonais|Délire collectif|集団狂気|Jūdan Kyōki}}
+* Ch. 034 : {{japonais|Monsieur Tanaka|田中さん|Tanaka-san}}
+</div>
+ | extra          = 
+ | résumé         = 
+}}

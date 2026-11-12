@@ -76,6 +76,17 @@ export const sourceUrl = ({ site, id }: SourceLink) =>
  */
 export type SeriesRating = { value: number; count: number };
 
+/**
+ * Tome d'une fiche en ligne (Bedetheque, Wikipédia) : son type, son numéro
+ * (aucun pour un one-shot), son titre et son année de parution en France.
+ */
+export type SheetVolume = {
+    kind: 'volume' | 'one-shot' | 'integrale' | 'hors-serie';
+    number: number | null;
+    title?: string;
+    year?: number;
+};
+
 /** Note sur `best` ramenée sur 5, à un chiffre après la virgule. */
 export const ratingOutOf5 = (value: number, best: number) =>
     Math.round((value / best) * 5 * 10) / 10;

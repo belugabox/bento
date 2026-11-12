@@ -16,7 +16,12 @@ import {
 import { IconSearch } from '@tabler/icons-react';
 import { type FormEvent, type ReactNode, useEffect, useState } from 'react';
 
-import { type MetadataSource, SOURCE_LABELS, genreKey } from '@server/types';
+import {
+    type MetadataSource,
+    SOURCE_LABELS,
+    nameVariant,
+    sameSeriesName,
+} from '@server/types';
 
 import {
     fetchSettings,
@@ -105,48 +110,72 @@ export const SeriesSearch = ({
         }
     };
 
-    const searchOn = async (site: MetadataSource, text: string) => {
+    /** Résultats d'un site pour un nom. */
+    const resultsOn = async (site: MetadataSource, text: string) =>
+        site === 'wikipedia'
+            ? (await searchWikipedia(text)).map((r) => ({
+                  key: String(r.id),
+                  title: r.title,
+              }))
+            : site === 'bedetheque'
+              ? (await searchBedetheque(text)).map((r) => ({
+                    key: r.id,
+                    title: r.title,
+                    subtitle: r.country,
+                }))
+              : (await searchMangaNews(text)).map((r) => ({
+                    key: r.id,
+                    title: r.title,
+                    subtitle: [r.year, r.authors].filter(Boolean).join(' · '),
+                }));
+
+    const searchOn = async (
+        site: MetadataSource,
+        text: string,
+        // Fiche déjà choisie sur ce site : gardée, la nouvelle recherche
+        // ne fait que remplacer la liste des résultats.
+        keepChosen: boolean,
+    ) => {
         update(site, {
             loading: true,
             error: undefined,
             results: undefined,
-            chosen: undefined,
+            ...(!keepChosen && { chosen: undefined }),
         });
         try {
-            const results =
-                site === 'wikipedia'
-                    ? (await searchWikipedia(text)).map((r) => ({
-                          key: String(r.id),
-                          title: r.title,
-                      }))
-                    : site === 'bedetheque'
-                      ? (await searchBedetheque(text)).map((r) => ({
-                            key: r.id,
-                            title: r.title,
-                            subtitle: r.country,
-                        }))
-                      : (await searchMangaNews(text)).map((r) => ({
-                            key: r.id,
-                            title: r.title,
-                            subtitle: [r.year, r.authors]
-                                .filter(Boolean)
-                                .join(' · '),
-                        }));
+            let results = await resultsOn(site, text);
+            const exactIn = (list: typeof results) =>
+                list.filter((r) => sameSeriesName(r.title, text));
+            // Rien au nom exact : l'autre écriture (« & » pour « et »),
+            // une seule requête de plus.
+            const variant = nameVariant(text);
+            if (exactIn(results).length === 0 && variant) {
+                const more = await resultsOn(site, variant);
+                results = [
+                    ...results,
+                    ...more.filter(
+                        (r) => !results.some((known) => known.key === r.key),
+                    ),
+                ];
+            }
             update(site, { loading: false, results });
             // Un seul résultat au nom exact : sa fiche s'ouvre d'elle-même.
-            const exact = results.filter(
-                (r) => genreKey(r.title) === genreKey(text),
-            );
-            if (exact.length === 1) await open(site, exact[0]!.key);
+            const exact = exactIn(results);
+            if (exact.length === 1 && !keepChosen) {
+                await open(site, exact[0]!.key);
+            }
         } catch (e) {
             update(site, { loading: false, error: (e as Error).message });
         }
     };
 
-    const searchAll = (wanted = query) => {
+    /** Tous les sites ; `keep` : garder les fiches déjà choisies. */
+    const searchAll = (wanted = query, keep = true) => {
         const text = wanted.trim();
         if (!text) return;
-        for (const site of sites) void searchOn(site, text);
+        for (const site of sites) {
+            void searchOn(site, text, keep && !!columns[site].chosen);
+        }
     };
 
     // Nouvelle ouverture : repartir de la série en cours d'édition.
@@ -154,7 +183,7 @@ export const SeriesSearch = ({
         if (!opened) return;
         setQuery(initialQuery);
         setColumns(EMPTY);
-        if (autoSearch) searchAll(initialQuery);
+        if (autoSearch) searchAll(initialQuery, false);
         // `searchAll` change à chaque rendu : seule l'ouverture compte.
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [opened, initialQuery, autoSearch]);
