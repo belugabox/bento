@@ -1,6 +1,7 @@
 import { load as cheerioLoad } from 'cheerio';
 
 import { badGateway, notFound } from '../tools/errors';
+import type { SheetVolume } from './sourceLink';
 
 // Métadonnées de séries depuis Wikipédia FR (API MediaWiki officielle).
 // La politique Wikimedia demande un User-Agent qui identifie l'application.
@@ -162,6 +163,52 @@ export class Wikipedia {
         };
     };
 
+    /**
+     * Tomes de la série, avec leur année de sortie en France : listés dans
+     * l'article, ou dans sa page « Liste des chapitres de… » (parfois
+     * découpée en parties, 8 au plus).
+     */
+    volumes = async (id: number): Promise<SheetVolume[]> => {
+        const { wikitext } = await this.parse<{ wikitext: string }>(id, {
+            prop: 'wikitext',
+        });
+        const inline = parseVolumeList(wikitext);
+        if (inline.length > 0) return inline;
+        const target = volumeListTitle(wikitext);
+        if (!target) return [];
+        const list = await this.wikitextOf(target);
+        const volumes = parseVolumeList(list);
+        if (volumes.length > 0) return volumes;
+        const parts = [
+            ...new Set(
+                [
+                    ...list.matchAll(
+                        new RegExp(
+                            `\\[\\[(${escapeRegExp(target)} \\([^)\\]|]*\\))`,
+                            'g',
+                        ),
+                    ),
+                ].map((m) => m[1]!),
+            ),
+        ].slice(0, MAX_LIST_PARTS);
+        const all: SheetVolume[] = [];
+        for (const part of parts) {
+            all.push(...parseVolumeList(await this.wikitextOf(part)));
+        }
+        return all;
+    };
+
+    /** Wikitexte d'une page, par son titre (vide si elle n'existe pas). */
+    private wikitextOf = async (title: string) => {
+        const data = await this.get<{ parse?: { wikitext: string } }>({
+            action: 'parse',
+            page: title,
+            prop: 'wikitext',
+            redirects: '1',
+        });
+        return data.parse?.wikitext ?? '';
+    };
+
     private parse = async <T>(id: number, params: Record<string, string>) => {
         const data = await this.get<{ parse?: T }>({
             action: 'parse',
@@ -176,6 +223,49 @@ export class Wikipedia {
 }
 
 // --- Extraction (fonctions pures, testées) ---------------------------------
+
+// Parties d'une liste de tomes découpée (One Piece : six).
+const MAX_LIST_PARTS = 8;
+
+/** Page de la liste des tomes, d'après l'infobox (« liste_volumes »). */
+export const volumeListTitle = (wikitext: string) => {
+    const raw = /^\s*\|\s*liste_volumes\s*=(.*)$/m.exec(wikitext)?.[1] ?? '';
+    const title = raw
+        .replace(/<!--[\s\S]*?-->/g, '')
+        .replace(/^\s*\[\[/, '')
+        .replace(/(\||\]\])[\s\S]*$/, '')
+        .trim();
+    return title || undefined;
+};
+
+/**
+ * Tomes d'une liste en modèles « TomeBD » : numéro et année de sortie en
+ * France (la colonne « Français » de l'en-tête, la 2e par défaut).
+ */
+export const parseVolumeList = (wikitext: string): SheetVolume[] => {
+    const header = /\{\{\s*TomeBD\/Ent[êe]te([\s\S]*?)\}\}/.exec(wikitext)?.[1];
+    const french = header
+        ? ([1, 2, 3].find((n) =>
+              new RegExp(`langue_${n}\\s*=\\s*Fran`).test(header),
+          ) ?? null)
+        : 2;
+    const volumes: SheetVolume[] = [];
+    for (const block of wikitext.split(/\{\{\s*TomeBD\s*\n/).slice(1)) {
+        const param = (name: string) =>
+            new RegExp(`^\\s*\\|\\s*${name}\\s*=(.*)$`, 'm').exec(block)?.[1] ??
+            '';
+        const number = /\d+/.exec(cleanWikitext(param('volume')))?.[0];
+        if (number === undefined) continue;
+        const date = french ? cleanWikitext(param(`sortie_${french}`)) : '';
+        const year = Number(/\b(1[89]\d{2}|20\d{2})\b/.exec(date)?.[1]);
+        volumes.push({
+            kind: 'volume',
+            number: Number(number),
+            ...(year && { year }),
+        });
+    }
+    return volumes;
+};
 
 /** Texte lisible d'une valeur de wikitexte (liens, modèles, références). */
 export const cleanWikitext = (value: string): string => {

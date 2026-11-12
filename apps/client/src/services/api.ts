@@ -395,6 +395,14 @@ export const searchWikipedia = (q: string) =>
 export const searchBedetheque = (q: string) =>
     json(api.metadata.bedetheque.search.$get({ query: { q } }));
 
+/** Albums d'une série sur Bedetheque : numéro, titre, année. */
+export const fetchBedethequeVolumes = (bedethequeId: string) =>
+    json(api.metadata.bedetheque.volumes.$get({ query: { id: bedethequeId } }));
+
+/** Tomes d'une série sur Wikipédia : numéro, année de sortie en France. */
+export const fetchWikipediaVolumes = (wikiId: number) =>
+    json(api.metadata.wikipedia[':id'].volumes.$get(id(wikiId)));
+
 /** Fiche d'une série sur Bedetheque, par son identifiant. */
 export const fetchBedethequeSeries = (bedethequeId: string) =>
     json(api.metadata.bedetheque.series.$get({ query: { id: bedethequeId } }));

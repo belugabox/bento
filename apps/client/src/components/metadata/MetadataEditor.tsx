@@ -20,6 +20,7 @@ import {
     Tooltip,
 } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
+import { notifications } from '@mantine/notifications';
 import {
     IconArrowBackUp,
     IconArrowRight,
@@ -68,11 +69,13 @@ import {
 } from '@/reader/navigation';
 import {
     type ClassificationChanges,
+    fetchBedethequeVolumes,
     fetchCredits,
     fetchFilePageSizes,
     fetchFormats,
     fetchGenres,
     fetchSettings,
+    fetchWikipediaVolumes,
     filePageUrl,
     publishFiles,
     saveComicInfo,
@@ -95,6 +98,7 @@ import {
     changesOf,
     editedValues,
     fillFromFileNames,
+    fillFromSheetVolumes,
     initialEdits,
     isFieldChanged,
     isMixed,
@@ -315,6 +319,9 @@ export const MetadataEditor = ({
     const readable = useMemo(() => volumes.filter((v) => !v.error), [dataKey]);
     const paths = readable.map((v) => v.path);
     const [edits, setEdits] = useState<Edits>(() => initialEdits(readable));
+    // État affiché, lu après une attente (remplissage des tomes).
+    const editsRef = useRef(edits);
+    editsRef.current = edits;
     // Modifications d'avant le choix d'une série existante (pour l'annuler),
     // et les réglages de Bento d'alors (format, âge, statut, mode).
     const beforeJoin = useRef<Edits>(undefined);
@@ -327,6 +334,8 @@ export const MetadataEditor = ({
     const [pickerKey, setPickerKey] = useState(0);
     // Après une fiche en ligne, compléter numéros, titres et années des tomes.
     const [alsoFileNames, setAlsoFileNames] = useState(true);
+    // Titre et année de chaque tome, d'après les fiches qui les listent.
+    const [alsoVolumes, setAlsoVolumes] = useState(true);
     // Fiches trouvées, en cours de comparaison.
     const [comparing, setComparing] = useState<FoundSeries[]>();
     const [refreshing, setRefreshing] = useState(false);
@@ -555,6 +564,7 @@ export const MetadataEditor = ({
                 : filled;
         });
         if (seriesStatus && values.Status) setStatus(values.Status);
+        if (alsoVolumes) void fillVolumes(found);
         if (!classification) return;
         if (values.Format) setFormatValue(values.Format);
         if (values.Age) chooseAge(values.Age);
@@ -564,6 +574,48 @@ export const MetadataEditor = ({
                 found.map((f) => ({ site: f.source, id: f.id })),
             ),
         );
+    };
+
+    /**
+     * Titre et année de chaque tome, d'après les tomes des fiches
+     * (Bedetheque : titres et années ; Wikipédia : années en France) ;
+     * seuls les champs vides sont remplis.
+     */
+    const fillVolumes = async (found: FoundSeries[]) => {
+        const listed = found.filter(
+            (f) => f.source === 'bedetheque' || f.source === 'wikipedia',
+        );
+        if (listed.length === 0) return;
+        try {
+            const lists = await Promise.all(
+                listed.map((f) =>
+                    f.source === 'bedetheque'
+                        ? fetchBedethequeVolumes(f.id)
+                        : fetchWikipediaVolumes(Number(f.id)),
+                ),
+            );
+            // Champs remplis, comptés sur l'état affiché (le message) ;
+            // appliqués à l'état à jour.
+            const { filled } = fillFromSheetVolumes(
+                editsRef.current,
+                readable,
+                lists,
+            );
+            setEdits(
+                (current) =>
+                    fillFromSheetVolumes(current, readable, lists).edits,
+            );
+            notifications.show({
+                message: filled
+                    ? `Tomes : ${filled} titre${filled > 1 ? 's' : ''} ou année${filled > 1 ? 's' : ''} remplis d’après les fiches.`
+                    : 'Tomes : rien à remplir d’après les fiches.',
+            });
+        } catch (e) {
+            notifications.show({
+                color: 'red',
+                message: `Tomes non remplis : ${(e as Error).message}`,
+            });
+        }
     };
 
     /** Fiches déjà choisies, relues sur leur site puis comparées. */
@@ -1498,13 +1550,28 @@ export const MetadataEditor = ({
                 display={display}
                 onApply={(values) => applyComparison(values, comparing ?? [])}
                 footer={
-                    <Checkbox
-                        label="Puis compléter depuis les noms de fichiers (numéro, titre, année)"
-                        checked={alsoFileNames}
-                        onChange={(e) =>
-                            setAlsoFileNames(e.currentTarget.checked)
-                        }
-                    />
+                    <Stack gap="xs">
+                        <Checkbox
+                            label="Puis compléter depuis les noms de fichiers (numéro, année)"
+                            checked={alsoFileNames}
+                            onChange={(e) =>
+                                setAlsoFileNames(e.currentTarget.checked)
+                            }
+                        />
+                        {comparing?.some(
+                            (f) =>
+                                f.source === 'bedetheque' ||
+                                f.source === 'wikipedia',
+                        ) && (
+                            <Checkbox
+                                label="Et le titre et l’année de chaque tome, d’après les fiches (Bedetheque, Wikipédia)"
+                                checked={alsoVolumes}
+                                onChange={(e) =>
+                                    setAlsoVolumes(e.currentTarget.checked)
+                                }
+                            />
+                        )}
+                    </Stack>
                 }
             />
         </Stack>

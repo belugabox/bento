@@ -50,6 +50,7 @@ export {
     SHEET_FIELD_LABELS,
     SHEET_FIELDS,
     type SheetField,
+    type SheetVolume,
     SOURCE_LABELS,
     type SourceLink,
     type SourcePriority,

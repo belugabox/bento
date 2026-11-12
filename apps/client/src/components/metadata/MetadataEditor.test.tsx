@@ -449,6 +449,15 @@ describe('MetadataEditor', () => {
             'manga-news/search': [],
             'wikipedia/search': [],
             'bedetheque/search': [{ id: '25654', title: 'Gantz' }],
+            // Albums : titre et année du tome 1 seulement.
+            'bedetheque/volumes': [
+                {
+                    kind: 'volume',
+                    number: 1,
+                    title: 'Le début',
+                    year: 2002,
+                },
+            ],
             'bedetheque/series': {
                 id: '25654',
                 title: 'Gantz',
@@ -510,6 +519,31 @@ describe('MetadataEditor', () => {
 
         // (3,9 × 39 + 4,3 × 127) / 166, avant même d'enregistrer.
         await vi.waitFor(() => expect(badge()).toBe('★ 4,2'));
+        // Le titre et l'année du tome 1, d'après les albums (l'année lue
+        // dans le nom de fichier, déjà là, est gardée).
+        await vi.waitFor(() =>
+            expect(
+                (
+                    screen.getByLabelText(
+                        'Titre de Gantz T01 (2017).cbz',
+                    ) as HTMLInputElement
+                ).value,
+            ).toBe('Le début'),
+        );
+        expect(
+            (
+                screen.getByLabelText(
+                    'Année de Gantz T01 (2017).cbz',
+                ) as HTMLInputElement
+            ).value,
+        ).toBe('2017');
+        expect(
+            (
+                screen.getByLabelText(
+                    'Titre de Gantz T02 (2017).cbz',
+                ) as HTMLInputElement
+            ).value,
+        ).toBe('');
         fireEvent.click(screen.getByRole('button', { name: /Enregistrer/ }));
         await vi.waitFor(() =>
             expect(save).toHaveBeenCalledWith(
