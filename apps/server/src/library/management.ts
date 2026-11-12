@@ -76,6 +76,8 @@ export const listManagedSeries = (db: Db) => {
             ...ratingFields(seriesRatingOf(parseSources(sources), ratings)),
             // Fiches changées depuis que l'admin les a vues (mise à jour
             // de nuit) : « Fiche à revoir ».
+            // Sites des fiches liées (filtre « Sans fiche Bedetheque »).
+            sheetSites: parseSources(sources).map((link) => link.site),
             sheetChanges: parseSources(sources).flatMap(
                 (link) => sheets.get(`${link.site}:${link.id}`)?.changes ?? [],
             ),

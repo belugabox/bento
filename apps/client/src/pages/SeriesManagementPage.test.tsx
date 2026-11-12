@@ -40,6 +40,7 @@ const managed = (
     rating: null,
     ratingCount: 0,
     sheetChanges: [] as string[],
+    sheetSites: [] as string[],
     ...changes,
 });
 
@@ -55,6 +56,7 @@ beforeEach(() => {
             size: 900 * MB,
             // Fiche changée en ligne depuis la dernière visite.
             sheetChanges: ['Tomes : 37 → 38'],
+            sheetSites: ['manga-news', 'bedetheque'],
         }),
     ];
     vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
@@ -168,5 +170,20 @@ describe('SeriesManagementPage', () => {
         );
         fireEvent.click(screen.getByRole('button', { name: 'Voir toutes' }));
         await vi.waitFor(() => expect(names()).toHaveLength(3));
+    });
+
+    it('finds the series without a Bedetheque sheet', async () => {
+        show();
+        await screen.findByText('Gantz');
+        fireEvent.click(screen.getByRole('button', { name: 'Filtres' }));
+        fireEvent.click(await screen.findByRole('textbox', { name: 'Fiches' }));
+        fireEvent.click(
+            await screen.findByRole('option', {
+                name: 'Sans fiche Bedetheque (2)',
+            }),
+        );
+        await vi.waitFor(() =>
+            expect(names()).toEqual(['Coq de combat', 'Spirale']),
+        );
     });
 });

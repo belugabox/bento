@@ -49,6 +49,8 @@ const FILTERS = [
     { value: 'no-summary', label: 'Sans résumé' },
     { value: 'no-genre', label: 'Sans genre' },
     { value: 'incomplete', label: 'Fiche < 80 %' },
+    // Ajoutée depuis : à lier (« Remplir ») pour sa note et sa relecture.
+    { value: 'no-bedetheque', label: 'Sans fiche Bedetheque' },
     // Fiches changées en ligne (mise à jour de nuit).
     { value: 'to-review', label: 'Fiches à revoir' },
 ] as const;
@@ -125,6 +127,8 @@ const matches = (row: Row, filter: Filter) => {
             return row.percent < 80;
         case 'to-review':
             return row.sheetChanges.length > 0;
+        case 'no-bedetheque':
+            return !row.sheetSites.includes('bedetheque');
         default:
             return true;
     }
