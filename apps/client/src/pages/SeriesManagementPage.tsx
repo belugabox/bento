@@ -32,7 +32,6 @@ import { compareNames, genreKey } from '@server/types';
 
 import { CompletenessBadge } from '@/components/CompletenessBadge';
 import { ageLabel } from '@/components/ageLimits';
-import { completenessOf } from '@/components/completeness';
 import {
     formatSize,
     missingVolumesLabel,
@@ -94,23 +93,8 @@ type Row = ManagedSeries & {
 
 const toRow = (s: ManagedSeries): Row => {
     const effectiveAge = s.age ?? s.fileAge;
-    const { percent, missing } = completenessOf({
-        name: s.name,
-        hasFormat: !!s.formatId,
-        hasAge: effectiveAge !== null,
-        hasStatus: !!s.status,
-        hasRating: s.rating !== null,
-        genreCount: s.genres.length,
-        writer: s.writer,
-        penciller: s.penciller,
-        publisher: s.publisher,
-        summary: s.hasSummary ? 'oui' : '',
-        volumes: {
-            total: s.volumeCount,
-            withNumber: s.withNumber,
-            withYear: s.withYear,
-        },
-    });
+    // Calculée par le serveur, comme l'éditeur et la fiche série.
+    const { percent, missing } = s.completeness;
     return {
         ...s,
         percent,

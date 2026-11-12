@@ -61,6 +61,13 @@ export { parseVolumeFileName } from './archive/fileName';
 export type { ComicInfo } from './archive/comicInfo';
 export { publicationPathOf } from './library/publication';
 export {
+    type Completeness,
+    type CompletenessInput,
+    type VolumeCounts,
+    completenessOf,
+    fieldsFromVolumes,
+} from './library/completeness';
+export {
     KIND_FORMATS,
     VOLUME_KIND_LABELS,
     VOLUME_KINDS,

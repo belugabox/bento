@@ -41,6 +41,8 @@ const managed = (
     ratingCount: 0,
     sheetChanges: [] as string[],
     sheetSites: [] as string[],
+    // Calculée par le serveur.
+    completeness: { percent: 90, missing: ['Note'] },
     volumesStatus: {
         published: null as number | null,
         missing: [] as number[],
@@ -54,8 +56,16 @@ let requests: [string, string, unknown][] = [];
 beforeEach(() => {
     requests = [];
     series = [
-        managed(1, 'Spirale', { age: null, size: 50 * MB }),
-        managed(2, 'Coq de combat', { formatId: null, format: null }),
+        managed(1, 'Spirale', {
+            age: null,
+            size: 50 * MB,
+            completeness: { percent: 81, missing: ['Âge', 'Note'] },
+        }),
+        managed(2, 'Coq de combat', {
+            formatId: null,
+            format: null,
+            completeness: { percent: 81, missing: ['Format', 'Note'] },
+        }),
         managed(3, 'Gantz', {
             size: 900 * MB,
             // Fiche changée en ligne depuis la dernière visite.

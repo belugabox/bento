@@ -15,6 +15,7 @@ import { libraries, series, volumes } from '../db/schema';
 import { TaskList } from '../tasks';
 import type { Logger } from '../tools/logger';
 import { seriesAge } from './ageRating';
+import { fieldsFromVolumes } from './completeness';
 import { smallCoverFile } from './smallCovers';
 import { volumeNumbering } from './volumeKind';
 
@@ -359,18 +360,22 @@ export class LibraryScanner {
                 .all()
                 .map((v) => v.comicInfo);
             const info = infos[0] ?? {};
+            // Nom, genres, auteur, éditeur : la première valeur remplie (un
+            // tome 1 sans auteur ne vide pas celui de la série), comme
+            // l'éditeur et la complétude ; le résumé et l'année du tome 1.
+            const fields = fieldsFromVolumes(infos);
             this.db
                 .update(series)
                 .set({
-                    name: info.Series ?? row.key,
+                    name: fields.name ?? row.key,
                     summary: info.Summary ?? null,
-                    genre: info.Genre ?? null,
-                    tags: info.Tags ?? null,
+                    genre: fields.genre ?? null,
+                    tags: fields.tags ?? null,
                     ...seriesAge(infos.map((i) => i.AgeRating)),
                     year: info.Year ?? null,
                     count: info.Count ?? null,
-                    writer: info.Writer ?? null,
-                    publisher: info.Publisher ?? null,
+                    writer: fields.writer ?? null,
+                    publisher: fields.publisher ?? null,
                 })
                 .where(eq(series.id, row.id))
                 .run();
