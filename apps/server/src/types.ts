@@ -81,6 +81,11 @@ export {
 } from './library/volumeKind';
 export { articleFirst, compareNames, sortKeyOf } from './library/sortName';
 export {
+    nameVariant,
+    sameSeriesName,
+    seriesNameKey,
+} from './metadata/seriesNames';
+export {
     PAGE_WIDTHS,
     type PageWidth,
     isPageWidth,
