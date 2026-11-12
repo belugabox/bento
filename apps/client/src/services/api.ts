@@ -484,6 +484,30 @@ export const seriesCoverUrl = (
 ) =>
     `/api/series/${series.id}/cover?v=${encodeURIComponent(series.coverUpdatedAt ?? `${series.coverVolumeId ?? ''}-${series.coverVolumeVersion ?? ''}`)}${size ? `&size=${size}` : ''}`;
 
+/** Bannière d'une série (grande illustration en tête de sa fiche). */
+export const seriesBannerUrl = (series: {
+    id: number;
+    bannerUpdatedAt: string | null;
+}) =>
+    series.bannerUpdatedAt
+        ? `/api/series/${series.id}/banner?v=${encodeURIComponent(series.bannerUpdatedAt)}`
+        : undefined;
+
+/** Bannières possibles (fiche Manga-news liée, AniList), lues à la demande. */
+export const fetchBannerChoices = (seriesId: number) =>
+    json(api.series[':id'].banners.$get({ param: { id: String(seriesId) } }));
+
+export const setSeriesBanner = (seriesId: number, url: string) =>
+    json(
+        api.series[':id'].banner.$put({
+            param: { id: String(seriesId) },
+            json: { url },
+        }),
+    );
+
+export const removeSeriesBanner = (seriesId: number) =>
+    json(api.series[':id'].banner.$delete({ param: { id: String(seriesId) } }));
+
 /** Séries en attente dans les brouillons (pastille de l'en-tête). */
 export const fetchPendingDrafts = () => json(api.drafts.pending.$get());
 

@@ -52,6 +52,8 @@ export type MangaNewsSeries = {
     volumeCount?: number;
     ongoing?: boolean;
     coverUrl?: string;
+    /** Bannière en tête de la fiche (illustration large), s'il y en a une. */
+    bannerUrl?: string;
     /** Note des lecteurs, sur 5. */
     rating?: SeriesRating;
 };
@@ -213,6 +215,8 @@ export const parseSeriesPage = (
             $('#picinfo a.cpModal').attr('href') ??
                 $('#picinfo img.entryPicture').attr('src'),
         ),
+        // Grande illustration en tête de la fiche, quand il y en a une.
+        bannerUrl: absolute($('.product-banner img').first().attr('src')),
     };
 };
 

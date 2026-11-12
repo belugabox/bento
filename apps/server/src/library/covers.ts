@@ -20,6 +20,45 @@ const ALLOWED_IMAGE_HOSTS = ['upload.wikimedia.org', 'www.manga-news.com'];
 const USER_AGENT = 'bento/1.0 (https://github.com/belugabox/bento)';
 const ADMIN = { id: 0, role: 'admin' as const, maxAge: null };
 
+/**
+ * Image d'un des sites acceptés (pas d'adresse arbitraire, pas de
+ * redirection), 10 Mo au plus.
+ */
+export const downloadImage = async (
+    fetchFn: typeof fetch,
+    url: string,
+    hosts: readonly string[],
+) => {
+    let parsed: URL;
+    try {
+        parsed = new URL(url);
+    } catch {
+        throw badRequest('Adresse d’image invalide');
+    }
+    if (parsed.protocol !== 'https:' || !hosts.includes(parsed.hostname)) {
+        throw badRequest(
+            `Image refusée : seuls ${hosts.join(', ')} sont acceptés`,
+        );
+    }
+    const response = await fetchFn(parsed, {
+        headers: { 'User-Agent': USER_AGENT },
+        // Une redirection pourrait mener hors des sites acceptés.
+        redirect: 'error',
+        signal: AbortSignal.timeout(15_000),
+    }).catch(() => undefined);
+    if (!response?.ok) {
+        throw badGateway(`Image introuvable sur ${parsed.hostname}`);
+    }
+    if (!response.headers.get('content-type')?.startsWith('image/')) {
+        throw badGateway('L’adresse ne renvoie pas une image');
+    }
+    const image = Buffer.from(await response.arrayBuffer());
+    if (image.length > MAX_IMAGE_BYTES) {
+        throw badRequest('Image trop lourde');
+    }
+    return image;
+};
+
 /** Partie de l'image gardée quand elle est recadrée en 2:3. */
 export type CoverPosition = 'top' | 'center' | 'bottom';
 
@@ -69,39 +108,8 @@ export class SeriesCovers {
         private readonly fetchFn: typeof fetch = fetch,
     ) {}
 
-    private download = async (url: string) => {
-        let parsed: URL;
-        try {
-            parsed = new URL(url);
-        } catch {
-            throw badRequest('Adresse d’image invalide');
-        }
-        if (
-            parsed.protocol !== 'https:' ||
-            !ALLOWED_IMAGE_HOSTS.includes(parsed.hostname)
-        ) {
-            throw badRequest(
-                'Seules les images de Wikimedia et de Manga-news sont acceptées',
-            );
-        }
-        const response = await this.fetchFn(parsed, {
-            headers: { 'User-Agent': USER_AGENT },
-            // Une redirection pourrait mener hors des sites acceptés.
-            redirect: 'error',
-            signal: AbortSignal.timeout(15_000),
-        }).catch(() => undefined);
-        if (!response?.ok) {
-            throw badGateway(`Image introuvable sur ${parsed.hostname}`);
-        }
-        if (!response.headers.get('content-type')?.startsWith('image/')) {
-            throw badGateway('L’adresse ne renvoie pas une image');
-        }
-        const image = Buffer.from(await response.arrayBuffer());
-        if (image.length > MAX_IMAGE_BYTES) {
-            throw badRequest('Image trop lourde');
-        }
-        return image;
-    };
+    private download = (url: string) =>
+        downloadImage(this.fetchFn, url, ALLOWED_IMAGE_HOSTS);
 
     private decode = (data: string) => {
         const image = Buffer.from(data, 'base64');

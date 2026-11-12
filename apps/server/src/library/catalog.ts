@@ -295,6 +295,7 @@ export const getSeries = (db: Db, viewer: Viewer, id: number) => {
             age: series.age,
             fileAge: series.minAge,
             coverUpdatedAt: series.coverUpdatedAt,
+            bannerUpdatedAt: series.bannerUpdatedAt,
             year: series.year,
             status: series.status,
             readingMode: series.readingMode,

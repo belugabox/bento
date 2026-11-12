@@ -26,6 +26,8 @@ import { isAvatarSeed } from './auth/rules';
 import { deleteUser, listUsers, updateAccount, updateUser } from './auth/users';
 import { READING_MODES } from './classification';
 import type { Db } from './db';
+import { createBannerRoutes } from './library/bannerRoutes';
+import { SeriesBanners } from './library/banners';
 import {
     getSeries,
     getVolume,
@@ -85,6 +87,7 @@ import { SheetRefresher } from './library/sheetRefresh';
 import { sheetSeen } from './library/sheets';
 import { readCover } from './library/smallCovers';
 import { getStats } from './library/stats';
+import { AniList } from './metadata/anilist';
 import { Bedetheque } from './metadata/bedetheque';
 import { MangaNews } from './metadata/mangaNews';
 import {
@@ -98,6 +101,7 @@ import { KavitaImport } from './migration/kavita';
 import { SettingsStore, settingsUpdateSchema } from './settings';
 import { AppError, badRequest, notFound } from './tools/errors';
 import type { Logger } from './tools/logger';
+import { idParam, imageCache } from './tools/routeParams';
 import { zValidator } from './tools/validator';
 
 export type ApiDeps = {
@@ -114,6 +118,9 @@ export type ApiDeps = {
     mangaNews?: MangaNews;
     /** Bedetheque (le vrai site si absent). */
     bedetheque?: Bedetheque;
+    /** Bannières d'AniList (mangas). */
+    anilist?: AniList;
+    banners?: SeriesBanners;
     /** Mise à jour des fiches en arrière-plan (lancée par `main`). */
     sheetRefresher?: SheetRefresher;
     /** Réglages de l'admin (valeurs par défaut si absents). */
@@ -126,19 +133,10 @@ export type ApiDeps = {
     auth: Omit<AuthDeps, 'db' | 'logger'>;
 };
 
-const idParam = z.object({ id: z.coerce.number().int().positive() });
-
 // Fichier d'une bibliothèque, relatif à sa racine.
 const fileQuery = z.object({ path: z.string().min(1) });
 // `?size=small` : version réduite d'une couverture (vignettes des grilles).
 const smallCover = (size?: string) => (size === 'small' ? size : undefined);
-
-/**
- * Cache d'une image de la bibliothèque. Avec sa version dans l'adresse
- * (`?v=`), elle ne change jamais : le navigateur la garde un an.
- */
-const imageCache = (version?: string) =>
-    version ? 'private, max-age=31536000, immutable' : 'private, max-age=3600';
 
 // Format, âge et fiches en ligne d'une série, réglés dans Bento : null
 // (liste vide pour les fiches) pour les retirer.
@@ -235,6 +233,8 @@ export const createApi = ({
     wikipedia,
     mangaNews = new MangaNews(),
     bedetheque = new Bedetheque(),
+    anilist = new AniList(),
+    banners = new SeriesBanners(db, coversPath),
     settings = new SettingsStore(db),
     sheetRefresher = new SheetRefresher(
         db,
@@ -334,6 +334,17 @@ export const createApi = ({
         .route(
             '/preview',
             createPreviewRoutes(db, auth.publicUrl.startsWith('https://')),
+        )
+        // Bannières des séries (grande illustration en tête de fiche).
+        .route(
+            '/series',
+            createBannerRoutes({
+                db,
+                settings,
+                mangaNews,
+                anilist,
+                banners,
+            }),
         )
         .get('/libraries', (c) =>
             c.json(

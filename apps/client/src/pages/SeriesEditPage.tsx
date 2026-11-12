@@ -3,6 +3,7 @@ import { useDisclosure } from '@mantine/hooks';
 import { IconArrowLeft } from '@tabler/icons-react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 
+import { BannerSettings } from '@/components/BannerSettings';
 import { CoverPicker } from '@/components/metadata/CoverPicker';
 import { MetadataEditor } from '@/components/metadata/MetadataEditor';
 import { volumeLabel } from '@/components/readingStatus';
@@ -135,6 +136,8 @@ export const SeriesEditPage = () => {
                 )}
                 onChanged={(moved) => void afterChange(moved)}
             />
+
+            <BannerSettings series={series} onChanged={reload} />
 
             <CoverPicker
                 opened={coverOpened}

@@ -225,6 +225,13 @@
       "when": 1794490678101,
       "tag": "0031_volume_count_site",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "6",
+      "when": 1794492673570,
+      "tag": "0032_series_banner",
+      "breakpoints": true
     }
   ]
 }

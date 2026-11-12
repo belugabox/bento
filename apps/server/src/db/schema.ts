@@ -79,6 +79,9 @@ export const series = sqliteTable(
         // Couverture choisie (fichier covers/series-<id>.webp) : date de mise
         // à jour, pour les caches ; null = celle du premier tome.
         coverUpdatedAt: integer('cover_updated_at', { mode: 'timestamp_ms' }),
+        // Bannière choisie (fichier covers/banners/series-<id>.webp) : date
+        // de mise à jour, pour les caches ; null = aucune.
+        bannerUpdatedAt: integer('banner_updated_at', { mode: 'timestamp_ms' }),
         year: integer('year'),
         count: integer('count'),
         // En cours de parution ou terminée, réglé dans Bento (pas dans les
