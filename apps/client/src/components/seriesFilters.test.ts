@@ -166,3 +166,20 @@ describe('sort by rating', () => {
         ).toEqual(['C', 'A', 'B']);
     });
 });
+
+describe('list details', () => {
+    it('show the readers rating', () => {
+        expect(
+            seriesDetails({
+                name: 'Gantz',
+                volumeCount: 37,
+                readCount: 0,
+                startedCount: 0,
+                lastAddedAt: null,
+                format: 'Manga',
+                status: 'completed',
+                rating: 4.4,
+            }),
+        ).toEqual(['Manga · Terminée · ★ 4,4']);
+    });
+});

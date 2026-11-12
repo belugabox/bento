@@ -91,7 +91,6 @@ export const SHEET_FIELDS = [
     'Writer',
     'Penciller',
     'Publisher',
-    'Rating',
     'Summary',
 ] as const;
 
@@ -107,7 +106,6 @@ export const SHEET_FIELD_LABELS: Record<SheetField, string> = {
     Writer: 'Scénario',
     Penciller: 'Dessin',
     Publisher: 'Éditeur',
-    Rating: 'Note',
     Summary: 'Résumé',
 };
 

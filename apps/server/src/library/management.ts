@@ -3,8 +3,10 @@ import { eq, sql } from 'drizzle-orm';
 import { classify } from '../classification';
 import type { Db } from '../db';
 import { formats, libraries, series, volumes } from '../db/schema';
-import { coverVolumeSql, ratingSql } from './catalog';
+import { parseSources } from '../metadata/sourceLink';
+import { coverVolumeSql, ratingFields } from './catalog';
 import { genreCatalog } from './genres';
+import { seriesRatingOf, sourceRatingsMap } from './ratings';
 import { compareNames } from './sortName';
 
 /** Séries à classer : sans format, ou sans âge (choisi ou déduit des tomes). */
@@ -17,6 +19,7 @@ const toClassifySql = sql`(series.format_id is null or coalesce(series.age, seri
  */
 export const listManagedSeries = (db: Db) => {
     const catalog = genreCatalog(db);
+    const ratings = sourceRatingsMap(db);
     return db
         .select({
             id: series.id,
@@ -57,7 +60,7 @@ export const listManagedSeries = (db: Db) => {
             ),
             coverUpdatedAt: series.coverUpdatedAt,
             ...coverVolumeSql,
-            rating: ratingSql,
+            sources: series.sources,
         })
         .from(series)
         .innerJoin(libraries, eq(libraries.id, series.libraryId))
@@ -66,8 +69,9 @@ export const listManagedSeries = (db: Db) => {
         .groupBy(series.id)
         .all()
         .sort((a, b) => compareNames(a.name, b.name))
-        .map(({ genre, tags, ...row }) => ({
+        .map(({ genre, tags, sources, ...row }) => ({
             ...row,
+            ...ratingFields(seriesRatingOf(parseSources(sources), ratings)),
             ...classify(genre, tags, catalog),
         }));
 };

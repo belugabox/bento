@@ -1,5 +1,6 @@
 import type { MetadataSource, SourceLink } from '@server/types';
 
+import { ratingLabel, reviewsLabel } from '@/components/format';
 import {
     type BedethequeDetails,
     type MangaNewsDetails,
@@ -69,6 +70,9 @@ const fromMangaNews = (details: MangaNewsDetails): Preview => ({
         details.age !== undefined
             ? `Âge conseillé : ${details.age === 0 ? 'tout public' : `${details.age}+`}`
             : '',
+        details.rating
+            ? `${ratingLabel(details.rating.value)} (${reviewsLabel(details.rating.count)})`
+            : '',
     ].filter(Boolean),
 });
 
@@ -93,6 +97,9 @@ const fromBedetheque = (details: BedethequeDetails): Preview => ({
             : '',
         details.volumeCount && !details.oneShot
             ? `${details.volumeCount} tomes${details.ongoing === undefined ? '' : details.ongoing ? ' (en cours)' : ' (terminée)'}`
+            : '',
+        details.rating
+            ? `${ratingLabel(details.rating.value)} (${reviewsLabel(details.rating.count)})`
             : '',
     ].filter(Boolean),
 });

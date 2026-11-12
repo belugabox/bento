@@ -9,12 +9,14 @@ import {
     Image,
     Loader,
     Menu,
+    Popover,
     SimpleGrid,
     Stack,
     Text,
     ThemeIcon,
     Title,
     Tooltip,
+    UnstyledButton,
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import {
@@ -46,7 +48,7 @@ import { DownloadRing } from '@/components/DownloadIndicator';
 import { SeriesReaders } from '@/components/SeriesReaders';
 import { ageLabel, seriesAgeOf } from '@/components/ageLimits';
 import { completenessOf, fieldsFromVolumes } from '@/components/completeness';
-import { ratingLabel } from '@/components/format';
+import { ratingLabel, reviewsLabel } from '@/components/format';
 import { gridColumns, useLibraryDisplay } from '@/components/libraryDisplay';
 import {
     countedVolumes,
@@ -84,6 +86,60 @@ const KIND_SECTIONS = [
     { key: 'hors-serie', title: 'Hors-séries' },
     { key: 'special', title: 'Spéciaux' },
 ] as const;
+
+/**
+ * Note des lecteurs (moyenne des fiches en ligne, chacune selon son nombre
+ * d'avis) ; un clic montre la note de chaque site.
+ */
+const SeriesRatingBadge = ({
+    rating,
+}: {
+    rating: { value: number; count: number; sources: SeriesRatingSource[] };
+}) => (
+    <Popover position="bottom-start" withArrow shadow="md">
+        <Popover.Target>
+            <UnstyledButton aria-label="Détail de la note">
+                <Badge
+                    variant="light"
+                    color="yellow"
+                    style={{ cursor: 'pointer' }}
+                >
+                    {ratingLabel(rating.value)}
+                </Badge>
+            </UnstyledButton>
+        </Popover.Target>
+        <Popover.Dropdown>
+            <Stack gap={6}>
+                <Text size="sm" fw={600}>
+                    Note des lecteurs
+                </Text>
+                {rating.sources.map((source) => (
+                    <Group key={source.site} justify="space-between" gap="lg">
+                        <Text size="sm">{SOURCE_LABELS[source.site]}</Text>
+                        <Text size="sm">
+                            {ratingLabel(source.value)}{' '}
+                            <Text span size="xs" c="dimmed">
+                                {reviewsLabel(source.count)}
+                            </Text>
+                        </Text>
+                    </Group>
+                ))}
+                {rating.sources.length > 1 && (
+                    <Text size="xs" c="dimmed">
+                        Moyenne de {reviewsLabel(rating.count)}, chaque site
+                        selon son nombre d’avis.
+                    </Text>
+                )}
+            </Stack>
+        </Popover.Dropdown>
+    </Popover>
+);
+
+type SeriesRatingSource = {
+    site: keyof typeof SOURCE_LABELS;
+    value: number;
+    count: number;
+};
 
 export const SeriesPage = () => {
     const seriesId = Number(useParams().id);
@@ -255,15 +311,10 @@ export const SeriesPage = () => {
                         <Badge variant="light">
                             {volumeCountLabel(series.volumes)}
                         </Badge>
-                        {/* Note des lecteurs (fiches en ligne), sur 5. */}
-                        {series.rating != null && (
-                            <Badge
-                                variant="light"
-                                color="yellow"
-                                title="Note des lecteurs, sur 5"
-                            >
-                                {ratingLabel(series.rating)}
-                            </Badge>
+                        {/* Note des lecteurs (fiches en ligne), sur 5 : le
+                            détail par site au clic. */}
+                        {series.rating && (
+                            <SeriesRatingBadge rating={series.rating} />
                         )}
                         {series.status && (
                             <Badge

@@ -1,5 +1,7 @@
 import { ageLabel, compareNames } from '@server/types';
 
+import { ratingLabel } from '@/components/format';
+
 /** Ce dont les filtres ont besoin pour une série de la liste. */
 export type ListedSeries = {
     name: string;
@@ -14,8 +16,9 @@ export type ListedSeries = {
     format?: string | null;
     status?: 'ongoing' | 'completed' | null;
     toRead?: boolean;
-    // Note des lecteurs, sur 5 (tri « Mieux notées »).
+    // Note des lecteurs, sur 5, et son nombre d'avis (tri « Mieux notées »).
     rating?: number | null;
+    ratingCount?: number;
     // Tomes ajoutés depuis la dernière lecture (pastille « +2 »).
     newCount?: number;
     year?: number | null;
@@ -81,6 +84,8 @@ export const seriesDetails = (s: ListedSeries): string[] =>
             s.year,
             s.age !== null && s.age !== undefined ? ageLabel(s.age) : null,
             s.status ? STATUS_LABELS[s.status] : null,
+            // Note des lecteurs (fiches en ligne).
+            s.rating != null ? ratingLabel(s.rating) : null,
         ]
             .filter((value) => value !== null && value !== undefined)
             .join(' · '),

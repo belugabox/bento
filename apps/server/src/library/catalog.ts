@@ -25,10 +25,17 @@ import {
 import { notFound } from '../tools/errors';
 import { genreCatalog } from './genres';
 import { publicationPathOf } from './paths';
+import { seriesRatingOf, sourceRatingsMap } from './ratings';
 import { coverFile, kindOrder } from './scanner';
 import { compareNames } from './sortName';
 import { type Viewer, visibleTo } from './visibility';
 import { MAIN_KINDS } from './volumeKind';
+
+/** Note d'une série dans une liste : sa valeur et son nombre d'avis. */
+export const ratingFields = (summary: ReturnType<typeof seriesRatingOf>) => ({
+    rating: summary?.value ?? null,
+    ratingCount: summary?.count ?? 0,
+});
 
 /**
  * Version d'un tome : la date de son fichier, qui change à chaque réécriture.
@@ -168,14 +175,6 @@ export const seriesAgeSql = sql<
  * Sous-requêtes en SQL brut : Drizzle n'y préfixe pas les colonnes par leur
  * table.
  */
-/**
- * Note des lecteurs d'une série (sur 5) : le `CommunityRating` du ComicInfo
- * de son premier tome, rempli depuis les fiches en ligne.
- */
-export const ratingSql = sql<
-    number | null
->`(select json_extract(v.comic_info, '$.CommunityRating') from volumes v where v.series_id = series.id order by v.kind != 'volume', v.kind, v.sort_number is null, v.sort_number, v.file limit 1)`;
-
 export const coverVolumeSql = {
     coverVolumeId: sql<number>`(select v.id from volumes v where v.series_id = series.id order by v.kind != 'volume', v.kind, v.sort_number is null, v.sort_number, v.file limit 1)`,
     coverVolumeVersion: sql<number>`(select cast(v.mtime_ms as integer) from volumes v where v.series_id = series.id order by v.kind != 'volume', v.kind, v.sort_number is null, v.sort_number, v.file limit 1)`,
@@ -191,6 +190,7 @@ export const listSeries = (
     const catalog = genreCatalog(db);
     // Tomes ajoutés depuis sa dernière lecture (pastille « +2 »).
     const fresh = newVolumeCounts(db, viewer.id);
+    const ratings = sourceRatingsMap(db);
     return db
         .select({
             id: series.id,
@@ -223,8 +223,8 @@ export const listSeries = (
                 string | null
             >`(select json_extract(v.comic_info, '$.Penciller') from volumes v where v.series_id = series.id order by v.kind != 'volume', v.kind, v.sort_number is null, v.sort_number, v.file limit 1)`,
             ...coverVolumeSql,
-            // Note des lecteurs (tri « Mieux notées »).
-            rating: ratingSql,
+            // Fiches en ligne : leur note (tri « Mieux notées »).
+            sources: series.sources,
             // Tomes lus par la personne.
             // Tomes de la série d'abord (`cross join` : SQLite garde cet ordre), puis la
             // lecture de chacun : sinon SQLite parcourt toutes les lectures de la
@@ -255,8 +255,10 @@ export const listSeries = (
         .groupBy(series.id)
         .all()
         .sort((a, b) => compareNames(a.name, b.name))
-        .map(({ genre, tags, libraryType: _type, ...row }) => ({
+        .map(({ genre, tags, libraryType: _type, sources, ...row }) => ({
             ...row,
+            // Note des lecteurs (moyenne des fiches), sur 5.
+            ...ratingFields(seriesRatingOf(parseSources(sources), ratings)),
             newCount: fresh.get(row.id) ?? 0,
             ...classify(genre, tags, catalog),
             // Genres tels qu'écrits dans les fichiers (« Humour »), cherchés
@@ -299,7 +301,6 @@ export const getSeries = (db: Db, viewer: Viewer, id: number) => {
             sources: series.sources,
             writer: series.writer,
             publisher: series.publisher,
-            rating: ratingSql,
             ...listsOf(viewer),
             library: {
                 id: libraries.id,
@@ -348,6 +349,8 @@ export const getSeries = (db: Db, viewer: Viewer, id: number) => {
         ...details,
         format: formatName,
         sources: parseSources(sources),
+        // Note des lecteurs : moyenne des fiches, et le détail par site.
+        rating: seriesRatingOf(parseSources(sources), sourceRatingsMap(db)),
         ...classify(genre, tags, genreCatalog(db)),
         defaultReadingMode: defaultReadingMode(
             row.library.type,

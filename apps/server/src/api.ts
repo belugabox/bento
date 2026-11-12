@@ -71,6 +71,7 @@ import {
     saveProgress,
     snapshotProgress,
 } from './library/progress';
+import { saveSourceRating } from './library/ratings';
 import { familyReaders, seriesReaders } from './library/readers';
 import { addReadingTime } from './library/readingTime';
 import { ResizedPages } from './library/resizedPages';
@@ -614,8 +615,13 @@ export const createApi = ({
             requireAdmin,
             // Fin de l'adresse de la fiche (« Spy-X-Family »).
             zValidator('query', z.object({ id: z.string().min(1).max(200) })),
-            async (c) =>
-                c.json(await mangaNews.series(c.req.valid('query').id)),
+            async (c) => {
+                const { id } = c.req.valid('query');
+                const series = await mangaNews.series(id);
+                // Note des lecteurs gardée : elle suit les séries liées.
+                saveSourceRating(db, 'manga-news', id, series.rating);
+                return c.json(series);
+            },
         )
         // --- Bedetheque (admin) : BD, comics, romans graphiques.
         .get(
@@ -633,8 +639,12 @@ export const createApi = ({
                 'query',
                 z.object({ id: z.string().regex(/^\d{1,12}$/) }),
             ),
-            async (c) =>
-                c.json(await bedetheque.series(c.req.valid('query').id)),
+            async (c) => {
+                const { id } = c.req.valid('query');
+                const series = await bedetheque.series(id);
+                saveSourceRating(db, 'bedetheque', id, series.rating);
+                return c.json(series);
+            },
         )
         .get('/volumes/:id', zValidator('param', idParam), (c) => {
             // Le chemin sur disque reste côté serveur.

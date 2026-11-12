@@ -183,6 +183,13 @@
       "when": 1794244853657,
       "tag": "0025_reading_sessions",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "6",
+      "when": 1794472959808,
+      "tag": "0026_source_ratings",
+      "breakpoints": true
     }
   ]
 }

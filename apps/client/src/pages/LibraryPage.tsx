@@ -42,6 +42,7 @@ import { useLocation, useSearchParams } from 'react-router';
 
 import { SeriesCardMenu, VolumeCardMenu } from '@/components/CardMenus';
 import { CoverCard } from '@/components/CoverCard';
+import { ratingLabel, reviewsLabel } from '@/components/format';
 import { GROUPINGS, type Grouping, groupSeries } from '@/components/homeGroups';
 import {
     LIST_COLUMNS,
@@ -580,12 +581,18 @@ export const LibraryPage = () => {
                                             }
                                             tag={newBadge(item.newCount)}
                                             subtitle={
-                                                state === 'started'
-                                                    ? `${item.readCount} / ${item.volumeCount} lus`
-                                                    : seriesVolumesLabel(
-                                                          item.volumeCount,
-                                                          item.volumeKinds,
-                                                      )
+                                                // Tri par note : la note à la
+                                                // place des tomes.
+                                                sort === 'rating'
+                                                    ? item.rating != null
+                                                        ? `${ratingLabel(item.rating)} · ${reviewsLabel(item.ratingCount ?? 0)}`
+                                                        : 'Pas de note'
+                                                    : state === 'started'
+                                                      ? `${item.readCount} / ${item.volumeCount} lus`
+                                                      : seriesVolumesLabel(
+                                                            item.volumeCount,
+                                                            item.volumeKinds,
+                                                        )
                                             }
                                             progress={
                                                 state === 'started'

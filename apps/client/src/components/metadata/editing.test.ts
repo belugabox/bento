@@ -448,7 +448,7 @@ describe('sheetFromBedetheque', () => {
 });
 
 describe('rating from the online sheets', () => {
-    it('is offered as a field, then written to every volume', () => {
+    it('stays out of the fields and of the ComicInfo', () => {
         const values = sheetValues(
             sheetFromMangaNews({
                 title: 'Spy x Family',
@@ -464,16 +464,6 @@ describe('rating from the online sheets', () => {
             [],
             [],
         );
-        expect(values.Rating).toBe('4.4');
-
-        const edits = applySheetValues(
-            { a: { Series: 'Spy x Family' }, b: { Series: 'Spy x Family' } },
-            ['a', 'b'],
-            { Rating: '4.4' },
-            [],
-        );
-        expect(edits.a?.CommunityRating).toBe(4.4);
-        expect(edits.b?.CommunityRating).toBe(4.4);
-        expect(editedValues(edits, ['a', 'b'], []).Rating).toBe('4.4');
+        expect(values).toEqual({ Series: 'Spy x Family' });
     });
 });
