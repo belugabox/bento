@@ -1,3 +1,5 @@
+import { SOURCE_LABELS } from '@server/types';
+
 /** Taille lisible : « 12,4 Go », « 820 Mo ». */
 export const formatSize = (bytes: number) => {
     const units = ['o', 'Ko', 'Mo', 'Go', 'To'];
@@ -74,12 +76,26 @@ export const numbersLabel = (numbers: number[]) => {
     return parts.join(', ');
 };
 
-/** « Tomes manquants : 7, 13 à 15 (15 parus) ». */
+type PublishedCount = { site: 'manga-news' | 'bedetheque'; count: number };
+
+/**
+ * « Tomes manquants : 7, 13 à 15 (15 parus d'après Manga-news) », avec le
+ * nombre des autres fiches s'il diffère (« ; Bedetheque : 18 »).
+ */
 export const missingVolumesLabel = ({
     published,
+    others,
     missing,
 }: {
-    published: number | null;
+    published: PublishedCount | null;
+    others: PublishedCount[];
     missing: number[];
-}) =>
-    `${missing.length > 1 ? 'Tomes manquants' : 'Tome manquant'} : ${numbersLabel(missing)}${published ? ` (${published} parus)` : ''}`;
+}) => {
+    const sources = published
+        ? ` (${[
+              `${published.count} parus d’après ${SOURCE_LABELS[published.site]}`,
+              ...others.map((o) => `${SOURCE_LABELS[o.site]} : ${o.count}`),
+          ].join(' ; ')})`
+        : '';
+    return `${missing.length > 1 ? 'Tomes manquants' : 'Tome manquant'} : ${numbersLabel(missing)}${sources}`;
+};

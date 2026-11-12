@@ -45,7 +45,8 @@ const managed = (
     // Calculée par le serveur.
     completeness: { percent: 90, missing: ['Note'] },
     volumesStatus: {
-        published: null as number | null,
+        published: null as { site: string; count: number } | null,
+        others: [] as unknown[],
         missing: [] as number[],
     },
     ...changes,
@@ -88,7 +89,11 @@ beforeEach(() => {
             // Fiche changée en ligne depuis la dernière visite.
             sheetChanges: ['Tomes : 37 → 38'],
             sheetSites: ['manga-news', 'bedetheque'],
-            volumesStatus: { published: 4, missing: [3, 4] },
+            volumesStatus: {
+                published: { site: 'bedetheque', count: 4 },
+                others: [],
+                missing: [3, 4],
+            },
         }),
     ];
     vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
@@ -223,7 +228,9 @@ describe('SeriesManagementPage', () => {
         show();
         await screen.findByText('Gantz');
         expect(
-            screen.getByText('Tomes manquants : 3, 4 (4 parus)'),
+            screen.getByText(
+                'Tomes manquants : 3, 4 (4 parus d’après Bedetheque)',
+            ),
         ).toBeTruthy();
         fireEvent.click(screen.getByRole('button', { name: 'Filtres' }));
         fireEvent.click(await screen.findByRole('textbox', { name: 'Fiches' }));

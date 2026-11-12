@@ -8,7 +8,7 @@ import { parseSources } from '../metadata/sourceLink';
 import { coverVolumeSql, ratingFields, volumeOrder } from './catalog';
 import { completenessOf, fieldsFromVolumes } from './completeness';
 import { genreCatalog } from './genres';
-import { publishedCount, volumesStatus } from './missingVolumes';
+import { publishedCounts, volumesStatus } from './missingVolumes';
 import { seriesRatingOf, sourceRatingsMap } from './ratings';
 import { proposalsBySeries } from './sheetProposals';
 import { sourceSheetsMap } from './sheets';
@@ -93,6 +93,8 @@ export const listManagedSeries = (db: Db) => {
                 string | null
             >`(select group_concat(v.number, '|') from volumes v where v.series_id = series.id and v.kind = 'volume')`,
             integrales: sql<number>`count(case when ${volumes.kind} = 'integrale' then 1 end)`,
+            // Hors-séries et spéciaux (que Manga-news compte dans la série).
+            extras: sql<number>`count(case when ${volumes.kind} in ('hors-serie', 'special') then 1 end)`,
         })
         .from(series)
         .innerJoin(libraries, eq(libraries.id, series.libraryId))
@@ -101,56 +103,71 @@ export const listManagedSeries = (db: Db) => {
         .groupBy(series.id)
         .all()
         .sort((a, b) => compareNames(a.name, b.name))
-        .map(({ genre, tags, sources, volumeNumbers, integrales, ...row }) => {
-            const rating = seriesRatingOf(parseSources(sources), ratings);
-            // Comme l'éditeur et la fiche série : la première valeur
-            // remplie de chaque champ, dans l'ordre des tomes.
-            const fields = fieldsFromVolumes(infos.get(row.id) ?? []);
-            return {
-                ...row,
-                completeness: completenessOf({
-                    ...fields,
-                    hasFormat: !!row.formatId,
-                    hasAge: (row.age ?? row.fileAge) !== null,
-                    hasStatus: !!row.status,
-                    hasRating: rating !== null,
-                    genreCount: classify(
-                        fields.genre ?? '',
-                        fields.tags ?? '',
-                        catalog,
-                    ).genres.length,
-                }),
-                volumesStatus: volumesStatus(
-                    [
-                        ...(volumeNumbers ?? '')
-                            .split('|')
-                            .filter(Boolean)
-                            .map((number) => ({ kind: 'volume', number })),
-                        ...(integrales > 0
-                            ? [{ kind: 'integrale', number: null }]
-                            : []),
-                    ],
-                    publishedCount(parseSources(sources), sheets),
-                ),
-                ...ratingFields(rating),
-                // Sites des fiches liées (filtre « Sans fiche Bedetheque »).
-                sheetSites: parseSources(sources).map((link) => link.site),
-                // Fiches trouvées la nuit, à lier (sites encore sans fiche).
-                proposals: (proposals.get(row.id) ?? []).filter(
-                    (p) =>
-                        !parseSources(sources).some(
-                            (link) => link.site === p.site,
-                        ),
-                ),
-                // Fiches changées depuis que l'admin les a vues (mise à jour
-                // de nuit) : « Fiche à revoir ».
-                sheetChanges: parseSources(sources).flatMap(
-                    (link) =>
-                        sheets.get(`${link.site}:${link.id}`)?.changes ?? [],
-                ),
-                ...classify(genre, tags, catalog),
-            };
-        });
+        .map(
+            ({
+                genre,
+                tags,
+                sources,
+                volumeNumbers,
+                integrales,
+                extras,
+                ...row
+            }) => {
+                const rating = seriesRatingOf(parseSources(sources), ratings);
+                // Comme l'éditeur et la fiche série : la première valeur
+                // remplie de chaque champ, dans l'ordre des tomes.
+                const fields = fieldsFromVolumes(infos.get(row.id) ?? []);
+                return {
+                    ...row,
+                    completeness: completenessOf({
+                        ...fields,
+                        hasFormat: !!row.formatId,
+                        hasAge: (row.age ?? row.fileAge) !== null,
+                        hasStatus: !!row.status,
+                        hasRating: rating !== null,
+                        genreCount: classify(
+                            fields.genre ?? '',
+                            fields.tags ?? '',
+                            catalog,
+                        ).genres.length,
+                    }),
+                    volumesStatus: volumesStatus(
+                        [
+                            ...(volumeNumbers ?? '')
+                                .split('|')
+                                .filter(Boolean)
+                                .map((number) => ({ kind: 'volume', number })),
+                            ...(integrales > 0
+                                ? [{ kind: 'integrale', number: null }]
+                                : []),
+                            ...Array.from({ length: extras }, () => ({
+                                kind: 'special',
+                                number: null,
+                            })),
+                        ],
+                        publishedCounts(parseSources(sources), sheets),
+                    ),
+                    ...ratingFields(rating),
+                    // Sites des fiches liées (filtre « Sans fiche Bedetheque »).
+                    sheetSites: parseSources(sources).map((link) => link.site),
+                    // Fiches trouvées la nuit, à lier (sites encore sans fiche).
+                    proposals: (proposals.get(row.id) ?? []).filter(
+                        (p) =>
+                            !parseSources(sources).some(
+                                (link) => link.site === p.site,
+                            ),
+                    ),
+                    // Fiches changées depuis que l'admin les a vues (mise à jour
+                    // de nuit) : « Fiche à revoir ».
+                    sheetChanges: parseSources(sources).flatMap(
+                        (link) =>
+                            sheets.get(`${link.site}:${link.id}`)?.changes ??
+                            [],
+                    ),
+                    ...classify(genre, tags, catalog),
+                };
+            },
+        );
 };
 
 /** Nombre de séries à classer (compteur du menu). */

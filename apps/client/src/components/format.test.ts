@@ -35,11 +35,21 @@ describe('volume numbers', () => {
         expect(numbersLabel([12, 3, 7, 8, 9, 5, 6])).toBe('3, 5 à 9, 12');
         expect(numbersLabel([5, 6])).toBe('5, 6');
         expect(numbersLabel([4])).toBe('4');
-        expect(missingVolumesLabel({ published: 14, missing: [7] })).toBe(
-            'Tome manquant : 7 (14 parus)',
+        expect(
+            missingVolumesLabel({
+                published: { site: 'manga-news', count: 14 },
+                others: [{ site: 'bedetheque', count: 15 }],
+                missing: [7],
+            }),
+        ).toBe(
+            'Tome manquant : 7 (14 parus d’après Manga-news ; Bedetheque : 15)',
         );
-        expect(missingVolumesLabel({ published: null, missing: [1, 2] })).toBe(
-            'Tomes manquants : 1, 2',
-        );
+        expect(
+            missingVolumesLabel({
+                published: null,
+                others: [],
+                missing: [1, 2],
+            }),
+        ).toBe('Tomes manquants : 1, 2');
     });
 });
