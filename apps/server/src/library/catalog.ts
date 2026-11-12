@@ -197,7 +197,11 @@ export const listSeries = (
             libraryId: series.libraryId,
             libraryType: libraries.type,
             name: series.name,
-            year: series.year,
+            // Début de parution (Bento), sinon l'année du premier tome.
+            year: sql<
+                number | null
+            >`coalesce(${series.startYear}, ${series.year})`,
+            endYear: series.endYear,
             genre: series.genre,
             tags: series.tags,
             formatId: series.formatId,
@@ -295,6 +299,8 @@ export const getSeries = (db: Db, viewer: Viewer, id: number) => {
             age: series.age,
             fileAge: series.minAge,
             coverUpdatedAt: series.coverUpdatedAt,
+            startYear: series.startYear,
+            endYear: series.endYear,
             year: series.year,
             status: series.status,
             readingMode: series.readingMode,
@@ -500,6 +506,8 @@ export const setSeriesClassification = (
     }: {
         formatId?: number | null;
         age?: number | null;
+        startYear?: number | null;
+        endYear?: number | null;
         sources?: SourceLink[];
     },
 ) => {
@@ -513,6 +521,8 @@ export const setSeriesClassification = (
         .returning({
             formatId: series.formatId,
             age: series.age,
+            startYear: series.startYear,
+            endYear: series.endYear,
             sources: series.sources,
         })
         .get();

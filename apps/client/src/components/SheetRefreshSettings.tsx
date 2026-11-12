@@ -11,6 +11,8 @@ import {
 import { IconRefresh } from '@tabler/icons-react';
 import { useState } from 'react';
 
+import { SOURCE_LABELS } from '@server/types';
+
 import { formatRelative } from '@/components/format';
 import {
     type SettingsResponse,
@@ -88,7 +90,7 @@ export const SheetRefreshSettings = ({
                     label="Relire les fiches la nuit"
                     description={
                         status
-                            ? `Entre ${status.night.start} h et ${status.night.end} h (heure du serveur), en alternant les sites ; arrêt de 24 h au premier refus.`
+                            ? `Entre ${status.night.start} h et ${status.night.end} h (heure du serveur), en alternant les sites. Un site qui refuse est réessayé une fois, comme pour « Remplir » ; s’il refuse encore, lui seul fait une pause (1 h, puis 6 h, puis 24 h).`
                             : undefined
                     }
                     checked={enabled}
@@ -144,14 +146,12 @@ export const SheetRefreshSettings = ({
                                 {formatRelative(status.lastCheckedAt)}.
                             </Text>
                         )}
-                        {status.pausedUntil && (
-                            <Text size="xs" c="orange">
-                                En pause jusqu’à {timeLabel(status.pausedUntil)}
-                                {status.lastError
-                                    ? ` : ${status.lastError}`
-                                    : ''}
+                        {status.pauses.map((pause) => (
+                            <Text key={pause.site} size="xs" c="orange">
+                                {SOURCE_LABELS[pause.site]} en pause jusqu’à{' '}
+                                {timeLabel(pause.until)} : {pause.error}
                             </Text>
-                        )}
+                        ))}
                     </Stack>
                 )}
                 {status && status.due + status.toSearch > 0 && (
@@ -160,7 +160,7 @@ export const SheetRefreshSettings = ({
                             size="xs"
                             variant="default"
                             leftSection={<IconRefresh size={14} />}
-                            disabled={status.running || !!status.pausedUntil}
+                            disabled={status.running}
                             onClick={() => void runNow()}
                         >
                             {status.running

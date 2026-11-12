@@ -71,6 +71,8 @@ export const listManagedSeries = (db: Db) => {
             age: series.age,
             fileAge: series.minAge,
             status: series.status,
+            startYear: series.startYear,
+            endYear: series.endYear,
             hasSummary:
                 sql<boolean>`coalesce(trim(series.summary), '') != ''`.mapWith(
                     Boolean,
@@ -129,6 +131,7 @@ export const listManagedSeries = (db: Db) => {
                         hasAge: (row.age ?? row.fileAge) !== null,
                         hasStatus: !!row.status,
                         hasRating: rating !== null,
+                        hasPeriod: row.startYear !== null,
                         genreCount: classify(
                             fields.genre ?? '',
                             fields.tags ?? '',

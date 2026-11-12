@@ -617,6 +617,92 @@ describe('MetadataEditor', () => {
         ).toBeTruthy();
     });
 
+    it('takes the period from the sheets, and saves it in Bento', async () => {
+        mockServer({
+            'manga-news/series': { ...MANGA_NEWS_GANTZ, year: 2000 },
+            'wikipedia/7': { ...WIKI_GANTZ, firstYear: 2000, lastYear: 2013 },
+        });
+        const save = vi.fn().mockResolvedValue({});
+        render(
+            <MantineProvider>
+                <MetadataEditor
+                    libraryId={1}
+                    kind="manga"
+                    mode="series"
+                    volumes={volumes()}
+                    classification={{
+                        formatId: 1,
+                        age: 16,
+                        startYear: null,
+                        endYear: null,
+                        sources: [
+                            { site: 'manga-news', id: 'Gantz' },
+                            { site: 'wikipedia', id: '7' },
+                        ],
+                        save,
+                    }}
+                    onChanged={() => {}}
+                />
+            </MantineProvider>,
+        );
+        fireEvent.click(screen.getByRole('button', { name: /Mettre à jour/ }));
+        // Wikipédia, préférée pour la parution (début et fin), d'office.
+        expect(
+            (
+                (await screen.findByRole('radio', {
+                    name: 'Parution : Wikipédia',
+                })) as HTMLInputElement
+            ).checked,
+        ).toBe(true);
+        fireEvent.click(screen.getByRole('button', { name: 'Appliquer' }));
+        const field = screen.getByRole('textbox', {
+            name: /^Parution/,
+        }) as HTMLInputElement;
+        expect(field.value).toBe('2000 – 2013');
+
+        fireEvent.click(screen.getByRole('button', { name: /Enregistrer/ }));
+        await vi.waitFor(() =>
+            expect(save).toHaveBeenCalledWith(
+                expect.objectContaining({ startYear: 2000, endYear: 2013 }),
+            ),
+        );
+    });
+
+    it('refuses a period that is not one', async () => {
+        mockServer();
+        render(
+            <MantineProvider>
+                <MetadataEditor
+                    libraryId={1}
+                    kind="manga"
+                    mode="series"
+                    volumes={volumes()}
+                    classification={{
+                        formatId: 1,
+                        age: 16,
+                        startYear: 2000,
+                        endYear: null,
+                        save: vi.fn(),
+                    }}
+                    onChanged={() => {}}
+                />
+            </MantineProvider>,
+        );
+        const field = screen.getByRole('textbox', {
+            name: /^Parution/,
+        }) as HTMLInputElement;
+        expect(field.value).toBe('2000');
+        fireEvent.change(field, { target: { value: 'années 2000' } });
+        expect(await screen.findByText(/Une année/)).toBeTruthy();
+        expect(
+            (
+                screen.getByRole('button', {
+                    name: /Enregistrer/,
+                }) as HTMLButtonElement
+            ).disabled,
+        ).toBe(true);
+    });
+
     it('requires a format, and keeps the exact age in Bento', async () => {
         mockServer();
         const save = vi.fn().mockResolvedValue({});

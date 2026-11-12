@@ -16,6 +16,7 @@ import {
     IconAdjustments,
     IconDatabaseImport,
     IconTags,
+    IconWorldSearch,
 } from '@tabler/icons-react';
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router';
@@ -277,20 +278,23 @@ const SettingsForm = ({
     );
 };
 
-type Tab = 'general' | 'classement' | 'kavita';
+// Onglets ; un onglet absent d'ici n'apparaîtrait jamais (« Général »).
+const TABS = ['general', 'classement', 'fiches', 'kavita'] as const;
+type Tab = (typeof TABS)[number];
 
 /**
- * Réglages de Bento (admin), en deux onglets : « Général » (compression,
- * scan, apparence ; enregistrés ensemble) et « Classement » (formats, âges,
- * genres, sites des fiches en ligne ; enregistrés à chaque changement). L'onglet reste dans l'adresse.
+ * Réglages de Bento (admin) : « Général » (compression, scan, apparence ;
+ * enregistrés ensemble), « Classement » (formats, âges, genres), « Fiches
+ * en ligne » (mise à jour automatique, sites) et « Kavita » ; les autres
+ * réglages sont enregistrés à chaque changement. L'onglet reste dans
+ * l'adresse.
  */
 export const SettingsPage = () => {
     const { data, error } = useQuery(fetchSettings, []);
     const [saved, setSaved] = useState<SettingsResponse>();
     const [params, setParams] = useSearchParams();
     const asked = params.get('tab');
-    const tab: Tab =
-        asked === 'classement' || asked === 'kavita' ? asked : 'general';
+    const tab: Tab = TABS.find((t) => t === asked) ?? 'general';
     const current = saved ?? data;
 
     if (error) return <Alert color="red">{error.message}</Alert>;
@@ -323,10 +327,16 @@ export const SettingsPage = () => {
                         Classement
                     </Tabs.Tab>
                     <Tabs.Tab
+                        value="fiches"
+                        leftSection={<IconWorldSearch size={16} />}
+                    >
+                        Fiches en ligne
+                    </Tabs.Tab>
+                    <Tabs.Tab
                         value="kavita"
                         leftSection={<IconDatabaseImport size={16} />}
                     >
-                        Migration Kavita
+                        Kavita
                     </Tabs.Tab>
                 </Tabs.List>
                 <Tabs.Panel value="general">
@@ -340,14 +350,19 @@ export const SettingsPage = () => {
                             onSaved={setSaved}
                         />
                         <GenresSettings />
-                        <SourcePrioritySettings
-                            priority={current.settings.sourcePriority}
-                            disabled={current.settings.disabledSources}
-                            onSaved={setSaved}
-                        />
+                    </Stack>
+                </Tabs.Panel>
+                {/* Fiches en ligne : la mise à jour automatique d'abord. */}
+                <Tabs.Panel value="fiches">
+                    <Stack>
                         <SheetRefreshSettings
                             enabled={current.settings.sheetRefresh}
                             minutes={current.settings.sheetRefreshMinutes}
+                            onSaved={setSaved}
+                        />
+                        <SourcePrioritySettings
+                            priority={current.settings.sourcePriority}
+                            disabled={current.settings.disabledSources}
                             onSaved={setSaved}
                         />
                     </Stack>

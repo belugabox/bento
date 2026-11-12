@@ -80,6 +80,7 @@ export {
     volumeNumbering,
 } from './library/volumeKind';
 export { articleFirst, compareNames, sortKeyOf } from './library/sortName';
+export { type Period, parsePeriod, periodText } from './metadata/period';
 export {
     nameVariant,
     sameSeriesName,

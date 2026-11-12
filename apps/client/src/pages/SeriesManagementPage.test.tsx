@@ -155,7 +155,7 @@ describe('SeriesManagementPage', () => {
             screen
                 .getByRole('link', { name: 'Remplir Coq de combat' })
                 .getAttribute('href'),
-        ).toBe('/series/2/edit?fill=online&from=to-classify');
+        ).toBe('/series/2/edit?fill=online&from=manage');
 
         // Moyennes : par tome et par page.
         const gantz = cards()[2]!;
@@ -177,7 +177,7 @@ describe('SeriesManagementPage', () => {
             screen
                 .getByRole('link', { name: 'Revoir Gantz' })
                 .getAttribute('href'),
-        ).toBe('/series/3/edit?fill=online&from=to-classify');
+        ).toBe('/series/3/edit?fill=online&from=manage');
     });
 
     it('sorts by size, the biggest first on a second click', async () => {
@@ -327,5 +327,20 @@ describe('SeriesManagementPage', () => {
                 { site: 'manga-news' },
             ]),
         );
+    });
+
+    it('gives its list to the editor when a series is opened', async () => {
+        show('/manage?sheet=bedetheque');
+        await vi.waitFor(() =>
+            expect(names()).toEqual(['Coq de combat', 'Spirale']),
+        );
+        fireEvent.click(screen.getByRole('link', { name: 'Modifier Spirale' }));
+        expect(JSON.parse(sessionStorage.getItem('bento:manage')!)).toEqual({
+            items: [
+                { id: 2, name: 'Coq de combat' },
+                { id: 1, name: 'Spirale' },
+            ],
+            search: 'sheet=bedetheque',
+        });
     });
 });

@@ -359,6 +359,8 @@ export class LibraryFiles {
             readingMode: settings.get(folder)?.readingMode ?? null,
             formatId: settings.get(folder)?.formatId ?? null,
             age: settings.get(folder)?.age ?? null,
+            startYear: settings.get(folder)?.startYear ?? null,
+            endYear: settings.get(folder)?.endYear ?? null,
             sources: parseSources(settings.get(folder)?.sources),
             // Note de ses fiches (gardée à leur lecture), comme une série.
             rating: seriesRatingOf(
@@ -376,7 +378,13 @@ export class LibraryFiles {
         changes: Partial<
             Pick<
                 DraftSettings,
-                'status' | 'readingMode' | 'formatId' | 'age' | 'sources'
+                | 'status'
+                | 'readingMode'
+                | 'formatId'
+                | 'age'
+                | 'startYear'
+                | 'endYear'
+                | 'sources'
             >
         >,
     ) => {
@@ -484,6 +492,8 @@ export class LibraryFiles {
                     readingMode: series.readingMode,
                     formatId: series.formatId,
                     age: series.age,
+                    startYear: series.startYear,
+                    endYear: series.endYear,
                     sources: series.sources,
                 })
                 .from(volumes)
@@ -564,6 +574,12 @@ export class LibraryFiles {
                         old.formatId && { formatId: old.formatId }),
                     ...(draft?.age == null &&
                         old.age != null && { age: old.age }),
+                    // Parution : l'une sans l'autre n'aurait pas de sens.
+                    ...(draft?.startYear == null &&
+                        old.startYear != null && {
+                            startYear: old.startYear,
+                            endYear: old.endYear,
+                        }),
                     ...(!draft?.sources &&
                         old.sources && { sources: old.sources }),
                 };
@@ -609,6 +625,10 @@ export class LibraryFiles {
         if (draft.readingMode) changes.readingMode = draft.readingMode;
         if (draft.formatId) changes.formatId = draft.formatId;
         if (draft.age != null) changes.age = draft.age;
+        if (draft.startYear != null) {
+            changes.startYear = draft.startYear;
+            changes.endYear = draft.endYear;
+        }
         // Fiches : ajoutées à celles de la série (celle du brouillon
         // l'emporte pour son site) ; une fiche Bedetheque ajoutée ne fait pas
         // perdre celle de Manga-news, ni sa note.

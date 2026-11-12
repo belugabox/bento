@@ -34,8 +34,13 @@ export const REFRESH_INTERVAL_MS = 10 * 60_000;
 export const NIGHT_START_HOUR = 2;
 export const NIGHT_END_HOUR = 6;
 export const RECHECK_AFTER_MS = 30 * 24 * 3600_000;
-// Après un refus (anti-robot, trop de requêtes) ou un site en panne.
-export const PAUSE_MS = 24 * 3600_000;
+/**
+ * Pause d'un site après un refus (anti-robot, trop de requêtes) ou une
+ * panne, malgré le nouvel essai : 1 h, puis 6 h, puis 24 h s'il refuse
+ * encore ; une requête réussie remet le compte à zéro. Les autres sites
+ * continuent.
+ */
+export const PAUSES_MS = [3600_000, 6 * 3600_000, 24 * 3600_000];
 const TICK_MS = 60_000;
 
 /** Sites relus : ceux qui donnent une note des lecteurs. */
@@ -52,8 +57,8 @@ export type SheetRefreshStatus = {
     toSearch: number;
     proposed: number;
     lastCheckedAt: Date | null;
-    lastError: string | null;
-    pausedUntil: Date | null;
+    /** Sites en pause : jusqu'à quand, et pourquoi. */
+    pauses: { site: MetadataSource; until: Date; error: string }[];
     intervalMinutes: number;
     night: { start: number; end: number };
 };
@@ -63,8 +68,9 @@ export type SheetRefreshStatus = {
  * Bedetheque), une à une : la note des lecteurs est mise à jour, les autres
  * changements sont seulement signalés (« Fiche à revoir »). Cherche aussi
  * la fiche des séries qui n'en ont pas sur un site, pour la proposer à
- * l'admin (jamais liée d'office). Une requête à la fois, jamais de nouvel
- * essai : au premier refus, pause de 24 h.
+ * l'admin (jamais liée d'office). Une requête à la fois ; un refus est
+ * réessayé une fois, à l'identique, comme pour « Remplir » (jamais
+ * contourné) ; s'il persiste, seul ce site fait une pause (`PAUSES_MS`).
  */
 export class SheetRefresher {
     private timer: NodeJS.Timeout | undefined;
@@ -73,8 +79,12 @@ export class SheetRefresher {
     private lastFetchAt = 0;
     private lastSite: MetadataSource | undefined;
     private lastCheckedAt: Date | null = null;
-    private lastError: string | null = null;
-    private pausedUntil = 0;
+    // Sites en pause, et leurs refus d'affilée.
+    private pauses = new Map<
+        MetadataSource,
+        { until: number; error: string }
+    >();
+    private refusals = new Map<MetadataSource, number>();
 
     constructor(
         private readonly db: Db,
@@ -145,11 +155,13 @@ export class SheetRefresher {
                 pendingProposals(this.db, disabled).length,
             proposed: [...proposalsBySeries(this.db).values()].flat().length,
             lastCheckedAt: this.lastCheckedAt,
-            lastError: this.lastError,
-            pausedUntil:
-                this.pausedUntil > this.now().getTime()
-                    ? new Date(this.pausedUntil)
-                    : null,
+            pauses: [...this.pauses]
+                .filter(([, pause]) => pause.until > this.now().getTime())
+                .map(([site, pause]) => ({
+                    site,
+                    until: new Date(pause.until),
+                    error: pause.error,
+                })),
             intervalMinutes: this.settings.get().sheetRefreshMinutes,
             night: { start: NIGHT_START_HOUR, end: NIGHT_END_HOUR },
         };
@@ -172,14 +184,13 @@ export class SheetRefresher {
         ) {
             return;
         }
-        if (now < this.pausedUntil) {
-            this.forced = false;
-            return;
-        }
         const interval = this.settings.get().sheetRefreshMinutes * 60_000;
         if (now - this.lastFetchAt < interval) return;
 
-        const actions = this.actions(now);
+        // Sites en pause : leur travail attend.
+        const actions = this.actions(now).filter(
+            (a) => (this.pauses.get(a.site)?.until ?? 0) <= now,
+        );
         if (actions.length === 0) {
             this.forced = false;
             return;
@@ -193,17 +204,23 @@ export class SheetRefresher {
         try {
             await action.run();
             this.lastCheckedAt = this.now();
-            this.lastError = null;
+            this.refusals.delete(action.site);
+            this.pauses.delete(action.site);
         } catch (error) {
             const message =
                 error instanceof Error ? error.message : String(error);
-            this.lastError = message;
-            // Refus, site injoignable ou en panne : on n'insiste pas.
-            this.pausedUntil = now + PAUSE_MS;
-            this.forced = false;
+            // Refus (malgré le nouvel essai), site injoignable ou en panne :
+            // ce site attend, de plus en plus longtemps ; les autres non.
+            const count = (this.refusals.get(action.site) ?? 0) + 1;
+            this.refusals.set(action.site, count);
+            const pause = PAUSES_MS[Math.min(count, PAUSES_MS.length) - 1]!;
+            this.pauses.set(action.site, {
+                until: now + pause,
+                error: message,
+            });
             const refused = error instanceof RefusedError;
             this.logger?.warn(
-                `Mise à jour des fiches en pause 24 h (${refused ? 'refus' : 'erreur'}) : ${message}`,
+                `Mise à jour des fiches : ${action.site} en pause ${pause / 3600_000} h (${refused ? 'refus' : 'erreur'} n° ${count}) : ${message}`,
             );
         } finally {
             this.busy = false;
@@ -235,8 +252,8 @@ export class SheetRefresher {
     private readSheet = async (site: SearchedSite, id: string) => {
         try {
             return site === 'manga-news'
-                ? await this.sites.mangaNews.series(id, { retry: false })
-                : await this.sites.bedetheque.series(id, { retry: false });
+                ? await this.sites.mangaNews.series(id)
+                : await this.sites.bedetheque.series(id);
         } catch (error) {
             // Fiche disparue (ou devenue illisible) : sans pause.
             if (error instanceof AppError && error.status === 404) {
@@ -250,12 +267,8 @@ export class SheetRefresher {
     private search = async (search: SheetSearch) => {
         const results =
             search.site === 'manga-news'
-                ? await this.sites.mangaNews.search(search.text, {
-                      retry: false,
-                  })
-                : await this.sites.bedetheque.search(search.text, {
-                      retry: false,
-                  });
+                ? await this.sites.mangaNews.search(search.text)
+                : await this.sites.bedetheque.search(search.text);
         const found = recordSearch(this.db, search, results, this.now());
         this.logger?.debug(
             `Fiche cherchée : ${search.site} « ${search.text} » (${found} trouvée(s))`,

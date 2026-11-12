@@ -13,6 +13,7 @@ const FULL: CompletenessInput = {
     hasAge: true,
     hasStatus: true,
     hasRating: true,
+    hasPeriod: true,
     genreCount: 2,
     writer: 'Hiroya Oku',
     penciller: 'Hiroya Oku',
@@ -38,7 +39,7 @@ describe('completenessOf', () => {
         expect(percent).toBeLessThan(100);
     });
 
-    it('lists what is missing, volumes counted by share', () => {
+    it('lists what is missing, volume numbers counted by share', () => {
         const { percent, missing } = completenessOf({
             ...FULL,
             hasFormat: false,
@@ -46,14 +47,23 @@ describe('completenessOf', () => {
             volumes: [
                 { number: '1', year: null },
                 { number: '2', year: null },
-                { number: '3', year: 2002 },
+                { number: null, year: 2002 },
                 { number: '4', year: 2003 },
             ],
         });
-        expect(missing).toEqual(['Format', 'Résumé', 'Année de 2 tomes']);
-        // 8 champs (note comprise), tous les numéros, la moitié des
-        // années : 9,5 sur 12.
-        expect(percent).toBe(79);
+        expect(missing).toEqual(['Format', 'Résumé', 'Numéro de 1 tome']);
+        // 9 champs sur 11 (parution comprise), trois numéros sur quatre :
+        // 9,75 sur 12.
+        expect(percent).toBe(81);
+    });
+
+    it('asks for the period of the series, not the year of each volume', () => {
+        const { missing } = completenessOf({
+            ...FULL,
+            hasPeriod: false,
+            volumes: [{ number: '1', year: null }],
+        });
+        expect(missing).toEqual(['Parution']);
     });
 
     it('never rounds up to 100 %', () => {
@@ -65,7 +75,7 @@ describe('completenessOf', () => {
                         number: '1',
                         year: 2000,
                     })),
-                    { number: '1000', year: null },
+                    { number: null, year: null },
                 ],
             }).percent,
         ).toBe(99);
@@ -78,6 +88,7 @@ describe('fieldsFromVolumes', () => {
         hasAge: true,
         hasStatus: true,
         hasRating: true,
+        hasPeriod: true,
         genreCount: 1,
     };
 
@@ -110,12 +121,11 @@ describe('fieldsFromVolumes', () => {
             penciller: undefined,
             publisher: undefined,
         });
-        // Dessin, éditeur, résumé et années absents : pas comptés.
+        // Dessin, éditeur et résumé absents : pas comptés.
         expect(completenessOf({ ...fields, ...full }).missing).toEqual([
             'Dessin',
             'Éditeur',
             'Résumé',
-            'Année de 2 tomes',
         ]);
     });
 });
@@ -123,7 +133,7 @@ describe('fieldsFromVolumes', () => {
 describe('missingHint', () => {
     it('says how to fill what is missing', () => {
         expect(missingHint('Note')).toMatch(/Manga-news ou Bedetheque/);
-        expect(missingHint('Année de 3 tomes')).toMatch(/noms de fichiers/);
+        expect(missingHint('Parution')).toMatch(/Wikipédia/);
         expect(missingHint('Format')).toMatch(/éditeur/);
         expect(missingHint('Résumé')).toMatch(/Remplir/);
     });

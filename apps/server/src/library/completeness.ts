@@ -11,6 +11,11 @@ export type CompletenessInput = {
     hasStatus: boolean;
     /** Une note des lecteurs relevée sur une fiche en ligne. */
     hasRating: boolean;
+    /**
+     * Parution de la série (édition d'origine) : une année de début. Elle
+     * remplace l'année de chaque tome, trop exigeante (12 novembre 2026).
+     */
+    hasPeriod: boolean;
     genreCount: number;
     writer?: string | null;
     penciller?: string | null;
@@ -29,11 +34,10 @@ export type CompletenessInput = {
         | VolumeCounts;
 };
 
-/** Tomes d'une série : combien, et combien ont un numéro ou une année. */
+/** Tomes d'une série : combien, et combien ont un numéro. */
 export type VolumeCounts = {
     total: number;
     withNumber: number;
-    withYear: number;
 };
 
 export type Completeness = {
@@ -57,6 +61,7 @@ export const completenessOf = (input: CompletenessInput): Completeness => {
         ['Format', input.hasFormat],
         ['Âge', input.hasAge],
         ['Statut', input.hasStatus],
+        ['Parution', input.hasPeriod],
         ['Genres', input.genreCount > 0],
         ['Scénario', filled(input.writer)],
         ['Dessin', filled(input.penciller)],
@@ -64,26 +69,24 @@ export const completenessOf = (input: CompletenessInput): Completeness => {
         ['Résumé', filled(input.summary)],
         ['Note', input.hasRating],
     ];
-    const { total, withNumber, withYear } = Array.isArray(input.volumes)
+    const { total, withNumber } = Array.isArray(input.volumes)
         ? {
               total: input.volumes.length,
               withNumber: input.volumes.filter(
                   (v) => v.standalone || filled(v.number),
               ).length,
-              withYear: input.volumes.filter((v) => !!v.year).length,
           }
         : input.volumes;
+    // Le numéro des tomes compte (au prorata) ; leur année, plus.
     const parts = [
         ...fields.map(([, done]) => (done ? 1 : 0)),
         total ? withNumber / total : 1,
-        total ? withYear / total : 1,
     ];
     const missing = [
         ...fields.filter(([, done]) => !done).map(([label]) => label),
         ...(withNumber < total
             ? [`Numéro de ${tomes(total - withNumber)}`]
             : []),
-        ...(withYear < total ? [`Année de ${tomes(total - withYear)}`] : []),
     ];
     const sum = parts.reduce((a, b) => a + b, 0);
     // Arrondi vers le bas : 100 % seulement si tout est rempli.

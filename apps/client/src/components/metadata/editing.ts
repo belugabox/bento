@@ -14,6 +14,7 @@ import {
     genreKey,
     kindOfWord,
     parseVolumeFileName,
+    periodText,
     volumeNumbering,
 } from '@server/types';
 
@@ -261,6 +262,8 @@ export type BedethequeSeries = {
     publisher: string;
     ongoing?: boolean;
     rating?: { value: number; count: number };
+    firstYear?: number;
+    lastYear?: number;
 };
 
 /** Fiche Wikipédia, telle que renvoyée par le serveur. */
@@ -272,6 +275,7 @@ export type WikipediaSeries = {
     penciller: string;
     publisher: string;
     ongoing: boolean;
+    firstYear?: number;
     lastYear?: number;
 };
 
@@ -298,6 +302,8 @@ export type MangaNewsSeries = {
     ageRating?: string;
     ongoing?: boolean;
     rating?: { value: number; count: number };
+    /** Année de l'édition d'origine (« Japon - 2019 »). */
+    year?: number;
 };
 
 /**
@@ -318,6 +324,9 @@ export type SeriesSheet = {
     format?: string;
     /** Âge conseillé (« 12+ » : 12). */
     age?: number;
+    /** Parution de l'édition d'origine : début, et fin si finie. */
+    startYear?: number;
+    endYear?: number;
 };
 
 export const sheetFromWikipedia = (wiki: WikipediaSeries): SeriesSheet => ({
@@ -328,6 +337,9 @@ export const sheetFromWikipedia = (wiki: WikipediaSeries): SeriesSheet => ({
     penciller: wiki.penciller,
     publisher: wiki.publisher,
     status: statusFromWikipedia(wiki),
+    // Premier et dernier volume de l'édition d'origine.
+    startYear: wiki.firstYear,
+    endYear: wiki.lastYear,
 });
 
 export const sheetFromMangaNews = (series: MangaNewsSeries): SeriesSheet => ({
@@ -347,6 +359,8 @@ export const sheetFromMangaNews = (series: MangaNewsSeries): SeriesSheet => ({
               : 'completed',
     format: series.format ?? undefined,
     age: series.age,
+    // L'année d'origine seule (pas de fin sur la fiche).
+    startYear: series.year,
 });
 
 /**
@@ -376,6 +390,12 @@ export const sheetFromBedetheque = (series: BedethequeSeries): SeriesSheet => ({
               ? 'ongoing'
               : 'completed',
     format: formatFromOrigin(series.origin),
+    // Ses années sont celles de l'édition française : l'édition d'origine
+    // pour une BD, pas pour un manga.
+    ...(formatFromOrigin(series.origin) !== 'Manga' && {
+        startYear: series.firstYear,
+        endYear: series.lastYear,
+    }),
 });
 
 /**
@@ -408,6 +428,10 @@ export const sheetValues = (
         Format: format && String(format.id),
         Age: sheet.age === undefined ? undefined : String(sheet.age),
         Status: sheet.status,
+        Period: periodText({
+            start: sheet.startYear ?? null,
+            end: sheet.endYear ?? null,
+        }),
         Genre: genres.join(', '),
         Tags: themes.join(', '),
         Writer: cleanNames(sheet.writer, known.people),

@@ -1,16 +1,23 @@
-import { Alert, Anchor, Group, Loader, Stack, Title } from '@mantine/core';
+import {
+    Alert,
+    Anchor,
+    Group,
+    Loader,
+    Stack,
+    Text,
+    Title,
+} from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { IconArrowLeft } from '@tabler/icons-react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 
+import { queuePosition, readManageQueue } from '@/components/manageQueue';
 import { CoverPicker } from '@/components/metadata/CoverPicker';
 import { MetadataEditor } from '@/components/metadata/MetadataEditor';
 import { volumeLabel } from '@/components/readingStatus';
-import { nextToClassify, toClassify } from '@/components/toClassify';
 import {
     coverUrl,
     fetchSeries,
-    fetchSeriesList,
     fetchVolume,
     pageUrl,
     seriesCoverUrl,
@@ -32,15 +39,10 @@ export const SeriesEditPage = () => {
         reload,
     } = useQuery(() => fetchSeries(seriesId), [seriesId]);
     const [coverOpened, cover] = useDisclosure(false);
-    // Depuis « Séries à classer » : la liste, pour passer à la suivante.
-    const fromQueue = params.get('from') === 'to-classify';
-    const queue = useQuery(
-        () =>
-            fromQueue
-                ? fetchSeriesList().then(toClassify)
-                : Promise.resolve(undefined),
-        [fromQueue, seriesId],
-    );
+    // Depuis la page Séries : sa liste (ordre, filtres), pour passer à la
+    // suivante et y revenir.
+    const fromManage = params.get('from') === 'manage';
+    const queue = fromManage ? readManageQueue() : null;
 
     if (error) return <Alert color="red">{error.message}</Alert>;
     if (!series) return <Loader mx="auto" />;
@@ -66,7 +68,8 @@ export const SeriesEditPage = () => {
         reload();
     };
 
-    const next = queue.data && nextToClassify(queue.data, series);
+    const place = queuePosition(queue, series.id);
+    const next = place?.next;
 
     return (
         <Stack>
@@ -77,9 +80,20 @@ export const SeriesEditPage = () => {
             </Anchor>
             <Group justify="space-between" align="baseline">
                 <Title order={2}>Modifier la série</Title>
-                {fromQueue && queue.data && (
-                    <Anchor component={Link} to="/manage" size="sm">
-                        Séries à classer : {queue.data.length}
+                {fromManage && (
+                    <Anchor
+                        component={Link}
+                        to={`/manage${queue?.search ? `?${queue.search}` : ''}`}
+                        size="sm"
+                    >
+                        <Group gap={4} wrap="nowrap">
+                            <IconArrowLeft size={14} /> Séries
+                            {place?.position && (
+                                <Text span size="xs" c="dimmed">
+                                    ({place.position} / {place.total})
+                                </Text>
+                            )}
+                        </Group>
                     </Anchor>
                 )}
             </Group>
@@ -97,13 +111,15 @@ export const SeriesEditPage = () => {
                 classification={{
                     formatId: series.formatId,
                     age: series.age,
+                    startYear: series.startYear,
+                    endYear: series.endYear,
                     sources: series.sources,
                     rating: series.rating,
                     save: (changes) =>
                         setSeriesClassification(series.id, changes),
                 }}
                 cover={{ src: currentCover, onEdit: cover.open }}
-                // Depuis « Séries à classer » : recherche Manga-news ouverte.
+                // « Remplir » depuis la page Séries : recherche en ligne lancée.
                 autoFill={params.get('fill') === 'online'}
                 next={
                     next && {

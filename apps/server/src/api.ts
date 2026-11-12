@@ -148,6 +148,9 @@ const sourceLink = z
 const classificationBody = z.object({
     formatId: z.number().int().positive().nullable().optional(),
     age: z.number().int().min(0).max(99).nullable().optional(),
+    // Parution de l'édition d'origine (null : aucune).
+    startYear: z.number().int().min(1800).max(2100).nullable().optional(),
+    endYear: z.number().int().min(1800).max(2100).nullable().optional(),
     sources: z
         .array(sourceLink)
         .max(METADATA_SOURCES.length)
@@ -913,17 +916,16 @@ export const createApi = ({
                     ...changes
                 } = c.req.valid('json');
                 checkFormatId(db, changes.formatId);
-                const { formatId, age, sources } = files.setDraftSettings(
-                    c.req.valid('param').id,
-                    folder,
-                    {
+                const { formatId, age, startYear, endYear, sources } =
+                    files.setDraftSettings(c.req.valid('param').id, folder, {
                         ...changes,
                         ...(links && { sources: sourcesText(links) }),
-                    },
-                );
+                    });
                 return c.json({
                     formatId,
                     age,
+                    startYear,
+                    endYear,
                     sources: parseSources(sources),
                 });
             },

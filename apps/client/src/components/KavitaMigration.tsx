@@ -117,7 +117,7 @@ const ReportAlert = ({ report }: { report: Report }) => (
 );
 
 /**
- * Réglages, onglet « Migration Kavita » : envoyer la base de Kavita, voir
+ * Réglages, onglet « Kavita » : envoyer la base de Kavita, voir
  * ce qui en serait repris, choisir pour chaque compte, puis migrer.
  * Relançable : rien n'est repris deux fois.
  */
