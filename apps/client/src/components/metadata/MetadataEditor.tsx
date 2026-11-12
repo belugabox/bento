@@ -1212,8 +1212,16 @@ export const MetadataEditor = ({
                             {classification && (
                                 <Grid.Col span={{ base: 12, xs: 6, sm: 4 }}>
                                     <TextInput
-                                        label="Parution"
-                                        description="Édition d’origine"
+                                        // La précision à côté du mot, sans
+                                        // ligne de plus (alignée avec l'âge).
+                                        label={
+                                            <>
+                                                Parution{' '}
+                                                <Text span size="xs" c="dimmed">
+                                                    (édition d’origine)
+                                                </Text>
+                                            </>
+                                        }
                                         placeholder="2000 – 2013"
                                         value={periodValue}
                                         onChange={(e) =>

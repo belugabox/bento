@@ -656,7 +656,7 @@ describe('MetadataEditor', () => {
         ).toBe(true);
         fireEvent.click(screen.getByRole('button', { name: 'Appliquer' }));
         const field = screen.getByRole('textbox', {
-            name: 'Parution',
+            name: /^Parution/,
         }) as HTMLInputElement;
         expect(field.value).toBe('2000 – 2013');
 
@@ -689,7 +689,7 @@ describe('MetadataEditor', () => {
             </MantineProvider>,
         );
         const field = screen.getByRole('textbox', {
-            name: 'Parution',
+            name: /^Parution/,
         }) as HTMLInputElement;
         expect(field.value).toBe('2000');
         fireEvent.change(field, { target: { value: 'années 2000' } });
