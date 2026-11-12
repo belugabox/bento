@@ -307,7 +307,7 @@ export const MetadataEditor = ({
      * fiches déjà choisies, elles sont relues et comparées.
      */
     autoFill?: boolean;
-    /** Série suivante à traiter (« Séries à classer »). */
+    /** Série suivante à traiter (ordre de la page Séries). */
     next?: { name: string; go: () => void };
 }) => {
     // Contenu des données reçues : le parent peut recréer la liste à chaque

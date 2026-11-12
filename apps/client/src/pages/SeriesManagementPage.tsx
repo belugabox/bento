@@ -47,6 +47,7 @@ import {
     publishedLabel,
     ratingLabel,
 } from '@/components/format';
+import { saveManageQueue } from '@/components/manageQueue';
 import {
     type ManagedSeries,
     answerSheetProposal,
@@ -464,6 +465,12 @@ export const SeriesManagementPage = () => {
         (formatFilter ? 1 : 0) +
         (statusFilter ? 1 : 0) +
         (sheetFilter ? 1 : 0);
+    // Série ouverte : l'éditeur suit cette liste (« Suivante », retour).
+    const rememberList = () =>
+        saveManageQueue({
+            items: shown.map((s) => ({ id: s.id, name: s.name })),
+            search: params.toString(),
+        });
     const chooseFilter = (value: Filter) =>
         update({ filter: value === 'all' ? null : value });
 
@@ -780,7 +787,8 @@ export const SeriesManagementPage = () => {
                                     <Group gap={6} wrap="nowrap">
                                         <Button
                                             component={Link}
-                                            to={`/series/${s.id}/edit?fill=online&from=to-classify`}
+                                            to={`/series/${s.id}/edit?fill=online&from=manage`}
+                                            onClick={rememberList}
                                             size="compact-sm"
                                             variant="light"
                                             leftSection={<IconWand size={14} />}
@@ -797,7 +805,8 @@ export const SeriesManagementPage = () => {
                                         </Button>
                                         <Button
                                             component={Link}
-                                            to={`/series/${s.id}/edit?from=to-classify`}
+                                            to={`/series/${s.id}/edit?from=manage`}
+                                            onClick={rememberList}
                                             size="compact-sm"
                                             variant="default"
                                             leftSection={
