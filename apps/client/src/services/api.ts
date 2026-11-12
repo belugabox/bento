@@ -619,6 +619,9 @@ export const setSeriesReadingMode = (
 export type ClassificationChanges = {
     formatId?: number | null;
     age?: number | null;
+    /** Parution de l'édition d'origine (null : aucune). */
+    startYear?: number | null;
+    endYear?: number | null;
     sources?: SourceLink[];
 };
 

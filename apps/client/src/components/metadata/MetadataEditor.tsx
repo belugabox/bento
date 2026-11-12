@@ -44,6 +44,8 @@ import {
     VOLUME_KIND_LABELS,
     type VolumeKind,
     classify,
+    parsePeriod,
+    periodText,
     publicationPathOf,
     sourceUrl,
 } from '@server/types';
@@ -294,6 +296,9 @@ export const MetadataEditor = ({
     classification?: {
         formatId: number | null;
         age: number | null;
+        /** Parution de l'édition d'origine (null : pas encore connue). */
+        startYear?: number | null;
+        endYear?: number | null;
         /** Fiches en ligne choisies (Manga-news, Wikipédia). */
         sources?: SourceLink[];
         /** Note des lecteurs déjà relevée (moyenne des fiches), ou null. */
@@ -367,6 +372,19 @@ export const MetadataEditor = ({
     const [ageValue, setAgeValue] = useState<string>(savedAge);
     useEffect(() => setAgeValue(savedAge), [savedAge]);
     const ageChanged = !!classification && ageValue !== savedAge;
+    // Parution (« 2000 – 2013 »), gardée dans Bento.
+    const savedPeriod = periodText({
+        start: classification?.startYear ?? null,
+        end: classification?.endYear ?? null,
+    });
+    const [periodValue, setPeriodValue] = useState(savedPeriod);
+    useEffect(() => setPeriodValue(savedPeriod), [savedPeriod]);
+    const period = parsePeriod(periodValue);
+    const periodInvalid = !!classification && period === null;
+    const periodChanged =
+        !!classification &&
+        !periodInvalid &&
+        periodText(period!) !== savedPeriod;
     // Fiches en ligne choisies pour la série.
     const savedSources = useMemo(
         () => classification?.sources ?? [],
@@ -384,6 +402,7 @@ export const MetadataEditor = ({
         modeChanged ||
         formatChanged ||
         ageChanged ||
+        periodChanged ||
         sourcesChanged;
     const genres = useQuery(fetchGenres, []);
     const catalog = genres.data ?? [];
@@ -543,6 +562,7 @@ export const MetadataEditor = ({
         ...editedValues(edits, paths, catalog),
         ...(classification && formatValue && { Format: formatValue }),
         ...(classification && ageValue !== UNKNOWN && { Age: ageValue }),
+        ...(classification && period?.start && { Period: periodText(period) }),
         ...(seriesStatus && status !== UNKNOWN && { Status: status }),
     };
     const display = (field: SheetField, value: string) =>
@@ -568,6 +588,7 @@ export const MetadataEditor = ({
         if (!classification) return;
         if (values.Format) setFormatValue(values.Format);
         if (values.Age) chooseAge(values.Age);
+        if (values.Period) setPeriodValue(values.Period);
         setSourcesValue((current) =>
             mergeSources(
                 current,
@@ -672,6 +693,7 @@ export const MetadataEditor = ({
         hasStatus: !seriesStatus || status !== UNKNOWN,
         // Note déjà relevée, ou apportée par une fiche comparée ici.
         hasRating: !classification || !!shownRating,
+        hasPeriod: !classification || !!period?.start,
         // Sans `String(undefined)` : « undefined » serait un genre rempli.
         genreCount: classify(
             String(series('Genre') ?? ''),
@@ -707,7 +729,7 @@ export const MetadataEditor = ({
             }
             if (
                 classification &&
-                (formatChanged || ageChanged || sourcesChanged)
+                (formatChanged || ageChanged || periodChanged || sourcesChanged)
             ) {
                 await classification.save({
                     ...(formatChanged && {
@@ -716,8 +738,13 @@ export const MetadataEditor = ({
                     ...(ageChanged && {
                         age: ageValue === UNKNOWN ? null : Number(ageValue),
                     }),
+                    ...(periodChanged && {
+                        startYear: period!.start,
+                        endYear: period!.end,
+                    }),
                     ...(sourcesChanged && { sources: sourcesValue }),
                 });
+                if (periodChanged) lines.push('Parution enregistrée.');
                 if (formatChanged || ageChanged) {
                     lines.push(
                         formatChanged && ageChanged
@@ -833,6 +860,7 @@ export const MetadataEditor = ({
                             setModeValue(savedMode);
                             setFormatValue(savedFormat);
                             setAgeValue(savedAge);
+                            setPeriodValue(savedPeriod);
                             setSourcesValue(savedSources);
                         }}
                     >
@@ -842,6 +870,7 @@ export const MetadataEditor = ({
                         disabled={
                             (changes.length === 0 && !settingsChanged) ||
                             formatMissing ||
+                            periodInvalid ||
                             busy === 'publish'
                         }
                         title={
@@ -1176,6 +1205,30 @@ export const MetadataEditor = ({
                                                     ),
                                                 );
                                             },
+                                        })}
+                                    />
+                                </Grid.Col>
+                            )}
+                            {classification && (
+                                <Grid.Col span={{ base: 12, xs: 6, sm: 4 }}>
+                                    <TextInput
+                                        label="Parution"
+                                        description="Édition d’origine"
+                                        placeholder="2000 – 2013"
+                                        value={periodValue}
+                                        onChange={(e) =>
+                                            setPeriodValue(
+                                                e.currentTarget.value,
+                                            )
+                                        }
+                                        error={
+                                            periodInvalid &&
+                                            'Une année (« 2019 »), ou deux (« 2000 – 2013 »)'
+                                        }
+                                        {...changed(periodChanged, {
+                                            original: savedPeriod || '(vide)',
+                                            onRevert: () =>
+                                                setPeriodValue(savedPeriod),
                                         })}
                                     />
                                 </Grid.Col>

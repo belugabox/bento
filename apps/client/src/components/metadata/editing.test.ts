@@ -449,6 +449,62 @@ describe('sheetFromBedetheque', () => {
     });
 });
 
+describe('period from the online sheets', () => {
+    const base = {
+        title: 'X',
+        summary: '',
+        writer: '',
+        penciller: '',
+        publisher: '',
+    };
+    const period = (sheet: Parameters<typeof sheetValues>[0]) =>
+        sheetValues(sheet, [], []).Period;
+
+    it('takes the original edition: first and last volume, or the start only', () => {
+        // Wikipédia : premier et dernier volume.
+        expect(
+            period(
+                sheetFromWikipedia({
+                    ...base,
+                    genre: '',
+                    ongoing: false,
+                    firstYear: 2000,
+                    lastYear: 2013,
+                }),
+            ),
+        ).toBe('2000 – 2013');
+        // Manga-news : l'année d'origine seule.
+        expect(
+            period(
+                sheetFromMangaNews({
+                    ...base,
+                    genres: [],
+                    themes: [],
+                    format: 'Manga',
+                    year: 2019,
+                }),
+            ),
+        ).toBe('2019');
+    });
+
+    it('takes the Bedetheque years for a BD, not for a manga (French edition)', () => {
+        const bedetheque = {
+            ...base,
+            genres: [],
+            firstYear: 2004,
+            lastYear: 2010,
+        };
+        expect(
+            period(
+                sheetFromBedetheque({ ...bedetheque, origin: 'Franco-Belge' }),
+            ),
+        ).toBe('2004 – 2010');
+        expect(
+            period(sheetFromBedetheque({ ...bedetheque, origin: 'Manga' })),
+        ).toBeUndefined();
+    });
+});
+
 describe('rating from the online sheets', () => {
     it('stays out of the fields and of the ComicInfo', () => {
         const values = sheetValues(

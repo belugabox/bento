@@ -22,6 +22,8 @@ export type ListedSeries = {
     // Tomes ajoutés depuis la dernière lecture (pastille « +2 »).
     newCount?: number;
     year?: number | null;
+    // Fin de parution (série finie), après `year`.
+    endYear?: number | null;
     // Âge minimal : choisi dans Bento, sinon déduit des tomes.
     age?: number | null;
     // Auteur de la fiche, et dessin du premier tome.
@@ -81,7 +83,9 @@ export const seriesDetails = (s: ListedSeries): string[] =>
         creditsOf(s),
         [
             s.format,
-            s.year,
+            s.year && s.endYear && s.endYear !== s.year
+                ? `${s.year} – ${s.endYear}`
+                : s.year,
             s.age !== null && s.age !== undefined ? ageLabel(s.age) : null,
             s.status ? STATUS_LABELS[s.status] : null,
             // Note des lecteurs (fiches en ligne).

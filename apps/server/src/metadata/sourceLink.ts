@@ -97,6 +97,8 @@ export const SHEET_FIELDS = [
     'Format',
     'Age',
     'Status',
+    // Parution de l'édition d'origine (« 2000 – 2013 »), gardée dans Bento.
+    'Period',
     'Genre',
     'Tags',
     'Writer',
@@ -112,6 +114,7 @@ export const SHEET_FIELD_LABELS: Record<SheetField, string> = {
     Format: 'Format',
     Age: 'Âge',
     Status: 'Statut',
+    Period: 'Parution',
     Genre: 'Genres',
     Tags: 'Thèmes',
     Writer: 'Scénario',
@@ -126,6 +129,10 @@ export const SHEET_FIELD_LABELS: Record<SheetField, string> = {
  */
 export type SourcePriority = Record<SheetField, MetadataSource>;
 
-export const DEFAULT_SOURCE_PRIORITY: SourcePriority = Object.fromEntries(
-    SHEET_FIELDS.map((field) => [field, 'manga-news']),
-) as SourcePriority;
+export const DEFAULT_SOURCE_PRIORITY: SourcePriority = {
+    ...(Object.fromEntries(
+        SHEET_FIELDS.map((field) => [field, 'manga-news']),
+    ) as SourcePriority),
+    // Wikipédia donne le début et la fin ; Manga-news, le début seulement.
+    Period: 'wikipedia',
+};

@@ -79,6 +79,10 @@ export const series = sqliteTable(
         // Couverture choisie (fichier covers/series-<id>.webp) : date de mise
         // à jour, pour les caches ; null = celle du premier tome.
         coverUpdatedAt: integer('cover_updated_at', { mode: 'timestamp_ms' }),
+        // Parution de l'édition d'origine, choisie dans Bento (fiches en
+        // ligne) : année de début, et de fin si la série est finie.
+        startYear: integer('start_year'),
+        endYear: integer('end_year'),
         year: integer('year'),
         count: integer('count'),
         // En cours de parution ou terminée, réglé dans Bento (pas dans les
@@ -269,6 +273,8 @@ export const draftSettings = sqliteTable(
         }),
         age: integer('age'),
         sources: text('source'),
+        startYear: integer('start_year'),
+        endYear: integer('end_year'),
         // Couverture choisie (fichier covers/drafts/…) ; null = aucune.
         coverUpdatedAt: integer('cover_updated_at', { mode: 'timestamp_ms' }),
     },

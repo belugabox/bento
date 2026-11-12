@@ -36,6 +36,7 @@ import {
     SOURCE_LABELS,
     isMainKind,
     isStandalone,
+    periodText,
     sourceUrl,
 } from '@server/types';
 
@@ -127,7 +128,10 @@ export const SeriesPage = () => {
     const age = seriesAgeOf(series);
     const details = [
         series.format,
-        series.year && String(series.year),
+        // Parution (Bento), sinon l'année du premier tome.
+        series.startYear
+            ? periodText({ start: series.startYear, end: series.endYear })
+            : series.year && String(series.year),
         series.writer,
         series.publisher,
     ].filter(Boolean);
@@ -142,6 +146,7 @@ export const SeriesPage = () => {
               hasAge: age !== null,
               hasStatus: !!series.status,
               hasRating: series.rating !== null,
+              hasPeriod: series.startYear !== null,
               genreCount: series.genres.length,
           })
         : undefined;
