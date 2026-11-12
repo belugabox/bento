@@ -59,7 +59,6 @@ const SERIES = {
     coverUpdatedAt: null,
     toRead: false,
     sources: [],
-    volumesStatus: { published: null, missing: [] as number[] },
     library: { id: 1, name: 'Mangas', type: 'manga' },
     volumes: [volume(1, true), volume(2, null), volume(7, null, 'hors-serie')],
 };
@@ -286,37 +285,6 @@ describe('SeriesPage', () => {
                 .getByRole('link', { name: 'Wikipédia' })
                 .getAttribute('href'),
         ).toBe('https://fr.wikipedia.org/?curid=7');
-    });
-
-    it('shows the missing volumes, from the numbering and the sheets', async () => {
-        vi.spyOn(globalThis, 'fetch').mockImplementation(
-            async () =>
-                new Response(
-                    JSON.stringify({
-                        ...SERIES,
-                        volumesStatus: { published: 6, missing: [3, 4, 5, 6] },
-                    }),
-                    { headers: { 'Content-Type': 'application/json' } },
-                ),
-        );
-        render(
-            <MantineProvider>
-                <UserContext.Provider value={READER}>
-                    <MemoryRouter initialEntries={['/series/3']}>
-                        <Routes>
-                            <Route
-                                path="/series/:id"
-                                element={<SeriesPage />}
-                            />
-                        </Routes>
-                    </MemoryRouter>
-                </UserContext.Provider>
-            </MantineProvider>,
-        );
-
-        expect(
-            await screen.findByText('Tomes manquants : 3 à 6 (6 parus)'),
-        ).toBeTruthy();
     });
 
     it('offers the downloads in their own small menu', async () => {

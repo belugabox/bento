@@ -1,7 +1,6 @@
 import {
     ActionIcon,
     Box,
-    Center,
     Group,
     Popover,
     SegmentedControl,
@@ -117,13 +116,13 @@ export const Reader = ({
     onShown?: (pages: number[]) => void;
     /** Retour en arrière depuis la première page (tome précédent). */
     onBeforeFirst?: () => void;
-    /** Page suivante sur l'écran « Fin du tome » (tome suivant). */
+    /** Page suivante après la dernière page (tome suivant). */
     onAfterLast?: () => void;
     mode: ReadingMode;
     onModeChange: (mode: ReadingMode) => void;
     modeLabel: string;
     exit: ReaderExit;
-    /** Fin du tome : ce qui suit (tome suivant, dernier tome…). */
+    /** Sous la dernière page d'un webtoon : bouton du tome suivant… */
     end: ReactNode;
     toolbarExtra?: ReactNode;
 }) => {
@@ -137,7 +136,6 @@ export const Reader = ({
     });
     const [toolbar, setToolbar] = useState(true);
     const fullscreen = useFullscreen();
-    const [ended, setEnded] = useState(false);
     const [zoomed, setZoomed] = useState(false);
     const zoom = useRef<ReactZoomPanPinchRef>(null);
 
@@ -170,7 +168,6 @@ export const Reader = ({
 
     const goTo = useCallback(
         (next: number) => {
-            setEnded(false);
             goToPage(clampPage(next, pageCount));
         },
         [goToPage, pageCount],
@@ -182,18 +179,17 @@ export const Reader = ({
         (to: Move) => {
             if (to === 'next') {
                 const next = spreads[spreadIndex + 1];
+                // Après la dernière page : le tome suivant, sans écran
+                // de fin.
                 if (next) goTo(next[0]!);
-                else if (ended) onAfterLast?.();
-                else setEnded(true);
-            } else if (ended) {
-                setEnded(false);
+                else onAfterLast?.();
             } else if (spreadIndex > 0) {
                 goTo(spreads[spreadIndex - 1]![0]!);
             } else {
                 onBeforeFirst?.();
             }
         },
-        [spreads, spreadIndex, ended, goTo, onBeforeFirst, onAfterLast],
+        [spreads, spreadIndex, goTo, onBeforeFirst, onAfterLast],
     );
 
     // Nouvelle page : revenir à la taille normale.
@@ -375,20 +371,6 @@ export const Reader = ({
                         images
                     )}
                 </Box>
-            )}
-
-            {ended && (
-                <Center pos="fixed" inset={0} style={{ pointerEvents: 'none' }}>
-                    <Stack
-                        align="center"
-                        p="lg"
-                        bg="rgba(0,0,0,0.85)"
-                        style={{ borderRadius: 8, pointerEvents: 'auto' }}
-                    >
-                        <Text c="white">Fin du tome</Text>
-                        {end}
-                    </Stack>
-                </Center>
             )}
 
             {toolbar && (

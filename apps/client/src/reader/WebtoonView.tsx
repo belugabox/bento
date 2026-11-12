@@ -1,4 +1,4 @@
-import { Box, Center, Loader, Stack, Text } from '@mantine/core';
+import { Box, Center, Loader, Stack } from '@mantine/core';
 import { type ReactNode, useEffect, useRef } from 'react';
 
 // Largeur maximale des pages : lisible sur un grand écran.
@@ -89,7 +89,6 @@ export const WebtoonView = ({
                 />
             ))}
             <Stack align="center" py={80} onClick={(e) => e.stopPropagation()}>
-                <Text c="white">Fin du tome</Text>
                 {end}
             </Stack>
         </Box>

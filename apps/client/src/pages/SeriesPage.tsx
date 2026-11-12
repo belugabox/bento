@@ -47,7 +47,6 @@ import { RatingBadge } from '@/components/RatingBadge';
 import { SeriesReaders } from '@/components/SeriesReaders';
 import { ageLabel, seriesAgeOf } from '@/components/ageLimits';
 import { completenessOf, fieldsFromVolumes } from '@/components/completeness';
-import { missingVolumesLabel } from '@/components/format';
 import { gridColumns, useLibraryDisplay } from '@/components/libraryDisplay';
 import {
     countedVolumes,
@@ -476,13 +475,6 @@ export const SeriesPage = () => {
                 return (
                     <Stack key={key} gap="xs">
                         {title && <Title order={4}>{title}</Title>}
-                        {/* Tomes absents de Bento (numérotation, fiches). */}
-                        {key === 'main' &&
-                            series.volumesStatus.missing.length > 0 && (
-                                <Text size="sm" c="dimmed">
-                                    {missingVolumesLabel(series.volumesStatus)}
-                                </Text>
-                            )}
                         <SimpleGrid cols={gridColumns(size)}>
                             {group.map((volume, index) => {
                                 const read =

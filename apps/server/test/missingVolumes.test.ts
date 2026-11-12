@@ -86,10 +86,14 @@ describe('missing volumes of a series', () => {
         await ctx.scanner.scan(ctx.library.id);
         ctx.db.update(series).set({ sources: 'manga-news:Gantz' }).run();
         const [gantz] = listSeries(ctx.db, ADMIN);
-        expect(getSeries(ctx.db, ADMIN, gantz!.id).volumesStatus).toEqual({
+        expect(listManagedSeries(ctx.db)[0]!.volumesStatus).toEqual({
             published: null,
             missing: [3],
         });
+        // Réservé à l'admin (page Séries) : pas sur la fiche série.
+        expect(getSeries(ctx.db, ADMIN, gantz!.id)).not.toHaveProperty(
+            'volumesStatus',
+        );
 
         sheetSeen(ctx.db, 'manga-news', 'Gantz', {
             title: 'Gantz',
@@ -98,10 +102,6 @@ describe('missing volumes of a series', () => {
             penciller: '',
             publisher: '',
             summary: '',
-        });
-        expect(getSeries(ctx.db, ADMIN, gantz!.id).volumesStatus).toEqual({
-            published: 6,
-            missing: [3, 5, 6],
         });
         expect(listManagedSeries(ctx.db)[0]!.volumesStatus).toEqual({
             published: 6,

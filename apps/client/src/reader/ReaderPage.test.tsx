@@ -185,16 +185,12 @@ describe('ReaderPage', () => {
         );
     });
 
-    it('opens the next volume by turning the page after the end', async () => {
+    it('opens the next volume by turning the last page, without an end screen', async () => {
         await open('rtl', '/read/7?page=3');
 
         press(' ');
 
-        expect(screen.getByText('Fin du tome')).toBeTruthy();
-        expect(screen.getByText('Page suivante : tome suivant.')).toBeTruthy();
-        // Plus de boutons : la page suivante ouvre le tome suivant.
-        expect(screen.queryByRole('link', { name: 'Tome suivant' })).toBeNull();
-        press(' ');
+        expect(screen.queryByText('Fin du tome')).toBeNull();
         await vi.waitFor(() => expect(location).toBe('/read/8'));
     });
 
@@ -383,7 +379,13 @@ describe('ReaderPage', () => {
             ]),
         );
         expect(screen.queryByRole('slider')).toBeNull();
-        expect(screen.getByText('Fin du tome')).toBeTruthy();
+        // Sous la dernière page : le tome suivant, sans « Fin du tome ».
+        expect(screen.queryByText('Fin du tome')).toBeNull();
+        expect(
+            screen
+                .getByRole('link', { name: 'Tome suivant' })
+                .getAttribute('href'),
+        ).toBe('/read/8');
         // Les flèches ne tournent pas de page : le défilement reste natif.
         await vi.waitFor(() => expect(location).toBe('/read/7?page=1'));
         press('ArrowRight');
