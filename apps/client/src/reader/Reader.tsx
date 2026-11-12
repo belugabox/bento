@@ -96,6 +96,7 @@ export const Reader = ({
     goTo: goToPage,
     onShown,
     onBeforeFirst,
+    onAfterLast,
     mode,
     onModeChange,
     modeLabel,
@@ -116,11 +117,13 @@ export const Reader = ({
     onShown?: (pages: number[]) => void;
     /** Retour en arrière depuis la première page (tome précédent). */
     onBeforeFirst?: () => void;
+    /** Page suivante sur l'écran « Fin du tome » (tome suivant). */
+    onAfterLast?: () => void;
     mode: ReadingMode;
     onModeChange: (mode: ReadingMode) => void;
     modeLabel: string;
     exit: ReaderExit;
-    /** Fin du tome : tome suivant, retour… */
+    /** Fin du tome : ce qui suit (tome suivant, dernier tome…). */
     end: ReactNode;
     toolbarExtra?: ReactNode;
 }) => {
@@ -180,6 +183,7 @@ export const Reader = ({
             if (to === 'next') {
                 const next = spreads[spreadIndex + 1];
                 if (next) goTo(next[0]!);
+                else if (ended) onAfterLast?.();
                 else setEnded(true);
             } else if (ended) {
                 setEnded(false);
@@ -189,7 +193,7 @@ export const Reader = ({
                 onBeforeFirst?.();
             }
         },
-        [spreads, spreadIndex, ended, goTo, onBeforeFirst],
+        [spreads, spreadIndex, ended, goTo, onBeforeFirst, onAfterLast],
     );
 
     // Nouvelle page : revenir à la taille normale.
