@@ -45,7 +45,7 @@ import { CoverCard } from '@/components/CoverCard';
 import { DownloadRing } from '@/components/DownloadIndicator';
 import { SeriesReaders } from '@/components/SeriesReaders';
 import { ageLabel, seriesAgeOf } from '@/components/ageLimits';
-import { completenessOf } from '@/components/completeness';
+import { completenessOf, fieldsFromVolumes } from '@/components/completeness';
 import { gridColumns, useLibraryDisplay } from '@/components/libraryDisplay';
 import {
     countedVolumes,
@@ -133,19 +133,14 @@ export const SeriesPage = () => {
     // Fiche incomplète : montrée à l'admin seulement (ComicInfo des tomes).
     const completeness = isAdmin
         ? completenessOf({
-              name: series.name,
+              // Lus dans les tomes, comme l'éditeur : même pourcentage.
+              ...fieldsFromVolumes(
+                  series.volumes.map((v) => v.admin?.comicInfo ?? {}),
+              ),
               hasFormat: !!series.formatId,
               hasAge: age !== null,
               hasStatus: !!series.status,
               genreCount: series.genres.length,
-              writer: series.writer,
-              penciller: first?.admin?.comicInfo.Penciller,
-              publisher: series.publisher,
-              summary: series.summary,
-              volumes: series.volumes.map((v) => ({
-                  number: v.number,
-                  year: v.admin?.comicInfo.Year,
-              })),
           })
         : undefined;
 
@@ -232,7 +227,24 @@ export const SeriesPage = () => {
                     />
                 )}
                 <Stack gap="xs" style={{ flex: 1, minWidth: 0 }}>
-                    <Title order={2}>{series.name}</Title>
+                    {/* Modifier (admin) : un crayon discret à côté du nom. */}
+                    <Group gap={6} wrap="nowrap" align="center">
+                        <Title order={2}>{series.name}</Title>
+                        {isAdmin && (
+                            <Tooltip label="Modifier les métadonnées">
+                                <ActionIcon
+                                    component={Link}
+                                    to={`/series/${series.id}/edit`}
+                                    variant="subtle"
+                                    color="gray"
+                                    size="sm"
+                                    aria-label="Modifier les métadonnées"
+                                >
+                                    <IconPencil size={16} />
+                                </ActionIcon>
+                            </Tooltip>
+                        )}
+                    </Group>
                     {details.length > 0 && (
                         <Text c="dimmed" size="sm">
                             {details.join(' · ')}
@@ -294,43 +306,31 @@ export const SeriesPage = () => {
                             />
                         </div>
                     )}
-                    {isAdmin && (
-                        <Button
-                            component={Link}
-                            to={`/series/${series.id}/edit`}
-                            variant="default"
-                            size="xs"
-                            w="fit-content"
-                            leftSection={<IconPencil size={14} />}
-                        >
-                            Modifier les métadonnées
-                        </Button>
-                    )}
-                    {(series.summary || series.sources.length > 0) && (
+                    {series.summary && (
                         <Text size="sm" style={{ whiteSpace: 'pre-line' }}>
                             {series.summary}
-                            {/* Fiches en ligne de la série, en fin de résumé,
-                                le plus discrètement possible. */}
-                            {series.sources.length > 0 && (
-                                <Text span size="xs" c="dimmed">
-                                    {series.summary ? ' ' : ''}Sources :{' '}
-                                    {series.sources.map((link, index) => (
-                                        <Fragment key={link.site}>
-                                            {index > 0 && ' · '}
-                                            <Anchor
-                                                href={sourceUrl(link)}
-                                                target="_blank"
-                                                rel="noreferrer"
-                                                size="xs"
-                                                c="dimmed"
-                                                underline="hover"
-                                            >
-                                                {SOURCE_LABELS[link.site]}
-                                            </Anchor>
-                                        </Fragment>
-                                    ))}
-                                </Text>
-                            )}
+                        </Text>
+                    )}
+                    {/* Fiches en ligne de la série, sous le résumé, le plus
+                        discrètement possible. */}
+                    {series.sources.length > 0 && (
+                        <Text size="xs" c="dimmed" mt={-4}>
+                            Sources :{' '}
+                            {series.sources.map((link, index) => (
+                                <Fragment key={link.site}>
+                                    {index > 0 && ' · '}
+                                    <Anchor
+                                        href={sourceUrl(link)}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        size="xs"
+                                        c="dimmed"
+                                        underline="hover"
+                                    >
+                                        {SOURCE_LABELS[link.site]}
+                                    </Anchor>
+                                </Fragment>
+                            ))}
                         </Text>
                     )}
                     {/* Boutons de lecture, et « Lu par » à droite. */}

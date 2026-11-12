@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { type CompletenessInput, completenessOf } from './completeness';
+import {
+    type CompletenessInput,
+    completenessOf,
+    fieldsFromVolumes,
+} from './completeness';
 
 const FULL: CompletenessInput = {
     name: 'Gantz',
@@ -53,5 +57,52 @@ describe('completenessOf', () => {
                 ],
             }).percent,
         ).toBe(99);
+    });
+});
+
+describe('fieldsFromVolumes', () => {
+    const full = {
+        hasFormat: true,
+        hasAge: true,
+        hasStatus: true,
+        genreCount: 1,
+    };
+
+    it('does not ask a one-shot for a number', () => {
+        const fields = fieldsFromVolumes([
+            {
+                Series: 'Asterios Polyp',
+                Format: 'One-shot',
+                Year: 2010,
+                Writer: 'David Mazzucchelli',
+                Penciller: 'David Mazzucchelli',
+                Publisher: 'Casterman',
+                Summary: 'Un architecte…',
+            },
+        ]);
+        expect(completenessOf({ ...fields, ...full })).toEqual({
+            percent: 100,
+            missing: [],
+        });
+    });
+
+    it('takes the first filled value of each field, never a missing one', () => {
+        const fields = fieldsFromVolumes([
+            { Series: 'Gantz', Number: '1' },
+            { Series: 'Gantz', Number: '2', Writer: 'Hiroya Oku' },
+        ]);
+        expect(fields).toMatchObject({
+            name: 'Gantz',
+            writer: 'Hiroya Oku',
+            penciller: undefined,
+            publisher: undefined,
+        });
+        // Dessin, éditeur, résumé et années absents : pas comptés.
+        expect(completenessOf({ ...fields, ...full }).missing).toEqual([
+            'Dessin',
+            'Éditeur',
+            'Résumé',
+            'Année de 2 tomes',
+        ]);
     });
 });

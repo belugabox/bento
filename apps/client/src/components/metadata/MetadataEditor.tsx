@@ -55,7 +55,7 @@ import {
     ratingForAge,
     useAgeSteps,
 } from '@/components/ageLimits';
-import { completenessOf } from '@/components/completeness';
+import { completenessOf, fieldsFromVolumes } from '@/components/completeness';
 import { formatSize } from '@/components/format';
 import { volumeCountLabel } from '@/components/readingStatus';
 import { ReaderPreview } from '@/reader/ReaderPreview';
@@ -591,25 +591,20 @@ export const MetadataEditor = ({
 
     // Complétude de la fiche, avec ce qui est saisi (pas encore enregistré).
     const completeness = completenessOf({
-        name: String(series('Series')),
+        // Lus dans les tomes (première valeur remplie), comme la fiche
+        // série : même pourcentage.
+        ...fieldsFromVolumes(readable.map((v) => edits[v.path] ?? {})),
         hasFormat: !classification || !!formatValue,
         hasAge:
             ageValue !== UNKNOWN ||
-            ageOfRating(String(series('AgeRating'))) !== null,
+            ageOfRating(String(series('AgeRating') ?? '')) !== null,
         hasStatus: !seriesStatus || status !== UNKNOWN,
+        // Sans `String(undefined)` : « undefined » serait un genre rempli.
         genreCount: classify(
-            String(series('Genre')),
-            String(series('Tags')),
+            String(series('Genre') ?? ''),
+            String(series('Tags') ?? ''),
             catalog,
         ).genres.length,
-        writer: String(series('Writer')),
-        penciller: String(series('Penciller')),
-        publisher: String(series('Publisher')),
-        summary: first ? edits[first]?.Summary : '',
-        volumes: readable.map((v) => ({
-            number: edits[v.path]?.Number,
-            year: edits[v.path]?.Year,
-        })),
     });
     const totalSize = volumes.reduce((sum, v) => sum + (v.size ?? 0), 0);
 

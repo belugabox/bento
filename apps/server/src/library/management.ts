@@ -42,7 +42,8 @@ export const listManagedSeries = (db: Db) => {
             >`(select json_extract(v.comic_info, '$.Penciller') from volumes v where v.series_id = series.id order by v.kind != 'volume', v.kind, v.sort_number is null, v.sort_number, v.file limit 1)`,
             volumeCount: sql<number>`count(${volumes.id})`,
             // Tomes au numéro et à l'année renseignés (complétude).
-            withNumber: sql<number>`count(case when coalesce(trim(${volumes.number}), '') != '' then 1 end)`,
+            // Un one-shot, une intégrale sans numéro : rien à numéroter.
+            withNumber: sql<number>`count(case when coalesce(trim(${volumes.number}), '') != '' or ${volumes.kind} in ('one-shot', 'integrale') then 1 end)`,
             withYear: sql<number>`count(json_extract(${volumes.comicInfo}, '$.Year'))`,
             pageCount: sql<number>`coalesce(sum(${volumes.pageCount}), 0)`,
             size: sql<number>`coalesce(sum(${volumes.size}), 0)`,
