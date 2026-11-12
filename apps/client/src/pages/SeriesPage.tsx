@@ -29,10 +29,15 @@ import {
     IconPlayerPlay,
     IconRestore,
 } from '@tabler/icons-react';
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
 import { Link, useParams } from 'react-router';
 
-import { isMainKind, isStandalone } from '@server/types';
+import {
+    SOURCE_LABELS,
+    isMainKind,
+    isStandalone,
+    sourceUrl,
+} from '@server/types';
 
 import { SeriesVolumeMenu } from '@/components/CardMenus';
 import { CompletenessBadge } from '@/components/CompletenessBadge';
@@ -301,9 +306,31 @@ export const SeriesPage = () => {
                             Modifier les métadonnées
                         </Button>
                     )}
-                    {series.summary && (
+                    {(series.summary || series.sources.length > 0) && (
                         <Text size="sm" style={{ whiteSpace: 'pre-line' }}>
                             {series.summary}
+                            {/* Fiches en ligne de la série, en fin de résumé,
+                                le plus discrètement possible. */}
+                            {series.sources.length > 0 && (
+                                <Text span size="xs" c="dimmed">
+                                    {series.summary ? ' ' : ''}Sources :{' '}
+                                    {series.sources.map((link, index) => (
+                                        <Fragment key={link.site}>
+                                            {index > 0 && ' · '}
+                                            <Anchor
+                                                href={sourceUrl(link)}
+                                                target="_blank"
+                                                rel="noreferrer"
+                                                size="xs"
+                                                c="dimmed"
+                                                underline="hover"
+                                            >
+                                                {SOURCE_LABELS[link.site]}
+                                            </Anchor>
+                                        </Fragment>
+                                    ))}
+                                </Text>
+                            )}
                         </Text>
                     )}
                     {/* Boutons de lecture, et « Lu par » à droite. */}

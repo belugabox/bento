@@ -58,6 +58,7 @@ const SERIES = {
     publisher: null,
     coverUpdatedAt: null,
     toRead: false,
+    sources: [],
     library: { id: 1, name: 'Mangas', type: 'manga' },
     volumes: [volume(1, true), volume(2, null), volume(7, null, 'hors-serie')],
 };
@@ -242,6 +243,48 @@ describe('SeriesPage', () => {
         expect(
             screen.queryByRole('button', { name: /^Actions pour/ }),
         ).toBeNull();
+    });
+
+    it('links its online sheets at the end of the summary', async () => {
+        vi.spyOn(globalThis, 'fetch').mockImplementation(
+            async () =>
+                new Response(
+                    JSON.stringify({
+                        ...SERIES,
+                        summary: 'Des aliens.',
+                        sources: [
+                            { site: 'wikipedia', id: '7' },
+                            { site: 'bedetheque', id: '500' },
+                        ],
+                    }),
+                    { headers: { 'Content-Type': 'application/json' } },
+                ),
+        );
+        render(
+            <MantineProvider>
+                <UserContext.Provider value={READER}>
+                    <MemoryRouter initialEntries={['/series/3']}>
+                        <Routes>
+                            <Route
+                                path="/series/:id"
+                                element={<SeriesPage />}
+                            />
+                        </Routes>
+                    </MemoryRouter>
+                </UserContext.Provider>
+            </MantineProvider>,
+        );
+
+        const link = await screen.findByRole('link', { name: 'Bedetheque' });
+        expect(link.getAttribute('href')).toBe(
+            'https://www.bedetheque.com/serie_500.html',
+        );
+        expect(link.getAttribute('target')).toBe('_blank');
+        expect(
+            screen
+                .getByRole('link', { name: 'Wikipédia' })
+                .getAttribute('href'),
+        ).toBe('https://fr.wikipedia.org/?curid=7');
     });
 
     it('offers the downloads in their own small menu', async () => {
