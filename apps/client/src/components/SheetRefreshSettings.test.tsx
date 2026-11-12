@@ -9,6 +9,8 @@ const status = (changes: Record<string, unknown> = {}) => ({
     running: false,
     linked: 40,
     due: 12,
+    toSearch: 3,
+    proposed: 2,
     lastCheckedAt: null,
     lastError: null,
     pausedUntil: null,
@@ -46,6 +48,11 @@ describe('SheetRefreshSettings', () => {
             await screen.findByText('12 fiches à relire sur 40.'),
         ).toBeTruthy();
         expect(screen.getByText(/Entre 2 h et 6 h/)).toBeTruthy();
+        expect(
+            screen.getByText(
+                /3 recherches de fiche à faire · 2 fiches proposées dans Séries/,
+            ),
+        ).toBeTruthy();
         // Rythme : au plus 24 fiches par nuit à 10 minutes.
         expect(
             (

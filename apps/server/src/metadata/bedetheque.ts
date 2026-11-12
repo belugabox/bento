@@ -329,9 +329,10 @@ export class Bedetheque {
     };
 
     /** Séries dont le nom correspond au texte (autocomplétion du site). */
-    search = async (text: string) => {
+    search = async (text: string, options?: { retry?: boolean }) => {
         const body = await this.get(
             `${BASE_URL}/ajax/series?term=${encodeURIComponent(text)}`,
+            options,
         );
         if (!body) return [];
         try {

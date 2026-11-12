@@ -344,9 +344,10 @@ export class MangaNews {
     };
 
     /** Séries dont le titre correspond au texte. */
-    search = async (text: string) => {
+    search = async (text: string, options?: { retry?: boolean }) => {
         const html = await this.get(
             `${BASE_URL}/recherche/?q=${encodeURIComponent(text)}`,
+            options,
         );
         return html ? parseSearchPage(html) : [];
     };

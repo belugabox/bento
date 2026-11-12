@@ -10,6 +10,7 @@ import { completenessOf, fieldsFromVolumes } from './completeness';
 import { genreCatalog } from './genres';
 import { publishedCount, volumesStatus } from './missingVolumes';
 import { seriesRatingOf, sourceRatingsMap } from './ratings';
+import { proposalsBySeries } from './sheetProposals';
 import { sourceSheetsMap } from './sheets';
 import { compareNames } from './sortName';
 
@@ -52,6 +53,7 @@ export const listManagedSeries = (db: Db) => {
     const ratings = sourceRatingsMap(db);
     const sheets = sourceSheetsMap(db);
     const infos = volumeInfos(db);
+    const proposals = proposalsBySeries(db);
     return db
         .select({
             id: series.id,
@@ -133,6 +135,13 @@ export const listManagedSeries = (db: Db) => {
                 ...ratingFields(rating),
                 // Sites des fiches liées (filtre « Sans fiche Bedetheque »).
                 sheetSites: parseSources(sources).map((link) => link.site),
+                // Fiches trouvées la nuit, à lier (sites encore sans fiche).
+                proposals: (proposals.get(row.id) ?? []).filter(
+                    (p) =>
+                        !parseSources(sources).some(
+                            (link) => link.site === p.site,
+                        ),
+                ),
                 // Fiches changées depuis que l'admin les a vues (mise à jour
                 // de nuit) : « Fiche à revoir ».
                 sheetChanges: parseSources(sources).flatMap(

@@ -76,6 +76,7 @@ import { familyReaders, seriesReaders } from './library/readers';
 import { addReadingTime } from './library/readingTime';
 import { ResizedPages } from './library/resizedPages';
 import { type LibraryScanner, coverFile } from './library/scanner';
+import { SEARCHED_SITES, answerProposal } from './library/sheetProposals';
 import { SheetRefresher } from './library/sheetRefresh';
 import { sheetSeen } from './library/sheets';
 import { readCover } from './library/smallCovers';
@@ -1155,6 +1156,25 @@ export const createApi = ({
         )
         .get('/manage/series/to-classify', requireAdmin, (c) =>
             c.json({ count: countToClassify(db) }),
+        )
+        // Fiche proposée (trouvée la nuit) : liée, ou refusée pour de bon.
+        .post(
+            '/manage/series/:id/proposals',
+            requireAdmin,
+            zValidator('param', idParam),
+            zValidator(
+                'json',
+                z.object({
+                    site: z.enum(SEARCHED_SITES),
+                    id: z.string().min(1).max(200),
+                    accept: z.boolean(),
+                }),
+            ),
+            (c) => {
+                const { site, id, accept } = c.req.valid('json');
+                answerProposal(db, c.req.valid('param').id, site, id, accept);
+                return c.json({ ok: true });
+            },
         )
         .patch(
             '/users/:id',

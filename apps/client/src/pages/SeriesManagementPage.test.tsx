@@ -41,6 +41,7 @@ const managed = (
     ratingCount: 0,
     sheetChanges: [] as string[],
     sheetSites: [] as string[],
+    proposals: [] as unknown[],
     // Calculée par le serveur.
     completeness: { percent: 90, missing: ['Note'] },
     volumesStatus: {
@@ -64,6 +65,22 @@ beforeEach(() => {
         managed(2, 'Coq de combat', {
             formatId: null,
             format: null,
+            // Trouvée la nuit, à lier.
+            proposals: [
+                {
+                    site: 'bedetheque',
+                    id: '7000',
+                    title: 'Coq de combat',
+                    details: {
+                        writer: 'Izō Hashimoto',
+                        penciller: 'Akio Tanaka',
+                        publisher: 'Delcourt',
+                        volumeCount: 34,
+                        year: 2004,
+                        sameAuthor: true,
+                    },
+                },
+            ],
             completeness: { percent: 81, missing: ['Format', 'Note'] },
         }),
         managed(3, 'Gantz', {
@@ -214,5 +231,35 @@ describe('SeriesManagementPage', () => {
             await screen.findByRole('option', { name: 'Tomes manquants (1)' }),
         );
         await vi.waitFor(() => expect(names()).toEqual(['Gantz']));
+    });
+
+    it('shows the sheets found at night, to link or refuse', async () => {
+        show();
+        const proposal = await screen.findByTestId('proposal');
+        expect(
+            within(proposal).getByText(
+                'Izō Hashimoto · Akio Tanaka · Delcourt · 34 tomes · depuis 2004 · même auteur',
+            ),
+        ).toBeTruthy();
+        expect(
+            within(proposal)
+                .getByRole('link', { name: 'Coq de combat' })
+                .getAttribute('href'),
+        ).toBe('https://www.bedetheque.com/serie_7000.html');
+
+        fireEvent.click(within(proposal).getByRole('button', { name: 'Lier' }));
+        await vi.waitFor(() =>
+            expect(requests).toContainEqual([
+                'POST',
+                '/api/manage/series/2/proposals',
+                { site: 'bedetheque', id: '7000', accept: true },
+            ]),
+        );
+        // Liste rechargée.
+        await vi.waitFor(() =>
+            expect(
+                requests.filter(([, url]) => url === '/api/manage/series'),
+            ).toHaveLength(2),
+        );
     });
 });

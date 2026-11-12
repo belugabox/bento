@@ -8,6 +8,7 @@ import {
     Image,
     Indicator,
     Loader,
+    Paper,
     Popover,
     Select,
     SimpleGrid,
@@ -17,6 +18,7 @@ import {
     Title,
     Tooltip,
 } from '@mantine/core';
+import { notifications } from '@mantine/notifications';
 import {
     IconFilter,
     IconPencil,
@@ -28,7 +30,12 @@ import {
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 
-import { compareNames, genreKey } from '@server/types';
+import {
+    SOURCE_LABELS,
+    compareNames,
+    genreKey,
+    sourceUrl,
+} from '@server/types';
 
 import { CompletenessBadge } from '@/components/CompletenessBadge';
 import { ageLabel } from '@/components/ageLimits';
@@ -39,6 +46,7 @@ import {
 } from '@/components/format';
 import {
     type ManagedSeries,
+    answerSheetProposal,
     fetchFormats,
     fetchManagedSeries,
     seriesCoverUrl,
@@ -58,6 +66,8 @@ const FILTERS = [
     { value: 'no-bedetheque', label: 'Sans fiche Bedetheque' },
     // Fiches changées en ligne (mise à jour de nuit).
     { value: 'to-review', label: 'Fiches à revoir' },
+    // Fiches trouvées la nuit pour une série qui n'en avait pas.
+    { value: 'proposed', label: 'Fiches proposées' },
 ] as const;
 type Filter = (typeof FILTERS)[number]['value'];
 
@@ -117,6 +127,8 @@ const matches = (row: Row, filter: Filter) => {
             return row.percent < 80;
         case 'to-review':
             return row.sheetChanges.length > 0;
+        case 'proposed':
+            return row.proposals.length > 0;
         case 'missing-volumes':
             return row.volumesStatus.missing.length > 0;
         case 'no-bedetheque':
@@ -193,6 +205,91 @@ const formatDay = (iso: string | null) =>
           })
         : '—';
 
+/** Ce que dit une fiche proposée : auteurs, tomes, année, même auteur. */
+const proposalDetails = ({ details }: ManagedSeries['proposals'][number]) =>
+    [
+        details.writer,
+        details.penciller !== details.writer && details.penciller,
+        details.publisher,
+        details.volumeCount &&
+            `${details.volumeCount} tome${details.volumeCount > 1 ? 's' : ''}`,
+        details.year && `depuis ${details.year}`,
+        details.sameAuthor === true
+            ? 'même auteur'
+            : details.sameAuthor === false
+              ? 'autre auteur'
+              : null,
+    ]
+        .filter(Boolean)
+        .join(' · ');
+
+/**
+ * Fiche trouvée la nuit pour la série : son site, son nom (lien vers la
+ * fiche), ce qu'elle dit, et « Lier » ou « Ce n'est pas elle ».
+ */
+const ProposalLine = ({
+    seriesId,
+    proposal,
+    onAnswered,
+}: {
+    seriesId: number;
+    proposal: ManagedSeries['proposals'][number];
+    onAnswered: () => void;
+}) => {
+    const [busy, setBusy] = useState(false);
+    const answer = async (accept: boolean) => {
+        setBusy(true);
+        try {
+            await answerSheetProposal(seriesId, proposal, accept);
+            onAnswered();
+        } catch (e) {
+            notifications.show({ color: 'red', message: (e as Error).message });
+            setBusy(false);
+        }
+    };
+    return (
+        <Paper withBorder radius="sm" p={8} data-testid="proposal">
+            <Stack gap={4}>
+                <Text size="xs">
+                    Fiche {SOURCE_LABELS[proposal.site]} proposée :{' '}
+                    <Anchor
+                        href={sourceUrl({
+                            site: proposal.site,
+                            id: proposal.id,
+                        })}
+                        target="_blank"
+                        size="xs"
+                    >
+                        {proposal.title}
+                    </Anchor>
+                </Text>
+                <Text size="xs" c="dimmed">
+                    {proposalDetails(proposal)}
+                </Text>
+                <Group gap={6}>
+                    <Button
+                        size="compact-xs"
+                        variant="light"
+                        disabled={busy}
+                        onClick={() => void answer(true)}
+                    >
+                        Lier
+                    </Button>
+                    <Button
+                        size="compact-xs"
+                        variant="subtle"
+                        color="gray"
+                        disabled={busy}
+                        onClick={() => void answer(false)}
+                    >
+                        Ce n’est pas elle
+                    </Button>
+                </Group>
+            </Stack>
+        </Paper>
+    );
+};
+
 /**
  * Gestion des séries (admin) : toutes les séries en cartes, les fiches les
  * moins complètes d'abord, à trier et à filtrer ; chaque carte dit ce qui
@@ -207,7 +304,7 @@ export const SeriesManagementPage = () => {
     const formatFilter = params.get('format');
     const statusFilter = params.get('status');
     const [search, setSearch] = useState('');
-    const { data, error } = useQuery(fetchManagedSeries, []);
+    const { data, error, reload } = useQuery(fetchManagedSeries, []);
     const formats = useQuery(fetchFormats, []);
 
     const update = (changes: Record<string, string | null>) =>
@@ -403,6 +500,17 @@ export const SeriesManagementPage = () => {
                                 {counts['to-review'] > 1 ? 's' : ''} à revoir
                             </Anchor>
                         )}
+                        {counts.proposed > 0 && filter !== 'proposed' && (
+                            <Anchor
+                                component="button"
+                                size="xs"
+                                onClick={() => chooseFilter('proposed')}
+                            >
+                                {counts.proposed} série
+                                {counts.proposed > 1 ? 's' : ''} avec une fiche
+                                proposée
+                            </Anchor>
+                        )}
                         {filter !== 'all' && (
                             <Anchor
                                 component="button"
@@ -520,6 +628,16 @@ export const SeriesManagementPage = () => {
                                         )}
                                     </Stack>
                                 </Group>
+                                {/* Fiches trouvées la nuit : liées
+                                    seulement par l'admin. */}
+                                {s.proposals.map((proposal) => (
+                                    <ProposalLine
+                                        key={`${proposal.site}:${proposal.id}`}
+                                        seriesId={s.id}
+                                        proposal={proposal}
+                                        onAnswered={reload}
+                                    />
+                                ))}
                                 <Group
                                     justify="space-between"
                                     wrap="nowrap"

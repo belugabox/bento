@@ -513,6 +513,19 @@ export const setSeriesStatus = (
 /** Gestion des séries (admin) : toutes, avec taille, pages et fiche. */
 export const fetchManagedSeries = () => json(api.manage.series.$get());
 
+/** Fiche proposée (trouvée la nuit) : liée à la série, ou refusée. */
+export const answerSheetProposal = (
+    seriesId: number,
+    proposal: { site: 'manga-news' | 'bedetheque'; id: string },
+    accept: boolean,
+) =>
+    json(
+        api.manage.series[':id'].proposals.$post({
+            param: { id: String(seriesId) },
+            json: { site: proposal.site, id: proposal.id, accept },
+        }),
+    );
+
 export type ManagedSeries = Awaited<
     ReturnType<typeof fetchManagedSeries>
 >[number];

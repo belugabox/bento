@@ -13,7 +13,16 @@ import type { SettingsStore } from '../settings';
 import { AppError, RefusedError } from '../tools/errors';
 import type { Logger } from '../tools/logger';
 import { saveSourceRating } from './ratings';
-import { type WatchedSheet, sheetChecked, sourceSheetsMap } from './sheets';
+import {
+    type SearchedSite,
+    type SheetSearch,
+    pendingProposals,
+    proposalsBySeries,
+    recordSearch,
+    searchesToDo,
+    verifyProposal,
+} from './sheetProposals';
+import { sheetChecked, sourceSheetsMap } from './sheets';
 
 /**
  * Rythme de la mise à jour, très lent pour ne jamais gêner les sites (ni
@@ -39,6 +48,9 @@ export type SheetRefreshStatus = {
     /** Fiches liées aux séries (sites actifs), et celles à relire. */
     linked: number;
     due: number;
+    /** Fiches manquantes à chercher, et fiches proposées à l'admin. */
+    toSearch: number;
+    proposed: number;
     lastCheckedAt: Date | null;
     lastError: string | null;
     pausedUntil: Date | null;
@@ -49,8 +61,10 @@ export type SheetRefreshStatus = {
 /**
  * Relit en arrière-plan les fiches liées aux séries (Manga-news,
  * Bedetheque), une à une : la note des lecteurs est mise à jour, les autres
- * changements sont seulement signalés (« Fiche à revoir »). Jamais de
- * nouvel essai : au premier refus, pause de 24 h.
+ * changements sont seulement signalés (« Fiche à revoir »). Cherche aussi
+ * la fiche des séries qui n'en ont pas sur un site, pour la proposer à
+ * l'admin (jamais liée d'office). Une requête à la fois, jamais de nouvel
+ * essai : au premier refus, pause de 24 h.
  */
 export class SheetRefresher {
     private timer: NodeJS.Timeout | undefined;
@@ -120,11 +134,16 @@ export class SheetRefresher {
 
     status = (): SheetRefreshStatus => {
         const { linked, due } = this.dueLinks();
+        const disabled = this.settings.get().disabledSources;
         return {
             enabled: this.settings.get().sheetRefresh,
             running: this.forced,
             linked,
             due: due.length,
+            toSearch:
+                searchesToDo(this.db, this.now().getTime(), disabled).length +
+                pendingProposals(this.db, disabled).length,
+            proposed: [...proposalsBySeries(this.db).values()].flat().length,
             lastCheckedAt: this.lastCheckedAt,
             lastError: this.lastError,
             pausedUntil:
@@ -160,18 +179,19 @@ export class SheetRefresher {
         const interval = this.settings.get().sheetRefreshMinutes * 60_000;
         if (now - this.lastFetchAt < interval) return;
 
-        const { due } = this.dueLinks();
-        if (due.length === 0) {
+        const actions = this.actions(now);
+        if (actions.length === 0) {
             this.forced = false;
             return;
         }
-        // Un autre site que la fois d'avant, s'il y en a un à relire.
-        const link = due.find((l) => l.site !== this.lastSite) ?? due[0]!;
+        // Un autre site que la fois d'avant, s'il y a de quoi faire.
+        const action =
+            actions.find((a) => a.site !== this.lastSite) ?? actions[0]!;
         this.busy = true;
         this.lastFetchAt = now;
-        this.lastSite = link.site;
+        this.lastSite = action.site;
         try {
-            await this.check(link);
+            await action.run();
             this.lastCheckedAt = this.now();
             this.lastError = null;
         } catch (error) {
@@ -190,24 +210,79 @@ export class SheetRefresher {
         }
     };
 
-    private check = async (link: SourceLink) => {
-        let sheet:
-            | (WatchedSheet & { rating?: { value: number; count: number } })
-            | undefined;
+    /**
+     * Ce qu'il reste à faire, une requête chacun : lire une fiche trouvée
+     * (pour la proposer), relire une fiche liée, chercher une fiche.
+     */
+    private actions = (now: number) => {
+        const disabled = this.settings.get().disabledSources;
+        return [
+            ...pendingProposals(this.db, disabled).map((proposal) => ({
+                site: proposal.site as MetadataSource,
+                run: () => this.verify(proposal),
+            })),
+            ...this.dueLinks().due.map((link) => ({
+                site: link.site,
+                run: () => this.check(link),
+            })),
+            ...searchesToDo(this.db, now, disabled).map((search) => ({
+                site: search.site as MetadataSource,
+                run: () => this.search(search),
+            })),
+        ];
+    };
+
+    private readSheet = async (site: SearchedSite, id: string) => {
         try {
-            sheet =
-                link.site === 'manga-news'
-                    ? await this.sites.mangaNews.series(link.id, {
-                          retry: false,
-                      })
-                    : await this.sites.bedetheque.series(link.id, {
-                          retry: false,
-                      });
+            return site === 'manga-news'
+                ? await this.sites.mangaNews.series(id, { retry: false })
+                : await this.sites.bedetheque.series(id, { retry: false });
         } catch (error) {
-            // Fiche disparue (ou devenue illisible) : signalée, sans pause.
-            if (!(error instanceof AppError && error.status === 404))
-                throw error;
+            // Fiche disparue (ou devenue illisible) : sans pause.
+            if (error instanceof AppError && error.status === 404) {
+                return undefined;
+            }
+            throw error;
         }
+    };
+
+    /** Cherche la fiche d'une série par son nom (une écriture). */
+    private search = async (search: SheetSearch) => {
+        const results =
+            search.site === 'manga-news'
+                ? await this.sites.mangaNews.search(search.text, {
+                      retry: false,
+                  })
+                : await this.sites.bedetheque.search(search.text, {
+                      retry: false,
+                  });
+        const found = recordSearch(this.db, search, results, this.now());
+        this.logger?.debug(
+            `Fiche cherchée : ${search.site} « ${search.text} » (${found} trouvée(s))`,
+        );
+    };
+
+    /** Lit une fiche trouvée : proposée, avec sa note gardée. */
+    private verify = async (proposal: {
+        seriesId: number;
+        site: SearchedSite;
+        sourceId: string;
+    }) => {
+        const sheet = await this.readSheet(proposal.site, proposal.sourceId);
+        saveSourceRating(
+            this.db,
+            proposal.site,
+            proposal.sourceId,
+            sheet?.rating,
+        );
+        if (sheet)
+            sheetChecked(this.db, proposal.site, proposal.sourceId, sheet);
+        verifyProposal(this.db, proposal, sheet);
+    };
+
+    private check = async (link: SourceLink) => {
+        // Fiche disparue : signalée (« Fiche introuvable »), sans pause.
+        const sheet = await this.readSheet(link.site as SearchedSite, link.id);
         saveSourceRating(this.db, link.site, link.id, sheet?.rating);
         sheetChecked(this.db, link.site, link.id, sheet);
         this.logger?.debug(`Fiche relue : ${link.site}:${link.id}`);
