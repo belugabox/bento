@@ -12,8 +12,7 @@ const status = (changes: Record<string, unknown> = {}) => ({
     toSearch: 3,
     proposed: 2,
     lastCheckedAt: null,
-    lastError: null,
-    pausedUntil: null,
+    pauses: [] as unknown[],
     intervalMinutes: 10,
     night: { start: 2, end: 6 },
     ...changes,
@@ -70,5 +69,43 @@ describe('SheetRefreshSettings', () => {
             await screen.findByRole('button', { name: 'Relecture en cours…' }),
         ).toBeTruthy();
         expect(requests).toContainEqual(['POST', '/api/metadata/refresh']);
+    });
+
+    it('shows the sites in pause, each with its reason', async () => {
+        vi.mocked(globalThis.fetch).mockImplementation(
+            async () =>
+                new Response(
+                    JSON.stringify(
+                        status({
+                            pauses: [
+                                {
+                                    site: 'manga-news',
+                                    until: '2026-11-13T03:00:00.000Z',
+                                    error: 'Manga-news refuse la requête',
+                                },
+                            ],
+                        }),
+                    ),
+                    { headers: { 'Content-Type': 'application/json' } },
+                ),
+        );
+        render(
+            <MantineProvider>
+                <SheetRefreshSettings enabled minutes={10} onSaved={() => {}} />
+            </MantineProvider>,
+        );
+        expect(
+            await screen.findByText(
+                /Manga-news en pause jusqu’à .* : Manga-news refuse la requête/,
+            ),
+        ).toBeTruthy();
+        // Les autres sites continuent : « Lancer maintenant » reste permis.
+        expect(
+            (
+                screen.getByRole('button', {
+                    name: 'Lancer maintenant',
+                }) as HTMLButtonElement
+            ).disabled,
+        ).toBe(false);
     });
 });

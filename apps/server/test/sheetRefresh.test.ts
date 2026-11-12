@@ -45,8 +45,9 @@ const fakeSites = () => {
     const answers = new Map<string, () => ReturnType<typeof sheet>>();
     const site =
         (name: string) => async (id: string, options?: { retry?: boolean }) => {
+            // Le nouvel essai de « Remplir » doit rester permis.
             calls.push(
-                `${name}:${id}${options?.retry === false ? '' : ' (retry)'}`,
+                `${name}:${id}${options?.retry === false ? ' (sans nouvel essai)' : ''}`,
             );
             const answer = answers.get(`${name}:${id}`);
             if (!answer) throw notFound('introuvable');
@@ -131,7 +132,7 @@ describe('sheet changes', () => {
 });
 
 describe('background sheet refresh', () => {
-    it('reads one sheet every 10 minutes at night, alternating the sites, never retrying', async () => {
+    it('reads one sheet every 10 minutes at night, alternating the sites, with the single retry of « Remplir »', async () => {
         const { refresher, calls } = refresherWith();
         expect(refresher.status()).toMatchObject({ linked: 2, due: 2 });
 
@@ -148,7 +149,7 @@ describe('background sheet refresh', () => {
         later(REFRESH_INTERVAL_MS);
         await refresher.tick();
         expect(calls).toHaveLength(2);
-        expect(refresher.status()).toMatchObject({ due: 0, lastError: null });
+        expect(refresher.status()).toMatchObject({ due: 0, pauses: [] });
 
         // La note suit les deux sites.
         const [gantz] = listManagedSeries(ctx.db);
@@ -203,29 +204,51 @@ describe('background sheet refresh', () => {
         ]);
     });
 
-    it('pauses for 24 hours at the first refusal', async () => {
+    it('pauses the refusing site only, longer each time, until it answers again', async () => {
         const { refresher, answers, calls } = refresherWith();
         answers.set('manga-news:Gantz', () => {
             throw refused('Manga-news refuse la requête');
         });
         await refresher.tick();
-        expect(refresher.status()).toMatchObject({
-            lastError: 'Manga-news refuse la requête',
-            due: 2,
-        });
-        expect(refresher.status().pausedUntil).not.toBeNull();
+        const start = clock.getTime();
+        expect(refresher.status().pauses).toEqual([
+            {
+                site: 'manga-news',
+                until: new Date(start + 3600_000),
+                error: 'Manga-news refuse la requête',
+            },
+        ]);
 
-        // Ni la suite de la nuit, ni « Lancer maintenant ».
+        // Bedetheque continue.
         later(REFRESH_INTERVAL_MS);
         await refresher.tick();
+        expect(calls).toEqual(['manga-news:Gantz', 'bedetheque:500']);
+        // Manga-news attend sa pause, même avec « Lancer maintenant ».
+        later(REFRESH_INTERVAL_MS);
         refresher.runNow();
         await settle();
-        expect(calls).toEqual(['manga-news:Gantz']);
-
-        // La nuit suivante, ça reprend.
-        later(24 * 3600_000);
-        await refresher.tick();
         expect(calls).toHaveLength(2);
+
+        // Une heure après (4 h) : de nouveau refusé, 6 h de pause ; la nuit
+        // suivante (3 h) : encore, 24 h.
+        clock = new Date(start + 3600_000);
+        await refresher.tick();
+        expect(refresher.status().pauses[0]!.until).toEqual(
+            new Date(start + 7 * 3600_000),
+        );
+        clock = new Date(start + 24 * 3600_000);
+        await refresher.tick();
+        expect(refresher.status().pauses[0]!.until).toEqual(
+            new Date(start + 48 * 3600_000),
+        );
+        expect(calls).toHaveLength(4);
+
+        // Il répond de nouveau : plus de pause, le compte repart de zéro.
+        answers.set('manga-news:Gantz', () => sheet());
+        clock = new Date(start + 48 * 3600_000);
+        await refresher.tick();
+        expect(calls).toHaveLength(5);
+        expect(refresher.status().pauses).toEqual([]);
     });
 
     it('follows the pace chosen by the admin', async () => {
