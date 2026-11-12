@@ -290,6 +290,8 @@ export const MetadataEditor = ({
         age: number | null;
         /** Fiches en ligne choisies (Manga-news, Wikipédia). */
         sources?: SourceLink[];
+        /** La série a déjà une note des lecteurs (complétude). */
+        hasRating?: boolean;
         save: (changes: ClassificationChanges) => Promise<unknown>;
     };
     /** Couverture de la série, et son choix. */
@@ -326,6 +328,9 @@ export const MetadataEditor = ({
     // Fiches trouvées, en cours de comparaison.
     const [comparing, setComparing] = useState<FoundSeries[]>();
     const [refreshing, setRefreshing] = useState(false);
+    // Une fiche comparée a apporté une note des lecteurs (gardée par le
+    // serveur à sa lecture) : comptée dans la complétude.
+    const [rated, setRated] = useState(false);
     // Statut de la série (publiée) : « unknown » pour « inconnu ».
     const savedStatus = seriesStatus?.value ?? UNKNOWN;
     const [status, setStatus] = useState<string>(savedStatus);
@@ -540,6 +545,7 @@ export const MetadataEditor = ({
 
     /** Valeurs choisies dans la comparaison, et les fiches gardées. */
     const applyComparison = (values: SheetValues, found: FoundSeries[]) => {
+        if (found.some((f) => f.rating)) setRated(true);
         setEdits((current) => {
             const filled = applySheetValues(current, paths, values, catalog);
             return alsoFileNames
@@ -599,6 +605,8 @@ export const MetadataEditor = ({
             ageValue !== UNKNOWN ||
             ageOfRating(String(series('AgeRating') ?? '')) !== null,
         hasStatus: !seriesStatus || status !== UNKNOWN,
+        // Note déjà relevée, ou apportée par une fiche comparée ici.
+        hasRating: !classification || !!classification.hasRating || rated,
         // Sans `String(undefined)` : « undefined » serait un genre rempli.
         genreCount: classify(
             String(series('Genre') ?? ''),

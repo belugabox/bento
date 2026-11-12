@@ -11,6 +11,7 @@ const FULL: CompletenessInput = {
     hasFormat: true,
     hasAge: true,
     hasStatus: true,
+    hasRating: true,
     genreCount: 2,
     writer: 'Hiroya Oku',
     penciller: 'Hiroya Oku',
@@ -27,6 +28,15 @@ describe('completenessOf', () => {
         expect(completenessOf(FULL)).toEqual({ percent: 100, missing: [] });
     });
 
+    it('counts the readers rating from the online sheets', () => {
+        const { percent, missing } = completenessOf({
+            ...FULL,
+            hasRating: false,
+        });
+        expect(missing).toEqual(['Note']);
+        expect(percent).toBeLessThan(100);
+    });
+
     it('lists what is missing, volumes counted by share', () => {
         const { percent, missing } = completenessOf({
             ...FULL,
@@ -40,8 +50,9 @@ describe('completenessOf', () => {
             ],
         });
         expect(missing).toEqual(['Format', 'Résumé', 'Année de 2 tomes']);
-        // 7 champs, tous les numéros, la moitié des années : 8,5 sur 11.
-        expect(percent).toBe(77);
+        // 8 champs (note comprise), tous les numéros, la moitié des
+        // années : 9,5 sur 12.
+        expect(percent).toBe(79);
     });
 
     it('never rounds up to 100 %', () => {
@@ -65,6 +76,7 @@ describe('fieldsFromVolumes', () => {
         hasFormat: true,
         hasAge: true,
         hasStatus: true,
+        hasRating: true,
         genreCount: 1,
     };
 

@@ -197,6 +197,7 @@ export const SeriesPage = () => {
               hasFormat: !!series.formatId,
               hasAge: age !== null,
               hasStatus: !!series.status,
+              hasRating: series.rating !== null,
               genreCount: series.genres.length,
           })
         : undefined;

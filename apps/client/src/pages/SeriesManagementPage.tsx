@@ -85,6 +85,7 @@ const toRow = (s: ManagedSeries): Row => {
         hasFormat: !!s.formatId,
         hasAge: effectiveAge !== null,
         hasStatus: !!s.status,
+        hasRating: s.rating !== null,
         genreCount: s.genres.length,
         writer: s.writer,
         penciller: s.penciller,

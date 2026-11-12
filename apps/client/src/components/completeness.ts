@@ -6,6 +6,8 @@ export type CompletenessInput = {
     hasFormat: boolean;
     hasAge: boolean;
     hasStatus: boolean;
+    /** Une note des lecteurs relevée sur une fiche en ligne. */
+    hasRating: boolean;
     genreCount: number;
     writer?: string | null;
     penciller?: string | null;
@@ -57,6 +59,7 @@ export const completenessOf = (input: CompletenessInput): Completeness => {
         ['Dessin', filled(input.penciller)],
         ['Éditeur', filled(input.publisher)],
         ['Résumé', filled(input.summary)],
+        ['Note', input.hasRating],
     ];
     const { total, withNumber, withYear } = Array.isArray(input.volumes)
         ? {
