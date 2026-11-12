@@ -339,6 +339,42 @@ export const genres = sqliteTable('genres', {
         .default(sql`'[]'`),
 });
 
+/**
+ * Notes des lecteurs relevées sur les fiches en ligne (Manga-news,
+ * Bedetheque), une par fiche : gardées à chaque lecture de la fiche, elles
+ * suivent les séries liées à cette fiche (et ses brouillons). Sur 5.
+ */
+export const sourceRatings = sqliteTable(
+    'source_ratings',
+    {
+        site: text('site').notNull(),
+        sourceId: text('source_id').notNull(),
+        value: real('value').notNull(),
+        count: integer('count').notNull(),
+        updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
+    },
+    (t) => [primaryKey({ columns: [t.site, t.sourceId] })],
+);
+
+/**
+ * Fiches en ligne lues : date de la dernière lecture, valeurs principales
+ * telles que l'admin les a vues (ou à la première lecture), et ce qui a
+ * changé depuis d'après la mise à jour de nuit (« Fiche à revoir »).
+ */
+export const sourceSheets = sqliteTable(
+    'source_sheets',
+    {
+        site: text('site').notNull(),
+        sourceId: text('source_id').notNull(),
+        checkedAt: integer('checked_at', { mode: 'timestamp_ms' }).notNull(),
+        snapshot: text('snapshot', { mode: 'json' })
+            .$type<Record<string, string | number | boolean | null>>()
+            .notNull(),
+        changes: text('changes', { mode: 'json' }).$type<string[]>(),
+    },
+    (t) => [primaryKey({ columns: [t.site, t.sourceId] })],
+);
+
 /** Réglages de l'admin (clé → valeur JSON). */
 export const settings = sqliteTable('settings', {
     key: text('key').primaryKey(),

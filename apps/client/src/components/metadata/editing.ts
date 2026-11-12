@@ -218,6 +218,7 @@ export type BedethequeSeries = {
     penciller: string;
     publisher: string;
     ongoing?: boolean;
+    rating?: { value: number; count: number };
 };
 
 /** Fiche Wikipédia, telle que renvoyée par le serveur. */
@@ -254,6 +255,7 @@ export type MangaNewsSeries = {
     age?: number;
     ageRating?: string;
     ongoing?: boolean;
+    rating?: { value: number; count: number };
 };
 
 /**
@@ -409,10 +411,13 @@ export type ComparisonRow = {
 
 /**
  * Même valeur, sans compter majuscules, accents, espaces ni ponctuation
- * (« Roman graphique » et « Roman Graphique »).
+ * (« Roman graphique » et « Roman Graphique »). Le nom de la série, lui, est
+ * comparé tel quel : « Gantz G » et « Gantz:G » sont deux choix.
  */
-const sameValue = (a?: string, b?: string) =>
-    genreKey(a ?? '') === genreKey(b ?? '');
+const sameValue = (field: SheetField, a?: string, b?: string) =>
+    field === 'Series'
+        ? (a ?? '').trim() === (b ?? '').trim()
+        : genreKey(a ?? '') === genreKey(b ?? '');
 
 /** Un choix d'une ligne : une valeur, et les fiches qui la donnent. */
 export type ComparisonOption = {
@@ -434,7 +439,9 @@ export const rowOptions = (
     const options: ComparisonOption[] = [];
     const add = (choice: SheetChoice, value: string | undefined) => {
         if (!value?.trim()) return;
-        const same = options.find((option) => sameValue(option.value, value));
+        const same = options.find((option) =>
+            sameValue(row.field, option.value, value),
+        );
         if (same) same.sources.push(choice);
         else options.push({ choice, value, sources: [choice] });
     };
@@ -458,7 +465,7 @@ export const comparisonRows = (
                 .map((sheet) => [sheet.site, sheet.values[field]]),
         );
         return Object.values(found).some(
-            (value) => !sameValue(value, current[field]),
+            (value) => !sameValue(field, value, current[field]),
         )
             ? [{ field, current: current[field], found }]
             : [];

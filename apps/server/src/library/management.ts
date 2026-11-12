@@ -3,8 +3,11 @@ import { eq, sql } from 'drizzle-orm';
 import { classify } from '../classification';
 import type { Db } from '../db';
 import { formats, libraries, series, volumes } from '../db/schema';
-import { coverVolumeSql } from './catalog';
+import { parseSources } from '../metadata/sourceLink';
+import { coverVolumeSql, ratingFields } from './catalog';
 import { genreCatalog } from './genres';
+import { seriesRatingOf, sourceRatingsMap } from './ratings';
+import { sourceSheetsMap } from './sheets';
 import { compareNames } from './sortName';
 
 /** Séries à classer : sans format, ou sans âge (choisi ou déduit des tomes). */
@@ -17,6 +20,8 @@ const toClassifySql = sql`(series.format_id is null or coalesce(series.age, seri
  */
 export const listManagedSeries = (db: Db) => {
     const catalog = genreCatalog(db);
+    const ratings = sourceRatingsMap(db);
+    const sheets = sourceSheetsMap(db);
     return db
         .select({
             id: series.id,
@@ -42,7 +47,8 @@ export const listManagedSeries = (db: Db) => {
             >`(select json_extract(v.comic_info, '$.Penciller') from volumes v where v.series_id = series.id order by v.kind != 'volume', v.kind, v.sort_number is null, v.sort_number, v.file limit 1)`,
             volumeCount: sql<number>`count(${volumes.id})`,
             // Tomes au numéro et à l'année renseignés (complétude).
-            withNumber: sql<number>`count(case when coalesce(trim(${volumes.number}), '') != '' then 1 end)`,
+            // Un one-shot, une intégrale sans numéro : rien à numéroter.
+            withNumber: sql<number>`count(case when coalesce(trim(${volumes.number}), '') != '' or ${volumes.kind} in ('one-shot', 'integrale') then 1 end)`,
             withYear: sql<number>`count(json_extract(${volumes.comicInfo}, '$.Year'))`,
             pageCount: sql<number>`coalesce(sum(${volumes.pageCount}), 0)`,
             size: sql<number>`coalesce(sum(${volumes.size}), 0)`,
@@ -56,6 +62,7 @@ export const listManagedSeries = (db: Db) => {
             ),
             coverUpdatedAt: series.coverUpdatedAt,
             ...coverVolumeSql,
+            sources: series.sources,
         })
         .from(series)
         .innerJoin(libraries, eq(libraries.id, series.libraryId))
@@ -64,8 +71,16 @@ export const listManagedSeries = (db: Db) => {
         .groupBy(series.id)
         .all()
         .sort((a, b) => compareNames(a.name, b.name))
-        .map(({ genre, tags, ...row }) => ({
+        .map(({ genre, tags, sources, ...row }) => ({
             ...row,
+            ...ratingFields(seriesRatingOf(parseSources(sources), ratings)),
+            // Fiches changées depuis que l'admin les a vues (mise à jour
+            // de nuit) : « Fiche à revoir ».
+            // Sites des fiches liées (filtre « Sans fiche Bedetheque »).
+            sheetSites: parseSources(sources).map((link) => link.site),
+            sheetChanges: parseSources(sources).flatMap(
+                (link) => sheets.get(`${link.site}:${link.id}`)?.changes ?? [],
+            ),
             ...classify(genre, tags, catalog),
         }));
 };

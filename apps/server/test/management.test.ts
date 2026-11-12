@@ -28,7 +28,10 @@ beforeEach(async () => {
     for (const n of [1, 2]) {
         await writeCbz(ctx.file(`Gantz/Gantz T0${n}.cbz`), { pages: 3 });
     }
-    await writeCbz(ctx.file('Spirale/Spirale T01.cbz'), { pages: 5 });
+    await writeCbz(ctx.file('Spirale/Spirale.cbz'), {
+        pages: 5,
+        comicInfo: '<Series>Spirale</Series><Format>One-shot</Format>',
+    });
     await ctx.scanner.scan(ctx.library.id);
 });
 
@@ -55,6 +58,8 @@ describe('series management', () => {
             hasSummary: false,
         });
         expect(gantz.size).toBeGreaterThan(0);
+        // Un one-shot n'a pas de numéro à donner : compté comme numéroté.
+        expect(body[1]).toMatchObject({ volumeCount: 1, withNumber: 1 });
         expect(gantz.coverVolumeId).toBeTypeOf('number');
         // Sans format ni âge : les deux sont à classer.
         expect((await get('/manage/series/to-classify', admin)).body).toEqual({

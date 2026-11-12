@@ -147,3 +147,42 @@ describe('seriesDetails', () => {
         ).toEqual(['Katsuhiro Otomo']);
     });
 });
+
+describe('sort by rating', () => {
+    it('puts the best rated first, the unrated last', () => {
+        const series = [
+            { name: 'A', rating: 3.9 },
+            { name: 'B', rating: null },
+            { name: 'C', rating: 4.6 },
+            // « À lire » : pas avant une série mieux notée.
+            { name: 'D', rating: 4.1, toRead: true },
+            { name: 'E', rating: 4.1, ratingCount: 300 },
+        ].map((s) => ({
+            ...s,
+            volumeCount: 2,
+            readCount: 0,
+            startedCount: 0,
+            lastAddedAt: null,
+        }));
+        expect(
+            filterSeries(series, { sort: 'rating' }).map((s) => s.name),
+        ).toEqual(['C', 'E', 'D', 'A', 'B']);
+    });
+});
+
+describe('list details', () => {
+    it('show the readers rating', () => {
+        expect(
+            seriesDetails({
+                name: 'Gantz',
+                volumeCount: 37,
+                readCount: 0,
+                startedCount: 0,
+                lastAddedAt: null,
+                format: 'Manga',
+                status: 'completed',
+                rating: 4.4,
+            }),
+        ).toEqual(['Manga · Terminée · ★ 4,4']);
+    });
+});

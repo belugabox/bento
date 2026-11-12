@@ -45,3 +45,11 @@ export const formatDuration = (seconds: number) => {
         maximumFractionDigits: hours < 10 ? 1 : 0,
     })} h`;
 };
+
+/** Note des lecteurs, sur 5 : « ★ 4,4 ». */
+export const ratingLabel = (rating: number) =>
+    `★ ${rating.toLocaleString('fr-FR', { maximumFractionDigits: 1 })}`;
+
+/** Nombre d'avis : « 96 avis », « 1 avis ». */
+export const reviewsLabel = (count: number) =>
+    `${count.toLocaleString('fr-FR')} avis`;

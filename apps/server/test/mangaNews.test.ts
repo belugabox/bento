@@ -7,9 +7,11 @@ import { ratingForAge } from '../src/library/ageRating';
 import {
     MangaNews,
     decodePage,
+    parseRating,
     parseSearchPage,
     parseSeriesPage,
 } from '../src/metadata/mangaNews';
+import { RefusedError } from '../src/tools/errors';
 import { authDeps, sessionCookie, setup, silent } from './helpers';
 
 // Extraits réels des pages, réduits aux blocs lus (novembre 2026).
@@ -23,6 +25,26 @@ const fakeSite = (respond: (url: string) => unknown) =>
 
 const fakeFetch = (status: number, body: string) =>
     fakeSite(() => new Response(body, { status }));
+
+describe('Manga-news rating', () => {
+    it('reads the readers rating from the structured data, out of 5', () => {
+        // 17,5/20 sur 96 avis ; le nom n'y est pas du JSON valide.
+        expect(
+            parseRating(
+                readFileSync(
+                    path.join(
+                        __dirname,
+                        'fixtures',
+                        'manga-news',
+                        'rating-spy-x-family.html',
+                    ),
+                    'utf-8',
+                ),
+            ),
+        ).toEqual({ value: 4.4, count: 96 });
+        expect(parseRating('<p>Sans note</p>')).toBeUndefined();
+    });
+});
 
 describe('parseSeriesPage', () => {
     it('reads a manga sheet', () => {
@@ -125,6 +147,13 @@ describe('MangaNews', () => {
         });
         // Une seule nouvelle tentative, la même requête.
         expect(calls).toBe(2);
+
+        // Mise à jour de nuit : aucune nouvelle tentative, refus reconnu.
+        calls = 0;
+        await expect(
+            site.series('Spy-X-Family', { retry: false }),
+        ).rejects.toBeInstanceOf(RefusedError);
+        expect(calls).toBe(1);
     });
 
     it('tries once more after a one-off refusal, then keeps the page', async () => {

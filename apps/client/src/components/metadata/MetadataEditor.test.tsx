@@ -16,6 +16,8 @@ import {
     DEFAULT_SOURCE_PRIORITY,
 } from '@server/types';
 
+import type { RatingSummary } from '@/components/rating';
+
 import { type EditorVolume, MetadataEditor } from './MetadataEditor';
 
 // Genres, formats et grille d'âges : ceux de départ, sans passer par le
@@ -397,6 +399,128 @@ describe('MetadataEditor', () => {
             screen.getByRole('button', { name: 'Revenir à cette valeur' }),
         );
         expect(numberOf(1).value).toBe('');
+    });
+
+    it('shows whether a readers rating was found, like the series page', async () => {
+        mockServer();
+        const show = (rating: RatingSummary | null) =>
+            render(
+                <MantineProvider>
+                    <MetadataEditor
+                        libraryId={1}
+                        kind="manga"
+                        mode="series"
+                        volumes={volumes()}
+                        classification={{
+                            formatId: 1,
+                            age: 16,
+                            rating,
+                            save: vi.fn(),
+                        }}
+                        onChanged={() => {}}
+                    />
+                </MantineProvider>,
+            );
+        const first = show({
+            value: 4.3,
+            count: 209,
+            sources: [
+                { site: 'manga-news', value: 4, count: 39 },
+                { site: 'bedetheque', value: 4.4, count: 170 },
+            ],
+        });
+        fireEvent.click(
+            await screen.findByRole('button', { name: 'Détail de la note' }),
+        );
+        expect(screen.getByText('★ 4,3')).toBeTruthy();
+        // Le détail par site, au clic.
+        expect(await screen.findByText('170 avis')).toBeTruthy();
+        first.unmount();
+
+        show(null);
+        expect(
+            (await screen.findByRole('button', { name: 'Détail de la note' }))
+                .textContent,
+        ).toBe('☆ Pas de note');
+    });
+
+    it('adds a Bedetheque sheet: its rating joins the Manga-news one, both sheets saved', async () => {
+        mockServer({
+            'manga-news/search': [],
+            'wikipedia/search': [],
+            'bedetheque/search': [{ id: '25654', title: 'Gantz' }],
+            'bedetheque/series': {
+                id: '25654',
+                title: 'Gantz',
+                url: 'https://www.bedetheque.com/serie-25654-BD-Gantz.html',
+                genres: [],
+                origin: 'Manga',
+                writer: '',
+                penciller: '',
+                publisher: '',
+                summary: '',
+                oneShot: false,
+                rating: { value: 4.3, count: 127 },
+            },
+        });
+        const save = vi.fn().mockResolvedValue({});
+        render(
+            <MantineProvider>
+                <MetadataEditor
+                    libraryId={1}
+                    kind="manga"
+                    mode="series"
+                    volumes={volumes()}
+                    classification={{
+                        formatId: 1,
+                        age: 16,
+                        sources: [{ site: 'manga-news', id: 'Gantz' }],
+                        rating: {
+                            value: 3.9,
+                            count: 39,
+                            sources: [
+                                { site: 'manga-news', value: 3.9, count: 39 },
+                            ],
+                        },
+                        save,
+                    }}
+                    onChanged={() => {}}
+                />
+            </MantineProvider>,
+        );
+        const badge = () =>
+            screen.getByRole('button', { name: 'Détail de la note' })
+                .textContent;
+        expect(badge()).toBe('★ 3,9');
+
+        fireEvent.click(screen.getByRole('button', { name: /Remplir/ }));
+        fireEvent.click(
+            await screen.findByRole('button', { name: 'Rechercher' }),
+        );
+        const bedetheque = await screen.findByRole('region', {
+            name: 'Bedetheque',
+        });
+        expect(await within(bedetheque).findByText(/127 avis/)).toBeTruthy();
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Comparer la fiche' }),
+        );
+        fireEvent.click(
+            await screen.findByRole('button', { name: 'Appliquer' }),
+        );
+
+        // (3,9 × 39 + 4,3 × 127) / 166, avant même d'enregistrer.
+        await vi.waitFor(() => expect(badge()).toBe('★ 4,2'));
+        fireEvent.click(screen.getByRole('button', { name: /Enregistrer/ }));
+        await vi.waitFor(() =>
+            expect(save).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    sources: [
+                        { site: 'manga-news', id: 'Gantz' },
+                        { site: 'bedetheque', id: '25654' },
+                    ],
+                }),
+            ),
+        );
     });
 
     it('requires a format, and keeps the exact age in Bento', async () => {

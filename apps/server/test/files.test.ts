@@ -161,6 +161,7 @@ describe('drafts', () => {
                 formatId: null,
                 age: null,
                 sources: [],
+                rating: null,
                 coverUpdatedAt: null,
             },
             {
@@ -175,6 +176,7 @@ describe('drafts', () => {
                 formatId: null,
                 age: null,
                 sources: [],
+                rating: null,
                 coverUpdatedAt: null,
             },
             {
@@ -192,6 +194,7 @@ describe('drafts', () => {
                 formatId: null,
                 age: null,
                 sources: [],
+                rating: null,
                 coverUpdatedAt: null,
             },
         ]);

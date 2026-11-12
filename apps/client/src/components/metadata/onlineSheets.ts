@@ -1,5 +1,6 @@
 import type { MetadataSource, SourceLink } from '@server/types';
 
+import { ratingLabel, reviewsLabel } from '@/components/format';
 import {
     type BedethequeDetails,
     type MangaNewsDetails,
@@ -25,6 +26,8 @@ export type FoundSeries = {
     url: string;
     coverUrl?: string;
     sheet: SeriesSheet;
+    /** Note des lecteurs de la fiche (gardée par le serveur à sa lecture). */
+    rating?: { value: number; count: number };
 };
 
 /** Ce que montre l'aperçu d'une fiche, ligne par ligne. */
@@ -57,6 +60,7 @@ const fromMangaNews = (details: MangaNewsDetails): Preview => ({
     url: details.url,
     coverUrl: details.coverUrl,
     sheet: sheetFromMangaNews(details),
+    rating: details.rating,
     themes: details.themes,
     lines: [
         [details.format, details.year].filter(Boolean).join(' · '),
@@ -69,6 +73,9 @@ const fromMangaNews = (details: MangaNewsDetails): Preview => ({
         details.age !== undefined
             ? `Âge conseillé : ${details.age === 0 ? 'tout public' : `${details.age}+`}`
             : '',
+        details.rating
+            ? `${ratingLabel(details.rating.value)} (${reviewsLabel(details.rating.count)})`
+            : '',
     ].filter(Boolean),
 });
 
@@ -79,6 +86,7 @@ const fromBedetheque = (details: BedethequeDetails): Preview => ({
     url: details.url,
     coverUrl: details.coverUrl,
     sheet: sheetFromBedetheque(details),
+    rating: details.rating,
     lines: [
         [details.origin, details.oneShot ? 'One shot' : '']
             .filter(Boolean)
@@ -93,6 +101,9 @@ const fromBedetheque = (details: BedethequeDetails): Preview => ({
             : '',
         details.volumeCount && !details.oneShot
             ? `${details.volumeCount} tomes${details.ongoing === undefined ? '' : details.ongoing ? ' (en cours)' : ' (terminée)'}`
+            : '',
+        details.rating
+            ? `${ratingLabel(details.rating.value)} (${reviewsLabel(details.rating.count)})`
             : '',
     ].filter(Boolean),
 });

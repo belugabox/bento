@@ -1,8 +1,8 @@
 import { load as cheerioLoad } from 'cheerio';
 
 import { articleFirst } from '../library/sortName';
-import { badGateway, notFound } from '../tools/errors';
-import { bedethequeSeriesUrl } from './sourceLink';
+import { badGateway, notFound, refused } from '../tools/errors';
+import { type SeriesRating, bedethequeSeriesUrl } from './sourceLink';
 
 // Métadonnées de séries depuis Bedetheque (BD, comics, romans graphiques,
 // mangas). Le site n'a pas d'API : la recherche passe par son
@@ -46,6 +46,27 @@ export type BedethequeSeries = {
     ongoing?: boolean;
     oneShot: boolean;
     coverUrl?: string;
+    /** Note des lecteurs (moyenne des albums), sur 5. */
+    rating?: SeriesRating;
+};
+
+/**
+ * Note de la série : celles des lecteurs pour chaque album (« Note : 4.3/5
+ * (127 votes) »), en moyenne pondérée par leurs votes.
+ */
+export const parseAlbumRatings = (html: string): SeriesRating | undefined => {
+    let sum = 0;
+    let count = 0;
+    for (const match of html.matchAll(
+        /Note\s*:\s*<strong>([\d.]+)<\/strong>\s*\/\s*5\s*\((\d+)\s*votes?\)/g,
+    )) {
+        const votes = Number(match[2]);
+        sum += Number(match[1]) * votes;
+        count += votes;
+    }
+    return count > 0
+        ? { value: Math.round((sum / count) * 10) / 10, count }
+        : undefined;
 };
 
 const clean = (text: string | undefined) =>
@@ -148,6 +169,7 @@ export const parseSeriesPage = (
                 : undefined,
         oneShot,
         coverUrl: $('img[itemprop="image"]').first().attr('src'),
+        ...(parseAlbumRatings(html) && { rating: parseAlbumRatings(html) }),
     };
 };
 
@@ -194,14 +216,18 @@ export class Bedetheque {
         };
     };
 
-    private get = async (url: string) => {
+    /**
+     * Page lue (ou gardée) ; `retry: false` : pas de nouvel essai après un
+     * refus (mise à jour en arrière-plan, qui s'arrête alors).
+     */
+    private get = async (url: string, { retry = true } = {}) => {
         const cached = this.cache.get(url);
         if (cached && cached.until > Date.now()) return cached.body;
 
         let page = await this.fetchPage(url);
         // Refus ponctuel : la même requête, refaite une seule fois après une
         // pause. Le contrôle n'est jamais contourné (ni résolu, ni déguisé).
-        if (page.challenged || page.status === 429) {
+        if (retry && (page.challenged || page.status === 429)) {
             await new Promise((resolve) =>
                 setTimeout(
                     resolve,
@@ -211,12 +237,12 @@ export class Bedetheque {
             page = await this.fetchPage(url);
         }
         if (page.challenged) {
-            throw badGateway(
+            throw refused(
                 `Bedetheque refuse la requête (protection anti-robot, ${page.status}) : réessaie plus tard`,
             );
         }
         if (page.status === 429) {
-            throw badGateway(
+            throw refused(
                 'Bedetheque limite les requêtes : réessaie dans quelques secondes',
             );
         }
@@ -254,8 +280,8 @@ export class Bedetheque {
     };
 
     /** Fiche d'une série, par son identifiant. */
-    series = async (id: string) => {
-        const html = await this.get(bedethequeSeriesUrl(id));
+    series = async (id: string, options?: { retry?: boolean }) => {
+        const html = await this.get(bedethequeSeriesUrl(id), options);
         const series = html && parseSeriesPage(html, id);
         if (!series) throw notFound(`Série introuvable sur Bedetheque (${id})`);
         return series;

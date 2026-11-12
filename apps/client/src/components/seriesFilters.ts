@@ -1,5 +1,7 @@
 import { ageLabel, compareNames } from '@server/types';
 
+import { ratingLabel } from '@/components/format';
+
 /** Ce dont les filtres ont besoin pour une série de la liste. */
 export type ListedSeries = {
     name: string;
@@ -14,6 +16,9 @@ export type ListedSeries = {
     format?: string | null;
     status?: 'ongoing' | 'completed' | null;
     toRead?: boolean;
+    // Note des lecteurs, sur 5, et son nombre d'avis (tri « Mieux notées »).
+    rating?: number | null;
+    ratingCount?: number;
     // Tomes ajoutés depuis la dernière lecture (pastille « +2 »).
     newCount?: number;
     year?: number | null;
@@ -47,12 +52,13 @@ export const creditsOf = (s: Pick<ListedSeries, 'writer' | 'penciller'>) => {
 
 /** État de lecture d'une série pour la personne. */
 export type ReadingState = 'unread' | 'started' | 'read';
-export type SeriesSort = 'name' | 'recent';
+export type SeriesSort = 'name' | 'recent' | 'rating';
 export type StatusFilter = 'all' | 'ongoing' | 'completed';
 
 export const SERIES_SORTS: { value: SeriesSort; label: string }[] = [
     { value: 'name', label: 'Nom' },
     { value: 'recent', label: 'Ajouts récents' },
+    { value: 'rating', label: 'Mieux notées' },
 ];
 
 export const STATUS_FILTERS: { value: StatusFilter; label: string }[] = [
@@ -78,6 +84,8 @@ export const seriesDetails = (s: ListedSeries): string[] =>
             s.year,
             s.age !== null && s.age !== undefined ? ageLabel(s.age) : null,
             s.status ? STATUS_LABELS[s.status] : null,
+            // Note des lecteurs (fiches en ligne).
+            s.rating != null ? ratingLabel(s.rating) : null,
         ]
             .filter((value) => value !== null && value !== undefined)
             .join(' · '),
@@ -112,8 +120,13 @@ export const genresByCount = (series: Pick<ListedSeries, 'genres'>[]) => {
  * Rang d'une série sur l'accueil : celles de la liste « à lire » d'abord,
  * les séries entièrement lues à la fin.
  */
-const readingRank = (s: ListedSeries) =>
-    readingStateOf(s) === 'read' ? 2 : s.toRead ? 0 : 1;
+const readingRank = (s: ListedSeries, sort: SeriesSort) =>
+    readingStateOf(s) === 'read'
+        ? 2
+        : // « Mieux notées » : la note avant la liste « à lire ».
+          s.toRead && sort !== 'rating'
+          ? 0
+          : 1;
 
 /**
  * Séries à afficher, filtrées (genre, statut) puis triées : « à lire »
@@ -140,10 +153,15 @@ export const filterSeries = <T extends ListedSeries>(
     // Tri stable : l'ordre par nom du serveur est gardé dans chaque groupe.
     return kept.sort(
         (a, b) =>
-            readingRank(a) - readingRank(b) ||
+            readingRank(a, sort) - readingRank(b, sort) ||
             (sort === 'recent'
                 ? (b.lastAddedAt ?? '').localeCompare(a.lastAddedAt ?? '') ||
                   compareNames(a.name, b.name)
-                : 0),
+                : sort === 'rating'
+                  ? // Sans note à la fin ; à note égale, la plus
+                    // donnée d'abord.
+                    (b.rating ?? -1) - (a.rating ?? -1) ||
+                    (b.ratingCount ?? 0) - (a.ratingCount ?? 0)
+                  : 0),
     );
 };

@@ -22,6 +22,7 @@ import {
     setSeriesField,
     setVolumeKind,
     sheetFromBedetheque,
+    sheetFromMangaNews,
     sheetFromWikipedia,
     sheetValues,
     statusFromWikipedia,
@@ -298,6 +299,22 @@ describe('comparison with online sheets', () => {
         ).toEqual({ Writer: 'Tatsuya Endō' });
     });
 
+    it('keeps names that differ only by punctuation apart', () => {
+        const rows = comparisonRows({ Series: 'Gantz G' }, [
+            { site: 'manga-news', values: { Series: 'Gantz G' } },
+            { site: 'bedetheque', values: { Series: 'Gantz:G' } },
+        ]);
+        expect(rows).toHaveLength(1);
+        expect(
+            rowOptions(rows[0]!, ['manga-news', 'wikipedia', 'bedetheque']).map(
+                (option) => [option.value, option.sources],
+            ),
+        ).toEqual([
+            ['Gantz G', ['current', 'manga-news']],
+            ['Gantz:G', ['bedetheque']],
+        ]);
+    });
+
     it('shows each different value once, with who gives it', () => {
         const rows = comparisonRows(
             { Publisher: 'Casterman', Tags: 'Roman graphique' },
@@ -427,5 +444,26 @@ describe('sheetFromBedetheque', () => {
             format: 'BD',
             status: 'ongoing',
         });
+    });
+});
+
+describe('rating from the online sheets', () => {
+    it('stays out of the fields and of the ComicInfo', () => {
+        const values = sheetValues(
+            sheetFromMangaNews({
+                title: 'Spy x Family',
+                summary: '',
+                genres: [],
+                themes: [],
+                writer: '',
+                penciller: '',
+                publisher: '',
+                format: null,
+                rating: { value: 4.4, count: 96 },
+            }),
+            [],
+            [],
+        );
+        expect(values).toEqual({ Series: 'Spy x Family' });
     });
 });

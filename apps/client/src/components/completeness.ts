@@ -1,16 +1,29 @@
+import { type ComicInfo, isStandalone, volumeNumbering } from '@server/types';
+
 /** Ce que la complétude d'une série regarde. */
 export type CompletenessInput = {
     name?: string | null;
     hasFormat: boolean;
     hasAge: boolean;
     hasStatus: boolean;
+    /** Une note des lecteurs relevée sur une fiche en ligne. */
+    hasRating: boolean;
     genreCount: number;
     writer?: string | null;
     penciller?: string | null;
     publisher?: string | null;
     summary?: string | null;
-    /** Les tomes, ou seulement leurs comptes (gestion des séries). */
-    volumes: { number?: string | null; year?: number | null }[] | VolumeCounts;
+    /**
+     * Les tomes (un one-shot, une intégrale sans numéro : `standalone`, sans
+     * numéro à donner), ou seulement leurs comptes (gestion des séries).
+     */
+    volumes:
+        | {
+              number?: string | null;
+              year?: number | null;
+              standalone?: boolean;
+          }[]
+        | VolumeCounts;
 };
 
 /** Tomes d'une série : combien, et combien ont un numéro ou une année. */
@@ -46,11 +59,14 @@ export const completenessOf = (input: CompletenessInput): Completeness => {
         ['Dessin', filled(input.penciller)],
         ['Éditeur', filled(input.publisher)],
         ['Résumé', filled(input.summary)],
+        ['Note', input.hasRating],
     ];
     const { total, withNumber, withYear } = Array.isArray(input.volumes)
         ? {
               total: input.volumes.length,
-              withNumber: input.volumes.filter((v) => filled(v.number)).length,
+              withNumber: input.volumes.filter(
+                  (v) => v.standalone || filled(v.number),
+              ).length,
               withYear: input.volumes.filter((v) => !!v.year).length,
           }
         : input.volumes;
@@ -70,3 +86,45 @@ export const completenessOf = (input: CompletenessInput): Completeness => {
     // Arrondi vers le bas : 100 % seulement si tout est rempli.
     return { percent: Math.floor((sum / parts.length) * 100), missing };
 };
+
+/** Première valeur remplie d'un champ, dans l'ordre des tomes. */
+const firstFilled = (infos: ComicInfo[], field: keyof ComicInfo) => {
+    const value = infos
+        .map((info) => info[field])
+        .find((v) => v !== undefined && v !== null && String(v).trim() !== '');
+    return value === undefined ? undefined : String(value);
+};
+
+/**
+ * Champs d'une série lus dans les ComicInfo de ses tomes, comme l'éditeur
+ * les montre : la première valeur remplie de chaque champ, le résumé du
+ * premier tome. La fiche série et l'éditeur passent par là : même
+ * pourcentage des deux côtés.
+ */
+export const fieldsFromVolumes = (infos: ComicInfo[]) => ({
+    name: firstFilled(infos, 'Series'),
+    writer: firstFilled(infos, 'Writer'),
+    penciller: firstFilled(infos, 'Penciller'),
+    publisher: firstFilled(infos, 'Publisher'),
+    summary: infos[0]?.Summary,
+    volumes: infos.map((info) => {
+        const { kind, number } = volumeNumbering(info);
+        return {
+            number,
+            year: info.Year,
+            standalone: isStandalone({ kind, number }),
+        };
+    }),
+});
+
+/** Comment remplir ce qui manque (« Résumé », « Année de 3 tomes »…). */
+export const missingHint = (item: string) =>
+    /^Format|^Âge|^Statut/.test(item)
+        ? 'À choisir dans l’éditeur.'
+        : /^Note/.test(item)
+          ? 'Relevée sur Manga-news ou Bedetheque par « Remplir » ou « Mettre à jour ».'
+          : /^Numéro/.test(item)
+            ? 'Dans l’éditeur, ou lu dans les noms de fichiers (« T01 », « #01 »).'
+            : /^Année/.test(item)
+              ? 'Dans l’éditeur, ou lue dans les noms de fichiers (« (2021) »).'
+              : 'À saisir, ou avec « Remplir » depuis une fiche en ligne.';

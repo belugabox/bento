@@ -198,6 +198,7 @@ export const DraftsPage = () => {
                                             formatId: draft?.formatId ?? null,
                                             age: draft?.age ?? null,
                                             sources: draft?.sources ?? [],
+                                            rating: draft?.rating ?? null,
                                             save: (changes) =>
                                                 setDraftClassification(
                                                     libraryId,

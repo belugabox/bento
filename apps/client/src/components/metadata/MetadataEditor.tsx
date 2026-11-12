@@ -48,6 +48,7 @@ import {
 } from '@server/types';
 
 import { CompletenessBadge } from '@/components/CompletenessBadge';
+import { RatingBadge } from '@/components/RatingBadge';
 import {
     ageLabel,
     ageOfRating,
@@ -55,8 +56,9 @@ import {
     ratingForAge,
     useAgeSteps,
 } from '@/components/ageLimits';
-import { completenessOf } from '@/components/completeness';
+import { completenessOf, fieldsFromVolumes } from '@/components/completeness';
 import { formatSize } from '@/components/format';
+import { type RatingSummary, averageRating } from '@/components/rating';
 import { volumeCountLabel } from '@/components/readingStatus';
 import { ReaderPreview } from '@/reader/ReaderPreview';
 import {
@@ -290,6 +292,8 @@ export const MetadataEditor = ({
         age: number | null;
         /** Fiches en ligne choisies (Manga-news, Wikipédia). */
         sources?: SourceLink[];
+        /** Note des lecteurs déjà relevée (moyenne des fiches), ou null. */
+        rating?: RatingSummary | null;
         save: (changes: ClassificationChanges) => Promise<unknown>;
     };
     /** Couverture de la série, et son choix. */
@@ -326,6 +330,9 @@ export const MetadataEditor = ({
     // Fiches trouvées, en cours de comparaison.
     const [comparing, setComparing] = useState<FoundSeries[]>();
     const [refreshing, setRefreshing] = useState(false);
+    // Fiches comparées avec une note des lecteurs (gardée par le serveur à
+    // leur lecture) : la note montrée, et comptée dans la complétude.
+    const [rated, setRated] = useState<FoundSeries[]>([]);
     // Statut de la série (publiée) : « unknown » pour « inconnu ».
     const savedStatus = seriesStatus?.value ?? UNKNOWN;
     const [status, setStatus] = useState<string>(savedStatus);
@@ -540,6 +547,7 @@ export const MetadataEditor = ({
 
     /** Valeurs choisies dans la comparaison, et les fiches gardées. */
     const applyComparison = (values: SheetValues, found: FoundSeries[]) => {
+        if (found.some((f) => f.rating)) setRated(found);
         setEdits((current) => {
             const filled = applySheetValues(current, paths, values, catalog);
             return alsoFileNames
@@ -590,26 +598,34 @@ export const MetadataEditor = ({
     }, []);
 
     // Complétude de la fiche, avec ce qui est saisi (pas encore enregistré).
+    // Note montrée : celle déjà relevée, chaque site remplacé par la fiche
+    // comparée ici s'il y en a une (moyenne pondérée par les avis).
+    const comparedSites = rated.flatMap((f) =>
+        f.rating ? [{ site: f.source, ...f.rating }] : [],
+    );
+    const shownRating = averageRating([
+        ...(classification?.rating?.sources ?? []).filter(
+            (s) => !comparedSites.some((c) => c.site === s.site),
+        ),
+        ...comparedSites,
+    ]);
     const completeness = completenessOf({
-        name: String(series('Series')),
+        // Lus dans les tomes (première valeur remplie), comme la fiche
+        // série : même pourcentage.
+        ...fieldsFromVolumes(readable.map((v) => edits[v.path] ?? {})),
         hasFormat: !classification || !!formatValue,
         hasAge:
             ageValue !== UNKNOWN ||
-            ageOfRating(String(series('AgeRating'))) !== null,
+            ageOfRating(String(series('AgeRating') ?? '')) !== null,
         hasStatus: !seriesStatus || status !== UNKNOWN,
+        // Note déjà relevée, ou apportée par une fiche comparée ici.
+        hasRating: !classification || !!shownRating,
+        // Sans `String(undefined)` : « undefined » serait un genre rempli.
         genreCount: classify(
-            String(series('Genre')),
-            String(series('Tags')),
+            String(series('Genre') ?? ''),
+            String(series('Tags') ?? ''),
             catalog,
         ).genres.length,
-        writer: String(series('Writer')),
-        penciller: String(series('Penciller')),
-        publisher: String(series('Publisher')),
-        summary: first ? edits[first]?.Summary : '',
-        volumes: readable.map((v) => ({
-            number: edits[v.path]?.Number,
-            year: edits[v.path]?.Year,
-        })),
     });
     const totalSize = volumes.reduce((sum, v) => sum + (v.size ?? 0), 0);
 
@@ -850,6 +866,12 @@ export const MetadataEditor = ({
                             )}
                             {totalSize > 0 && ` · ${formatSize(totalSize)}`}
                         </Text>
+                        {/* Note des lecteurs : relevée, ou non. */}
+                        {classification && (
+                            <div>
+                                <RatingBadge rating={shownRating} />
+                            </div>
+                        )}
                         {sourcesValue.length > 0 && (
                             <Group gap={6}>
                                 <Text size="xs" c="dimmed">

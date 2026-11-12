@@ -6,7 +6,9 @@ import {
     Card,
     Group,
     Image,
+    Indicator,
     Loader,
+    Popover,
     Select,
     SimpleGrid,
     Stack,
@@ -15,8 +17,8 @@ import {
     Title,
     Tooltip,
 } from '@mantine/core';
-import { notifications } from '@mantine/notifications';
 import {
+    IconFilter,
     IconPencil,
     IconSearch,
     IconSortAscending,
@@ -29,26 +31,28 @@ import { Link, useSearchParams } from 'react-router';
 import { compareNames, genreKey } from '@server/types';
 
 import { CompletenessBadge } from '@/components/CompletenessBadge';
-import { ageLabel, ageOptions, useAgeSteps } from '@/components/ageLimits';
+import { ageLabel } from '@/components/ageLimits';
 import { completenessOf } from '@/components/completeness';
-import { formatSize } from '@/components/format';
+import { formatSize, ratingLabel } from '@/components/format';
 import {
     type ManagedSeries,
     fetchFormats,
     fetchManagedSeries,
     seriesCoverUrl,
-    setSeriesClassification,
-    setSeriesStatus,
 } from '@/services/api';
 import { useQuery } from '@/services/useQuery';
 
-/** Filtres rapides ; « À classer » par défaut. */
+/** Filtres (bouton « Filtres ») ; toutes les séries par défaut. */
 const FILTERS = [
+    { value: 'all', label: 'Toutes' },
     { value: 'to-classify', label: 'À classer' },
     { value: 'no-summary', label: 'Sans résumé' },
     { value: 'no-genre', label: 'Sans genre' },
     { value: 'incomplete', label: 'Fiche < 80 %' },
-    { value: 'all', label: 'Toutes' },
+    // Ajoutée depuis : à lier (« Remplir ») pour sa note et sa relecture.
+    { value: 'no-bedetheque', label: 'Sans fiche Bedetheque' },
+    // Fiches changées en ligne (mise à jour de nuit).
+    { value: 'to-review', label: 'Fiches à revoir' },
 ] as const;
 type Filter = (typeof FILTERS)[number]['value'];
 
@@ -56,6 +60,10 @@ const STATUSES = [
     { value: 'ongoing', label: 'En cours' },
     { value: 'completed', label: 'Terminée' },
 ];
+const STATUS_LABELS = {
+    ongoing: 'En cours de parution',
+    completed: 'Terminée',
+} as const;
 
 type SortKey =
     | 'name'
@@ -66,7 +74,8 @@ type SortKey =
     | 'volumes'
     | 'size'
     | 'perPage'
-    | 'added';
+    | 'added'
+    | 'rating';
 
 /** Une série du tableau, avec sa complétude et ses moyennes. */
 type Row = ManagedSeries & {
@@ -84,6 +93,7 @@ const toRow = (s: ManagedSeries): Row => {
         hasFormat: !!s.formatId,
         hasAge: effectiveAge !== null,
         hasStatus: !!s.status,
+        hasRating: s.rating !== null,
         genreCount: s.genres.length,
         writer: s.writer,
         penciller: s.penciller,
@@ -115,6 +125,10 @@ const matches = (row: Row, filter: Filter) => {
             return row.genres.length === 0;
         case 'incomplete':
             return row.percent < 80;
+        case 'to-review':
+            return row.sheetChanges.length > 0;
+        case 'no-bedetheque':
+            return !row.sheetSites.includes('bedetheque');
         default:
             return true;
     }
@@ -137,6 +151,8 @@ const sortValue = (row: Row, key: SortKey): string | number | null => {
             return row.size;
         case 'perPage':
             return row.perPage;
+        case 'rating':
+            return row.rating ?? null;
         case 'added':
             return row.lastAddedAt ? new Date(row.lastAddedAt).getTime() : null;
         default:
@@ -173,6 +189,7 @@ const SORTS: { value: SortKey; label: string }[] = [
     { value: 'size', label: 'Taille' },
     { value: 'perPage', label: 'Taille par page' },
     { value: 'added', label: 'Dernier ajout' },
+    { value: 'rating', label: 'Note' },
 ];
 
 const formatDay = (iso: string | null) =>
@@ -185,23 +202,21 @@ const formatDay = (iso: string | null) =>
         : '—';
 
 /**
- * Gestion des séries (admin) : toutes les séries en tableau, à trier et à
- * filtrer (« À classer » par défaut). Format, âge et statut se changent dans
- * la ligne ; une ligne changée reste affichée, même si elle sort du filtre.
+ * Gestion des séries (admin) : toutes les séries en cartes, les fiches les
+ * moins complètes d'abord, à trier et à filtrer ; chaque carte dit ce qui
+ * manque et mène à l'éditeur (« Remplir », « Modifier »).
  */
 export const SeriesManagementPage = () => {
     const [params, setParams] = useSearchParams();
-    const filter = (params.get('filter') as Filter | null) ?? 'to-classify';
-    const sort = (params.get('sort') as SortKey | null) ?? 'name';
+    const filter = (params.get('filter') as Filter | null) ?? 'all';
+    // Les fiches les moins complètes d'abord.
+    const sort = (params.get('sort') as SortKey | null) ?? 'completeness';
     const desc = params.get('dir') === 'desc';
     const formatFilter = params.get('format');
     const statusFilter = params.get('status');
     const [search, setSearch] = useState('');
-    const { data, error, reload } = useQuery(fetchManagedSeries, []);
+    const { data, error } = useQuery(fetchManagedSeries, []);
     const formats = useQuery(fetchFormats, []);
-    const ages = useAgeSteps();
-    // Lignes changées ici : gardées à l'écran.
-    const [touched, setTouched] = useState<Set<number>>(new Set());
 
     const update = (changes: Record<string, string | null>) =>
         setParams(
@@ -230,107 +245,70 @@ export const SeriesManagementPage = () => {
     const shown = rows
         .filter(
             (r) =>
-                touched.has(r.id) ||
-                (matches(r, filter) &&
-                    (!formatFilter ||
-                        (formatFilter === 'none'
-                            ? !r.formatId
-                            : String(r.formatId) === formatFilter)) &&
-                    (!statusFilter ||
-                        (statusFilter === 'none'
-                            ? !r.status
-                            : r.status === statusFilter))),
+                matches(r, filter) &&
+                (!formatFilter ||
+                    (formatFilter === 'none'
+                        ? !r.formatId
+                        : String(r.formatId) === formatFilter)) &&
+                (!statusFilter ||
+                    (statusFilter === 'none'
+                        ? !r.status
+                        : r.status === statusFilter)),
         )
         .filter((r) => !text || genreKey(r.name).includes(text))
         .sort(compareRows(sort, desc));
-
-    /** Enregistre un changement de la ligne, puis recharge la liste. */
-    const save = async (id: number, action: () => Promise<unknown>) => {
-        setTouched((current) => new Set(current).add(id));
-        try {
-            await action();
-            reload();
-        } catch (e) {
-            notifications.show({ color: 'red', message: (e as Error).message });
-        }
-    };
 
     const formatChoices = (formats.data ?? []).map((f) => ({
         value: String(f.id),
         label: f.name,
     }));
+    const extraFilters =
+        (filter !== 'all' ? 1 : 0) +
+        (formatFilter ? 1 : 0) +
+        (statusFilter ? 1 : 0);
+    const chooseFilter = (value: Filter) =>
+        update({ filter: value === 'all' ? null : value });
 
     return (
-        <Stack>
+        <Stack gap="sm">
             <div>
                 <Title order={2}>Séries</Title>
                 <Text size="sm" c="dimmed">
-                    Format, âge et statut se changent sur chaque carte. Sans
-                    âge, une série est masquée aux comptes limités. « Remplir »
-                    lance la recherche en ligne dans l’éditeur.
+                    Les fiches les moins complètes d’abord. Sans âge, une série
+                    est masquée aux comptes limités.
                 </Text>
             </div>
 
-            <Group gap="xs">
-                {FILTERS.map((f) => (
-                    <Button
-                        key={f.value}
-                        size="compact-sm"
-                        radius="xl"
-                        fw={400}
-                        variant={filter === f.value ? 'filled' : 'default'}
-                        aria-pressed={filter === f.value}
-                        onClick={() => {
-                            setTouched(new Set());
-                            update({
-                                filter:
-                                    f.value === 'to-classify' ? null : f.value,
-                            });
-                        }}
-                    >
-                        {f.label} ({counts[f.value]})
-                    </Button>
-                ))}
-            </Group>
-            <SimpleGrid cols={{ base: 2, md: 4 }} spacing="xs">
-                <TextInput
-                    placeholder="Chercher une série"
-                    aria-label="Chercher une série"
-                    leftSection={<IconSearch size={14} />}
-                    value={search}
-                    onChange={(e) => setSearch(e.currentTarget.value)}
-                />
-                <Select
-                    aria-label="Format"
-                    placeholder="Tous les formats"
-                    clearable
-                    data={[
-                        { value: 'none', label: 'Sans format' },
-                        ...formatChoices,
-                    ]}
-                    value={formatFilter}
-                    onChange={(value) => update({ format: value })}
-                />
-                <Select
-                    aria-label="Statut"
-                    placeholder="Tous les statuts"
-                    clearable
-                    data={[
-                        { value: 'none', label: 'Sans statut' },
-                        ...STATUSES,
-                    ]}
-                    value={statusFilter}
-                    onChange={(value) => update({ status: value })}
-                />
-                <Group gap={4} wrap="nowrap">
+            {/* Outils : toujours visibles en haut (sous l'en-tête). */}
+            <Stack
+                gap={8}
+                py={8}
+                style={{
+                    position: 'sticky',
+                    top: 'var(--app-shell-header-height, 56px)',
+                    zIndex: 10,
+                    background: 'var(--mantine-color-body)',
+                }}
+            >
+                <Group gap={6} wrap="nowrap">
+                    <TextInput
+                        placeholder="Chercher une série"
+                        aria-label="Chercher une série"
+                        leftSection={<IconSearch size={14} />}
+                        value={search}
+                        onChange={(e) => setSearch(e.currentTarget.value)}
+                        style={{ flex: 1, minWidth: 0 }}
+                    />
                     <Select
                         aria-label="Trier par"
-                        style={{ flex: 1 }}
+                        w={{ base: 120, sm: 170 }}
                         allowDeselect={false}
                         data={SORTS}
                         value={sort}
                         onChange={(value) =>
-                            update({ sort: value === 'name' ? null : value })
+                            update({
+                                sort: value === 'completeness' ? null : value,
+                            })
                         }
                     />
                     <Tooltip label={desc ? 'Décroissant' : 'Croissant'}>
@@ -351,13 +329,105 @@ export const SeriesManagementPage = () => {
                             )}
                         </ActionIcon>
                     </Tooltip>
+                    {/* Format et statut : rangés ici, pour garder la
+                        barre sur une ligne. */}
+                    <Popover position="bottom-end" shadow="md" withArrow>
+                        <Popover.Target>
+                            <Indicator
+                                disabled={extraFilters === 0}
+                                label={extraFilters}
+                                size={16}
+                            >
+                                <ActionIcon
+                                    variant={extraFilters ? 'light' : 'default'}
+                                    size="input-sm"
+                                    aria-label="Filtres"
+                                >
+                                    <IconFilter size={18} />
+                                </ActionIcon>
+                            </Indicator>
+                        </Popover.Target>
+                        <Popover.Dropdown>
+                            <Stack gap="xs" w={220}>
+                                <Select
+                                    label="Fiches"
+                                    allowDeselect={false}
+                                    comboboxProps={{ withinPortal: false }}
+                                    data={FILTERS.map((f) => ({
+                                        value: f.value,
+                                        label: `${f.label} (${counts[f.value]})`,
+                                    }))}
+                                    value={filter}
+                                    onChange={(value) =>
+                                        value && chooseFilter(value as Filter)
+                                    }
+                                />
+                                <Select
+                                    label="Format"
+                                    placeholder="Tous les formats"
+                                    clearable
+                                    comboboxProps={{ withinPortal: false }}
+                                    data={[
+                                        { value: 'none', label: 'Sans format' },
+                                        ...formatChoices,
+                                    ]}
+                                    value={formatFilter}
+                                    onChange={(value) =>
+                                        update({ format: value })
+                                    }
+                                />
+                                <Select
+                                    label="Statut"
+                                    placeholder="Tous les statuts"
+                                    clearable
+                                    comboboxProps={{ withinPortal: false }}
+                                    data={[
+                                        { value: 'none', label: 'Sans statut' },
+                                        ...STATUSES,
+                                    ]}
+                                    value={statusFilter}
+                                    onChange={(value) =>
+                                        update({ status: value })
+                                    }
+                                />
+                            </Stack>
+                        </Popover.Dropdown>
+                    </Popover>
                 </Group>
-            </SimpleGrid>
+                <Group justify="space-between">
+                    <Group gap="sm">
+                        <Text size="xs" c="dimmed">
+                            {shown.length} série{shown.length > 1 ? 's' : ''}
+                        </Text>
+                        {/* Fiches changées en ligne : un lien discret. */}
+                        {counts['to-review'] > 0 && filter !== 'to-review' && (
+                            <Anchor
+                                component="button"
+                                size="xs"
+                                c="orange"
+                                onClick={() => chooseFilter('to-review')}
+                            >
+                                {counts['to-review']} fiche
+                                {counts['to-review'] > 1 ? 's' : ''} à revoir
+                            </Anchor>
+                        )}
+                        {filter !== 'all' && (
+                            <Anchor
+                                component="button"
+                                size="xs"
+                                onClick={() => chooseFilter('all')}
+                            >
+                                Voir toutes
+                            </Anchor>
+                        )}
+                    </Group>
+                </Group>
+            </Stack>
 
             {shown.length === 0 ? (
-                <Alert color={filter === 'to-classify' ? 'green' : 'gray'}>
-                    {filter === 'to-classify' && !text
-                        ? 'Toutes les séries sont classées.'
+                <Alert color="gray">
+                    {text || filter === 'all'
+                        ? 'Aucune série.'
                         : 'Aucune série dans ce filtre.'}
                 </Alert>
             ) : (
@@ -374,7 +444,7 @@ export const SeriesManagementPage = () => {
                             radius="md"
                             data-testid="managed-card"
                         >
-                            <Stack gap="sm">
+                            <Stack gap="sm" h="100%" justify="space-between">
                                 <Group
                                     gap="sm"
                                     wrap="nowrap"
@@ -404,6 +474,19 @@ export const SeriesManagementPage = () => {
                                         </Anchor>
                                         <Text size="xs" c="dimmed">
                                             {[
+                                                s.format ?? 'Sans format',
+                                                s.effectiveAge !== null &&
+                                                    ageLabel(s.effectiveAge),
+                                                s.status &&
+                                                    STATUS_LABELS[s.status],
+                                                s.rating != null &&
+                                                    ratingLabel(s.rating),
+                                            ]
+                                                .filter(Boolean)
+                                                .join(' · ')}
+                                        </Text>
+                                        <Text size="xs" c="dimmed">
+                                            {[
                                                 `${s.volumeCount} tome${s.volumeCount > 1 ? 's' : ''}`,
                                                 formatSize(s.size),
                                                 `${formatSize(s.perVolume)} / tome`,
@@ -423,86 +506,33 @@ export const SeriesManagementPage = () => {
                                                 .filter(Boolean)
                                                 .join(' · ')}
                                         </Text>
+                                        {/* Changé sur le site depuis la
+                                            dernière visite : rien
+                                            d'appliqué, à revoir. */}
+                                        {s.sheetChanges.length > 0 && (
+                                            <Text size="xs" c="orange">
+                                                Fiche à revoir :{' '}
+                                                {s.sheetChanges.join(' · ')}
+                                            </Text>
+                                        )}
                                     </Stack>
                                 </Group>
-                                <SimpleGrid cols={3} spacing={6}>
-                                    <Select
-                                        size="xs"
-                                        aria-label={`Format de ${s.name}`}
-                                        placeholder="Format"
-                                        clearable
-                                        error={!s.formatId}
-                                        data={formatChoices}
-                                        value={
-                                            s.formatId
-                                                ? String(s.formatId)
-                                                : null
-                                        }
-                                        onChange={(value) =>
-                                            void save(s.id, () =>
-                                                setSeriesClassification(s.id, {
-                                                    formatId: value
-                                                        ? Number(value)
-                                                        : null,
-                                                }),
-                                            )
-                                        }
-                                    />
-                                    <Select
-                                        size="xs"
-                                        aria-label={`Âge de ${s.name}`}
-                                        // Sans choix : l'âge déduit des fichiers.
-                                        placeholder={
-                                            s.fileAge !== null
-                                                ? `${ageLabel(s.fileAge)} (fichiers)`
-                                                : 'Âge'
-                                        }
-                                        clearable
-                                        error={s.effectiveAge === null}
-                                        data={ageOptions(ages, s.age)}
-                                        value={
-                                            s.age === null
-                                                ? null
-                                                : String(s.age)
-                                        }
-                                        onChange={(value) =>
-                                            void save(s.id, () =>
-                                                setSeriesClassification(s.id, {
-                                                    age:
-                                                        value === null
-                                                            ? null
-                                                            : Number(value),
-                                                }),
-                                            )
-                                        }
-                                    />
-                                    <Select
-                                        size="xs"
-                                        aria-label={`Statut de ${s.name}`}
-                                        placeholder="Statut"
-                                        clearable
-                                        data={STATUSES}
-                                        value={s.status}
-                                        onChange={(value) =>
-                                            void save(s.id, () =>
-                                                setSeriesStatus(
-                                                    s.id,
-                                                    value as
-                                                        | 'ongoing'
-                                                        | 'completed'
-                                                        | null,
-                                                ),
-                                            )
-                                        }
-                                    />
-                                </SimpleGrid>
-                                <Group justify="space-between" wrap="nowrap">
-                                    <CompletenessBadge
-                                        completeness={{
-                                            percent: s.percent,
-                                            missing: s.missing,
-                                        }}
-                                    />
+                                <Group
+                                    justify="space-between"
+                                    wrap="nowrap"
+                                    align="flex-start"
+                                >
+                                    {/* Ce qui manque, dans la bulle : sans
+                                        avoir à l'ouvrir. */}
+                                    <div style={{ minWidth: 0 }}>
+                                        <CompletenessBadge
+                                            withMissing
+                                            completeness={{
+                                                percent: s.percent,
+                                                missing: s.missing,
+                                            }}
+                                        />
+                                    </div>
                                     <Group gap={6} wrap="nowrap">
                                         <Button
                                             component={Link}
@@ -510,9 +540,16 @@ export const SeriesManagementPage = () => {
                                             size="compact-sm"
                                             variant="light"
                                             leftSection={<IconWand size={14} />}
-                                            aria-label={`Remplir ${s.name}`}
+                                            color={
+                                                s.sheetChanges.length > 0
+                                                    ? 'orange'
+                                                    : undefined
+                                            }
+                                            aria-label={`${s.sheetChanges.length > 0 ? 'Revoir' : 'Remplir'} ${s.name}`}
                                         >
-                                            Remplir
+                                            {s.sheetChanges.length > 0
+                                                ? 'Revoir'
+                                                : 'Remplir'}
                                         </Button>
                                         <Button
                                             component={Link}

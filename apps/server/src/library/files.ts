@@ -29,7 +29,7 @@ import { COVER_QUALITY, COVER_SIZE, readImage } from '../archive/image';
 import { updateComicInfo } from '../archive/write';
 import type { Db } from '../db';
 import { libraries, series, volumes } from '../db/schema';
-import { parseSources } from '../metadata/sourceLink';
+import { parseSources, sourcesText } from '../metadata/sourceLink';
 import { conflict, notFound } from '../tools/errors';
 import type { Logger } from '../tools/logger';
 import { draftCoverFile, seriesCoverFile } from './covers';
@@ -49,6 +49,7 @@ import {
     resolveInLibrary,
     volumeNumberOf,
 } from './paths';
+import { seriesRatingOf, sourceRatingsMap } from './ratings';
 import type { LibraryScanner } from './scanner';
 
 /** Un CBZ de la bibliothèque (brouillon ou publié), pour la gestion. */
@@ -350,6 +351,7 @@ export class LibraryFiles {
             ]);
         }
         const settings = draftSettingsOf(this.db, libraryId);
+        const ratings = sourceRatingsMap(this.db);
         return [...folders].map(([folder, files]) => ({
             folder,
             files,
@@ -358,6 +360,11 @@ export class LibraryFiles {
             formatId: settings.get(folder)?.formatId ?? null,
             age: settings.get(folder)?.age ?? null,
             sources: parseSources(settings.get(folder)?.sources),
+            // Note de ses fiches (gardée à leur lecture), comme une série.
+            rating: seriesRatingOf(
+                parseSources(settings.get(folder)?.sources),
+                ratings,
+            ),
             coverUpdatedAt: settings.get(folder)?.coverUpdatedAt ?? null,
         }));
     };
@@ -602,7 +609,20 @@ export class LibraryFiles {
         if (draft.readingMode) changes.readingMode = draft.readingMode;
         if (draft.formatId) changes.formatId = draft.formatId;
         if (draft.age != null) changes.age = draft.age;
-        if (draft.sources) changes.sources = draft.sources;
+        // Fiches : ajoutées à celles de la série (celle du brouillon
+        // l'emporte pour son site) ; une fiche Bedetheque ajoutée ne fait pas
+        // perdre celle de Manga-news, ni sa note.
+        if (draft.sources) {
+            const current = this.db
+                .select({ sources: series.sources })
+                .from(series)
+                .where(eq(series.id, seriesId))
+                .get();
+            changes.sources = sourcesText([
+                ...parseSources(current?.sources),
+                ...parseSources(draft.sources),
+            ]);
+        }
         if (draft.coverUpdatedAt) {
             const copied = await copyFile(
                 draftCoverFile(this.coversPath, libraryId, folder),
