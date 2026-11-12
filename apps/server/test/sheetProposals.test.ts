@@ -193,4 +193,26 @@ describe('missing sheets searched at night', () => {
             searchesToDo(ctx.db, clock.getTime() + 91 * 24 * 3600_000, []),
         ).toHaveLength(2);
     });
+
+    it('searches Manga-news for the mangas only, Bedetheque for all', async () => {
+        expect(
+            searchesToDo(ctx.db, clock.getTime(), []).map((s) => s.site),
+        ).toEqual(['manga-news', 'bedetheque']);
+        // Site désactivé : pas cherché.
+        expect(
+            searchesToDo(ctx.db, clock.getTime(), ['manga-news']).map(
+                (s) => s.site,
+            ),
+        ).toEqual(['bedetheque']);
+
+        const comics = await setup('comics');
+        await writeCbz(comics.file('Blacksad/T01.cbz'), {
+            comicInfo: '<Series>Blacksad</Series><Number>1</Number>',
+        });
+        await comics.scanner.scan(comics.library.id);
+        expect(
+            searchesToDo(comics.db, clock.getTime(), []).map((s) => s.site),
+        ).toEqual(['bedetheque']);
+        await comics.cleanup();
+    });
 });

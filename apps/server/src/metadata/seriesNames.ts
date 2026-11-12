@@ -6,10 +6,10 @@ import { articleFirst } from '../library/sortName';
  * Clé pour reconnaître une série d'un site à l'autre : sans majuscules,
  * accents ni ponctuation, l'article remis devant (« Sculpteur (Le) »), et
  * « et », « & » ou « and » ignorés (« Gloutons & Dragons » = « Gloutons et
- * Dragons »).
+ * Dragons »), « × » lu « x » (« Spy × Family » = « Spy X Family »).
  */
 export const seriesNameKey = (name: string) =>
-    genreKey(articleFirst(name.trim()))
+    genreKey(articleFirst(name.trim()).replace(/×/g, ' x '))
         .split(' ')
         .filter((word) => word && word !== 'et' && word !== 'and')
         .join(' ');

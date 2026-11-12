@@ -15,6 +15,7 @@ const managed = (
     id,
     libraryId: 1,
     libraryName: 'Mangas',
+    libraryType: 'manga',
     name,
     formatId: 1,
     format: 'Manga',
@@ -209,16 +210,34 @@ describe('SeriesManagementPage', () => {
         await vi.waitFor(() => expect(names()).toHaveLength(3));
     });
 
-    it('finds the series without a Bedetheque sheet', async () => {
+    it('finds the series without a sheet, or without the sheet of a site', async () => {
+        series[0] = { ...series[0]!, sheetSites: ['wikipedia'] };
         show();
         await screen.findByText('Gantz');
-        fireEvent.click(screen.getByRole('button', { name: 'Filtres' }));
-        fireEvent.click(await screen.findByRole('textbox', { name: 'Fiches' }));
-        fireEvent.click(
-            await screen.findByRole('option', {
-                name: 'Sans fiche Bedetheque (2)',
-            }),
+        // Les fiches de chaque série, sur sa carte.
+        expect(
+            within(cards()[2]!).getByText('Fiches : Manga-news · Bedetheque'),
+        ).toBeTruthy();
+        expect(
+            within(cards()[0]!).getByText('Aucune fiche en ligne'),
+        ).toBeTruthy();
+
+        const choose = async (option: string) => {
+            fireEvent.click(screen.getByRole('button', { name: 'Filtres' }));
+            fireEvent.click(
+                await screen.findByRole('textbox', { name: 'Fiches en ligne' }),
+            );
+            fireEvent.click(
+                await screen.findByRole('option', { name: option }),
+            );
+        };
+        await choose('Aucune fiche (1)');
+        await vi.waitFor(() => expect(names()).toEqual(['Coq de combat']));
+        await choose('Sans Bedetheque (2)');
+        await vi.waitFor(() =>
+            expect(names()).toEqual(['Coq de combat', 'Spirale']),
         );
+        await choose('Sans Manga-news (mangas) (2)');
         await vi.waitFor(() =>
             expect(names()).toEqual(['Coq de combat', 'Spirale']),
         );

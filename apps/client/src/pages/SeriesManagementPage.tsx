@@ -62,14 +62,34 @@ const FILTERS = [
     { value: 'incomplete', label: 'Fiche < 80 %' },
     // Numéros absents de Bento (trous, ou tomes parus d'après les fiches).
     { value: 'missing-volumes', label: 'Tomes manquants' },
-    // Ajoutée depuis : à lier (« Remplir ») pour sa note et sa relecture.
-    { value: 'no-bedetheque', label: 'Sans fiche Bedetheque' },
     // Fiches changées en ligne (mise à jour de nuit).
     { value: 'to-review', label: 'Fiches à revoir' },
     // Fiches trouvées la nuit pour une série qui n'en avait pas.
     { value: 'proposed', label: 'Fiches proposées' },
 ] as const;
 type Filter = (typeof FILTERS)[number]['value'];
+
+/**
+ * Fiches en ligne liées : aucune, ou pas celle d'un site (Manga-news : les
+ * mangas seulement, il n'a pas les BD).
+ */
+const SHEET_FILTERS = [
+    { value: 'none', label: 'Aucune fiche' },
+    { value: 'manga-news', label: 'Sans Manga-news (mangas)' },
+    { value: 'bedetheque', label: 'Sans Bedetheque' },
+    { value: 'wikipedia', label: 'Sans Wikipédia' },
+] as const;
+type SheetFilter = (typeof SHEET_FILTERS)[number]['value'];
+
+const matchesSheets = (
+    row: Pick<ManagedSeries, 'sheetSites' | 'libraryType'>,
+    filter: SheetFilter,
+) =>
+    filter === 'none'
+        ? row.sheetSites.length === 0
+        : filter === 'manga-news'
+          ? row.libraryType === 'manga' && !row.sheetSites.includes(filter)
+          : !row.sheetSites.includes(filter);
 
 const STATUSES = [
     { value: 'ongoing', label: 'En cours' },
@@ -131,8 +151,6 @@ const matches = (row: Row, filter: Filter) => {
             return row.proposals.length > 0;
         case 'missing-volumes':
             return row.volumesStatus.missing.length > 0;
-        case 'no-bedetheque':
-            return !row.sheetSites.includes('bedetheque');
         default:
             return true;
     }
@@ -303,6 +321,7 @@ export const SeriesManagementPage = () => {
     const desc = params.get('dir') === 'desc';
     const formatFilter = params.get('format');
     const statusFilter = params.get('status');
+    const sheetFilter = params.get('sheet') as SheetFilter | null;
     const [search, setSearch] = useState('');
     const { data, error, reload } = useQuery(fetchManagedSeries, []);
     const formats = useQuery(fetchFormats, []);
@@ -342,7 +361,8 @@ export const SeriesManagementPage = () => {
                 (!statusFilter ||
                     (statusFilter === 'none'
                         ? !r.status
-                        : r.status === statusFilter)),
+                        : r.status === statusFilter)) &&
+                (!sheetFilter || matchesSheets(r, sheetFilter)),
         )
         .filter((r) => !text || genreKey(r.name).includes(text))
         .sort(compareRows(sort, desc));
@@ -354,7 +374,8 @@ export const SeriesManagementPage = () => {
     const extraFilters =
         (filter !== 'all' ? 1 : 0) +
         (formatFilter ? 1 : 0) +
-        (statusFilter ? 1 : 0);
+        (statusFilter ? 1 : 0) +
+        (sheetFilter ? 1 : 0);
     const chooseFilter = (value: Filter) =>
         update({ filter: value === 'all' ? null : value });
 
@@ -477,6 +498,20 @@ export const SeriesManagementPage = () => {
                                     value={statusFilter}
                                     onChange={(value) =>
                                         update({ status: value })
+                                    }
+                                />
+                                <Select
+                                    label="Fiches en ligne"
+                                    placeholder="Toutes"
+                                    clearable
+                                    comboboxProps={{ withinPortal: false }}
+                                    data={SHEET_FILTERS.map((f) => ({
+                                        value: f.value,
+                                        label: `${f.label} (${rows.filter((r) => matchesSheets(r, f.value)).length})`,
+                                    }))}
+                                    value={sheetFilter}
+                                    onChange={(value) =>
+                                        update({ sheet: value })
                                     }
                                 />
                             </Stack>
@@ -617,6 +652,12 @@ export const SeriesManagementPage = () => {
                                                 )}
                                             </Text>
                                         )}
+                                        {/* Fiches en ligne liées. */}
+                                        <Text size="xs" c="dimmed">
+                                            {s.sheetSites.length
+                                                ? `Fiches : ${s.sheetSites.map((site) => SOURCE_LABELS[site]).join(' · ')}`
+                                                : 'Aucune fiche en ligne'}
+                                        </Text>
                                         {/* Changé sur le site depuis la
                                             dernière visite : rien
                                             d'appliqué, à revoir. */}

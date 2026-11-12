@@ -59,6 +59,8 @@ export const listManagedSeries = (db: Db) => {
             id: series.id,
             libraryId: series.libraryId,
             libraryName: libraries.name,
+            // Mangas : Manga-news a leur fiche (filtre « Sans Manga-news »).
+            libraryType: libraries.type,
             name: series.name,
             genre: series.genre,
             tags: series.tags,
