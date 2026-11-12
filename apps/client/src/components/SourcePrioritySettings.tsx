@@ -1,4 +1,5 @@
 import {
+    Accordion,
     Alert,
     Group,
     Paper,
@@ -91,48 +92,65 @@ export const SourcePrioritySettings = ({
                         />
                     ))}
                 </Stack>
-                <Text size="sm" c="dimmed">
-                    Le site préféré pour chaque champ. Quand plusieurs sites en
-                    donnent une valeur et que le champ est vide, la comparaison
-                    propose d’office celle de ce site ; tu peux toujours choisir
-                    une autre.
-                </Text>
-                <Table verticalSpacing={4} withRowBorders={false}>
-                    <Table.Tbody>
-                        {SHEET_FIELDS.map((field) => (
-                            <Table.Tr key={field}>
-                                <Table.Td>
-                                    <Text size="sm">
-                                        {SHEET_FIELD_LABELS[field]}
-                                    </Text>
-                                </Table.Td>
-                                <Table.Td>
-                                    <Group justify="flex-end">
-                                        <SegmentedControl
-                                            size="xs"
-                                            aria-label={`Site préféré : ${SHEET_FIELD_LABELS[field]}`}
-                                            value={priority[field]}
-                                            data={METADATA_SOURCES.map(
-                                                (site) => ({
-                                                    value: site,
-                                                    label: SOURCE_LABELS[site],
-                                                    disabled:
-                                                        disabled.includes(site),
-                                                }),
-                                            )}
-                                            onChange={(value) =>
-                                                void change(
-                                                    field,
-                                                    value as MetadataSource,
-                                                )
-                                            }
-                                        />
-                                    </Group>
-                                </Table.Td>
-                            </Table.Tr>
-                        ))}
-                    </Table.Tbody>
-                </Table>
+                {/* Long tableau : replié, ouvert à la demande. */}
+                <Accordion variant="separated" chevronPosition="left">
+                    <Accordion.Item value="priority">
+                        <Accordion.Control>
+                            <Text size="sm">
+                                Site préféré pour chaque champ
+                            </Text>
+                        </Accordion.Control>
+                        <Accordion.Panel>
+                            <Text size="sm" c="dimmed">
+                                Le site préféré pour chaque champ. Quand
+                                plusieurs sites en donnent une valeur et que le
+                                champ est vide, la comparaison propose d’office
+                                celle de ce site ; tu peux toujours choisir une
+                                autre.
+                            </Text>
+                            <Table verticalSpacing={4} withRowBorders={false}>
+                                <Table.Tbody>
+                                    {SHEET_FIELDS.map((field) => (
+                                        <Table.Tr key={field}>
+                                            <Table.Td>
+                                                <Text size="sm">
+                                                    {SHEET_FIELD_LABELS[field]}
+                                                </Text>
+                                            </Table.Td>
+                                            <Table.Td>
+                                                <Group justify="flex-end">
+                                                    <SegmentedControl
+                                                        size="xs"
+                                                        aria-label={`Site préféré : ${SHEET_FIELD_LABELS[field]}`}
+                                                        value={priority[field]}
+                                                        data={METADATA_SOURCES.map(
+                                                            (site) => ({
+                                                                value: site,
+                                                                label: SOURCE_LABELS[
+                                                                    site
+                                                                ],
+                                                                disabled:
+                                                                    disabled.includes(
+                                                                        site,
+                                                                    ),
+                                                            }),
+                                                        )}
+                                                        onChange={(value) =>
+                                                            void change(
+                                                                field,
+                                                                value as MetadataSource,
+                                                            )
+                                                        }
+                                                    />
+                                                </Group>
+                                            </Table.Td>
+                                        </Table.Tr>
+                                    ))}
+                                </Table.Tbody>
+                            </Table>
+                        </Accordion.Panel>
+                    </Accordion.Item>
+                </Accordion>
                 {error && <Alert color="red">{error}</Alert>}
             </Stack>
         </Paper>

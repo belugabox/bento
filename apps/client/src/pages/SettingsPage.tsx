@@ -16,6 +16,7 @@ import {
     IconAdjustments,
     IconDatabaseImport,
     IconTags,
+    IconWorldSearch,
 } from '@tabler/icons-react';
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router';
@@ -323,10 +324,16 @@ export const SettingsPage = () => {
                         Classement
                     </Tabs.Tab>
                     <Tabs.Tab
+                        value="fiches"
+                        leftSection={<IconWorldSearch size={16} />}
+                    >
+                        Fiches en ligne
+                    </Tabs.Tab>
+                    <Tabs.Tab
                         value="kavita"
                         leftSection={<IconDatabaseImport size={16} />}
                     >
-                        Migration Kavita
+                        Kavita
                     </Tabs.Tab>
                 </Tabs.List>
                 <Tabs.Panel value="general">
@@ -340,14 +347,19 @@ export const SettingsPage = () => {
                             onSaved={setSaved}
                         />
                         <GenresSettings />
-                        <SourcePrioritySettings
-                            priority={current.settings.sourcePriority}
-                            disabled={current.settings.disabledSources}
-                            onSaved={setSaved}
-                        />
+                    </Stack>
+                </Tabs.Panel>
+                {/* Fiches en ligne : la mise à jour automatique d'abord. */}
+                <Tabs.Panel value="fiches">
+                    <Stack>
                         <SheetRefreshSettings
                             enabled={current.settings.sheetRefresh}
                             minutes={current.settings.sheetRefreshMinutes}
+                            onSaved={setSaved}
+                        />
+                        <SourcePrioritySettings
+                            priority={current.settings.sourcePriority}
+                            disabled={current.settings.disabledSources}
                             onSaved={setSaved}
                         />
                     </Stack>

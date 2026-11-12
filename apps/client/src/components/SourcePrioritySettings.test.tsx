@@ -34,10 +34,16 @@ describe('SourcePrioritySettings', () => {
             </MantineProvider>,
         );
 
+        // Tableau replié : ouvert d'abord.
+        fireEvent.click(
+            screen.getByRole('button', {
+                name: 'Site préféré pour chaque champ',
+            }),
+        );
         await act(async () => {
             fireEvent.click(
                 within(
-                    screen.getByRole('radiogroup', {
+                    await screen.findByRole('radiogroup', {
                         name: 'Site préféré : Scénario',
                     }),
                 ).getByLabelText('Wikipédia'),
