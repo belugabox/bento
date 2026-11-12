@@ -361,8 +361,13 @@ export const saveSettings = (changes: {
     ages?: number[];
     sourcePriority?: Partial<Settings['sourcePriority']>;
     disabledSources?: Settings['disabledSources'];
+    sheetRefresh?: boolean;
     readByPercent?: number;
 }) => json(api.settings.$put({ json: changes }));
+
+/** Mise à jour des fiches liées, la nuit : état, et « Lancer maintenant ». */
+export const fetchSheetRefresh = () => json(api.metadata.refresh.$get());
+export const runSheetRefresh = () => json(api.metadata.refresh.$post());
 
 /** Thème par défaut choisi par l'admin (lisible sans session). */
 export const fetchAppearance = () => json(api.appearance.$get());

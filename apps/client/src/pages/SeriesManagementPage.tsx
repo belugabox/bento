@@ -48,6 +48,8 @@ const FILTERS = [
     { value: 'no-summary', label: 'Sans résumé' },
     { value: 'no-genre', label: 'Sans genre' },
     { value: 'incomplete', label: 'Fiche < 80 %' },
+    // Fiches changées en ligne (mise à jour de nuit) ; montré s'il y en a.
+    { value: 'to-review', label: 'Fiches à revoir' },
     { value: 'all', label: 'Toutes' },
 ] as const;
 type Filter = (typeof FILTERS)[number]['value'];
@@ -117,6 +119,8 @@ const matches = (row: Row, filter: Filter) => {
             return row.genres.length === 0;
         case 'incomplete':
             return row.percent < 80;
+        case 'to-review':
+            return row.sheetChanges.length > 0;
         default:
             return true;
     }
@@ -277,7 +281,12 @@ export const SeriesManagementPage = () => {
             </div>
 
             <Group gap="xs">
-                {FILTERS.map((f) => (
+                {FILTERS.filter(
+                    (f) =>
+                        f.value !== 'to-review' ||
+                        counts[f.value] > 0 ||
+                        filter === f.value,
+                ).map((f) => (
                     <Button
                         key={f.value}
                         size="compact-sm"
@@ -432,6 +441,15 @@ export const SeriesManagementPage = () => {
                                                 .filter(Boolean)
                                                 .join(' · ')}
                                         </Text>
+                                        {/* Changé sur le site depuis la
+                                            dernière visite : rien
+                                            d'appliqué, à revoir. */}
+                                        {s.sheetChanges.length > 0 && (
+                                            <Text size="xs" c="orange">
+                                                Fiche à revoir :{' '}
+                                                {s.sheetChanges.join(' · ')}
+                                            </Text>
+                                        )}
                                     </Stack>
                                 </Group>
                                 <SimpleGrid cols={3} spacing={6}>
@@ -519,9 +537,16 @@ export const SeriesManagementPage = () => {
                                             size="compact-sm"
                                             variant="light"
                                             leftSection={<IconWand size={14} />}
-                                            aria-label={`Remplir ${s.name}`}
+                                            color={
+                                                s.sheetChanges.length > 0
+                                                    ? 'orange'
+                                                    : undefined
+                                            }
+                                            aria-label={`${s.sheetChanges.length > 0 ? 'Revoir' : 'Remplir'} ${s.name}`}
                                         >
-                                            Remplir
+                                            {s.sheetChanges.length > 0
+                                                ? 'Revoir'
+                                                : 'Remplir'}
                                         </Button>
                                         <Button
                                             component={Link}

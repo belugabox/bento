@@ -7,6 +7,7 @@ import { parseSources } from '../metadata/sourceLink';
 import { coverVolumeSql, ratingFields } from './catalog';
 import { genreCatalog } from './genres';
 import { seriesRatingOf, sourceRatingsMap } from './ratings';
+import { sourceSheetsMap } from './sheets';
 import { compareNames } from './sortName';
 
 /** Séries à classer : sans format, ou sans âge (choisi ou déduit des tomes). */
@@ -20,6 +21,7 @@ const toClassifySql = sql`(series.format_id is null or coalesce(series.age, seri
 export const listManagedSeries = (db: Db) => {
     const catalog = genreCatalog(db);
     const ratings = sourceRatingsMap(db);
+    const sheets = sourceSheetsMap(db);
     return db
         .select({
             id: series.id,
@@ -72,6 +74,11 @@ export const listManagedSeries = (db: Db) => {
         .map(({ genre, tags, sources, ...row }) => ({
             ...row,
             ...ratingFields(seriesRatingOf(parseSources(sources), ratings)),
+            // Fiches changées depuis que l'admin les a vues (mise à jour
+            // de nuit) : « Fiche à revoir ».
+            sheetChanges: parseSources(sources).flatMap(
+                (link) => sheets.get(`${link.site}:${link.id}`)?.changes ?? [],
+            ),
             ...classify(genre, tags, catalog),
         }));
 };

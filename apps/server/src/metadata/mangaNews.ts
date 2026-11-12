@@ -2,7 +2,7 @@ import { type CheerioAPI, load as cheerioLoad } from 'cheerio';
 
 import { genreKey } from '../classification';
 import { type AgeRating, ratingForAge } from '../library/ageRating';
-import { badGateway, badRequest, notFound } from '../tools/errors';
+import { badGateway, badRequest, notFound, refused } from '../tools/errors';
 import {
     type SeriesRating,
     mangaNewsSeriesUrl,
@@ -287,7 +287,11 @@ export class MangaNews {
         };
     };
 
-    private get = async (url: string) => {
+    /**
+     * Page lue (ou gardée) ; `retry: false` : pas de nouvel essai après un
+     * refus (mise à jour en arrière-plan, qui s'arrête alors).
+     */
+    private get = async (url: string, { retry = true } = {}) => {
         const cached = this.cache.get(url);
         if (cached && cached.until > Date.now()) return cached.html;
 
@@ -295,7 +299,7 @@ export class MangaNews {
         // Refus ponctuel (contrôle anti-robot, trop de requêtes) : la même
         // requête, refaite une seule fois après une pause, passe souvent.
         // Le contrôle n'est jamais contourné (ni résolu, ni déguisé).
-        if (page.challenged || page.status === 429) {
+        if (retry && (page.challenged || page.status === 429)) {
             await new Promise((resolve) =>
                 setTimeout(
                     resolve,
@@ -305,12 +309,12 @@ export class MangaNews {
             page = await this.fetchPage(url);
         }
         if (page.challenged) {
-            throw badGateway(
+            throw refused(
                 `Manga-news refuse la requête (protection anti-robot, ${page.status}) : réessaie plus tard ou utilise Wikipédia`,
             );
         }
         if (page.status === 429) {
-            throw badGateway(
+            throw refused(
                 'Manga-news limite les requêtes : réessaie dans quelques secondes',
             );
         }
@@ -348,11 +352,11 @@ export class MangaNews {
     };
 
     /** Fiche d'une série, par la fin de son adresse. */
-    series = async (id: string) => {
+    series = async (id: string, options?: { retry?: boolean }) => {
         if (!/^[^/?#\\\s]+$/.test(id)) {
             throw badRequest('Identifiant Manga-news invalide');
         }
-        const html = await this.get(seriesUrl(id));
+        const html = await this.get(seriesUrl(id), options);
         const series = html && parseSeriesPage(html, id);
         if (!series) throw notFound(`Série introuvable sur Manga-news (${id})`);
         return series;

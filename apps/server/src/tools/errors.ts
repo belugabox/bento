@@ -27,6 +27,18 @@ export const unprocessable = (message: string) => new AppError(422, message);
 // Service externe (Manga-news…) en erreur ou injoignable.
 export const badGateway = (message: string) => new AppError(502, message);
 
+/**
+ * Un site refuse nos requêtes (contrôle anti-robot, trop de requêtes) : la
+ * mise à jour en arrière-plan s'arrête aussitôt, sans insister.
+ */
+export class RefusedError extends AppError {
+    constructor(message: string) {
+        super(502, message);
+        this.name = 'RefusedError';
+    }
+}
+export const refused = (message: string) => new RefusedError(message);
+
 /** Message lisible pour une erreur de validation zod (1re erreur seulement). */
 export const formatZodError = (error: ZodError): string => {
     const issue = error.issues[0];

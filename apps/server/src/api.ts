@@ -76,6 +76,8 @@ import { familyReaders, seriesReaders } from './library/readers';
 import { addReadingTime } from './library/readingTime';
 import { ResizedPages } from './library/resizedPages';
 import { type LibraryScanner, coverFile } from './library/scanner';
+import { SheetRefresher } from './library/sheetRefresh';
+import { sheetSeen } from './library/sheets';
 import { readCover } from './library/smallCovers';
 import { getStats } from './library/stats';
 import { Bedetheque } from './metadata/bedetheque';
@@ -107,6 +109,8 @@ export type ApiDeps = {
     mangaNews?: MangaNews;
     /** Bedetheque (le vrai site si absent). */
     bedetheque?: Bedetheque;
+    /** Mise à jour des fiches en arrière-plan (lancée par `main`). */
+    sheetRefresher?: SheetRefresher;
     /** Réglages de l'admin (valeurs par défaut si absents). */
     settings?: SettingsStore;
     kavita?: KavitaImport;
@@ -227,6 +231,12 @@ export const createApi = ({
     mangaNews = new MangaNews(),
     bedetheque = new Bedetheque(),
     settings = new SettingsStore(db),
+    sheetRefresher = new SheetRefresher(
+        db,
+        { mangaNews, bedetheque },
+        settings,
+        logger,
+    ),
     // Base de Kavita envoyée pour la migration, à côté des couvertures.
     kavita = new KavitaImport(
         db,
@@ -620,6 +630,8 @@ export const createApi = ({
                 const series = await mangaNews.series(id);
                 // Note des lecteurs gardée : elle suit les séries liées.
                 saveSourceRating(db, 'manga-news', id, series.rating);
+                // Vue par l'admin : plus rien à revoir.
+                sheetSeen(db, 'manga-news', id, series);
                 return c.json(series);
             },
         )
@@ -643,8 +655,16 @@ export const createApi = ({
                 const { id } = c.req.valid('query');
                 const series = await bedetheque.series(id);
                 saveSourceRating(db, 'bedetheque', id, series.rating);
+                sheetSeen(db, 'bedetheque', id, series);
                 return c.json(series);
             },
+        )
+        // --- Mise à jour des fiches liées, la nuit (admin).
+        .get('/metadata/refresh', requireAdmin, (c) =>
+            c.json(sheetRefresher.status()),
+        )
+        .post('/metadata/refresh', requireAdmin, (c) =>
+            c.json(sheetRefresher.runNow()),
         )
         .get('/volumes/:id', zValidator('param', idParam), (c) => {
             // Le chemin sur disque reste côté serveur.

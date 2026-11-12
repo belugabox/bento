@@ -24,6 +24,7 @@ import { AgesSettings } from '@/components/AgesSettings';
 import { FormatsSettings } from '@/components/FormatsSettings';
 import { GenresSettings } from '@/components/GenresSettings';
 import { KavitaMigration } from '@/components/KavitaMigration';
+import { SheetRefreshSettings } from '@/components/SheetRefreshSettings';
 import { SourcePrioritySettings } from '@/components/SourcePrioritySettings';
 import { AccentPicker, ColorSchemeControl } from '@/components/ThemePickers';
 import { useDefaultAppearance } from '@/components/theme';
@@ -342,6 +343,10 @@ export const SettingsPage = () => {
                         <SourcePrioritySettings
                             priority={current.settings.sourcePriority}
                             disabled={current.settings.disabledSources}
+                            onSaved={setSaved}
+                        />
+                        <SheetRefreshSettings
+                            enabled={current.settings.sheetRefresh}
                             onSaved={setSaved}
                         />
                     </Stack>

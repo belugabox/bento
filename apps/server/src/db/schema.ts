@@ -356,6 +356,25 @@ export const sourceRatings = sqliteTable(
     (t) => [primaryKey({ columns: [t.site, t.sourceId] })],
 );
 
+/**
+ * Fiches en ligne lues : date de la dernière lecture, valeurs principales
+ * telles que l'admin les a vues (ou à la première lecture), et ce qui a
+ * changé depuis d'après la mise à jour de nuit (« Fiche à revoir »).
+ */
+export const sourceSheets = sqliteTable(
+    'source_sheets',
+    {
+        site: text('site').notNull(),
+        sourceId: text('source_id').notNull(),
+        checkedAt: integer('checked_at', { mode: 'timestamp_ms' }).notNull(),
+        snapshot: text('snapshot', { mode: 'json' })
+            .$type<Record<string, string | number | boolean | null>>()
+            .notNull(),
+        changes: text('changes', { mode: 'json' }).$type<string[]>(),
+    },
+    (t) => [primaryKey({ columns: [t.site, t.sourceId] })],
+);
+
 /** Réglages de l'admin (clé → valeur JSON). */
 export const settings = sqliteTable('settings', {
     key: text('key').primaryKey(),

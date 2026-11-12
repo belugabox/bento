@@ -14,6 +14,9 @@ import { syncLibraries } from './library/catalog';
 import { SeriesCovers } from './library/covers';
 import { LibraryFiles } from './library/files';
 import { LibraryScanner } from './library/scanner';
+import { SheetRefresher } from './library/sheetRefresh';
+import { Bedetheque } from './metadata/bedetheque';
+import { MangaNews } from './metadata/mangaNews';
 import { Wikipedia } from './metadata/wikipedia';
 import { SettingsStore, defaultSettings } from './settings';
 import { createLogger } from './tools/logger';
@@ -53,6 +56,18 @@ const settings = new SettingsStore(
     defaultSettings(config.SCAN_INTERVAL_MINUTES),
 );
 
+// Sites de fiches, partagés par l'API et la mise à jour de nuit (pages
+// gardées un moment).
+const mangaNews = new MangaNews();
+const bedetheque = new Bedetheque();
+const sheetRefresher = new SheetRefresher(
+    database.db,
+    { mangaNews, bedetheque },
+    settings,
+    logger,
+);
+sheetRefresher.start();
+
 /** Scanne les bibliothèques l'une après l'autre. */
 const scanAll = async (libraryIds: number[]) => {
     for (const id of libraryIds) {
@@ -82,6 +97,9 @@ const app = new Hono()
             covers: new SeriesCovers(database.db, pages, config.COVERS_PATH),
             settings,
             wikipedia: new Wikipedia(),
+            mangaNews,
+            bedetheque,
+            sheetRefresher,
             auth: { publicUrl: config.PUBLIC_URL },
         }),
     )

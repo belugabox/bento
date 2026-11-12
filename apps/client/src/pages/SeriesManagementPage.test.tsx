@@ -37,6 +37,9 @@ const managed = (
     coverVolumeVersion: 1,
     genres: ['Action'],
     themes: [],
+    rating: null,
+    ratingCount: 0,
+    sheetChanges: [] as string[],
     ...changes,
 });
 
@@ -48,7 +51,11 @@ beforeEach(() => {
     series = [
         managed(1, 'Spirale', { age: null, size: 50 * MB }),
         managed(2, 'Coq de combat', { formatId: null, format: null }),
-        managed(3, 'Gantz', { size: 900 * MB }),
+        managed(3, 'Gantz', {
+            size: 900 * MB,
+            // Fiche changée en ligne depuis la dernière visite.
+            sheetChanges: ['Tomes : 37 → 38'],
+        }),
     ];
     vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
         const url = String(input);
@@ -114,6 +121,23 @@ describe('SeriesManagementPage', () => {
         const gantz = cards()[1]!;
         expect(within(gantz).getByText(/450 Mo \/ tome/)).toBeTruthy();
         expect(within(gantz).getByText(/2,3 Mo \/ page/)).toBeTruthy();
+    });
+
+    it('lists the sheets changed online, to review', async () => {
+        show();
+        fireEvent.click(
+            await screen.findByRole('button', { name: 'Fiches à revoir (1)' }),
+        );
+        expect(names()).toEqual(['Gantz']);
+        expect(
+            screen.getByText('Fiche à revoir : Tomes : 37 → 38'),
+        ).toBeTruthy();
+        // « Revoir » relit ses fiches dans l'éditeur.
+        expect(
+            screen
+                .getByRole('link', { name: 'Revoir Gantz' })
+                .getAttribute('href'),
+        ).toBe('/series/3/edit?fill=online&from=to-classify');
     });
 
     it('sorts by size, the biggest first on a second click', async () => {

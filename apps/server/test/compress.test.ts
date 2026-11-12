@@ -300,6 +300,7 @@ describe('settings', () => {
                 scanIntervalMinutes: 30,
                 readByPercent: 10,
                 disabledSources: [],
+                sheetRefresh: false,
                 appearance: { colorScheme: 'auto', accent: 'violet' },
                 ages: [0, 8, 10, 12, 14, 16, 18],
                 sourcePriority: DEFAULT_SOURCE_PRIORITY,
@@ -309,6 +310,7 @@ describe('settings', () => {
                 scanIntervalMinutes: 30,
                 readByPercent: 10,
                 disabledSources: [],
+                sheetRefresh: false,
                 appearance: { colorScheme: 'auto', accent: 'violet' },
                 ages: [0, 8, 10, 12, 14, 16, 18],
                 sourcePriority: DEFAULT_SOURCE_PRIORITY,
@@ -339,6 +341,7 @@ describe('settings', () => {
             ages: [0, 8, 10, 12, 14, 16, 18],
             sourcePriority: { ...DEFAULT_SOURCE_PRIORITY, Writer: 'wikipedia' },
             disabledSources: ['manga-news'],
+            sheetRefresh: false,
         });
         expect((await put({ disabledSources: ['nautiljon'] })).status).toBe(
             400,

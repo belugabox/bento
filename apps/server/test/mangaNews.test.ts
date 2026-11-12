@@ -11,6 +11,7 @@ import {
     parseSearchPage,
     parseSeriesPage,
 } from '../src/metadata/mangaNews';
+import { RefusedError } from '../src/tools/errors';
 import { authDeps, sessionCookie, setup, silent } from './helpers';
 
 // Extraits réels des pages, réduits aux blocs lus (novembre 2026).
@@ -146,6 +147,13 @@ describe('MangaNews', () => {
         });
         // Une seule nouvelle tentative, la même requête.
         expect(calls).toBe(2);
+
+        // Mise à jour de nuit : aucune nouvelle tentative, refus reconnu.
+        calls = 0;
+        await expect(
+            site.series('Spy-X-Family', { retry: false }),
+        ).rejects.toBeInstanceOf(RefusedError);
+        expect(calls).toBe(1);
     });
 
     it('tries once more after a one-off refusal, then keeps the page', async () => {
