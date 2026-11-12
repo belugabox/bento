@@ -228,6 +228,22 @@ describe('background sheet refresh', () => {
         expect(calls).toHaveLength(2);
     });
 
+    it('follows the pace chosen by the admin', async () => {
+        const { refresher, settings, calls } = refresherWith();
+        settings.update({ sheetRefreshMinutes: 30 });
+        expect(refresher.status().intervalMinutes).toBe(30);
+        await refresher.tick();
+        later(REFRESH_INTERVAL_MS * 2);
+        await refresher.tick();
+        expect(calls).toHaveLength(1);
+        later(REFRESH_INTERVAL_MS);
+        await refresher.tick();
+        expect(calls).toHaveLength(2);
+        expect(
+            settings.update.bind(null, { sheetRefreshMinutes: 1 }),
+        ).toThrow();
+    });
+
     it('skips the disabled sites', async () => {
         const { refresher, settings, calls } = refresherWith();
         settings.update({ disabledSources: ['manga-news'] });

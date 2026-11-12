@@ -301,6 +301,7 @@ describe('settings', () => {
                 readByPercent: 10,
                 disabledSources: [],
                 sheetRefresh: false,
+                sheetRefreshMinutes: 10,
                 appearance: { colorScheme: 'auto', accent: 'violet' },
                 ages: [0, 8, 10, 12, 14, 16, 18],
                 sourcePriority: DEFAULT_SOURCE_PRIORITY,
@@ -311,6 +312,7 @@ describe('settings', () => {
                 readByPercent: 10,
                 disabledSources: [],
                 sheetRefresh: false,
+                sheetRefreshMinutes: 10,
                 appearance: { colorScheme: 'auto', accent: 'violet' },
                 ages: [0, 8, 10, 12, 14, 16, 18],
                 sourcePriority: DEFAULT_SOURCE_PRIORITY,
@@ -342,6 +344,7 @@ describe('settings', () => {
             sourcePriority: { ...DEFAULT_SOURCE_PRIORITY, Writer: 'wikipedia' },
             disabledSources: ['manga-news'],
             sheetRefresh: false,
+            sheetRefreshMinutes: 10,
         });
         expect((await put({ disabledSources: ['nautiljon'] })).status).toBe(
             400,

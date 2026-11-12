@@ -3,6 +3,7 @@ import {
     Button,
     Group,
     Paper,
+    Select,
     Stack,
     Switch,
     Text,
@@ -19,6 +20,9 @@ import {
 } from '@/services/api';
 import { useQuery } from '@/services/useQuery';
 
+// Minutes entre deux fiches (10 par défaut ; 5 au moins, côté serveur).
+const PACES = [5, 10, 15, 20, 30, 60];
+
 const timeLabel = (iso: string) =>
     new Date(iso).toLocaleString('fr-FR', {
         weekday: 'long',
@@ -33,22 +37,26 @@ const timeLabel = (iso: string) =>
  */
 export const SheetRefreshSettings = ({
     enabled,
+    minutes,
     onSaved,
 }: {
     enabled: boolean;
+    /** Minutes entre deux fiches relues. */
+    minutes: number;
     onSaved: (saved: SettingsResponse) => void;
 }) => {
     const { data: loaded, error: loadError } = useQuery(fetchSheetRefresh, [
         enabled,
+        minutes,
     ]);
     const [started, setStarted] = useState<typeof loaded>();
     const [error, setError] = useState<string>();
     const status = started ?? loaded;
 
-    const toggle = async (on: boolean) => {
+    const save = async (changes: Parameters<typeof saveSettings>[0]) => {
         setError(undefined);
         try {
-            onSaved(await saveSettings({ sheetRefresh: on }));
+            onSaved(await saveSettings(changes));
         } catch (e) {
             setError((e as Error).message);
         }
@@ -78,11 +86,33 @@ export const SheetRefreshSettings = ({
                     label="Relire les fiches la nuit"
                     description={
                         status
-                            ? `Une fiche toutes les ${status.intervalMinutes} minutes, entre ${status.night.start} h et ${status.night.end} h (heure du serveur), en alternant les sites ; arrêt de 24 h au premier refus.`
+                            ? `Entre ${status.night.start} h et ${status.night.end} h (heure du serveur), en alternant les sites ; arrêt de 24 h au premier refus.`
                             : undefined
                     }
                     checked={enabled}
-                    onChange={(e) => void toggle(e.currentTarget.checked)}
+                    onChange={(e) =>
+                        void save({ sheetRefresh: e.currentTarget.checked })
+                    }
+                />
+                <Select
+                    label="Rythme"
+                    description={
+                        status &&
+                        `Au plus ${Math.floor(((status.night.end - status.night.start) * 60) / minutes)} fiches par nuit. Plus lent, moins de risque d’être bloqué par un site.`
+                    }
+                    w={{ base: '100%', xs: 320 }}
+                    allowDeselect={false}
+                    data={[...new Set([...PACES, minutes])]
+                        .sort((a, b) => a - b)
+                        .map((value) => ({
+                            value: String(value),
+                            label: `Une fiche toutes les ${value} minutes${value === 10 ? ' (par défaut)' : ''}`,
+                        }))}
+                    value={String(minutes)}
+                    onChange={(value) =>
+                        value &&
+                        void save({ sheetRefreshMinutes: Number(value) })
+                    }
                 />
                 {status && (
                     <Stack gap={2}>

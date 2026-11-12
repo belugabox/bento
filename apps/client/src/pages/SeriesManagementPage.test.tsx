@@ -1,5 +1,5 @@
 import { MantineProvider } from '@mantine/core';
-import { act, fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -101,13 +101,13 @@ const names = () =>
     cards().map((card) => within(card).getAllByRole('link')[0]!.textContent);
 
 describe('SeriesManagementPage', () => {
-    it('starts with the series to classify, then shows them all', async () => {
+    it('shows all the series, the least complete sheets first', async () => {
         show();
 
-        expect(
-            await screen.findByRole('button', { name: 'À classer (2)' }),
-        ).toBeTruthy();
-        expect(names()).toEqual(['Coq de combat', 'Spirale']);
+        await screen.findByText('Gantz');
+        expect(names()).toEqual(['Coq de combat', 'Spirale', 'Gantz']);
+        // Ce qui manque, dans la bulle du pourcentage.
+        expect(within(cards()[0]!).getByText(/Format, Note/)).toBeTruthy();
         // « Remplir » ouvre l'éditeur, recherche en ligne lancée.
         expect(
             screen
@@ -115,10 +115,8 @@ describe('SeriesManagementPage', () => {
                 .getAttribute('href'),
         ).toBe('/series/2/edit?fill=online&from=to-classify');
 
-        fireEvent.click(screen.getByRole('button', { name: 'Toutes (3)' }));
-        expect(names()).toEqual(['Coq de combat', 'Gantz', 'Spirale']);
         // Moyennes : par tome et par page.
-        const gantz = cards()[1]!;
+        const gantz = cards()[2]!;
         expect(within(gantz).getByText(/450 Mo \/ tome/)).toBeTruthy();
         expect(within(gantz).getByText(/2,3 Mo \/ page/)).toBeTruthy();
     });
@@ -126,9 +124,9 @@ describe('SeriesManagementPage', () => {
     it('lists the sheets changed online, to review', async () => {
         show();
         fireEvent.click(
-            await screen.findByRole('button', { name: 'Fiches à revoir (1)' }),
+            await screen.findByRole('button', { name: '1 fiche à revoir' }),
         );
-        expect(names()).toEqual(['Gantz']);
+        await vi.waitFor(() => expect(names()).toEqual(['Gantz']));
         expect(
             screen.getByText('Fiche à revoir : Tomes : 37 → 38'),
         ).toBeTruthy();
@@ -141,7 +139,7 @@ describe('SeriesManagementPage', () => {
     });
 
     it('sorts by size, the biggest first on a second click', async () => {
-        show('/manage?filter=all');
+        show();
         await screen.findByText('Gantz');
 
         fireEvent.click(screen.getByRole('textbox', { name: 'Trier par' }));
@@ -157,31 +155,18 @@ describe('SeriesManagementPage', () => {
         );
     });
 
-    it('sets the format in the row, which stays on screen', async () => {
+    it('filters the series to classify, from the filters button', async () => {
         show();
-        const select = await screen.findByRole('textbox', {
-            name: 'Format de Coq de combat',
-        });
-        fireEvent.click(select);
-        // Ce que le serveur renverra au rechargement.
-        series[1] = { ...series[1]!, formatId: 2, format: 'Webtoon' };
-        await act(async () => {
-            fireEvent.click(
-                await screen.findByRole('option', { name: 'Webtoon' }),
-            );
-        });
-
-        expect(requests).toContainEqual([
-            'PUT',
-            '/api/series/2/classification',
-            { formatId: 2 },
-        ]);
-        // Classée : elle sort du filtre, mais reste affichée.
-        await vi.waitFor(() =>
-            expect(
-                screen.getByRole('button', { name: 'À classer (1)' }),
-            ).toBeTruthy(),
+        await screen.findByText('Gantz');
+        fireEvent.click(screen.getByRole('button', { name: 'Filtres' }));
+        fireEvent.click(await screen.findByRole('textbox', { name: 'Fiches' }));
+        fireEvent.click(
+            await screen.findByRole('option', { name: 'À classer (2)' }),
         );
-        expect(names()).toEqual(['Coq de combat', 'Spirale']);
+        await vi.waitFor(() =>
+            expect(names()).toEqual(['Coq de combat', 'Spirale']),
+        );
+        fireEvent.click(screen.getByRole('button', { name: 'Voir toutes' }));
+        await vi.waitFor(() => expect(names()).toHaveLength(3));
     });
 });

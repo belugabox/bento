@@ -20,6 +20,7 @@ import { type WatchedSheet, sheetChecked, sourceSheetsMap } from './sheets';
  * risquer d'être bloqué) : une fiche toutes les 10 minutes au plus, en
  * alternant les sites, seulement la nuit, et chaque fiche une fois par mois.
  */
+// Rythme par défaut ; l'admin le choisit (`sheetRefreshMinutes`).
 export const REFRESH_INTERVAL_MS = 10 * 60_000;
 export const NIGHT_START_HOUR = 2;
 export const NIGHT_END_HOUR = 6;
@@ -130,7 +131,7 @@ export class SheetRefresher {
                 this.pausedUntil > this.now().getTime()
                     ? new Date(this.pausedUntil)
                     : null,
-            intervalMinutes: REFRESH_INTERVAL_MS / 60_000,
+            intervalMinutes: this.settings.get().sheetRefreshMinutes,
             night: { start: NIGHT_START_HOUR, end: NIGHT_END_HOUR },
         };
     };
@@ -156,7 +157,8 @@ export class SheetRefresher {
             this.forced = false;
             return;
         }
-        if (now - this.lastFetchAt < REFRESH_INTERVAL_MS) return;
+        const interval = this.settings.get().sheetRefreshMinutes * 60_000;
+        if (now - this.lastFetchAt < interval) return;
 
         const { due } = this.dueLinks();
         if (due.length === 0) {

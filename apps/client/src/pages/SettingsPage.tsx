@@ -347,6 +347,7 @@ export const SettingsPage = () => {
                         />
                         <SheetRefreshSettings
                             enabled={current.settings.sheetRefresh}
+                            minutes={current.settings.sheetRefreshMinutes}
                             onSaved={setSaved}
                         />
                     </Stack>

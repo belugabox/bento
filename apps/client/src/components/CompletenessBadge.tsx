@@ -1,5 +1,6 @@
 import {
     Badge,
+    Box,
     List,
     Popover,
     Stack,
@@ -22,27 +23,53 @@ const colorOf = (percent: number) =>
 export const CompletenessBadge = ({
     completeness: { percent, missing },
     action,
-    short,
+    withMissing,
 }: {
     completeness: Completeness;
     action?: ReactNode;
-    /** « 72 % » seul (tableau des séries). */
-    short?: boolean;
+    /**
+     * Ce qui manque écrit dans la bulle (« 83 % · Note, Année de 3 tomes »),
+     * en casse normale (page Séries).
+     */
+    withMissing?: boolean;
 }) => (
     <Popover position="bottom-start" withArrow shadow="md" width={260}>
         <Popover.Target>
             <UnstyledButton aria-label={`Fiche complète à ${percent} %`}>
-                <Badge
-                    variant="light"
-                    color={colorOf(percent)}
-                    // On voit qu'elle s'ouvre (ce qui manque).
-                    rightSection={
-                        missing.length > 0 && <IconInfoCircle size={12} />
-                    }
-                    style={{ cursor: 'pointer' }}
-                >
-                    {short ? `${percent} %` : `Fiche à ${percent} %`}
-                </Badge>
+                {withMissing ? (
+                    <Box
+                        px={8}
+                        py={3}
+                        fz="xs"
+                        lh={1.4}
+                        ta="left"
+                        style={{
+                            borderRadius: 'var(--mantine-radius-md)',
+                            background: `var(--mantine-color-${colorOf(percent)}-light)`,
+                            color: `var(--mantine-color-${colorOf(percent)}-light-color)`,
+                            cursor: 'pointer',
+                            // Les raisons passent à la ligne.
+                            whiteSpace: 'normal',
+                        }}
+                    >
+                        <Text span inherit fw={700}>
+                            {percent} %
+                        </Text>
+                        {missing.length > 0 && ` · ${missing.join(', ')}`}
+                    </Box>
+                ) : (
+                    <Badge
+                        variant="light"
+                        color={colorOf(percent)}
+                        // On voit qu'elle s'ouvre (ce qui manque).
+                        rightSection={
+                            missing.length > 0 && <IconInfoCircle size={12} />
+                        }
+                        style={{ cursor: 'pointer' }}
+                    >
+                        {`Fiche à ${percent} %`}
+                    </Badge>
+                )}
             </UnstyledButton>
         </Popover.Target>
         <Popover.Dropdown>

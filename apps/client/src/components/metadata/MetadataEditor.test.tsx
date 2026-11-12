@@ -16,6 +16,8 @@ import {
     DEFAULT_SOURCE_PRIORITY,
 } from '@server/types';
 
+import type { RatingSummary } from '@/components/rating';
+
 import { type EditorVolume, MetadataEditor } from './MetadataEditor';
 
 // Genres, formats et grille d'âges : ceux de départ, sans passer par le
@@ -399,9 +401,9 @@ describe('MetadataEditor', () => {
         expect(numberOf(1).value).toBe('');
     });
 
-    it('shows whether a readers rating was found', async () => {
+    it('shows whether a readers rating was found, like the series page', async () => {
         mockServer();
-        const show = (rating: { value: number; count: number } | null) =>
+        const show = (rating: RatingSummary | null) =>
             render(
                 <MantineProvider>
                     <MetadataEditor
@@ -419,15 +421,26 @@ describe('MetadataEditor', () => {
                     />
                 </MantineProvider>,
             );
-        const first = show({ value: 4.3, count: 209 });
-        expect(
-            (await screen.findByLabelText('Note des lecteurs')).textContent,
-        ).toBe('★ 4,3 (209 avis)');
+        const first = show({
+            value: 4.3,
+            count: 209,
+            sources: [
+                { site: 'manga-news', value: 4, count: 39 },
+                { site: 'bedetheque', value: 4.4, count: 170 },
+            ],
+        });
+        fireEvent.click(
+            await screen.findByRole('button', { name: 'Détail de la note' }),
+        );
+        expect(screen.getByText('★ 4,3')).toBeTruthy();
+        // Le détail par site, au clic.
+        expect(await screen.findByText('170 avis')).toBeTruthy();
         first.unmount();
 
         show(null);
         expect(
-            (await screen.findByLabelText('Note des lecteurs')).textContent,
+            (await screen.findByRole('button', { name: 'Détail de la note' }))
+                .textContent,
         ).toBe('☆ Pas de note');
     });
 

@@ -154,6 +154,9 @@ describe('sort by rating', () => {
             { name: 'A', rating: 3.9 },
             { name: 'B', rating: null },
             { name: 'C', rating: 4.6 },
+            // « À lire » : pas avant une série mieux notée.
+            { name: 'D', rating: 4.1, toRead: true },
+            { name: 'E', rating: 4.1, ratingCount: 300 },
         ].map((s) => ({
             ...s,
             volumeCount: 2,
@@ -163,7 +166,7 @@ describe('sort by rating', () => {
         }));
         expect(
             filterSeries(series, { sort: 'rating' }).map((s) => s.name),
-        ).toEqual(['C', 'A', 'B']);
+        ).toEqual(['C', 'E', 'D', 'A', 'B']);
     });
 });
 

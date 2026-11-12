@@ -120,8 +120,13 @@ export const genresByCount = (series: Pick<ListedSeries, 'genres'>[]) => {
  * Rang d'une série sur l'accueil : celles de la liste « à lire » d'abord,
  * les séries entièrement lues à la fin.
  */
-const readingRank = (s: ListedSeries) =>
-    readingStateOf(s) === 'read' ? 2 : s.toRead ? 0 : 1;
+const readingRank = (s: ListedSeries, sort: SeriesSort) =>
+    readingStateOf(s) === 'read'
+        ? 2
+        : // « Mieux notées » : la note avant la liste « à lire ».
+          s.toRead && sort !== 'rating'
+          ? 0
+          : 1;
 
 /**
  * Séries à afficher, filtrées (genre, statut) puis triées : « à lire »
@@ -148,13 +153,15 @@ export const filterSeries = <T extends ListedSeries>(
     // Tri stable : l'ordre par nom du serveur est gardé dans chaque groupe.
     return kept.sort(
         (a, b) =>
-            readingRank(a) - readingRank(b) ||
+            readingRank(a, sort) - readingRank(b, sort) ||
             (sort === 'recent'
                 ? (b.lastAddedAt ?? '').localeCompare(a.lastAddedAt ?? '') ||
                   compareNames(a.name, b.name)
                 : sort === 'rating'
-                  ? // Sans note à la fin.
-                    (b.rating ?? -1) - (a.rating ?? -1)
+                  ? // Sans note à la fin ; à note égale, la plus
+                    // donnée d'abord.
+                    (b.rating ?? -1) - (a.rating ?? -1) ||
+                    (b.ratingCount ?? 0) - (a.ratingCount ?? 0)
                   : 0),
     );
 };

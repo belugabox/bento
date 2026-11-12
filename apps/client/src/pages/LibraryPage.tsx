@@ -444,6 +444,14 @@ export const LibraryPage = () => {
     const resume = (inProgress.data ?? []).filter((v) =>
         visibleIds.has(v.seriesId),
     );
+    // « Mieux notées » : le bloc « En cours » suit aussi la note (sinon,
+    // le dernier lu d'abord).
+    if (sort === 'rating') {
+        const rank = new Map(visible.map((s, i) => [s.id, i]));
+        resume.sort(
+            (a, b) => (rank.get(a.seriesId) ?? 0) - (rank.get(b.seriesId) ?? 0),
+        );
+    }
     const resumeOf = new Map(resume.map((v) => [v.seriesId, v]));
     // « Lecture » : le bloc « En cours » en tête, puis les autres séries.
     // Autres groupements : chaque série dans son bloc, en cours ou non (sa
@@ -454,13 +462,22 @@ export const LibraryPage = () => {
         display.groupBy,
         { readers: readers.data },
     );
+    const ratingOf = (seriesId: number) => {
+        const rating = visible.find((s) => s.id === seriesId)?.rating;
+        return rating != null ? ratingLabel(rating) : 'Pas de note';
+    };
     /** Tome à reprendre : ouvre le lecteur, avec l'avancement dans la série. */
     const resumeCard = (volume: InProgressVolume) => (
         <ResumeCard
             key={`resume-${volume.volumeId}`}
             volume={volume}
-            // Court : tient sur une ligne de la carte.
-            subtitle={`${volumeShortLabel(volume)} · ${volume.readCount}/${volume.volumeCount} lus`}
+            // Court : tient sur une ligne de la carte. Tri par note : la
+            // note à la place de l'avancement.
+            subtitle={
+                sort === 'rating'
+                    ? `${ratingOf(volume.seriesId)} · ${volumeShortLabel(volume)}`
+                    : `${volumeShortLabel(volume)} · ${volume.readCount}/${volume.volumeCount} lus`
+            }
             progress={seriesProgress(volume)}
             onChanged={reloadHome}
             display={display}

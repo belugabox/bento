@@ -48,6 +48,7 @@ import {
 } from '@server/types';
 
 import { CompletenessBadge } from '@/components/CompletenessBadge';
+import { RatingBadge } from '@/components/RatingBadge';
 import {
     ageLabel,
     ageOfRating,
@@ -56,7 +57,8 @@ import {
     useAgeSteps,
 } from '@/components/ageLimits';
 import { completenessOf, fieldsFromVolumes } from '@/components/completeness';
-import { formatSize, ratingLabel, reviewsLabel } from '@/components/format';
+import { formatSize } from '@/components/format';
+import { type RatingSummary, averageRating } from '@/components/rating';
 import { volumeCountLabel } from '@/components/readingStatus';
 import { ReaderPreview } from '@/reader/ReaderPreview';
 import {
@@ -291,7 +293,7 @@ export const MetadataEditor = ({
         /** Fiches en ligne choisies (Manga-news, Wikipédia). */
         sources?: SourceLink[];
         /** Note des lecteurs déjà relevée (moyenne des fiches), ou null. */
-        rating?: { value: number; count: number } | null;
+        rating?: RatingSummary | null;
         save: (changes: ClassificationChanges) => Promise<unknown>;
     };
     /** Couverture de la série, et son choix. */
@@ -596,25 +598,17 @@ export const MetadataEditor = ({
     }, []);
 
     // Complétude de la fiche, avec ce qui est saisi (pas encore enregistré).
-    // Note montrée : celle des fiches comparées ici (moyenne pondérée par
-    // leurs avis), sinon celle déjà relevée.
-    const ratedCount = rated.reduce((t, f) => t + (f.rating?.count ?? 0), 0);
-    const shownRating = ratedCount
-        ? {
-              value:
-                  Math.round(
-                      (rated.reduce(
-                          (t, f) =>
-                              t +
-                              (f.rating?.value ?? 0) * (f.rating?.count ?? 0),
-                          0,
-                      ) /
-                          ratedCount) *
-                          10,
-                  ) / 10,
-              count: ratedCount,
-          }
-        : (classification?.rating ?? null);
+    // Note montrée : celle déjà relevée, chaque site remplacé par la fiche
+    // comparée ici s'il y en a une (moyenne pondérée par les avis).
+    const comparedSites = rated.flatMap((f) =>
+        f.rating ? [{ site: f.source, ...f.rating }] : [],
+    );
+    const shownRating = averageRating([
+        ...(classification?.rating?.sources ?? []).filter(
+            (s) => !comparedSites.some((c) => c.site === s.site),
+        ),
+        ...comparedSites,
+    ]);
     const completeness = completenessOf({
         // Lus dans les tomes (première valeur remplie), comme la fiche
         // série : même pourcentage.
@@ -874,23 +868,9 @@ export const MetadataEditor = ({
                         </Text>
                         {/* Note des lecteurs : relevée, ou non. */}
                         {classification && (
-                            <Tooltip
-                                label={
-                                    shownRating
-                                        ? 'Note des lecteurs, relevée sur les fiches en ligne'
-                                        : 'Aucune note relevée : « Remplir » ou « Mettre à jour » la lit sur Manga-news ou Bedetheque'
-                                }
-                            >
-                                <Text
-                                    size="xs"
-                                    c={shownRating ? 'yellow' : 'dimmed'}
-                                    aria-label="Note des lecteurs"
-                                >
-                                    {shownRating
-                                        ? `${ratingLabel(shownRating.value)} (${reviewsLabel(shownRating.count)})`
-                                        : '☆ Pas de note'}
-                                </Text>
-                            </Tooltip>
+                            <div>
+                                <RatingBadge rating={shownRating} />
+                            </div>
                         )}
                         {sourcesValue.length > 0 && (
                             <Group gap={6}>

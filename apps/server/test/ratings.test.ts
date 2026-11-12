@@ -74,4 +74,17 @@ describe('readers ratings', () => {
             sources: [{ site: 'manga-news', value: 4.5, count: 100 }],
         });
     });
+
+    it('is given with the drafts too, from their sheets', async () => {
+        await writeCbz(ctx.file('_draft/Spirale/Spirale T01.cbz'));
+        ctx.files.setDraftSettings(ctx.library.id, '_draft/Spirale', {
+            sources: 'manga-news:Spirale',
+        });
+        saveSourceRating(ctx.db, 'manga-news', 'Spirale', {
+            value: 4.8,
+            count: 10,
+        });
+        const [draft] = await ctx.files.drafts(ctx.library.id);
+        expect(draft?.rating).toMatchObject({ value: 4.8, count: 10 });
+    });
 });

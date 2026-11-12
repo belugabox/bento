@@ -362,6 +362,7 @@ export const saveSettings = (changes: {
     sourcePriority?: Partial<Settings['sourcePriority']>;
     disabledSources?: Settings['disabledSources'];
     sheetRefresh?: boolean;
+    sheetRefreshMinutes?: number;
     readByPercent?: number;
 }) => json(api.settings.$put({ json: changes }));
 

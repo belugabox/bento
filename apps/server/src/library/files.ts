@@ -49,6 +49,7 @@ import {
     resolveInLibrary,
     volumeNumberOf,
 } from './paths';
+import { seriesRatingOf, sourceRatingsMap } from './ratings';
 import type { LibraryScanner } from './scanner';
 
 /** Un CBZ de la bibliothèque (brouillon ou publié), pour la gestion. */
@@ -350,6 +351,7 @@ export class LibraryFiles {
             ]);
         }
         const settings = draftSettingsOf(this.db, libraryId);
+        const ratings = sourceRatingsMap(this.db);
         return [...folders].map(([folder, files]) => ({
             folder,
             files,
@@ -358,6 +360,11 @@ export class LibraryFiles {
             formatId: settings.get(folder)?.formatId ?? null,
             age: settings.get(folder)?.age ?? null,
             sources: parseSources(settings.get(folder)?.sources),
+            // Note de ses fiches (gardée à leur lecture), comme une série.
+            rating: seriesRatingOf(
+                parseSources(settings.get(folder)?.sources),
+                ratings,
+            ),
             coverUpdatedAt: settings.get(folder)?.coverUpdatedAt ?? null,
         }));
     };

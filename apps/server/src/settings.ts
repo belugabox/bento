@@ -54,6 +54,8 @@ export const settingsSchema = z.object({
         .transform((sites) => [...new Set(sites)]),
     // Fiches liées relues chaque nuit (note, changements à revoir).
     sheetRefresh: z.boolean(),
+    // Minutes entre deux fiches relues (5 au moins : ne jamais gêner).
+    sheetRefreshMinutes: z.number().int().min(5).max(120),
     // « Lu par » d'une fiche série : à partir de cette part des pages lues.
     readByPercent: z.number().int().min(1).max(100),
 });
@@ -69,6 +71,7 @@ export const settingsUpdateSchema = z.object({
     sourcePriority: sourcePrioritySchema.partial().optional(),
     disabledSources: settingsSchema.shape.disabledSources.optional(),
     sheetRefresh: settingsSchema.shape.sheetRefresh.optional(),
+    sheetRefreshMinutes: settingsSchema.shape.sheetRefreshMinutes.optional(),
     readByPercent: settingsSchema.shape.readByPercent.optional(),
 });
 
@@ -82,6 +85,7 @@ export const defaultSettings = (scanIntervalMinutes = 30): Settings => ({
     sourcePriority: DEFAULT_SOURCE_PRIORITY,
     disabledSources: [],
     sheetRefresh: false,
+    sheetRefreshMinutes: 10,
     readByPercent: 10,
 });
 
