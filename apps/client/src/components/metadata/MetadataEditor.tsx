@@ -3,6 +3,7 @@ import {
     Alert,
     Anchor,
     Autocomplete,
+    Box,
     Button,
     Checkbox,
     CloseButton,
@@ -15,7 +16,6 @@ import {
     Popover,
     Select,
     Stack,
-    Table,
     Text,
     TextInput,
     Textarea,
@@ -264,6 +264,15 @@ const SERIES_TEXT_FIELDS: { field: SeriesField; label: string }[] = [
  * Édition du ComicInfo d'un ensemble de tomes (dossier de brouillons ou
  * série publiée), puis rangement des fichiers à leur emplacement.
  */
+/** Champs d'un tome et leur largeur (sur 24) : téléphone, puis plus grand. */
+const FIELD_COLUMNS = [
+    { label: 'Type', span: { base: 12, sm: 4 } },
+    { label: 'Groupe', span: { base: 12, sm: 8 } },
+    { label: 'Numéro', span: { base: 6, sm: 3 } },
+    { label: 'Titre', span: { base: 12, sm: 6 } },
+    { label: 'Année', span: { base: 6, sm: 3 } },
+] as const;
+
 /**
  * Nom d'un fichier dans le tableau des tomes : ce qui le distingue des
  * autres (deux lignes au plus) ; un clic, un toucher : le nom entier, à
@@ -281,12 +290,11 @@ const FileName = ({
 }) => (
     <Popover position="bottom-start" withArrow shadow="md" width={320}>
         <Popover.Target>
-            <UnstyledButton aria-label={`Nom du fichier : ${name}`}>
-                <Text
-                    size="sm"
-                    lineClamp={2}
-                    style={{ wordBreak: 'break-word' }}
-                >
+            <UnstyledButton
+                aria-label={`Nom du fichier : ${name}`}
+                style={{ display: 'block', maxWidth: '100%' }}
+            >
+                <Text size="sm" truncate="end">
                     {short}
                 </Text>
             </UnstyledButton>
@@ -1451,63 +1459,98 @@ export const MetadataEditor = ({
                 </Stack>
             </Paper>
 
-            <Table.ScrollContainer minWidth={960}>
-                <Table verticalSpacing="xs">
-                    <Table.Thead>
-                        <Table.Tr>
-                            <Table.Th w={48} />
-                            <Table.Th>Fichier</Table.Th>
-                            <Table.Th w={130}>Type</Table.Th>
-                            <Table.Th w={210}>Groupe</Table.Th>
-                            <Table.Th w={90}>Numéro</Table.Th>
-                            <Table.Th>Titre</Table.Th>
-                            <Table.Th w={100}>Année</Table.Th>
-                            <Table.Th w={40} />
-                        </Table.Tr>
-                    </Table.Thead>
-                    <Table.Tbody>
-                        {volumes.map((volume) => {
-                            const info: ComicInfo = edits[volume.path] ?? {};
-                            const target = destinations.find(
-                                (d) => d.volume.path === volume.path,
-                            )?.target;
-                            const set = <F extends keyof ComicInfo>(
-                                field: F,
-                                value: ComicInfo[F] | undefined,
-                            ) =>
-                                setEdits((current) =>
-                                    setVolumeField(
-                                        current,
-                                        volume.path,
-                                        field,
-                                        value,
-                                    ),
-                                );
-                            return (
-                                <Table.Tr key={volume.path}>
-                                    <Table.Td>
-                                        {volume.cover && (
-                                            <Image
-                                                src={volume.cover}
-                                                w={40}
-                                                h={60}
-                                                fit="cover"
-                                                radius="xs"
-                                                alt=""
+            {/* Tomes : une ligne pour le fichier (actuel, futur, aperçu),
+                une pour les champs, de largeur fixe : un nom long ne décale
+                rien. */}
+            <Stack gap={0}>
+                <Group gap="sm" wrap="nowrap" px="xs" pb={4} visibleFrom="sm">
+                    <Box w={40} style={{ flexShrink: 0 }} />
+                    <Grid columns={24} gutter="xs" style={{ flex: 1 }}>
+                        {FIELD_COLUMNS.map(({ label, span }) => (
+                            <Grid.Col key={label} span={span.sm}>
+                                <Text size="xs" fw={600}>
+                                    {label}
+                                </Text>
+                            </Grid.Col>
+                        ))}
+                    </Grid>
+                </Group>
+                {volumes.map((volume) => {
+                    const info: ComicInfo = edits[volume.path] ?? {};
+                    const target = destinations.find(
+                        (d) => d.volume.path === volume.path,
+                    )?.target;
+                    const set = <F extends keyof ComicInfo>(
+                        field: F,
+                        value: ComicInfo[F] | undefined,
+                    ) =>
+                        setEdits((current) =>
+                            setVolumeField(current, volume.path, field, value),
+                        );
+                    return (
+                        <Group
+                            key={volume.path}
+                            gap="sm"
+                            wrap="nowrap"
+                            align="flex-start"
+                            px="xs"
+                            py="xs"
+                            style={{
+                                borderTop:
+                                    '1px solid var(--mantine-color-default-border)',
+                            }}
+                        >
+                            <Box w={40} style={{ flexShrink: 0 }}>
+                                {volume.cover && (
+                                    <Image
+                                        src={volume.cover}
+                                        w={40}
+                                        h={60}
+                                        fit="cover"
+                                        radius="xs"
+                                        alt=""
+                                    />
+                                )}
+                            </Box>
+                            <Stack gap={6} style={{ flex: 1, minWidth: 0 }}>
+                                <Group
+                                    gap="xs"
+                                    wrap="nowrap"
+                                    justify="space-between"
+                                >
+                                    {/* Nom actuel et futur sur une ligne,
+                                        coupés ; en entier au toucher. */}
+                                    <Group
+                                        gap="xs"
+                                        wrap="nowrap"
+                                        style={{ flex: 1, minWidth: 0 }}
+                                    >
+                                        <Box
+                                            style={{
+                                                flex: '0 1 auto',
+                                                minWidth: 0,
+                                            }}
+                                        >
+                                            <FileName
+                                                name={volume.name}
+                                                target={target ?? undefined}
+                                                short={
+                                                    shortNames.get(
+                                                        volume.path,
+                                                    ) ?? volume.name
+                                                }
                                             />
-                                        )}
-                                    </Table.Td>
-                                    <Table.Td>
-                                        <FileName
-                                            name={volume.name}
-                                            target={target ?? undefined}
-                                            short={
-                                                shortNames.get(volume.path) ??
-                                                volume.name
-                                            }
-                                        />
+                                        </Box>
                                         {volume.error ? (
-                                            <Text size="xs" c="red">
+                                            <Text
+                                                size="xs"
+                                                c="red"
+                                                truncate="end"
+                                                style={{
+                                                    flex: '0 1 auto',
+                                                    minWidth: 0,
+                                                }}
+                                            >
                                                 {volume.error}
                                             </Text>
                                         ) : (
@@ -1520,7 +1563,11 @@ export const MetadataEditor = ({
                                                           ? 'dimmed'
                                                           : 'orange'
                                                 }
-                                                lineClamp={2}
+                                                truncate="end"
+                                                style={{
+                                                    flex: '0 1 auto',
+                                                    minWidth: 0,
+                                                }}
                                             >
                                                 {duplicated(volume.path)
                                                     ? 'Même numéro qu’un autre tome'
@@ -1531,8 +1578,24 @@ export const MetadataEditor = ({
                                                       : 'Série et numéro requis'}
                                             </Text>
                                         )}
-                                    </Table.Td>
-                                    <Table.Td>
+                                    </Group>
+                                    {canPreview(volume) && (
+                                        <Tooltip label="Aperçu de lecture">
+                                            <ActionIcon
+                                                variant="subtle"
+                                                color="gray"
+                                                aria-label={`Aperçu de ${volume.name}`}
+                                                onClick={() =>
+                                                    setPreview(volume)
+                                                }
+                                            >
+                                                <IconEye size={16} />
+                                            </ActionIcon>
+                                        </Tooltip>
+                                    )}
+                                </Group>
+                                <Grid columns={24} gutter="xs">
+                                    <Grid.Col span={FIELD_COLUMNS[0].span}>
                                         <Select
                                             size="xs"
                                             disabled={!!volume.error}
@@ -1581,8 +1644,8 @@ export const MetadataEditor = ({
                                                 },
                                             )}
                                         />
-                                    </Table.Td>
-                                    <Table.Td>
+                                    </Grid.Col>
+                                    <Grid.Col span={FIELD_COLUMNS[1].span}>
                                         <Autocomplete
                                             size="xs"
                                             disabled={!!volume.error}
@@ -1590,7 +1653,7 @@ export const MetadataEditor = ({
                                             // Libre : « Part 1 - Rouge, Bleu
                                             // et Jaune », « Guides »… ;
                                             // chaque groupe a sa numérotation.
-                                            placeholder="—"
+                                            placeholder="Groupe"
                                             {...volumeField(
                                                 volume.path,
                                                 'StoryArc',
@@ -1602,8 +1665,8 @@ export const MetadataEditor = ({
                                                 set('StoryArc', value)
                                             }
                                         />
-                                    </Table.Td>
-                                    <Table.Td>
+                                    </Grid.Col>
+                                    <Grid.Col span={FIELD_COLUMNS[2].span}>
                                         <TextInput
                                             size="xs"
                                             // One-shot : sans numéro.
@@ -1613,6 +1676,7 @@ export const MetadataEditor = ({
                                                     'one-shot'
                                             }
                                             aria-label={`Numéro de ${volume.name}`}
+                                            placeholder="N°"
                                             {...volumeField(
                                                 volume.path,
                                                 'Number',
@@ -1625,12 +1689,13 @@ export const MetadataEditor = ({
                                                 )
                                             }
                                         />
-                                    </Table.Td>
-                                    <Table.Td>
+                                    </Grid.Col>
+                                    <Grid.Col span={FIELD_COLUMNS[3].span}>
                                         <TextInput
                                             size="xs"
                                             disabled={!!volume.error}
                                             aria-label={`Titre de ${volume.name}`}
+                                            placeholder="Titre"
                                             {...volumeField(
                                                 volume.path,
                                                 'Title',
@@ -1643,12 +1708,13 @@ export const MetadataEditor = ({
                                                 )
                                             }
                                         />
-                                    </Table.Td>
-                                    <Table.Td>
+                                    </Grid.Col>
+                                    <Grid.Col span={FIELD_COLUMNS[4].span}>
                                         <NumberInput
                                             size="xs"
                                             disabled={!!volume.error}
                                             aria-label={`Année de ${volume.name}`}
+                                            placeholder="Année"
                                             {...volumeField(
                                                 volume.path,
                                                 'Year',
@@ -1664,29 +1730,13 @@ export const MetadataEditor = ({
                                                 )
                                             }
                                         />
-                                    </Table.Td>
-                                    <Table.Td>
-                                        {canPreview(volume) && (
-                                            <Tooltip label="Aperçu de lecture">
-                                                <ActionIcon
-                                                    variant="subtle"
-                                                    color="gray"
-                                                    aria-label={`Aperçu de ${volume.name}`}
-                                                    onClick={() =>
-                                                        setPreview(volume)
-                                                    }
-                                                >
-                                                    <IconEye size={16} />
-                                                </ActionIcon>
-                                            </Tooltip>
-                                        )}
-                                    </Table.Td>
-                                </Table.Tr>
-                            );
-                        })}
-                    </Table.Tbody>
-                </Table>
-            </Table.ScrollContainer>
+                                    </Grid.Col>
+                                </Grid>
+                            </Stack>
+                        </Group>
+                    );
+                })}
+            </Stack>
 
             {preview && (
                 <ReaderPreview
