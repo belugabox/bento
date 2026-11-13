@@ -150,10 +150,10 @@ export const ReaderPage = () => {
     const exitLabel = online
         ? 'Retour à la série'
         : 'Retour aux téléchargements';
-    // Tome suivant lisible : en ligne, ou téléchargé sur l'appareil.
-    const nextReadable =
-        !!volume.nextId &&
-        (online || downloads.some((d) => d.id === volume.nextId));
+    // Tome lisible : en ligne, ou téléchargé sur l'appareil.
+    const readable = (id: number | null | undefined) =>
+        !!id && (online || downloads.some((d) => d.id === id));
+    const nextReadable = readable(volume.nextId);
     // Rien après le dernier tome (ou le suivant pas téléchargé) : un
     // simple message, sans écran de fin.
     const noNext = volume.nextId
@@ -191,6 +191,14 @@ export const ReaderPage = () => {
             // Page par page : la page suivante ouvre le tome suivant ;
             // webtoon : un bouton sous la dernière page.
             onAfterLast={openNext}
+            // Boutons de la barre du bas ; le tome précédent s'ouvre au
+            // début (pas à la fin, comme en reculant depuis la page 1).
+            volumes={{
+                previous: readable(volume.previousId)
+                    ? () => navigate(`/read/${volume.previousId}`)
+                    : undefined,
+                next: nextReadable ? openNext : undefined,
+            }}
             end={
                 nextReadable ? (
                     <Button component={Link} to={`/read/${volume.nextId}`}>

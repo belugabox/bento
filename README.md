@@ -77,6 +77,8 @@ Bento écrit dans les fichiers (ComicInfo, rangement) : le conteneur doit pouvoi
 
 L'admin fixe le mode de chaque série dans « Modifier les métadonnées » (par défaut : manga de gauche à droite pour une bibliothèque de mangas, BD sinon) ; chacun peut le changer pour lui-même dans les réglages du lecteur.
 
+Barre du bas : de part et d'autre du curseur, tome précédent et première page, dernière page et tome suivant (dans le sens de lecture : de droite à gauche, la fin est à gauche ; en webtoon, les tomes seulement), et le numéro de page à largeur fixe (le curseur ne bouge plus). Boutons du haut et du bas à taille tactile (44 px, pour la tablette). Les commandes disparaissent après 4 s sans y toucher, ou d'un toucher au milieu (pas en tournant la page), qui les rappelle aussi (elles restent tant que les réglages de lecture sont ouverts).
+
 En fin de tome, pas d'écran de fin : page par page, la page suivante ouvre le tome suivant (s'il est lisible : en ligne, ou téléchargé ; sinon un message « Dernier tome de la série » ou « Tome suivant pas téléchargé ») ; en webtoon, un bouton « Tome suivant » sous la dernière page. Le retour reste dans la barre du haut.
 
 ### Accueil et listes
