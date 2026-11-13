@@ -10,6 +10,7 @@ import {
     chosenValues,
     comparisonRows,
     defaultChoice,
+    distinctNames,
     editedValues,
     fillFromFileNames,
     fillFromSheetVolumes,
@@ -23,11 +24,13 @@ import {
     seriesValue,
     setSeriesField,
     setVolumeKind,
+    sharedTargets,
     sheetFromBedetheque,
     sheetFromMangaNews,
     sheetFromWikipedia,
     sheetValues,
     statusFromWikipedia,
+    targetLabel,
     volumeKindOf,
 } from './editing';
 
@@ -600,5 +603,76 @@ describe('fillFromSheetVolumes', () => {
                 ],
             ).edits['A.cbz'],
         ).toMatchObject({ Title: 'Asterios Polyp', Year: 2010 });
+    });
+});
+
+describe('groups of volumes', () => {
+    const NAMES = [
+        'Pokémon - La Grande Aventure (Part 1) - Rouge, Bleu et Jaune T01 (Kusaka-Mato) (2014) [Digital-1085] [Manga FR] (PapriKa+).cbz',
+        'Pokémon - La Grande Aventure (Part 1) - Rouge, Bleu et Jaune T02 (Kusaka-Mato) (2014) [Digital-1920] [Manga FR] (PapriKa+).cbz',
+        'Pokémon - La Grande Aventure (Part 4b) - Emeraude T03 (Kusaka-Yamamoto) (2017) [Digital-1920] [Manga FR] (PapriKa+).cbz',
+    ];
+    const volumes = NAMES.map((name, i) => ({
+        path: `_draft/P/${i}.cbz`,
+        name,
+        comicInfo: {},
+    }));
+    const paths = volumes.map((v) => v.path);
+
+    it('fills the group from the file names, as written', () => {
+        const edits = fillFromFileNames({}, volumes, false);
+        expect(edits[paths[0]!]).toMatchObject({
+            Series: 'Pokémon - La Grande Aventure',
+            StoryArc: 'Part 1 - Rouge, Bleu et Jaune',
+            Number: '1',
+        });
+        expect(edits[paths[2]!]).toMatchObject({
+            StoryArc: 'Part 4b - Emeraude',
+            Number: '3',
+        });
+    });
+
+    it('finds the volumes that would land on the same file', () => {
+        expect([
+            ...sharedTargets(['a.cbz', 'b.cbz', 'a.cbz', null, null]),
+        ]).toEqual(['a.cbz']);
+        expect(sharedTargets(['a.cbz', 'b.cbz']).size).toBe(0);
+    });
+});
+
+describe('distinctNames', () => {
+    it('keeps what tells the files apart, the part whole, without tags', () => {
+        expect(
+            distinctNames([
+                'Pokémon - La Grande Aventure (Part 1) - Rouge, Bleu et Jaune T01 (Kusaka-Mato) (2014) [Digital-1085] [Manga FR] (PapriKa+).cbz',
+                'Pokémon - La Grande Aventure (Part 4b) - Emeraude T03 (Kusaka-Yamamoto) (2017) [Digital-1920] [Manga FR] (PapriKa+).cbz',
+            ]),
+        ).toEqual([
+            '(Part 1) - Rouge, Bleu et Jaune T01 (Kusaka-Mato) (2014)',
+            '(Part 4b) - Emeraude T03 (Kusaka-Yamamoto) (2017)',
+        ]);
+    });
+
+    it('keeps the whole name of a file alone, without its tags', () => {
+        expect(distinctNames(['Spirale [Digital-1920].cbz'])).toEqual([
+            'Spirale',
+        ]);
+        // Noms identiques à la casse près : rien de vide.
+        expect(distinctNames(['Gantz.cbz', 'Gantz.cbz'])).toEqual([
+            'Gantz',
+            'Gantz',
+        ]);
+    });
+});
+
+describe('targetLabel', () => {
+    it('keeps the future file name without what the series says', () => {
+        expect(
+            targetLabel(
+                'Pokémon - La Grande Aventure/Pokémon - La Grande Aventure - Part 1 #01 (2014).cbz',
+            ),
+        ).toBe('Part 1 #01 (2014)');
+        expect(targetLabel('Gantz/Gantz HS01.cbz')).toBe('HS01');
+        expect(targetLabel('Spirale/Spirale (2021).cbz')).toBe('(2021)');
     });
 });

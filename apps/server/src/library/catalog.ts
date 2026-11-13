@@ -26,7 +26,7 @@ import { notFound } from '../tools/errors';
 import { genreCatalog } from './genres';
 import { publicationPathOf } from './paths';
 import { seriesRatingOf, sourceRatingsMap } from './ratings';
-import { coverFile, kindOrder } from './scanner';
+import { coverFile, groupOrder, kindOrder } from './scanner';
 import { compareNames } from './sortName';
 import { type Viewer, visibleTo } from './visibility';
 import { MAIN_KINDS } from './volumeKind';
@@ -85,6 +85,7 @@ export const newVolumeCounts = (db: Db, viewerId: number) =>
 // numéro, puis par fichier.
 export const volumeOrder = [
     kindOrder,
+    ...groupOrder,
     sql`${volumes.sortNumber} is null`,
     asc(volumes.sortNumber),
     asc(volumes.file),
@@ -176,8 +177,8 @@ export const seriesAgeSql = sql<
  * table.
  */
 export const coverVolumeSql = {
-    coverVolumeId: sql<number>`(select v.id from volumes v where v.series_id = series.id order by v.kind != 'volume', v.kind, v.sort_number is null, v.sort_number, v.file limit 1)`,
-    coverVolumeVersion: sql<number>`(select cast(v.mtime_ms as integer) from volumes v where v.series_id = series.id order by v.kind != 'volume', v.kind, v.sort_number is null, v.sort_number, v.file limit 1)`,
+    coverVolumeId: sql<number>`(select v.id from volumes v where v.series_id = series.id order by v.kind != 'volume', v.kind, v.part_name, v.sort_number is null, v.sort_number, v.file limit 1)`,
+    coverVolumeVersion: sql<number>`(select cast(v.mtime_ms as integer) from volumes v where v.series_id = series.id order by v.kind != 'volume', v.kind, v.part_name, v.sort_number is null, v.sort_number, v.file limit 1)`,
 };
 
 export const listSeries = (
@@ -225,7 +226,7 @@ export const listSeries = (
             writer: series.writer,
             penciller: sql<
                 string | null
-            >`(select json_extract(v.comic_info, '$.Penciller') from volumes v where v.series_id = series.id order by v.kind != 'volume', v.kind, v.sort_number is null, v.sort_number, v.file limit 1)`,
+            >`(select json_extract(v.comic_info, '$.Penciller') from volumes v where v.series_id = series.id order by v.kind != 'volume', v.kind, v.part_name, v.sort_number is null, v.sort_number, v.file limit 1)`,
             ...coverVolumeSql,
             // Fiches en ligne : leur note (tri « Mieux notées »).
             sources: series.sources,
@@ -325,6 +326,7 @@ export const getSeries = (db: Db, viewer: Viewer, id: number) => {
             id: volumes.id,
             number: volumes.number,
             kind: volumes.kind,
+            group: volumes.group,
             title: volumes.title,
             pageCount: volumes.pageCount,
             version: volumeVersion,
@@ -389,6 +391,7 @@ export const getVolume = (db: Db, viewer: Viewer, id: number) => {
             seriesName: series.name,
             number: volumes.number,
             kind: volumes.kind,
+            group: volumes.group,
             title: volumes.title,
             pageCount: volumes.pageCount,
             version: volumeVersion,
@@ -453,7 +456,7 @@ export const seriesCoverOf = (db: Db, viewer: Viewer, id: number) => {
             coverUpdatedAt: series.coverUpdatedAt,
             firstVolumeId: sql<
                 number | null
-            >`(select v.id from volumes v where v.series_id = series.id order by v.kind != 'volume', v.kind, v.sort_number is null, v.sort_number, v.file limit 1)`,
+            >`(select v.id from volumes v where v.series_id = series.id order by v.kind != 'volume', v.kind, v.part_name, v.sort_number is null, v.sort_number, v.file limit 1)`,
         })
         .from(series)
         .where(and(eq(series.id, id), visibleTo(viewer)))

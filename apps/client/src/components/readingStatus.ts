@@ -17,25 +17,36 @@ export type VolumeWithProgress = {
     progress: Progress;
 };
 
+/** Groupement d'un tome (numéroté à part), ou rien. */
+type WithGroup = { group?: string | null };
+
 /**
  * « Tome 12 », « Intégrale 2 », « Hors-série 1 », « Spécial 2 », « One-shot »
- * (jamais de numéro) ; sans numéro, le titre, ou le nom du type.
+ * (jamais de numéro) ; sans numéro, le titre, ou le nom du type. Dans un
+ * groupement : « Part 1 - Rouge, Bleu et Jaune · Tome 1 ».
  */
-export const volumeLabel = (volume: {
-    number: string | null;
-    title: string | null;
-    kind?: VolumeKind;
-}) => {
+export const volumeLabel = (
+    volume: {
+        number: string | null;
+        title: string | null;
+        kind?: VolumeKind;
+    } & WithGroup,
+) => {
     const kind = volume.kind ?? 'volume';
     // One-shot, intégrale sans numéro : le nom du type.
-    if (isStandalone(volume)) return VOLUME_KIND_LABELS[kind];
-    return volume.number
-        ? kindTitle(kind, volume.number)
-        : (volume.title ??
-              VOLUME_KIND_LABELS[kind === 'volume' ? 'hors-serie' : kind]);
+    const label = isStandalone(volume)
+        ? VOLUME_KIND_LABELS[kind]
+        : volume.number
+          ? kindTitle(kind, volume.number)
+          : (volume.title ??
+            VOLUME_KIND_LABELS[kind === 'volume' ? 'hors-serie' : kind]);
+    return volume.group ? `${volume.group} · ${label}` : label;
 };
 
-/** Libellé court, pour une carte étroite : « T2 », « HS1 », « SP2 ». */
+/**
+ * Libellé court, pour une carte étroite : « T2 », « HS1 », « SP2 » (sans le
+ * groupement, trop long pour elle).
+ */
 export const volumeShortLabel = (volume: {
     number: string | null;
     title: string | null;
@@ -43,7 +54,7 @@ export const volumeShortLabel = (volume: {
 }) =>
     volume.number && !isStandalone(volume)
         ? `${SHORT_PREFIXES[volume.kind ?? 'volume']}${volume.number}`
-        : volumeLabel(volume);
+        : volumeLabel({ ...volume, group: null });
 
 const SHORT_PREFIXES: Record<VolumeKind, string> = {
     volume: 'T',

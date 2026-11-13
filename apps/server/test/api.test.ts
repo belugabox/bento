@@ -161,6 +161,7 @@ describe('volumes', () => {
             seriesName: 'Spy x Family',
             number: '1',
             kind: 'volume',
+            group: null,
             title: null,
             pageCount: 3,
             version: first.version,

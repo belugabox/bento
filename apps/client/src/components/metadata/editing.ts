@@ -150,8 +150,9 @@ const fillable = (current: unknown, overwrite: boolean) =>
     overwrite || isEmpty(current);
 
 /**
- * Numéro, année (et série si vide) lus dans les noms de fichiers. Sans
- * `overwrite`, seuls les champs vides sont remplis.
+ * Numéro, année, groupement (et série si vide) lus dans les noms de
+ * fichiers.
+ * Sans `overwrite`, seuls les champs vides sont remplis.
  */
 export const fillFromFileNames = (
     edits: Edits,
@@ -179,12 +180,97 @@ export const fillFromFileNames = (
         if (parsed.year && fillable(info.Year, overwrite)) {
             next = setVolumeField(next, volume.path, 'Year', parsed.year);
         }
+        // Groupement (« Part 1 - Rouge, Bleu et Jaune ») : numéroté à part.
+        if (parsed.group && fillable(info.StoryArc, overwrite)) {
+            next = setVolumeField(next, volume.path, 'StoryArc', parsed.group);
+        }
         // La série du nom de fichier ne remplace jamais une série saisie.
         if (parsed.series && isEmpty(info.Series)) {
             next = setVolumeField(next, volume.path, 'Series', parsed.series);
         }
     }
     return next;
+};
+
+/**
+ * Futur nom d'un tome, sans ce que la série dit déjà : « Série/Série -
+ * Part 1 #01 (2014).cbz » devient « Part 1 #01 (2014) ».
+ */
+export const targetLabel = (target: string) => {
+    const slash = target.lastIndexOf('/');
+    const folder = target.slice(0, Math.max(slash, 0));
+    const file = target.slice(slash + 1).replace(/\.cb[zr]$/i, '');
+    return folder && file.startsWith(folder)
+        ? file.slice(folder.length).replace(/^[\s\-–]+/, '') || file
+        : file;
+};
+
+/** Emplacements où arriveraient plusieurs tomes (même groupe et numéro). */
+export const sharedTargets = (targets: (string | null)[]) => {
+    const seen = new Set<string>();
+    const shared = new Set<string>();
+    for (const target of targets) {
+        if (!target) continue;
+        if (seen.has(target)) shared.add(target);
+        seen.add(target);
+    }
+    return shared;
+};
+
+/**
+ * Début commun de noms, coupé à une espace (pas au milieu d'un mot) et
+ * avant une parenthèse ou un crochet resté ouvert (« (Part » : la partie
+ * est gardée entière). `open`, `close` : l'inverse pour la fin des noms,
+ * lus à l'envers.
+ */
+const commonStart = (names: string[], open = '([', close = ')]') => {
+    let start = names[0] ?? '';
+    for (const name of names) {
+        while (!name.startsWith(start)) start = start.slice(0, -1);
+    }
+    let cut = start.slice(0, start.lastIndexOf(' ') + 1);
+    for (;;) {
+        // Ouvrant sans fermant : on coupe avant lui.
+        let unclosed = -1;
+        let depth = 0;
+        for (let i = cut.length - 1; i >= 0; i--) {
+            if (close.includes(cut[i]!)) depth++;
+            else if (open.includes(cut[i]!)) {
+                if (depth === 0) {
+                    unclosed = i;
+                    break;
+                }
+                depth--;
+            }
+        }
+        if (unclosed === -1) return cut;
+        cut = cut.slice(0, cut.lastIndexOf(' ', unclosed - 1) + 1);
+    }
+};
+
+/**
+ * Ce qui distingue chaque fichier d'un dossier : sans ce qui est commun à
+ * tous (« Pokémon - La Grande Aventure », « [Manga FR] (PapriKa+) »), sans
+ * les étiquettes entre crochets ni l'extension. « (Part 1) - Rouge, Bleu
+ * et Jaune T01 (Kusaka-Mato) (2014) ». Seul dans son dossier : le nom
+ * entier, sans les étiquettes.
+ */
+export const distinctNames = (names: string[]) => {
+    const stems = names.map((name) => name.replace(/\.cb[zr]$/i, ''));
+    const reversed = (texts: string[]) =>
+        texts.map((text) => [...text].reverse().join(''));
+    const start = stems.length > 1 ? commonStart(stems).length : 0;
+    const end =
+        stems.length > 1 ? commonStart(reversed(stems), ')]', '([').length : 0;
+    return stems.map((stem) => {
+        const middle = stem.slice(start, Math.max(start, stem.length - end));
+        const short = middle
+            .replace(/\[[^\]]*\]/g, '')
+            .replace(/\s+/g, ' ')
+            .replace(/^[\s\-–]+|[\s\-–]+$/g, '')
+            .trim();
+        return short || stem;
+    });
 };
 
 /**

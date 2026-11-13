@@ -99,6 +99,8 @@ export const listManagedSeries = (db: Db) => {
                 string | null
             >`(select group_concat(v.number, '|') from volumes v where v.series_id = series.id and v.kind = 'volume')`,
             integrales: sql<number>`count(case when ${volumes.kind} = 'integrale' then 1 end)`,
+            // Tomes groupés (chacun numéroté à part) : pas de manquants.
+            parts: sql<number>`count(case when ${volumes.kind} = 'volume' and ${volumes.group} is not null then 1 end)`,
             // Hors-séries et spéciaux (que Manga-news compte dans la série).
             extras: sql<number>`count(case when ${volumes.kind} in ('hors-serie', 'special') then 1 end)`,
         })
@@ -117,6 +119,7 @@ export const listManagedSeries = (db: Db) => {
                 volumeNumbers,
                 integrales,
                 extras,
+                parts,
                 ...row
             }) => {
                 const rating = seriesRatingOf(parseSources(sources), ratings);
@@ -144,7 +147,9 @@ export const listManagedSeries = (db: Db) => {
                                 .split('|')
                                 .filter(Boolean)
                                 .map((number) => ({ kind: 'volume', number })),
-                            ...(integrales > 0
+                            // Intégrales ou tomes groupés : numérotation à
+                            // part, rien à compter.
+                            ...(integrales > 0 || parts > 0
                                 ? [{ kind: 'integrale', number: null }]
                                 : []),
                             ...Array.from({ length: extras }, () => ({

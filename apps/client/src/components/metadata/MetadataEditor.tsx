@@ -2,9 +2,12 @@ import {
     ActionIcon,
     Alert,
     Anchor,
+    Autocomplete,
+    Box,
     Button,
     Checkbox,
     CloseButton,
+    CopyButton,
     Grid,
     Group,
     Image,
@@ -13,17 +16,19 @@ import {
     Popover,
     Select,
     Stack,
-    Table,
     Text,
     TextInput,
     Textarea,
     Tooltip,
+    UnstyledButton,
 } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
 import {
     IconArrowBackUp,
     IconArrowRight,
+    IconCheck,
+    IconCopy,
     IconEye,
     IconFileText,
     IconFileZip,
@@ -44,6 +49,7 @@ import {
     VOLUME_KIND_LABELS,
     type VolumeKind,
     classify,
+    groupSortKey,
     parsePeriod,
     periodText,
     publicationPathOf,
@@ -98,6 +104,7 @@ import {
     type SheetValues,
     applySheetValues,
     changesOf,
+    distinctNames,
     editedValues,
     fillFromFileNames,
     fillFromSheetVolumes,
@@ -112,6 +119,8 @@ import {
     setSeriesField,
     setVolumeField,
     setVolumeKind,
+    sharedTargets,
+    targetLabel,
     volumeKindOf,
 } from './editing';
 import { type FoundSeries, loadFound, sitesFor } from './onlineSheets';
@@ -255,6 +264,78 @@ const SERIES_TEXT_FIELDS: { field: SeriesField; label: string }[] = [
  * Édition du ComicInfo d'un ensemble de tomes (dossier de brouillons ou
  * série publiée), puis rangement des fichiers à leur emplacement.
  */
+/** Champs d'un tome et leur largeur (sur 24) : téléphone, puis plus grand. */
+const FIELD_COLUMNS = [
+    { label: 'Type', span: { base: 12, sm: 4 } },
+    { label: 'Groupe', span: { base: 12, sm: 8 } },
+    { label: 'Numéro', span: { base: 6, sm: 3 } },
+    { label: 'Titre', span: { base: 12, sm: 6 } },
+    { label: 'Année', span: { base: 6, sm: 3 } },
+] as const;
+
+/**
+ * Nom d'un fichier dans le tableau des tomes : ce qui le distingue des
+ * autres (deux lignes au plus) ; un clic, un toucher : le nom entier, à
+ * copier.
+ */
+const FileName = ({
+    name,
+    short,
+    target,
+}: {
+    name: string;
+    short: string;
+    /** Emplacement après publication (chemin complet). */
+    target?: string;
+}) => (
+    <Popover position="bottom-start" withArrow shadow="md" width={320}>
+        <Popover.Target>
+            <UnstyledButton
+                aria-label={`Nom du fichier : ${name}`}
+                style={{ display: 'block', maxWidth: '100%' }}
+            >
+                <Text size="sm" truncate="end">
+                    {short}
+                </Text>
+            </UnstyledButton>
+        </Popover.Target>
+        <Popover.Dropdown>
+            <Stack gap="xs">
+                <Text size="xs" style={{ wordBreak: 'break-all' }}>
+                    {name}
+                </Text>
+                {target && target !== name && (
+                    <Text
+                        size="xs"
+                        c="dimmed"
+                        style={{ wordBreak: 'break-all' }}
+                    >
+                        Deviendra : {target}
+                    </Text>
+                )}
+                <CopyButton value={name}>
+                    {({ copied, copy }) => (
+                        <Button
+                            size="compact-xs"
+                            variant="light"
+                            leftSection={
+                                copied ? (
+                                    <IconCheck size={12} />
+                                ) : (
+                                    <IconCopy size={12} />
+                                )
+                            }
+                            onClick={copy}
+                        >
+                            {copied ? 'Copié' : 'Copier'}
+                        </Button>
+                    )}
+                </CopyButton>
+            </Stack>
+        </Popover.Dropdown>
+    </Popover>
+);
+
 export const MetadataEditor = ({
     libraryId,
     kind,
@@ -518,6 +599,41 @@ export const MetadataEditor = ({
         (d) => d.target && d.target !== d.volume.path,
     );
     const incomplete = destinations.filter((d) => !d.target).length;
+    // Deux tomes de même numéro (même série, même type, même groupe), quelle
+    // que soit leur année : la publication en mettrait deux à la même place
+    // dans la série (ou l'un écraserait l'autre).
+    const sameVolumeOf = new Map(
+        readable.map((v) => [
+            v.path,
+            publicationPathOf({ ...(edits[v.path] ?? {}), Year: undefined }) ??
+                null,
+        ]),
+    );
+    const sharedVolumes = sharedTargets([...sameVolumeOf.values()]);
+    const duplicated = (path: string) =>
+        sharedVolumes.has(sameVolumeOf.get(path) ?? '');
+    // Groupes déjà saisis (suggérés pour les autres tomes), dans l'ordre
+    // naturel (« Part 2 » avant « Part 10 »).
+    const groups = [
+        ...new Set(
+            paths.flatMap((path) => {
+                const group = edits[path]?.StoryArc?.trim();
+                return group ? [group] : [];
+            }),
+        ),
+    ].sort((a, b) => groupSortKey(a).localeCompare(groupSortKey(b)));
+    const shared = new Set(
+        destinations
+            .filter((d) => duplicated(d.volume.path))
+            .flatMap((d) => (d.target ? [d.target] : [])),
+    );
+    // Ce qui distingue chaque fichier (le nom entier au toucher).
+    const shortNames = new Map(
+        distinctNames(volumes.map((v) => v.name)).map((name, i) => [
+            volumes[i]!.path,
+            name,
+        ]),
+    );
 
     const series = (field: SeriesField) =>
         seriesValue(edits, paths, field) ?? '';
@@ -808,13 +924,15 @@ export const MetadataEditor = ({
 
     const publishReason = formatMissing
         ? 'Choisis d’abord le format de la série'
-        : changes.length > 0
-          ? 'Enregistre d’abord les modifications'
-          : toMove.length === 0
-            ? incomplete > 0
-                ? `Série et numéro requis (${incomplete} tome(s) incomplet(s))`
-                : 'Tous les tomes sont déjà à leur place'
-            : undefined;
+        : shared.size > 0
+          ? 'Des tomes ont le même numéro : change leur groupe ou leur numéro'
+          : changes.length > 0
+            ? 'Enregistre d’abord les modifications'
+            : toMove.length === 0
+              ? incomplete > 0
+                  ? `Série et numéro requis (${incomplete} tome(s) incomplet(s))`
+                  : 'Tous les tomes sont déjà à leur place'
+              : undefined;
 
     return (
         <Stack>
@@ -1341,78 +1459,143 @@ export const MetadataEditor = ({
                 </Stack>
             </Paper>
 
-            <Table.ScrollContainer minWidth={760}>
-                <Table verticalSpacing="xs">
-                    <Table.Thead>
-                        <Table.Tr>
-                            <Table.Th w={48} />
-                            <Table.Th>Fichier</Table.Th>
-                            <Table.Th w={130}>Type</Table.Th>
-                            <Table.Th w={90}>Numéro</Table.Th>
-                            <Table.Th>Titre</Table.Th>
-                            <Table.Th w={100}>Année</Table.Th>
-                            <Table.Th w={40} />
-                        </Table.Tr>
-                    </Table.Thead>
-                    <Table.Tbody>
-                        {volumes.map((volume) => {
-                            const info: ComicInfo = edits[volume.path] ?? {};
-                            const target = destinations.find(
-                                (d) => d.volume.path === volume.path,
-                            )?.target;
-                            const set = <F extends keyof ComicInfo>(
-                                field: F,
-                                value: ComicInfo[F] | undefined,
-                            ) =>
-                                setEdits((current) =>
-                                    setVolumeField(
-                                        current,
-                                        volume.path,
-                                        field,
-                                        value,
-                                    ),
-                                );
-                            return (
-                                <Table.Tr key={volume.path}>
-                                    <Table.Td>
-                                        {volume.cover && (
-                                            <Image
-                                                src={volume.cover}
-                                                w={40}
-                                                h={60}
-                                                fit="cover"
-                                                radius="xs"
-                                                alt=""
-                                            />
-                                        )}
-                                    </Table.Td>
-                                    <Table.Td>
-                                        <Text
-                                            size="sm"
-                                            lineClamp={1}
-                                            title={volume.name}
+            {/* Tomes : une ligne pour le fichier (actuel, futur, aperçu),
+                une pour les champs, de largeur fixe : un nom long ne décale
+                rien. */}
+            <Stack gap={0}>
+                <Group gap="sm" wrap="nowrap" px="xs" pb={4} visibleFrom="sm">
+                    <Box w={40} style={{ flexShrink: 0 }} />
+                    <Grid columns={24} gutter="xs" style={{ flex: 1 }}>
+                        {FIELD_COLUMNS.map(({ label, span }) => (
+                            <Grid.Col key={label} span={span.sm}>
+                                <Text size="xs" fw={600}>
+                                    {label}
+                                </Text>
+                            </Grid.Col>
+                        ))}
+                    </Grid>
+                </Group>
+                {volumes.map((volume) => {
+                    const info: ComicInfo = edits[volume.path] ?? {};
+                    const target = destinations.find(
+                        (d) => d.volume.path === volume.path,
+                    )?.target;
+                    const set = <F extends keyof ComicInfo>(
+                        field: F,
+                        value: ComicInfo[F] | undefined,
+                    ) =>
+                        setEdits((current) =>
+                            setVolumeField(current, volume.path, field, value),
+                        );
+                    return (
+                        <Group
+                            key={volume.path}
+                            gap="sm"
+                            wrap="nowrap"
+                            align="flex-start"
+                            px="xs"
+                            py="xs"
+                            style={{
+                                borderTop:
+                                    '1px solid var(--mantine-color-default-border)',
+                            }}
+                        >
+                            <Box w={40} style={{ flexShrink: 0 }}>
+                                {volume.cover && (
+                                    <Image
+                                        src={volume.cover}
+                                        w={40}
+                                        h={60}
+                                        fit="cover"
+                                        radius="xs"
+                                        alt=""
+                                    />
+                                )}
+                            </Box>
+                            <Stack gap={6} style={{ flex: 1, minWidth: 0 }}>
+                                <Group
+                                    gap="xs"
+                                    wrap="nowrap"
+                                    justify="space-between"
+                                >
+                                    {/* Nom actuel et futur sur une ligne,
+                                        coupés ; en entier au toucher. */}
+                                    <Group
+                                        gap="xs"
+                                        wrap="nowrap"
+                                        style={{ flex: 1, minWidth: 0 }}
+                                    >
+                                        <Box
+                                            style={{
+                                                flex: '0 1 auto',
+                                                minWidth: 0,
+                                            }}
                                         >
-                                            {volume.name}
-                                        </Text>
+                                            <FileName
+                                                name={volume.name}
+                                                target={target ?? undefined}
+                                                short={
+                                                    shortNames.get(
+                                                        volume.path,
+                                                    ) ?? volume.name
+                                                }
+                                            />
+                                        </Box>
                                         {volume.error ? (
-                                            <Text size="xs" c="red">
+                                            <Text
+                                                size="xs"
+                                                c="red"
+                                                truncate="end"
+                                                style={{
+                                                    flex: '0 1 auto',
+                                                    minWidth: 0,
+                                                }}
+                                            >
                                                 {volume.error}
                                             </Text>
                                         ) : (
                                             <Text
                                                 size="xs"
-                                                c={target ? 'dimmed' : 'orange'}
-                                                lineClamp={1}
+                                                c={
+                                                    duplicated(volume.path)
+                                                        ? 'red'
+                                                        : target
+                                                          ? 'dimmed'
+                                                          : 'orange'
+                                                }
+                                                truncate="end"
+                                                style={{
+                                                    flex: '0 1 auto',
+                                                    minWidth: 0,
+                                                }}
                                             >
-                                                {target
-                                                    ? target === volume.path
-                                                        ? 'À sa place'
-                                                        : `→ ${target}`
-                                                    : 'Série et numéro requis'}
+                                                {duplicated(volume.path)
+                                                    ? 'Même numéro qu’un autre tome'
+                                                    : target
+                                                      ? target === volume.path
+                                                          ? 'À sa place'
+                                                          : `→ ${targetLabel(target)}`
+                                                      : 'Série et numéro requis'}
                                             </Text>
                                         )}
-                                    </Table.Td>
-                                    <Table.Td>
+                                    </Group>
+                                    {canPreview(volume) && (
+                                        <Tooltip label="Aperçu de lecture">
+                                            <ActionIcon
+                                                variant="subtle"
+                                                color="gray"
+                                                aria-label={`Aperçu de ${volume.name}`}
+                                                onClick={() =>
+                                                    setPreview(volume)
+                                                }
+                                            >
+                                                <IconEye size={16} />
+                                            </ActionIcon>
+                                        </Tooltip>
+                                    )}
+                                </Group>
+                                <Grid columns={24} gutter="xs">
+                                    <Grid.Col span={FIELD_COLUMNS[0].span}>
                                         <Select
                                             size="xs"
                                             disabled={!!volume.error}
@@ -1461,8 +1644,29 @@ export const MetadataEditor = ({
                                                 },
                                             )}
                                         />
-                                    </Table.Td>
-                                    <Table.Td>
+                                    </Grid.Col>
+                                    <Grid.Col span={FIELD_COLUMNS[1].span}>
+                                        <Autocomplete
+                                            size="xs"
+                                            disabled={!!volume.error}
+                                            aria-label={`Groupe de ${volume.name}`}
+                                            // Libre : « Part 1 - Rouge, Bleu
+                                            // et Jaune », « Guides »… ;
+                                            // chaque groupe a sa numérotation.
+                                            placeholder="Groupe"
+                                            {...volumeField(
+                                                volume.path,
+                                                'StoryArc',
+                                            )}
+                                            value={info.StoryArc ?? ''}
+                                            // Les groupes des autres tomes.
+                                            data={groups}
+                                            onChange={(value) =>
+                                                set('StoryArc', value)
+                                            }
+                                        />
+                                    </Grid.Col>
+                                    <Grid.Col span={FIELD_COLUMNS[2].span}>
                                         <TextInput
                                             size="xs"
                                             // One-shot : sans numéro.
@@ -1472,6 +1676,7 @@ export const MetadataEditor = ({
                                                     'one-shot'
                                             }
                                             aria-label={`Numéro de ${volume.name}`}
+                                            placeholder="N°"
                                             {...volumeField(
                                                 volume.path,
                                                 'Number',
@@ -1484,12 +1689,13 @@ export const MetadataEditor = ({
                                                 )
                                             }
                                         />
-                                    </Table.Td>
-                                    <Table.Td>
+                                    </Grid.Col>
+                                    <Grid.Col span={FIELD_COLUMNS[3].span}>
                                         <TextInput
                                             size="xs"
                                             disabled={!!volume.error}
                                             aria-label={`Titre de ${volume.name}`}
+                                            placeholder="Titre"
                                             {...volumeField(
                                                 volume.path,
                                                 'Title',
@@ -1502,12 +1708,13 @@ export const MetadataEditor = ({
                                                 )
                                             }
                                         />
-                                    </Table.Td>
-                                    <Table.Td>
+                                    </Grid.Col>
+                                    <Grid.Col span={FIELD_COLUMNS[4].span}>
                                         <NumberInput
                                             size="xs"
                                             disabled={!!volume.error}
                                             aria-label={`Année de ${volume.name}`}
+                                            placeholder="Année"
                                             {...volumeField(
                                                 volume.path,
                                                 'Year',
@@ -1523,29 +1730,13 @@ export const MetadataEditor = ({
                                                 )
                                             }
                                         />
-                                    </Table.Td>
-                                    <Table.Td>
-                                        {canPreview(volume) && (
-                                            <Tooltip label="Aperçu de lecture">
-                                                <ActionIcon
-                                                    variant="subtle"
-                                                    color="gray"
-                                                    aria-label={`Aperçu de ${volume.name}`}
-                                                    onClick={() =>
-                                                        setPreview(volume)
-                                                    }
-                                                >
-                                                    <IconEye size={16} />
-                                                </ActionIcon>
-                                            </Tooltip>
-                                        )}
-                                    </Table.Td>
-                                </Table.Tr>
-                            );
-                        })}
-                    </Table.Tbody>
-                </Table>
-            </Table.ScrollContainer>
+                                    </Grid.Col>
+                                </Grid>
+                            </Stack>
+                        </Group>
+                    );
+                })}
+            </Stack>
 
             {preview && (
                 <ReaderPreview

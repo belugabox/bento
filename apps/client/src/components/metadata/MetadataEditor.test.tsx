@@ -279,7 +279,7 @@ describe('MetadataEditor', () => {
                 />
             </MantineProvider>,
         );
-        expect(screen.getByText('→ Gantz/Gantz #01.cbz')).toBeTruthy();
+        expect(screen.getByText('→ #01')).toBeTruthy();
         const publish = screen.getByRole('button', { name: /Publier \(2\)/ });
 
         await act(async () => {
@@ -703,6 +703,137 @@ describe('MetadataEditor', () => {
         ).toBe(true);
     });
 
+    it('numbers groups apart, and refuses two volumes with the same number', async () => {
+        mockServer();
+        const name = (part: string, n: string) =>
+            `Pokémon - La Grande Aventure (Part ${part}) - Partie ${part} T0${n} (2014) [Digital-1920] [Manga FR] (PapriKa+).cbz`;
+        render(
+            <MantineProvider>
+                <MetadataEditor
+                    libraryId={1}
+                    kind="manga"
+                    mode="drafts"
+                    volumes={[
+                        {
+                            path: '_draft/P/1.cbz',
+                            name: name('1', '1'),
+                            // Même série, même numéro, sans partie ; les
+                            // années diffèrent (elles ne comptent pas).
+                            comicInfo: {
+                                Series: 'Pokémon',
+                                Number: '1',
+                                Year: 2014,
+                            },
+                            cover: null,
+                        },
+                        {
+                            path: '_draft/P/2.cbz',
+                            name: name('2', '1'),
+                            comicInfo: {
+                                Series: 'Pokémon',
+                                Number: '1',
+                                Year: 2016,
+                            },
+                            cover: null,
+                        },
+                    ]}
+                    onChanged={() => {}}
+                />
+            </MantineProvider>,
+        );
+        expect(
+            await screen.findAllByText('Même numéro qu’un autre tome'),
+        ).toHaveLength(2);
+
+        // Un groupe chacun : chacun sa place.
+        fireEvent.change(
+            screen.getByRole('textbox', {
+                name: `Groupe de ${name('1', '1')}`,
+            }),
+            {
+                target: { value: 'Part 1' },
+            },
+        );
+        fireEvent.change(
+            screen.getByRole('textbox', {
+                name: `Groupe de ${name('2', '1')}`,
+            }),
+            {
+                target: { value: 'Part 2' },
+            },
+        );
+        expect(screen.queryByText('Même numéro qu’un autre tome')).toBeNull();
+        expect(screen.getByText('→ Part 2 #01 (2016)')).toBeTruthy();
+    });
+
+    it('suggests the groups already typed on the other volumes', async () => {
+        mockServer();
+        render(<Editor />);
+        const [first, second] = volumes();
+        fireEvent.change(
+            await screen.findByRole('textbox', {
+                name: `Groupe de ${first!.name}`,
+            }),
+            { target: { value: 'Part 1 - Rouge, Bleu et Jaune' } },
+        );
+        fireEvent.click(
+            screen.getByRole('textbox', { name: `Groupe de ${second!.name}` }),
+        );
+        fireEvent.focus(
+            screen.getByRole('textbox', { name: `Groupe de ${second!.name}` }),
+        );
+        // Le menu du second tome (celui du premier peut rester ouvert).
+        const options = await screen.findAllByRole('option', {
+            name: 'Part 1 - Rouge, Bleu et Jaune',
+        });
+        fireEvent.click(options.at(-1)!);
+        expect(
+            (
+                screen.getByRole('textbox', {
+                    name: `Groupe de ${second!.name}`,
+                }) as HTMLInputElement
+            ).value,
+        ).toBe('Part 1 - Rouge, Bleu et Jaune');
+    });
+
+    it('shows what tells the files apart, and the whole name on a tap', async () => {
+        mockServer();
+        const names = [
+            'Pokémon - La Grande Aventure (Part 1) - Rouge T01 (2014) [Digital-1920] [Manga FR].cbz',
+            'Pokémon - La Grande Aventure (Part 2) - Or T01 (2016) [Digital-1920] [Manga FR].cbz',
+        ];
+        render(
+            <MantineProvider>
+                <MetadataEditor
+                    libraryId={1}
+                    kind="manga"
+                    mode="drafts"
+                    volumes={names.map((name, i) => ({
+                        path: `_draft/P/${i}.cbz`,
+                        name,
+                        comicInfo: {
+                            Series: 'Pokémon',
+                            Number: '1',
+                            StoryArc: `Part ${i + 1}`,
+                        },
+                        cover: null,
+                    }))}
+                    onChanged={() => {}}
+                />
+            </MantineProvider>,
+        );
+        const file = await screen.findByRole('button', {
+            name: `Nom du fichier : ${names[1]}`,
+        });
+        expect(file.textContent).toBe('(Part 2) - Or T01 (2016)');
+        fireEvent.click(file);
+        expect(await screen.findByText(names[1]!)).toBeTruthy();
+        expect(
+            screen.getByText('Deviendra : Pokémon/Pokémon - Part 2 #01.cbz'),
+        ).toBeTruthy();
+        expect(screen.getByRole('button', { name: 'Copier' })).toBeTruthy();
+    });
+
     it('requires a format, and keeps the exact age in Bento', async () => {
         mockServer();
         const save = vi.fn().mockResolvedValue({});
@@ -987,7 +1118,7 @@ describe('MetadataEditor', () => {
             await screen.findByRole('option', { name: 'Hors-série' }),
         );
 
-        expect(screen.getByText('→ Gantz/Gantz HS01.cbz')).toBeTruthy();
+        expect(screen.getByText('→ HS01')).toBeTruthy();
         expect(
             screen
                 .getByRole('textbox', { name: 'Type de Gantz T01 (2017).cbz' })
