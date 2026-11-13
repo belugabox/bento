@@ -48,6 +48,7 @@ export const COMIC_INFO_FIELDS: (keyof ComicInfo)[] = [
     'Locations',
     'ScanInformation',
     'StoryArc',
+    'StoryArcNumber',
     'SeriesGroup',
     'AgeRating',
     'CommunityRating',

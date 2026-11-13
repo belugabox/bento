@@ -60,6 +60,7 @@ export {
 export { parseVolumeFileName } from './archive/fileName';
 export type { ComicInfo } from './archive/comicInfo';
 export { publicationPathOf } from './library/publication';
+export { groupSortKey } from './library/groupSort';
 export {
     type Completeness,
     type CompletenessInput,

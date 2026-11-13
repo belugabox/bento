@@ -34,6 +34,7 @@ import { Link, useParams } from 'react-router';
 
 import {
     SOURCE_LABELS,
+    type VolumeKind,
     isMainKind,
     isStandalone,
     periodText,
@@ -85,6 +86,44 @@ const KIND_SECTIONS = [
     { key: 'hors-serie', title: 'Hors-séries' },
     { key: 'special', title: 'Spéciaux' },
 ] as const;
+
+/**
+ * Blocs de la fiche : les tomes, puis hors-séries et spéciaux ; dans chaque
+ * type, les tomes sans groupement, puis un bloc par groupement (« Part 1 -
+ * Rouge, Bleu et Jaune », « Hors-séries — Guides »), dans l'ordre du
+ * serveur.
+ */
+const volumeSections = <V extends { kind: VolumeKind; group?: string | null }>(
+    volumes: V[],
+) =>
+    KIND_SECTIONS.flatMap(({ key, title }) => {
+        const group = volumes.filter((v) =>
+            key === 'main' ? isMainKind(v.kind) : v.kind === key,
+        );
+        const blocks: {
+            key: string;
+            kind: (typeof KIND_SECTIONS)[number]['key'];
+            title: string | null;
+            group: V[];
+        }[] = [];
+        for (const volume of group) {
+            const name = volume.group ?? null;
+            const last = blocks.at(-1);
+            if (last && last.key === `${key}:${name ?? ''}`) {
+                last.group.push(volume);
+            } else {
+                blocks.push({
+                    key: `${key}:${name ?? ''}`,
+                    kind: key,
+                    title: name ? (title ? `${title} — ${name}` : name) : title,
+                    group: [volume],
+                });
+            }
+        }
+        return blocks.length > 0
+            ? blocks
+            : [{ key, kind: key, title: title as string | null, group }];
+    });
 
 export const SeriesPage = () => {
     const seriesId = Number(useParams().id);
@@ -464,133 +503,146 @@ export const SeriesPage = () => {
                 </Stack>
             </Flex>
 
-            {KIND_SECTIONS.map(({ key, title }) => {
-                const group = series.volumes.filter((v) =>
-                    key === 'main' ? isMainKind(v.kind) : v.kind === key,
-                );
-                if (group.length === 0) return null;
-                // Un one-shot seul : pas de tome à montrer (« Lire » suffit).
-                if (
-                    key === 'main' &&
-                    group.length === 1 &&
-                    isStandalone(group[0]!)
-                ) {
-                    return null;
-                }
-                return (
-                    <Stack key={key} gap="xs">
-                        {title && <Title order={4}>{title}</Title>}
-                        <SimpleGrid cols={gridColumns(size)}>
-                            {group.map((volume, index) => {
-                                const read =
-                                    volume.progress?.completed ?? false;
-                                const downloaded = downloadedIds.has(volume.id);
-                                const job = jobs.find(
-                                    (j) =>
-                                        j.volumeId === volume.id &&
-                                        j.state !== 'failed',
-                                );
-                                return (
-                                    <CoverCard
-                                        key={volume.id}
-                                        to={`/read/${volume.id}`}
-                                        cover={coverUrl(
-                                            volume.id,
-                                            volume.version,
-                                            'small',
-                                        )}
-                                        title={volumeLabel(volume)}
-                                        caption={
-                                            withTitles
-                                                ? (volumeTitleOf(volume) ?? '')
-                                                : undefined
-                                        }
-                                        subtitle={
-                                            volume.progress && !read
-                                                ? `Page ${volume.progress.page + 1} / ${volume.pageCount}`
-                                                : `${volume.pageCount} pages`
-                                        }
-                                        progress={
-                                            read
-                                                ? undefined
-                                                : progressRatio(volume)
-                                        }
-                                        menu={
-                                            <SeriesVolumeMenu
-                                                volume={volume}
-                                                series={series}
-                                                // Tomes seulement : « jusqu'à »
-                                                // suit l'ordre des tomes.
-                                                upTo={
-                                                    key === 'main' && index > 0
-                                                }
-                                                isAdmin={isAdmin}
-                                                onChanged={reload}
-                                            />
-                                        }
-                                        // Gardé sur l'appareil (lecture sans réseau).
-                                        tag={
-                                            // En téléchargement : son avancement.
-                                            job ? (
-                                                <DownloadRing
-                                                    ratio={
-                                                        job.total
-                                                            ? job.done /
-                                                              job.total
-                                                            : 0
+            {volumeSections(series.volumes).map(
+                ({ key, kind, title, group }) => {
+                    if (group.length === 0) return null;
+                    // Un one-shot seul : pas de tome à montrer (« Lire » suffit).
+                    if (
+                        kind === 'main' &&
+                        group.length === 1 &&
+                        isStandalone(group[0]!)
+                    ) {
+                        return null;
+                    }
+                    return (
+                        <Stack key={key} gap="xs">
+                            {title && <Title order={4}>{title}</Title>}
+                            <SimpleGrid cols={gridColumns(size)}>
+                                {group.map((volume, index) => {
+                                    const read =
+                                        volume.progress?.completed ?? false;
+                                    const downloaded = downloadedIds.has(
+                                        volume.id,
+                                    );
+                                    const job = jobs.find(
+                                        (j) =>
+                                            j.volumeId === volume.id &&
+                                            j.state !== 'failed',
+                                    );
+                                    return (
+                                        <CoverCard
+                                            key={volume.id}
+                                            to={`/read/${volume.id}`}
+                                            cover={coverUrl(
+                                                volume.id,
+                                                volume.version,
+                                                'small',
+                                            )}
+                                            // Dans le bloc de son groupement : « Tome 1 ».
+                                            title={volumeLabel({
+                                                ...volume,
+                                                group: null,
+                                            })}
+                                            caption={
+                                                withTitles
+                                                    ? (volumeTitleOf(volume) ??
+                                                      '')
+                                                    : undefined
+                                            }
+                                            subtitle={
+                                                volume.progress && !read
+                                                    ? `Page ${volume.progress.page + 1} / ${volume.pageCount}`
+                                                    : `${volume.pageCount} pages`
+                                            }
+                                            progress={
+                                                read
+                                                    ? undefined
+                                                    : progressRatio(volume)
+                                            }
+                                            menu={
+                                                <SeriesVolumeMenu
+                                                    volume={volume}
+                                                    series={series}
+                                                    // Tomes seulement : « jusqu'à »
+                                                    // suit l'ordre des tomes.
+                                                    upTo={
+                                                        kind === 'main' &&
+                                                        index > 0
                                                     }
+                                                    isAdmin={isAdmin}
+                                                    onChanged={reload}
                                                 />
-                                            ) : downloaded ? (
-                                                <ThemeIcon
-                                                    size="sm"
-                                                    radius="xl"
-                                                    color="gray"
-                                                    aria-label="Téléchargé"
-                                                >
-                                                    <IconDownload size={12} />
-                                                </ThemeIcon>
-                                            ) : undefined
-                                        }
-                                        corner={
-                                            <Tooltip
-                                                label={
-                                                    read
-                                                        ? 'Marquer comme non lu'
-                                                        : 'Marquer comme lu'
-                                                }
-                                            >
-                                                <ActionIcon
-                                                    radius="xl"
-                                                    size="sm"
-                                                    variant={
+                                            }
+                                            // Gardé sur l'appareil (lecture sans réseau).
+                                            tag={
+                                                // En téléchargement : son avancement.
+                                                job ? (
+                                                    <DownloadRing
+                                                        ratio={
+                                                            job.total
+                                                                ? job.done /
+                                                                  job.total
+                                                                : 0
+                                                        }
+                                                    />
+                                                ) : downloaded ? (
+                                                    <ThemeIcon
+                                                        size="sm"
+                                                        radius="xl"
+                                                        color="gray"
+                                                        aria-label="Téléchargé"
+                                                    >
+                                                        <IconDownload
+                                                            size={12}
+                                                        />
+                                                    </ThemeIcon>
+                                                ) : undefined
+                                            }
+                                            corner={
+                                                <Tooltip
+                                                    label={
                                                         read
-                                                            ? 'filled'
-                                                            : 'default'
-                                                    }
-                                                    style={{
-                                                        opacity: read ? 1 : 0.8,
-                                                    }}
-                                                    aria-label={
-                                                        read
-                                                            ? `${volumeLabel(volume)} lu`
-                                                            : `Marquer ${volumeLabel(volume)} comme lu`
-                                                    }
-                                                    disabled={readOnly}
-                                                    onClick={() =>
-                                                        void toggleRead(volume)
+                                                            ? 'Marquer comme non lu'
+                                                            : 'Marquer comme lu'
                                                     }
                                                 >
-                                                    <IconCheck size={14} />
-                                                </ActionIcon>
-                                            </Tooltip>
-                                        }
-                                    />
-                                );
-                            })}
-                        </SimpleGrid>
-                    </Stack>
-                );
-            })}
+                                                    <ActionIcon
+                                                        radius="xl"
+                                                        size="sm"
+                                                        variant={
+                                                            read
+                                                                ? 'filled'
+                                                                : 'default'
+                                                        }
+                                                        style={{
+                                                            opacity: read
+                                                                ? 1
+                                                                : 0.8,
+                                                        }}
+                                                        aria-label={
+                                                            read
+                                                                ? `${volumeLabel(volume)} lu`
+                                                                : `Marquer ${volumeLabel(volume)} comme lu`
+                                                        }
+                                                        disabled={readOnly}
+                                                        onClick={() =>
+                                                            void toggleRead(
+                                                                volume,
+                                                            )
+                                                        }
+                                                    >
+                                                        <IconCheck size={14} />
+                                                    </ActionIcon>
+                                                </Tooltip>
+                                            }
+                                        />
+                                    );
+                                })}
+                            </SimpleGrid>
+                        </Stack>
+                    );
+                },
+            )}
         </Stack>
     );
 };

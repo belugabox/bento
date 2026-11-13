@@ -16,6 +16,7 @@ import { TaskList } from '../tasks';
 import type { Logger } from '../tools/logger';
 import { seriesAge } from './ageRating';
 import { fieldsFromVolumes } from './completeness';
+import { groupSortKey } from './groupSort';
 import { smallCoverFile } from './smallCovers';
 import { volumeNumbering } from './volumeKind';
 
@@ -95,6 +96,12 @@ export const seriesKeyOf = (file: string, seriesName?: string) => {
 /** Tomes d'abord, puis hors-séries, puis spéciaux. */
 // La série (tomes, one-shots, intégrales), hors-séries, spéciaux.
 export const kindOrder = sql`case ${volumes.kind} when 'hors-serie' then 1 when 'special' then 2 else 0 end`;
+
+/**
+ * Groupements de tomes dans l'ordre naturel (« Part 2 » avant « Part
+ * 10 ») ; sans groupement en premier.
+ */
+export const groupOrder = [asc(volumes.groupSort)];
 
 const toSortNumber = (number?: string) => {
     const value = number === undefined ? NaN : Number.parseFloat(number);
@@ -248,6 +255,12 @@ export class LibraryScanner {
             file: archive.file,
             number: number ?? null,
             sortNumber: toSortNumber(number),
+            // Groupement (numéroté à part) : le ComicInfo, sinon le nom.
+            group: comicInfo.StoryArc ?? fromName.group ?? null,
+            groupSort:
+                (comicInfo.StoryArc ?? fromName.group)
+                    ? groupSortKey((comicInfo.StoryArc ?? fromName.group)!)
+                    : null,
             kind,
             title: comicInfo.Title ?? null,
             comicInfo,
@@ -353,6 +366,7 @@ export class LibraryScanner {
                 .where(eq(volumes.seriesId, row.id))
                 .orderBy(
                     kindOrder,
+                    ...groupOrder,
                     sql`${volumes.sortNumber} is null`,
                     asc(volumes.sortNumber),
                     asc(volumes.file),

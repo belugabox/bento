@@ -203,3 +203,18 @@ describe('one-shots and omnibus volumes', () => {
         expect(seriesVolumesLabel(1, null)).toBe('1 tome');
     });
 });
+
+describe('volume in a group', () => {
+    it('says the group before the volume, not on a narrow card', () => {
+        const volume = {
+            number: '1',
+            title: null,
+            group: 'Part 1 - Rouge, Bleu et Jaune',
+        };
+        expect(volumeLabel(volume)).toBe(
+            'Part 1 - Rouge, Bleu et Jaune · Tome 1',
+        );
+        expect(volumeShortLabel(volume)).toBe('T1');
+        expect(volumeLabel({ ...volume, group: null })).toBe('Tome 1');
+    });
+});

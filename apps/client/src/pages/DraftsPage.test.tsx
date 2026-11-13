@@ -71,6 +71,6 @@ describe('DraftsPage', () => {
 
         fireEvent.click(screen.getByText('Gantz'));
 
-        expect(await screen.findByText('→ Gantz/Gantz #01.cbz')).toBeTruthy();
+        expect(await screen.findByText('→ #01')).toBeTruthy();
     });
 });

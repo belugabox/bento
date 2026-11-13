@@ -12,7 +12,18 @@ export type VolumeFileName = {
     /** Hors-série ou spécial (« HS01 », « SP01 ») ; rien pour un tome. */
     kind?: VolumeKind;
     year?: number;
+    /**
+     * Groupement de tomes numérotés à part (« Part 1 - Rouge, Bleu et
+     * Jaune », « Saison 6 - The Fighting ») ; `series` est alors le nom sans
+     * lui.
+     */
+    group?: string;
 };
+
+// « (Part 1) - Rouge, Bleu et Jaune », « - Saison 6 - The Fighting »,
+// « Partie 4a », « Arc 2 » : à la fin du nom de série.
+const GROUP =
+    /^(.*?)[\s\-–:]*\(?\b(part(?:ie)?|arc|saison|season)\s*(\d{1,3}[a-z]?)\)?(?:\s*[-–:]\s*(.+))?$/i;
 
 // « T05 », « T.5 », « Tome 5 », « Vol 5 », « Volume 05 », « #05 ».
 const NUMBER =
@@ -37,9 +48,17 @@ export const parseVolumeFileName = (name: string): VolumeFileName => {
               .replace(/[\s._\-[(]+$/, '')
               .trim()
         : undefined;
+    const group = series ? GROUP.exec(series) : null;
+    const base = group ? group[1]!.trim() : series;
     return {
         // « Boxer (The) » devient « The Boxer ».
-        series: series ? articleFirst(series) : undefined,
+        series: base ? articleFirst(base) : undefined,
+        // « (Part 1) - Rouge… » devient « Part 1 - Rouge… ».
+        ...(group && {
+            group: [`${group[2]} ${group[3]}`, group[4]?.trim()]
+                .filter(Boolean)
+                .join(' - '),
+        }),
         number: digits ? String(Number(digits)) : undefined,
         ...(special && { kind: kindOfWord(special[1]) }),
         year: year ? Number(year[1]) : undefined,

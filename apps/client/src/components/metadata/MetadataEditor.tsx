@@ -2,9 +2,11 @@ import {
     ActionIcon,
     Alert,
     Anchor,
+    Autocomplete,
     Button,
     Checkbox,
     CloseButton,
+    CopyButton,
     Grid,
     Group,
     Image,
@@ -18,12 +20,15 @@ import {
     TextInput,
     Textarea,
     Tooltip,
+    UnstyledButton,
 } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
 import {
     IconArrowBackUp,
     IconArrowRight,
+    IconCheck,
+    IconCopy,
     IconEye,
     IconFileText,
     IconFileZip,
@@ -44,6 +49,7 @@ import {
     VOLUME_KIND_LABELS,
     type VolumeKind,
     classify,
+    groupSortKey,
     parsePeriod,
     periodText,
     publicationPathOf,
@@ -98,6 +104,7 @@ import {
     type SheetValues,
     applySheetValues,
     changesOf,
+    distinctNames,
     editedValues,
     fillFromFileNames,
     fillFromSheetVolumes,
@@ -112,6 +119,8 @@ import {
     setSeriesField,
     setVolumeField,
     setVolumeKind,
+    sharedTargets,
+    targetLabel,
     volumeKindOf,
 } from './editing';
 import { type FoundSeries, loadFound, sitesFor } from './onlineSheets';
@@ -255,6 +264,70 @@ const SERIES_TEXT_FIELDS: { field: SeriesField; label: string }[] = [
  * Édition du ComicInfo d'un ensemble de tomes (dossier de brouillons ou
  * série publiée), puis rangement des fichiers à leur emplacement.
  */
+/**
+ * Nom d'un fichier dans le tableau des tomes : ce qui le distingue des
+ * autres (deux lignes au plus) ; un clic, un toucher : le nom entier, à
+ * copier.
+ */
+const FileName = ({
+    name,
+    short,
+    target,
+}: {
+    name: string;
+    short: string;
+    /** Emplacement après publication (chemin complet). */
+    target?: string;
+}) => (
+    <Popover position="bottom-start" withArrow shadow="md" width={320}>
+        <Popover.Target>
+            <UnstyledButton aria-label={`Nom du fichier : ${name}`}>
+                <Text
+                    size="sm"
+                    lineClamp={2}
+                    style={{ wordBreak: 'break-word' }}
+                >
+                    {short}
+                </Text>
+            </UnstyledButton>
+        </Popover.Target>
+        <Popover.Dropdown>
+            <Stack gap="xs">
+                <Text size="xs" style={{ wordBreak: 'break-all' }}>
+                    {name}
+                </Text>
+                {target && target !== name && (
+                    <Text
+                        size="xs"
+                        c="dimmed"
+                        style={{ wordBreak: 'break-all' }}
+                    >
+                        Deviendra : {target}
+                    </Text>
+                )}
+                <CopyButton value={name}>
+                    {({ copied, copy }) => (
+                        <Button
+                            size="compact-xs"
+                            variant="light"
+                            leftSection={
+                                copied ? (
+                                    <IconCheck size={12} />
+                                ) : (
+                                    <IconCopy size={12} />
+                                )
+                            }
+                            onClick={copy}
+                        >
+                            {copied ? 'Copié' : 'Copier'}
+                        </Button>
+                    )}
+                </CopyButton>
+            </Stack>
+        </Popover.Dropdown>
+    </Popover>
+);
+
 export const MetadataEditor = ({
     libraryId,
     kind,
@@ -518,6 +591,41 @@ export const MetadataEditor = ({
         (d) => d.target && d.target !== d.volume.path,
     );
     const incomplete = destinations.filter((d) => !d.target).length;
+    // Deux tomes de même numéro (même série, même type, même groupe), quelle
+    // que soit leur année : la publication en mettrait deux à la même place
+    // dans la série (ou l'un écraserait l'autre).
+    const sameVolumeOf = new Map(
+        readable.map((v) => [
+            v.path,
+            publicationPathOf({ ...(edits[v.path] ?? {}), Year: undefined }) ??
+                null,
+        ]),
+    );
+    const sharedVolumes = sharedTargets([...sameVolumeOf.values()]);
+    const duplicated = (path: string) =>
+        sharedVolumes.has(sameVolumeOf.get(path) ?? '');
+    // Groupes déjà saisis (suggérés pour les autres tomes), dans l'ordre
+    // naturel (« Part 2 » avant « Part 10 »).
+    const groups = [
+        ...new Set(
+            paths.flatMap((path) => {
+                const group = edits[path]?.StoryArc?.trim();
+                return group ? [group] : [];
+            }),
+        ),
+    ].sort((a, b) => groupSortKey(a).localeCompare(groupSortKey(b)));
+    const shared = new Set(
+        destinations
+            .filter((d) => duplicated(d.volume.path))
+            .flatMap((d) => (d.target ? [d.target] : [])),
+    );
+    // Ce qui distingue chaque fichier (le nom entier au toucher).
+    const shortNames = new Map(
+        distinctNames(volumes.map((v) => v.name)).map((name, i) => [
+            volumes[i]!.path,
+            name,
+        ]),
+    );
 
     const series = (field: SeriesField) =>
         seriesValue(edits, paths, field) ?? '';
@@ -808,13 +916,15 @@ export const MetadataEditor = ({
 
     const publishReason = formatMissing
         ? 'Choisis d’abord le format de la série'
-        : changes.length > 0
-          ? 'Enregistre d’abord les modifications'
-          : toMove.length === 0
-            ? incomplete > 0
-                ? `Série et numéro requis (${incomplete} tome(s) incomplet(s))`
-                : 'Tous les tomes sont déjà à leur place'
-            : undefined;
+        : shared.size > 0
+          ? 'Des tomes ont le même numéro : change leur groupe ou leur numéro'
+          : changes.length > 0
+            ? 'Enregistre d’abord les modifications'
+            : toMove.length === 0
+              ? incomplete > 0
+                  ? `Série et numéro requis (${incomplete} tome(s) incomplet(s))`
+                  : 'Tous les tomes sont déjà à leur place'
+              : undefined;
 
     return (
         <Stack>
@@ -1341,13 +1451,14 @@ export const MetadataEditor = ({
                 </Stack>
             </Paper>
 
-            <Table.ScrollContainer minWidth={760}>
+            <Table.ScrollContainer minWidth={960}>
                 <Table verticalSpacing="xs">
                     <Table.Thead>
                         <Table.Tr>
                             <Table.Th w={48} />
                             <Table.Th>Fichier</Table.Th>
                             <Table.Th w={130}>Type</Table.Th>
+                            <Table.Th w={210}>Groupe</Table.Th>
                             <Table.Th w={90}>Numéro</Table.Th>
                             <Table.Th>Titre</Table.Th>
                             <Table.Th w={100}>Année</Table.Th>
@@ -1387,13 +1498,14 @@ export const MetadataEditor = ({
                                         )}
                                     </Table.Td>
                                     <Table.Td>
-                                        <Text
-                                            size="sm"
-                                            lineClamp={1}
-                                            title={volume.name}
-                                        >
-                                            {volume.name}
-                                        </Text>
+                                        <FileName
+                                            name={volume.name}
+                                            target={target ?? undefined}
+                                            short={
+                                                shortNames.get(volume.path) ??
+                                                volume.name
+                                            }
+                                        />
                                         {volume.error ? (
                                             <Text size="xs" c="red">
                                                 {volume.error}
@@ -1401,14 +1513,22 @@ export const MetadataEditor = ({
                                         ) : (
                                             <Text
                                                 size="xs"
-                                                c={target ? 'dimmed' : 'orange'}
-                                                lineClamp={1}
+                                                c={
+                                                    duplicated(volume.path)
+                                                        ? 'red'
+                                                        : target
+                                                          ? 'dimmed'
+                                                          : 'orange'
+                                                }
+                                                lineClamp={2}
                                             >
-                                                {target
-                                                    ? target === volume.path
-                                                        ? 'À sa place'
-                                                        : `→ ${target}`
-                                                    : 'Série et numéro requis'}
+                                                {duplicated(volume.path)
+                                                    ? 'Même numéro qu’un autre tome'
+                                                    : target
+                                                      ? target === volume.path
+                                                          ? 'À sa place'
+                                                          : `→ ${targetLabel(target)}`
+                                                      : 'Série et numéro requis'}
                                             </Text>
                                         )}
                                     </Table.Td>
@@ -1460,6 +1580,27 @@ export const MetadataEditor = ({
                                                         ),
                                                 },
                                             )}
+                                        />
+                                    </Table.Td>
+                                    <Table.Td>
+                                        <Autocomplete
+                                            size="xs"
+                                            disabled={!!volume.error}
+                                            aria-label={`Groupe de ${volume.name}`}
+                                            // Libre : « Part 1 - Rouge, Bleu
+                                            // et Jaune », « Guides »… ;
+                                            // chaque groupe a sa numérotation.
+                                            placeholder="—"
+                                            {...volumeField(
+                                                volume.path,
+                                                'StoryArc',
+                                            )}
+                                            value={info.StoryArc ?? ''}
+                                            // Les groupes des autres tomes.
+                                            data={groups}
+                                            onChange={(value) =>
+                                                set('StoryArc', value)
+                                            }
                                         />
                                     </Table.Td>
                                     <Table.Td>

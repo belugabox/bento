@@ -287,6 +287,58 @@ describe('SeriesPage', () => {
         ).toBe('https://fr.wikipedia.org/?curid=7');
     });
 
+    it('shows the volumes of each group in their own block, hors-séries too', async () => {
+        const grouped = (
+            id: number,
+            group: string,
+            number: string,
+            kind: 'volume' | 'hors-serie' = 'volume',
+        ) => ({ ...volume(id, null, kind), number, group });
+        vi.spyOn(globalThis, 'fetch').mockImplementation(
+            async () =>
+                new Response(
+                    JSON.stringify({
+                        ...SERIES,
+                        volumes: [
+                            grouped(1, 'Part 1 - Rouge, Bleu et Jaune', '1'),
+                            grouped(2, 'Part 1 - Rouge, Bleu et Jaune', '2'),
+                            grouped(3, 'Part 2 - Or et Argent', '1'),
+                            grouped(4, 'Guides', '1', 'hors-serie'),
+                        ],
+                    }),
+                    { headers: { 'Content-Type': 'application/json' } },
+                ),
+        );
+        render(
+            <MantineProvider>
+                <UserContext.Provider value={READER}>
+                    <MemoryRouter initialEntries={['/series/3']}>
+                        <Routes>
+                            <Route
+                                path="/series/:id"
+                                element={<SeriesPage />}
+                            />
+                        </Routes>
+                    </MemoryRouter>
+                </UserContext.Provider>
+            </MantineProvider>,
+        );
+
+        expect(
+            await screen.findByRole('heading', {
+                name: 'Part 1 - Rouge, Bleu et Jaune',
+            }),
+        ).toBeTruthy();
+        expect(
+            screen.getByRole('heading', { name: 'Part 2 - Or et Argent' }),
+        ).toBeTruthy();
+        expect(
+            screen.getByRole('heading', { name: 'Hors-séries — Guides' }),
+        ).toBeTruthy();
+        // Dans son bloc, le tome garde son numéro dans le groupe.
+        expect(screen.getAllByText('Tome 1')).toHaveLength(2);
+    });
+
     it('offers the downloads in their own small menu', async () => {
         vi.spyOn(globalThis, 'fetch').mockImplementation(
             async () =>

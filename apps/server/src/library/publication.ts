@@ -20,11 +20,14 @@ const folderName = (series: string) =>
 /**
  * Emplacement d'un tome dans la bibliothèque, d'après son ComicInfo :
  * `Série/Série #NN (Année).cbz`, ou `Série HSNN` pour un hors-série et
- * `Série SPNN` pour un spécial (année facultative). `undefined` sans série
- * ou sans numéro.
+ * `Série SPNN` pour un spécial (année facultative), `Série - Groupe #NN`
+ * dans une partie. `undefined` sans série ou sans numéro.
  */
 export const publicationPathOf = (
-    comicInfo: Pick<ComicInfo, 'Series' | 'Number' | 'Year' | 'Format'>,
+    comicInfo: Pick<
+        ComicInfo,
+        'Series' | 'Number' | 'Year' | 'Format' | 'StoryArc'
+    >,
 ): string | undefined => {
     const series = comicInfo.Series ? folderName(comicInfo.Series) : '';
     const { kind, number } = volumeNumbering(comicInfo);
@@ -37,7 +40,10 @@ export const publicationPathOf = (
     const padded = number.replace(/^\d+/, (digits) => digits.padStart(2, '0'));
     const label =
         kind === 'volume' ? `#${padded}` : `${KIND_PREFIXES[kind]}${padded}`;
-    return `${series}/${series} ${label}${year}.cbz`;
+    // Groupement : sa numérotation à lui (« Série - Part 1 - Rouge #01 »).
+    const group = comicInfo.StoryArc?.trim();
+    const groupLabel = group ? ` - ${folderName(group)}` : '';
+    return `${series}/${series}${groupLabel} ${label}${year}.cbz`;
 };
 
 /**

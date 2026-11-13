@@ -38,7 +38,9 @@ export type ComicInfo = {
     Teams?: string;
     Locations?: string;
     ScanInformation?: string;
+    /** Groupement de tomes, libre (« Part 1 - Rouge, Bleu et Jaune »). */
     StoryArc?: string;
+    StoryArcNumber?: string;
     SeriesGroup?: string;
     AgeRating?: string;
     CommunityRating?: number;
@@ -94,6 +96,7 @@ const STRING_FIELDS = [
     'Locations',
     'ScanInformation',
     'StoryArc',
+    'StoryArcNumber',
     'SeriesGroup',
     'AgeRating',
     'MainCharacterOrTeam',

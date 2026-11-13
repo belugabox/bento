@@ -136,6 +136,13 @@ export const volumes = sqliteTable(
         number: text('number'),
         // Numéro en nombre, pour trier (« 12.5 » entre 12 et 13).
         sortNumber: real('sort_number'),
+        // Groupement libre de tomes (« Part 1 - Rouge, Bleu et Jaune »,
+        // « Guides » pour des hors-séries), numérotés à part dans leur
+        // groupe : le ComicInfo (StoryArc) ou le nom du fichier ; et sa clé
+        // de tri naturelle. Colonnes nommées `part` et `part_name` par leur
+        // première version (migration 0033, déjà appliquée).
+        group: text('part'),
+        groupSort: text('part_name'),
         // Tome, hors-série ou spécial (`library/volumeKind.ts`) : chaque type
         // a sa numérotation, hors-séries et spéciaux viennent après les tomes.
         kind: text('kind', { enum: VOLUME_KINDS }).notNull().default('volume'),

@@ -232,6 +232,13 @@
       "when": 1794497218216,
       "tag": "0032_series_period",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "6",
+      "when": 1794580715836,
+      "tag": "0033_volume_parts",
+      "breakpoints": true
     }
   ]
 }
