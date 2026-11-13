@@ -74,8 +74,10 @@ const saveSheet = (
         changes: string[] | null;
         volumeCount?: number | null;
     },
+    // Heure de la lecture : celle de la relecture de nuit (son horloge).
+    now: Date,
 ) => {
-    const row = { ...values, checkedAt: new Date() };
+    const row = { ...values, checkedAt: now };
     db.insert(sourceSheets)
         .values({ site, sourceId, ...row })
         .onConflictDoUpdate({
@@ -95,11 +97,17 @@ export const sheetSeen = (
     sourceId: string,
     sheet: WatchedSheet,
 ) =>
-    saveSheet(db, site, sourceId, {
-        snapshot: snapshotOf(sheet),
-        changes: null,
-        volumeCount: sheet.volumeCount ?? null,
-    });
+    saveSheet(
+        db,
+        site,
+        sourceId,
+        {
+            snapshot: snapshotOf(sheet),
+            changes: null,
+            volumeCount: sheet.volumeCount ?? null,
+        },
+        new Date(),
+    );
 
 /**
  * Fiche relue en arrière-plan : ce qui a changé depuis que l'admin l'a vue
@@ -111,13 +119,17 @@ export const sheetChecked = (
     site: MetadataSource,
     sourceId: string,
     sheet: WatchedSheet | undefined,
+    now = new Date(),
 ) => {
     const known = findSheet(db, site, sourceId);
     if (!sheet) {
-        saveSheet(db, site, sourceId, {
-            snapshot: known?.snapshot ?? {},
-            changes: [SHEET_GONE],
-        });
+        saveSheet(
+            db,
+            site,
+            sourceId,
+            { snapshot: known?.snapshot ?? {}, changes: [SHEET_GONE] },
+            now,
+        );
         return;
     }
     // Sans référence (ou fiche disparue dès la 1re lecture) : celle-ci.
@@ -126,11 +138,17 @@ export const sheetChecked = (
             ? known.snapshot
             : snapshotOf(sheet);
     const changes = sheetChanges(snapshot, snapshotOf(sheet));
-    saveSheet(db, site, sourceId, {
-        snapshot,
-        changes: changes.length > 0 ? changes : null,
-        volumeCount: sheet.volumeCount ?? null,
-    });
+    saveSheet(
+        db,
+        site,
+        sourceId,
+        {
+            snapshot,
+            changes: changes.length > 0 ? changes : null,
+            volumeCount: sheet.volumeCount ?? null,
+        },
+        now,
+    );
 };
 
 /** Toutes les fiches lues, par « site:id » (date et changements). */

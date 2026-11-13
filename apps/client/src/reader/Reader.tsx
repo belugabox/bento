@@ -15,6 +15,10 @@ import {
     IconArrowLeft,
     IconMaximize,
     IconMinimize,
+    IconPlayerSkipBack,
+    IconPlayerSkipForward,
+    IconPlayerTrackNext,
+    IconPlayerTrackPrev,
     IconSettings,
     IconZoomIn,
     IconZoomOut,
@@ -59,6 +63,9 @@ import {
     spreadIndexOf,
 } from './navigation';
 
+// Commandes cachées après ce délai sans y toucher.
+export const TOOLBAR_HIDE_MS = 4000;
+
 /** Une page ou deux par écran ; `auto` : deux en paysage. */
 type PageMode = 'auto' | 'single' | 'double';
 
@@ -101,6 +108,7 @@ export const Reader = ({
     modeLabel,
     exit,
     end,
+    volumes,
     toolbarExtra,
 }: {
     title: string;
@@ -124,6 +132,11 @@ export const Reader = ({
     exit: ReaderExit;
     /** Sous la dernière page d'un webtoon : bouton du tome suivant… */
     end: ReactNode;
+    /**
+     * Tomes précédent et suivant (boutons de la barre du bas) ; absent :
+     * pas de boutons (aperçu), un côté absent : bouton grisé.
+     */
+    volumes?: { previous?: () => void; next?: () => void };
     toolbarExtra?: ReactNode;
 }) => {
     const [fit, setFit] = useLocalStorage<Fit>({
@@ -135,6 +148,17 @@ export const Reader = ({
         defaultValue: 'auto',
     });
     const [toolbar, setToolbar] = useState(true);
+    // Commandes : cachées après quelques secondes sans y toucher, et dès
+    // qu'on tourne la page ; elles restent pendant qu'on s'en sert (et
+    // tant que les réglages de lecture sont ouverts).
+    const [settingsOpened, setSettingsOpened] = useState(false);
+    const [lastUse, setLastUse] = useState(0);
+    const keepToolbar = useCallback(() => setLastUse(Date.now()), []);
+    useEffect(() => {
+        if (!toolbar || settingsOpened) return;
+        const timer = setTimeout(() => setToolbar(false), TOOLBAR_HIDE_MS);
+        return () => clearTimeout(timer);
+    }, [toolbar, settingsOpened, lastUse]);
     const fullscreen = useFullscreen();
     const [zoomed, setZoomed] = useState(false);
     const zoom = useRef<ReactZoomPanPinchRef>(null);
@@ -177,6 +201,8 @@ export const Reader = ({
 
     const move = useCallback(
         (to: Move) => {
+            // Page tournée : les commandes s'effacent.
+            setToolbar(false);
             if (to === 'next') {
                 const next = spreads[spreadIndex + 1];
                 // Après la dernière page : le tome suivant, sans écran
@@ -284,6 +310,72 @@ export const Reader = ({
         shown.length > 1
             ? `${shown[0]! + 1}-${lastShown + 1}`
             : String(page + 1);
+    // Largeur du plus long numéro possible : la barre ne bouge plus d'une
+    // page à l'autre (chiffres de même largeur).
+    const widestLabel = wantDouble
+        ? `${pageCount - 1}-${pageCount} / ${pageCount}`
+        : `${pageCount} / ${pageCount}`;
+
+    // Boutons de la barre du bas : vers le début (tome précédent, première
+    // page) et vers la fin (dernière page, tome suivant).
+    const control = (
+        label: string,
+        icon: ReactNode,
+        onClick: (() => void) | undefined,
+    ) => (
+        <ActionIcon
+            key={label}
+            variant="subtle"
+            color="gray"
+            c="white"
+            size="xl"
+            aria-label={label}
+            title={label}
+            disabled={!onClick}
+            onClick={onClick}
+            style={{ flexShrink: 0 }}
+        >
+            {icon}
+        </ActionIcon>
+    );
+    // De droite à gauche, la fin est à gauche : icônes en miroir.
+    const mirror = direction === 'rtl' ? { transform: 'scaleX(-1)' } : {};
+    // Les tomes à l'extérieur, les pages contre le curseur.
+    const toStart = [
+        volumes &&
+            control(
+                'Tome précédent',
+                <IconPlayerTrackPrev size={22} style={mirror} />,
+                volumes.previous,
+            ),
+        !webtoon &&
+            control(
+                'Première page',
+                <IconPlayerSkipBack size={22} style={mirror} />,
+                page > 0 ? () => goTo(0) : undefined,
+            ),
+    ];
+    const toEnd = [
+        !webtoon &&
+            control(
+                'Dernière page',
+                <IconPlayerSkipForward size={22} style={mirror} />,
+                lastShown < pageCount - 1
+                    ? () => goTo(pageCount - 1)
+                    : undefined,
+            ),
+        volumes &&
+            control(
+                'Tome suivant',
+                <IconPlayerTrackNext size={22} style={mirror} />,
+                volumes.next,
+            ),
+    ];
+    // Dans le sens du curseur : de droite à gauche, la fin est à gauche.
+    const [leftControls, rightControls] =
+        direction === 'rtl'
+            ? [[...toEnd].reverse(), [...toStart].reverse()]
+            : [toStart, toEnd];
 
     const images = (
         <Box
@@ -311,7 +403,7 @@ export const Reader = ({
         </Box>
     );
 
-    const exitIcon = <IconArrowLeft size={18} />;
+    const exitIcon = <IconArrowLeft size={22} />;
 
     return (
         <Box
@@ -384,6 +476,7 @@ export const Reader = ({
                         justify="space-between"
                         wrap="nowrap"
                         bg="rgba(0,0,0,0.75)"
+                        onPointerDown={keepToolbar}
                     >
                         <Group gap="xs" wrap="nowrap" style={{ minWidth: 0 }}>
                             {exit.to ? (
@@ -391,6 +484,7 @@ export const Reader = ({
                                     component={Link}
                                     to={exit.to}
                                     variant="subtle"
+                                    size="xl"
                                     color="gray"
                                     aria-label={exit.label}
                                 >
@@ -400,6 +494,7 @@ export const Reader = ({
                                 <ActionIcon
                                     onClick={exit.onExit}
                                     variant="subtle"
+                                    size="xl"
                                     color="gray"
                                     aria-label={exit.label}
                                 >
@@ -416,37 +511,41 @@ export const Reader = ({
                                 <>
                                     <ActionIcon
                                         variant="subtle"
+                                        size="xl"
                                         color="gray"
                                         aria-label="Zoom arrière"
                                         onClick={() => zoom.current?.zoomOut()}
                                     >
-                                        <IconZoomOut size={18} />
+                                        <IconZoomOut size={22} />
                                     </ActionIcon>
                                     {zoomed && (
                                         <ActionIcon
                                             variant="subtle"
+                                            size="xl"
                                             color="gray"
                                             aria-label="Taille normale"
                                             onClick={() =>
                                                 zoom.current?.resetTransform()
                                             }
                                         >
-                                            <IconZoomReset size={18} />
+                                            <IconZoomReset size={22} />
                                         </ActionIcon>
                                     )}
                                     <ActionIcon
                                         variant="subtle"
+                                        size="xl"
                                         color="gray"
                                         aria-label="Zoom avant"
                                         onClick={() => zoom.current?.zoomIn()}
                                     >
-                                        <IconZoomIn size={18} />
+                                        <IconZoomIn size={22} />
                                     </ActionIcon>
                                 </>
                             )}
                             {fullscreen.supported && (
                                 <ActionIcon
                                     variant="subtle"
+                                    size="xl"
                                     color="gray"
                                     aria-label={
                                         fullscreen.active
@@ -456,20 +555,31 @@ export const Reader = ({
                                     onClick={fullscreen.toggle}
                                 >
                                     {fullscreen.active ? (
-                                        <IconMinimize size={18} />
+                                        <IconMinimize size={22} />
                                     ) : (
-                                        <IconMaximize size={18} />
+                                        <IconMaximize size={22} />
                                     )}
                                 </ActionIcon>
                             )}
-                            <Popover position="bottom-end" withinPortal>
+                            <Popover
+                                position="bottom-end"
+                                withinPortal
+                                opened={settingsOpened}
+                                onChange={setSettingsOpened}
+                            >
                                 <Popover.Target>
                                     <ActionIcon
                                         variant="subtle"
+                                        size="xl"
                                         color="gray"
                                         aria-label="Réglages de lecture"
+                                        onClick={() =>
+                                            setSettingsOpened(
+                                                (opened) => !opened,
+                                            )
+                                        }
                                     >
-                                        <IconSettings size={18} />
+                                        <IconSettings size={22} />
                                     </ActionIcon>
                                 </Popover.Target>
                                 <Popover.Dropdown>
@@ -571,33 +681,48 @@ export const Reader = ({
                         left={0}
                         right={0}
                         p="sm"
+                        gap={4}
                         wrap="nowrap"
                         bg="rgba(0,0,0,0.75)"
+                        onPointerDown={keepToolbar}
                     >
-                        {!webtoon && (
+                        {leftControls}
+                        {webtoon ? (
+                            <Box style={{ flex: 1 }} />
+                        ) : (
                             <Slider
                                 style={{ flex: 1 }}
                                 min={1}
                                 max={Math.max(pageCount, 1)}
                                 value={sliderValue}
-                                onChange={(value) =>
+                                onChange={(value) => {
+                                    keepToolbar();
                                     goTo(
                                         direction === 'rtl'
                                             ? pageCount - value
                                             : value - 1,
-                                    )
-                                }
+                                    );
+                                }}
                                 label={null}
                                 color="gray"
+                                mx="xs"
                             />
                         )}
                         <Text
                             c="white"
                             size="sm"
-                            style={{ whiteSpace: 'nowrap' }}
+                            data-testid="page-label"
+                            style={{
+                                whiteSpace: 'nowrap',
+                                fontVariantNumeric: 'tabular-nums',
+                                textAlign: 'center',
+                                minWidth: `${widestLabel.length}ch`,
+                                flexShrink: 0,
+                            }}
                         >
                             {pageLabel} / {pageCount}
                         </Text>
+                        {rightControls}
                     </Group>
                 </>
             )}

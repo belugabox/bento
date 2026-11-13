@@ -1,5 +1,11 @@
 import { MantineProvider } from '@mantine/core';
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import {
+    act,
+    cleanup,
+    fireEvent,
+    render,
+    screen,
+} from '@testing-library/react';
 import {
     MemoryRouter,
     Route,
@@ -9,6 +15,7 @@ import {
 } from 'react-router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { TOOLBAR_HIDE_MS } from './Reader';
 import { ReaderPage } from './ReaderPage';
 
 type Saved = { page?: number; completed?: boolean };
@@ -57,6 +64,8 @@ const open = async (
     direction: Mode,
     url = '/read/7',
     progress: Saved | null = null,
+    // Autres champs du tome (tome précédent…).
+    extra: Record<string, unknown> = {},
 ) => {
     saved = [];
     vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
@@ -66,7 +75,7 @@ const open = async (
                   { progress: null })
                 : String(input).endsWith('/page-sizes')
                   ? PAGE_SIZES
-                  : volume(direction, progress);
+                  : { ...volume(direction, progress), ...extra };
         expect(String(input)).toMatch(/^\/api\/volumes\/7/);
         return new Response(JSON.stringify(body), {
             headers: { 'Content-Type': 'application/json' },
@@ -192,6 +201,139 @@ describe('ReaderPage', () => {
 
         expect(screen.queryByText('Fin du tome')).toBeNull();
         await vi.waitFor(() => expect(location).toBe('/read/8'));
+    });
+
+    it('jumps to the first or last page, or to the other volumes, from the bottom bar', async () => {
+        await open('ltr', '/read/7?page=2', null, { previousId: 6 });
+        const button = (name: string) =>
+            screen.getByRole('button', { name }) as HTMLButtonElement;
+
+        fireEvent.click(button('Dernière page'));
+        await vi.waitFor(() => expect(location).toBe('/read/7?page=3'));
+        expect(button('Dernière page').disabled).toBe(true);
+        fireEvent.click(button('Première page'));
+        await vi.waitFor(() => expect(location).toBe('/read/7?page=1'));
+        expect(button('Première page').disabled).toBe(true);
+
+        // Le tome précédent s'ouvre au début.
+        fireEvent.click(button('Tome précédent'));
+        await vi.waitFor(() => expect(location).toBe('/read/6'));
+    });
+
+    it('opens the next volume from the bottom bar, and greys a missing previous one', async () => {
+        await open('ltr');
+        expect(
+            (
+                screen.getByRole('button', {
+                    name: 'Tome précédent',
+                }) as HTMLButtonElement
+            ).disabled,
+        ).toBe(true);
+        fireEvent.click(screen.getByRole('button', { name: 'Tome suivant' }));
+        await vi.waitFor(() => expect(location).toBe('/read/8'));
+    });
+
+    it('puts the buttons in the reading direction, the volumes outside', async () => {
+        const order = () =>
+            screen
+                .getAllByRole('button', {
+                    name: /^(Tome précédent|Première page|Dernière page|Tome suivant)$/,
+                })
+                .map((b) => b.getAttribute('aria-label'));
+        await open('ltr');
+        expect(order()).toEqual([
+            'Tome précédent',
+            'Première page',
+            'Dernière page',
+            'Tome suivant',
+        ]);
+        cleanup();
+        // De droite à gauche : la fin à gauche, comme le curseur.
+        await open('rtl');
+        expect(order()).toEqual([
+            'Tome suivant',
+            'Dernière page',
+            'Première page',
+            'Tome précédent',
+        ]);
+    });
+
+    it('keeps only the volume buttons in a webtoon', async () => {
+        await open('webtoon');
+        expect(
+            screen.queryByRole('button', { name: 'Première page' }),
+        ).toBeNull();
+        expect(
+            screen.queryByRole('button', { name: 'Dernière page' }),
+        ).toBeNull();
+        expect(
+            screen.getByRole('button', { name: 'Tome suivant' }),
+        ).toBeTruthy();
+    });
+
+    it('keeps the page number the same width from one page to the next', async () => {
+        await open('ltr');
+        const label = screen.getByTestId('page-label');
+        expect(label.style.fontVariantNumeric).toBe('tabular-nums');
+        // « 3 / 3 » : le plus long possible pour 3 pages.
+        expect(label.style.minWidth).toBe('5ch');
+        press('ArrowRight');
+        // Commandes réaffichées (toucher au milieu) : même largeur.
+        tap(512);
+        expect(screen.getByTestId('page-label').style.minWidth).toBe('5ch');
+    });
+
+    it('hides the controls when a page is turned, and shows them on a tap in the middle', async () => {
+        await open('ltr');
+        expect(
+            screen.getByRole('button', { name: 'Tome suivant' }),
+        ).toBeTruthy();
+        tap(900);
+        expect(
+            screen.queryByRole('button', { name: 'Tome suivant' }),
+        ).toBeNull();
+        tap(512);
+        expect(
+            screen.getByRole('button', { name: 'Tome suivant' }),
+        ).toBeTruthy();
+    });
+
+    it('hides the controls after a few seconds, unless the reading settings are open', async () => {
+        // Horloge simulée qui avance aussi d'elle-même (chargement du tome).
+        vi.useFakeTimers({ shouldAdvanceTime: true });
+        try {
+            await open('ltr');
+            // Commandes cachées puis réaffichées : le délai repart de zéro.
+            tap(512);
+            tap(512);
+            act(() => vi.advanceTimersByTime(TOOLBAR_HIDE_MS - 500));
+            expect(screen.getByTestId('page-label')).toBeTruthy();
+            act(() => vi.advanceTimersByTime(500));
+            expect(screen.queryByTestId('page-label')).toBeNull();
+
+            // Réglages ouverts : les commandes restent.
+            tap(512);
+            fireEvent.click(
+                screen.getByRole('button', { name: 'Réglages de lecture' }),
+            );
+            act(() => vi.advanceTimersByTime(TOOLBAR_HIDE_MS * 2));
+            expect(screen.getByTestId('page-label')).toBeTruthy();
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it('makes the buttons big enough for a tablet', async () => {
+        await open('ltr');
+        for (const name of [
+            'Tome suivant',
+            'Première page',
+            'Réglages de lecture',
+        ]) {
+            expect(
+                screen.getByRole('button', { name }).getAttribute('data-size'),
+            ).toBe('xl');
+        }
     });
 
     it('goes back to the series with Escape', async () => {

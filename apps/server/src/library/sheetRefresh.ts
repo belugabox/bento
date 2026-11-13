@@ -289,7 +289,13 @@ export class SheetRefresher {
             sheet?.rating,
         );
         if (sheet)
-            sheetChecked(this.db, proposal.site, proposal.sourceId, sheet);
+            sheetChecked(
+                this.db,
+                proposal.site,
+                proposal.sourceId,
+                sheet,
+                this.now(),
+            );
         verifyProposal(this.db, proposal, sheet);
     };
 
@@ -297,7 +303,7 @@ export class SheetRefresher {
         // Fiche disparue : signalée (« Fiche introuvable »), sans pause.
         const sheet = await this.readSheet(link.site as SearchedSite, link.id);
         saveSourceRating(this.db, link.site, link.id, sheet?.rating);
-        sheetChecked(this.db, link.site, link.id, sheet);
+        sheetChecked(this.db, link.site, link.id, sheet, this.now());
         this.logger?.debug(`Fiche relue : ${link.site}:${link.id}`);
     };
 }
