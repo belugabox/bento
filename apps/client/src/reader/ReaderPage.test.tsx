@@ -278,17 +278,17 @@ describe('ReaderPage', () => {
         // « 3 / 3 » : le plus long possible pour 3 pages.
         expect(label.style.minWidth).toBe('5ch');
         press('ArrowRight');
-        // Commandes réaffichées (toucher au milieu) : même largeur.
-        tap(512);
         expect(screen.getByTestId('page-label').style.minWidth).toBe('5ch');
     });
 
-    it('hides the controls when a page is turned, and shows them on a tap in the middle', async () => {
+    it('keeps the controls when a page is turned; a tap in the middle hides or shows them', async () => {
         await open('ltr');
+        tap(900);
+        press('ArrowRight');
         expect(
             screen.getByRole('button', { name: 'Tome suivant' }),
         ).toBeTruthy();
-        tap(900);
+        tap(512);
         expect(
             screen.queryByRole('button', { name: 'Tome suivant' }),
         ).toBeNull();

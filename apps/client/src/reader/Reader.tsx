@@ -148,9 +148,9 @@ export const Reader = ({
         defaultValue: 'auto',
     });
     const [toolbar, setToolbar] = useState(true);
-    // Commandes : cachées après quelques secondes sans y toucher, et dès
-    // qu'on tourne la page ; elles restent pendant qu'on s'en sert (et
-    // tant que les réglages de lecture sont ouverts).
+    // Commandes : cachées après quelques secondes sans y toucher, ou d'une
+    // touche au milieu (pas en tournant la page) ; elles restent pendant
+    // qu'on s'en sert (et tant que les réglages de lecture sont ouverts).
     const [settingsOpened, setSettingsOpened] = useState(false);
     const [lastUse, setLastUse] = useState(0);
     const keepToolbar = useCallback(() => setLastUse(Date.now()), []);
@@ -201,8 +201,6 @@ export const Reader = ({
 
     const move = useCallback(
         (to: Move) => {
-            // Page tournée : les commandes s'effacent.
-            setToolbar(false);
             if (to === 'next') {
                 const next = spreads[spreadIndex + 1];
                 // Après la dernière page : le tome suivant, sans écran
