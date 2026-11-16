@@ -5,6 +5,7 @@ import {
     Loader,
     NavLink,
     Paper,
+    Progress,
     Select,
     Stack,
     Text,
@@ -12,7 +13,7 @@ import {
 } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { IconFile, IconFolder } from '@tabler/icons-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import { CoverPicker } from '@/components/metadata/CoverPicker';
 import { MetadataEditor } from '@/components/metadata/MetadataEditor';
@@ -40,6 +41,9 @@ const folderLabel = (folder: string) =>
     folder === '_draft'
         ? '(racine de _draft)'
         : folder.replace(/^_draft\//, '');
+
+/** Relecture du dossier pendant la conversion de ses PDF. */
+const CONVERSION_POLL_MS = 3000;
 
 /** Tomes à préparer (`_draft`) : métadonnées puis publication. */
 export const DraftsPage = () => {
@@ -77,6 +81,16 @@ export const DraftsPage = () => {
         drafts.reload();
         folderFiles.reload();
     };
+
+    // PDF convertis en arrière-plan par le serveur : le dossier est relu
+    // jusqu'à la fin, puis l'éditeur s'ouvre.
+    const converting = files?.filter((file) => file.converting).length ?? 0;
+    const reloadFolder = folderFiles.reload;
+    useEffect(() => {
+        if (converting === 0) return;
+        const timer = setTimeout(reloadFolder, CONVERSION_POLL_MS);
+        return () => clearTimeout(timer);
+    }, [converting, files, reloadFolder]);
 
     if (libraries.error) {
         return <Alert color="red">{libraries.error.message}</Alert>;
@@ -170,6 +184,24 @@ export const DraftsPage = () => {
                             </Stack>
                         ) : files.length === 0 ? (
                             <Text c="dimmed">Ce dossier est vide.</Text>
+                        ) : converting > 0 ? (
+                            <Stack py="xl" maw={420} mx="auto" w="100%">
+                                <Text fw={500}>Conversion des PDF en CBZ…</Text>
+                                <Progress
+                                    value={
+                                        ((files.length - converting) /
+                                            files.length) *
+                                        100
+                                    }
+                                    animated
+                                />
+                                <Text size="sm" c="dimmed">
+                                    {files.length - converting} / {files.length}{' '}
+                                    fichiers prêts. Les images des pages sont
+                                    reprises telles quelles ; l'éditeur s'ouvre
+                                    à la fin.
+                                </Text>
+                            </Stack>
                         ) : (
                             libraryId &&
                             library && (
