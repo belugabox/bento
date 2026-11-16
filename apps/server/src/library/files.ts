@@ -26,6 +26,7 @@ import {
     estimateCompression,
 } from '../archive/compress';
 import { COVER_QUALITY, COVER_SIZE, readImage } from '../archive/image';
+import { convertPdfToCbz, isPdf } from '../archive/pdf';
 import { updateComicInfo } from '../archive/write';
 import type { Db } from '../db';
 import { libraries, series, volumes } from '../db/schema';
@@ -63,8 +64,10 @@ export type FileInfo = {
     draft: boolean;
     pageCount: number;
     comicInfo: ComicInfo;
-    // Archive illisible ou .cbr non convertible.
+    // Archive illisible, .cbr ou .pdf non convertible, ou PDF en conversion.
     error: string | null;
+    // PDF en cours de conversion en arrière-plan.
+    converting?: boolean;
     // Emplacement d'après le ComicInfo ; null sans série ou sans numéro.
     publicationPath: string | null;
 };
@@ -118,11 +121,18 @@ export class LibraryFiles {
             info: Pick<FileInfo, 'pageCount' | 'comicInfo' | 'error'>;
         }
     >();
-    // .cbr dont la conversion a échoué : pas retentée tant qu'il ne change pas.
+    // .cbr ou .pdf dont la conversion a échoué : pas retentée tant qu'il ne
+    // change pas.
     private conversionErrors = new Map<
         string,
         { key: string; reason: string }
     >();
+    // PDF à convertir, un à la fois, en arrière-plan : plusieurs centaines
+    // de Mo ne doivent pas faire attendre l'ouverture du dossier (Cloudflare
+    // coupe une requête après 100 s).
+    private pdfQueue: { fullPath: string; key: string }[] = [];
+    private pdfConverting = new Set<string>();
+    private pdfRunning = false;
 
     constructor(
         private readonly db: Db,
@@ -198,6 +208,18 @@ export class LibraryFiles {
             folder: path.posix.dirname(relative),
             draft: isDraft(relative),
         };
+        if (this.pdfConverting.has(fullPath)) {
+            const { size } = await stat(fullPath).catch(() => ({ size: 0 }));
+            return {
+                ...base,
+                size,
+                pageCount: 0,
+                comicInfo: {},
+                error: 'Conversion du PDF en cours…',
+                converting: true,
+                publicationPath: null,
+            };
+        }
         if (conversion) {
             const { size } = await stat(fullPath);
             return {
@@ -233,17 +255,26 @@ export class LibraryFiles {
 
     /**
      * Convertit en CBZ des .cbr de brouillons, et réécrit en ZIP les .cbz
-     * qui sont en réalité des archives RAR.
+     * qui sont en réalité des archives RAR. Les PDF sont convertis en
+     * arrière-plan (`pdfQueue`).
      */
     private convertFiles = async (fullPaths: string[]) => {
         for (const fullPath of fullPaths) {
             const name = path.basename(fullPath);
             const extension = path.extname(name).toLowerCase();
-            if (extension !== '.cbz' && !isCbr(name)) continue;
+            if (extension !== '.cbz' && !isCbr(name) && !isPdf(name)) continue;
             const stats = await stat(fullPath).catch(() => undefined);
             if (!stats) continue;
             const key = `${stats.size}:${stats.mtimeMs}`;
             if (this.conversionErrors.get(fullPath)?.key === key) continue;
+            if (isPdf(name)) {
+                if (!this.pdfConverting.has(fullPath)) {
+                    this.pdfConverting.add(fullPath);
+                    this.pdfQueue.push({ fullPath, key });
+                    void this.convertPdfs();
+                }
+                continue;
+            }
             if (this.cache.get(fullPath)?.key === key) continue;
             try {
                 if (isCbr(name)) {
@@ -260,6 +291,45 @@ export class LibraryFiles {
                     reason: reasonOf(error),
                 });
             }
+        }
+    };
+
+    /** Convertit les PDF en attente, un à la fois. */
+    private convertPdfs = async () => {
+        if (this.pdfRunning) return;
+        this.pdfRunning = true;
+        try {
+            for (
+                let job = this.pdfQueue.shift();
+                job;
+                job = this.pdfQueue.shift()
+            ) {
+                const name = path.basename(job.fullPath);
+                try {
+                    await convertPdfToCbz(job.fullPath);
+                    this.conversionErrors.delete(job.fullPath);
+                    this.logger.info(`Brouillon ${name} converti en CBZ`);
+                } catch (error) {
+                    this.conversionErrors.set(job.fullPath, {
+                        key: job.key,
+                        reason: reasonOf(error),
+                    });
+                    this.logger.warn(
+                        `Conversion de ${name} impossible : ${reasonOf(error)}`,
+                    );
+                } finally {
+                    this.pdfConverting.delete(job.fullPath);
+                }
+            }
+        } finally {
+            this.pdfRunning = false;
+        }
+    };
+
+    /** Attend la fin des conversions de PDF en cours (tests). */
+    pdfConversions = async () => {
+        while (this.pdfRunning || this.pdfQueue.length > 0) {
+            await new Promise((resolve) => setTimeout(resolve, 10));
         }
     };
 
@@ -281,7 +351,9 @@ export class LibraryFiles {
                 const extension = path.extname(entry.name).toLowerCase();
                 if (
                     !entry.isFile() ||
-                    (extension !== '.cbz' && extension !== '.cbr')
+                    (extension !== '.cbz' &&
+                        extension !== '.cbr' &&
+                        extension !== '.pdf')
                 ) {
                     continue;
                 }
@@ -298,7 +370,7 @@ export class LibraryFiles {
         return count;
     };
 
-    /** Archives (.cbz, .cbr) sous un dossier, triées par chemin. */
+    /** Archives (.cbz, .cbr, .pdf) sous un dossier, triées par chemin. */
     private archivesUnder = async (libraryPath: string, dir: string) => {
         const entries = await readdir(dir, {
             withFileTypes: true,
@@ -310,7 +382,9 @@ export class LibraryFiles {
             const extension = path.extname(entry.name).toLowerCase();
             if (
                 !entry.isFile() ||
-                (extension !== '.cbz' && !isCbr(entry.name))
+                (extension !== '.cbz' &&
+                    !isCbr(entry.name) &&
+                    !isPdf(entry.name))
             ) {
                 continue;
             }
@@ -407,11 +481,11 @@ export class LibraryFiles {
         }
         const folder = relativeTo(library.path, dir);
         // Un tome seul à la racine de _draft : son groupe porte son nom en
-        // .cbz, qu'il soit encore un .cbr ou déjà converti.
+        // .cbz, qu'il soit encore un .cbr (ou un .pdf) ou déjà converti.
         // Un dossier nommé « X.cbz » reste un dossier.
         const lone =
             path.dirname(dir) === draftRoot &&
-            /\.cb[rz]$/i.test(dir) &&
+            /\.(cb[rz]|pdf)$/i.test(dir) &&
             !(await stat(dir).then(
                 (stats) => stats.isDirectory(),
                 () => false,
@@ -431,10 +505,12 @@ export class LibraryFiles {
         );
         const files: FileInfo[] = [];
         for (const archive of await archivesOfGroup()) {
-            // Un .cbr reste listé tant que sa conversion échoue.
+            // Un .cbr reste listé tant que sa conversion échoue ; un PDF
+            // aussi pendant qu'il est converti.
             if (
-                isCbr(archive.path) &&
-                !this.conversionErrors.has(archive.fullPath)
+                (isCbr(archive.path) || isPdf(archive.path)) &&
+                !this.conversionErrors.has(archive.fullPath) &&
+                !this.pdfConverting.has(archive.fullPath)
             ) {
                 continue;
             }
