@@ -677,6 +677,47 @@ describe('publishing', () => {
         expect(row?.pageCount).toBe(4);
     });
 
+    it('never replaces a volume of the same number in another group', async () => {
+        // Publiés un par un, comme depuis l'éditeur : chaque groupe a son
+        // tome 1, rien n'est supprimé.
+        const groups = [
+            ['Part 1 - Rouge', 2014],
+            ['Part 2 - Or et Argent', 2016],
+            ['Part 3 - Rubis', 2014],
+        ] as const;
+        for (const [group, year] of groups) {
+            await writeCbz(ctx.file(`_draft/Pokémon/${group}.cbz`), {
+                comicInfo: `<Series>Pokémon</Series><StoryArc>${group}</StoryArc><Number>1</Number><Year>${year}</Year>`,
+            });
+        }
+        await formatDrafts(ctx);
+        for (const [group] of groups) {
+            const { failures } = await ctx.files.publish(ctx.library.id, [
+                `_draft/Pokémon/${group}.cbz`,
+            ]);
+            expect(failures).toEqual([]);
+        }
+
+        expect((await readdir(ctx.file('Pokémon'))).sort()).toEqual([
+            'Pokémon - Part 1 - Rouge #01 (2014).cbz',
+            'Pokémon - Part 2 - Or et Argent #01 (2016).cbz',
+            'Pokémon - Part 3 - Rubis #01 (2014).cbz',
+        ]);
+
+        // Le même tome du même groupe, d'une autre année : remplacé.
+        await writeCbz(ctx.file('_draft/Pokémon/again.cbz'), {
+            comicInfo:
+                '<Series>Pokémon</Series><StoryArc>Part 1 - Rouge</StoryArc><Number>1</Number><Year>2020</Year>',
+        });
+        await formatDrafts(ctx);
+        await ctx.files.publish(ctx.library.id, ['_draft/Pokémon/again.cbz']);
+        expect((await readdir(ctx.file('Pokémon'))).sort()).toEqual([
+            'Pokémon - Part 1 - Rouge #01 (2020).cbz',
+            'Pokémon - Part 2 - Or et Argent #01 (2016).cbz',
+            'Pokémon - Part 3 - Rubis #01 (2014).cbz',
+        ]);
+    });
+
     it('moves a published series when renamed, keeping ids and progress', async () => {
         for (const n of ['1', '2']) {
             await writeCbz(ctx.file(`Spy X Family/Spy X Family #0${n}.cbz`), {

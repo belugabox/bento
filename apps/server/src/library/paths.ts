@@ -43,4 +43,8 @@ export const draftGroupOf = (relative: string) => {
         : folder;
 };
 
-export { publicationPathOf, volumeNumberOf } from './publication';
+export {
+    publicationPathOf,
+    volumeKeyOf,
+    volumeNumberOf,
+} from './publication';

@@ -51,6 +51,20 @@ export const publicationPathOf = (
  * ou « HS1 » et « SP1 » pour un hors-série et un spécial (chaque type a sa
  * numérotation).
  */
+/**
+ * Clé d'un tome rangé : son nom sans l'année ni l'extension, sans
+ * majuscules. « Gantz #12 » et « Gantz #12 (2024) » sont le même tome ;
+ * « Pokémon - Part 1 #01 » et « Pokémon - Part 2 #01 » non (le groupe
+ * compte).
+ */
+export const volumeKeyOf = (fileName: string) =>
+    fileName
+        .normalize('NFC')
+        .replace(/\.cbz$/i, '')
+        .replace(/\s*\(\d{4}\)$/, '')
+        .trim()
+        .toLowerCase();
+
 export const volumeNumberOf = (fileName: string): string | undefined => {
     const found = /(#|\b(?:HS|SP|INT))(\d+(?:\.\d+)?)(?!\d|\.\d)/i.exec(
         fileName,
