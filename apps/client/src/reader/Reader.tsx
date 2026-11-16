@@ -2,13 +2,16 @@ import {
     ActionIcon,
     Box,
     Group,
+    Modal,
     Popover,
     SegmentedControl,
     Select,
+    SimpleGrid,
     Slider,
     Stack,
     Switch,
     Text,
+    UnstyledButton,
 } from '@mantine/core';
 import { useLocalStorage, useMediaQuery } from '@mantine/hooks';
 import {
@@ -62,6 +65,7 @@ import {
     singleSpreads,
     spreadIndexOf,
 } from './navigation';
+import { useWakeLock } from './wakeLock';
 
 // Commandes cachées après ce délai sans y toucher.
 export const TOOLBAR_HIDE_MS = 4000;
@@ -96,6 +100,7 @@ export const Reader = ({
     title,
     pageCount,
     pageSrc,
+    thumbSrc = pageSrc,
     loadSizes,
     sizesKey,
     page,
@@ -114,6 +119,8 @@ export const Reader = ({
     title: string;
     pageCount: number;
     pageSrc: (index: number) => string;
+    /** Vignette d'une page (planche des pages) ; sinon la page elle-même. */
+    thumbSrc?: (index: number) => string;
     /** Dimensions des pages : double page, ou place des pages d'un webtoon. */
     loadSizes: () => Promise<[number, number][]>;
     /** Change avec le tome (recharge les dimensions). */
@@ -152,13 +159,17 @@ export const Reader = ({
     // touche au milieu (pas en tournant la page) ; elles restent pendant
     // qu'on s'en sert (et tant que les réglages de lecture sont ouverts).
     const [settingsOpened, setSettingsOpened] = useState(false);
+    // Planche des pages : toutes les vignettes, pour sauter à une page.
+    const [thumbsOpened, setThumbsOpened] = useState(false);
     const [lastUse, setLastUse] = useState(0);
     const keepToolbar = useCallback(() => setLastUse(Date.now()), []);
     useEffect(() => {
-        if (!toolbar || settingsOpened) return;
+        if (!toolbar || settingsOpened || thumbsOpened) return;
         const timer = setTimeout(() => setToolbar(false), TOOLBAR_HIDE_MS);
         return () => clearTimeout(timer);
-    }, [toolbar, settingsOpened, lastUse]);
+    }, [toolbar, settingsOpened, thumbsOpened, lastUse]);
+    // L'écran reste allumé pendant la lecture.
+    useWakeLock();
     const fullscreen = useFullscreen();
     const [zoomed, setZoomed] = useState(false);
     const zoom = useRef<ReactZoomPanPinchRef>(null);
@@ -224,6 +235,8 @@ export const Reader = ({
 
     useEffect(() => {
         const onKey = (event: KeyboardEvent) => {
+            // Planche ouverte : Échap la ferme, les flèches n'y tournent rien.
+            if (thumbsOpened) return;
             if (event.key === 'Escape') {
                 onExit();
                 return;
@@ -236,7 +249,7 @@ export const Reader = ({
         };
         window.addEventListener('keydown', onKey);
         return () => window.removeEventListener('keydown', onKey);
-    }, [direction, move, onExit, webtoon]);
+    }, [direction, move, onExit, webtoon, thumbsOpened]);
 
     // Précharger les pages voisines (cache du navigateur).
     useEffect(() => {
@@ -706,24 +719,103 @@ export const Reader = ({
                                 mx="xs"
                             />
                         )}
-                        <Text
-                            c="white"
-                            size="sm"
-                            data-testid="page-label"
-                            style={{
-                                whiteSpace: 'nowrap',
-                                fontVariantNumeric: 'tabular-nums',
-                                textAlign: 'center',
-                                minWidth: `${widestLabel.length}ch`,
-                                flexShrink: 0,
-                            }}
+                        <UnstyledButton
+                            aria-label="Planche des pages"
+                            title="Planche des pages"
+                            disabled={webtoon}
+                            onClick={() => setThumbsOpened(true)}
+                            style={{ flexShrink: 0, minHeight: 44 }}
                         >
-                            {pageLabel} / {pageCount}
-                        </Text>
+                            <Text
+                                c="white"
+                                size="sm"
+                                data-testid="page-label"
+                                style={{
+                                    whiteSpace: 'nowrap',
+                                    fontVariantNumeric: 'tabular-nums',
+                                    textAlign: 'center',
+                                    minWidth: `${widestLabel.length}ch`,
+                                    textDecoration: webtoon
+                                        ? undefined
+                                        : 'underline dotted',
+                                    textUnderlineOffset: 4,
+                                }}
+                            >
+                                {pageLabel} / {pageCount}
+                            </Text>
+                        </UnstyledButton>
                         {rightControls}
                     </Group>
                 </>
             )}
+
+            <Modal
+                opened={thumbsOpened}
+                onClose={() => setThumbsOpened(false)}
+                title="Pages"
+                fullScreen
+                styles={{
+                    body: { paddingBottom: 'var(--mantine-spacing-xl)' },
+                }}
+            >
+                {thumbsOpened && (
+                    <SimpleGrid
+                        cols={{ base: 3, xs: 4, sm: 6, md: 8 }}
+                        spacing="sm"
+                        // Manga : la première page en haut à droite.
+                        dir={direction === 'rtl' ? 'rtl' : undefined}
+                    >
+                        {Array.from({ length: pageCount }, (_, index) => {
+                            const current = shown.includes(index);
+                            return (
+                                <UnstyledButton
+                                    key={index}
+                                    aria-label={`Page ${index + 1}`}
+                                    aria-current={current ? 'page' : undefined}
+                                    // La page en cours, amenée au milieu.
+                                    ref={
+                                        current && index === shown[0]
+                                            ? (element) =>
+                                                  element?.scrollIntoView?.({
+                                                      block: 'center',
+                                                  })
+                                            : undefined
+                                    }
+                                    onClick={() => {
+                                        setThumbsOpened(false);
+                                        goTo(index);
+                                    }}
+                                    style={{
+                                        borderRadius: 4,
+                                        padding: 2,
+                                        outline: current
+                                            ? '3px solid var(--mantine-primary-color-filled)'
+                                            : undefined,
+                                    }}
+                                >
+                                    <img
+                                        src={thumbSrc(index)}
+                                        alt=""
+                                        loading="lazy"
+                                        draggable={false}
+                                        style={{
+                                            display: 'block',
+                                            width: '100%',
+                                            aspectRatio: '2 / 3',
+                                            objectFit: 'contain',
+                                            background:
+                                                'var(--mantine-color-default-hover)',
+                                        }}
+                                    />
+                                    <Text size="xs" ta="center" c="dimmed">
+                                        {index + 1}
+                                    </Text>
+                                </UnstyledButton>
+                            );
+                        })}
+                    </SimpleGrid>
+                )}
+            </Modal>
         </Box>
     );
 };

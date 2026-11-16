@@ -47,6 +47,8 @@ const volume = (mode: Mode, progress: Saved | null = null) => ({
 
 // Progressions envoyées au serveur (PUT /api/volumes/7/progress).
 let saved: Saved[] = [];
+// Adresses demandées au serveur (tome 7, et le 8 chargé d'avance).
+let requests: string[] = [];
 
 let location = '';
 const Location = () => {
@@ -68,15 +70,28 @@ const open = async (
     extra: Record<string, unknown> = {},
 ) => {
     saved = [];
+    requests = [];
     vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+        const url = String(input);
+        requests.push(`${init?.method ?? 'GET'} ${url}`);
+        // Tome suivant (chargé d'avance près de la fin).
+        const next = url.startsWith('/api/volumes/8');
         const body =
             init?.method === 'PUT'
                 ? (saved.push(JSON.parse(String(init.body))),
                   { progress: null })
-                : String(input).endsWith('/page-sizes')
+                : url.endsWith('/page-sizes')
                   ? PAGE_SIZES
-                  : { ...volume(direction, progress), ...extra };
-        expect(String(input)).toMatch(/^\/api\/volumes\/7/);
+                  : next
+                    ? {
+                          ...volume(direction),
+                          id: 8,
+                          number: '2',
+                          previousId: 7,
+                          nextId: null,
+                      }
+                    : { ...volume(direction, progress), ...extra };
+        expect(url).toMatch(/^\/api\/volumes\/[78]/);
         return new Response(JSON.stringify(body), {
             headers: { 'Content-Type': 'application/json' },
         });
@@ -588,5 +603,63 @@ describe('ReaderPage', () => {
             ),
         );
         await vi.waitFor(() => expect(location).toBe('/read/8?page=1'));
+    });
+
+    it('gets the next volume ready near the end, and opens it without asking again', async () => {
+        await open('ltr', '/read/7?page=1');
+        // Tome de 3 pages : déjà près de la fin.
+        await vi.waitFor(() =>
+            expect(requests).toEqual(
+                expect.arrayContaining([
+                    'GET /api/volumes/8',
+                    'GET /api/volumes/8/page-sizes',
+                ]),
+            ),
+        );
+        const before = requests.filter((r) => r === 'GET /api/volumes/8');
+        expect(before).toHaveLength(1);
+
+        fireEvent.click(screen.getByRole('button', { name: 'Tome suivant' }));
+        await vi.waitFor(() => expect(location).toBe('/read/8?page=1'));
+        // Servi par le chargement d'avance : pas de nouvelle demande.
+        expect(requests.filter((r) => r === 'GET /api/volumes/8')).toHaveLength(
+            1,
+        );
+    });
+
+    it('opens a sheet of page thumbnails to jump to a page', async () => {
+        await open('ltr', '/read/7?page=2');
+
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Planche des pages' }),
+        );
+        const thumbs = await screen.findAllByRole('button', {
+            name: /^Page \d+$/,
+        });
+        expect(thumbs).toHaveLength(3);
+        // La page en cours, signalée ; des vignettes légères.
+        expect(thumbs[1]!.getAttribute('aria-current')).toBe('page');
+        expect(thumbs[0]!.querySelector('img')!.getAttribute('src')).toBe(
+            '/api/volumes/7/pages/0?v=1700000000000&w=300',
+        );
+
+        fireEvent.click(thumbs[2]!);
+        await vi.waitFor(() => expect(location).toBe('/read/7?page=3'));
+        await vi.waitFor(() =>
+            expect(screen.queryByRole('button', { name: 'Page 1' })).toBeNull(),
+        );
+        // Les flèches tournent de nouveau les pages.
+        expect(shownPage()).toBe(
+            '/api/volumes/7/pages/2?v=1700000000000&w=800',
+        );
+    });
+
+    it('lays the thumbnails out right to left for a manga', async () => {
+        await open('rtl', '/read/7?page=1');
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Planche des pages' }),
+        );
+        const first = await screen.findByRole('button', { name: 'Page 1' });
+        expect(first.parentElement!.getAttribute('dir')).toBe('rtl');
     });
 });

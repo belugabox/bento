@@ -6,9 +6,17 @@
  * Une tablette Android affiche 1200 à 1600 pixels sur son petit côté.
  */
 export const PAGE_WIDTHS = [800, 1200, 1600] as const;
-export type PageWidth = (typeof PAGE_WIDTHS)[number];
+
+/**
+ * Vignettes de la planche des pages du lecteur : jamais choisie pour un
+ * écran (`pageWidthFor` ne regarde que `PAGE_WIDTHS`).
+ */
+export const THUMBNAIL_WIDTH = 300;
+
+export type PageWidth = (typeof PAGE_WIDTHS)[number] | typeof THUMBNAIL_WIDTH;
 
 export const isPageWidth = (value: number): value is PageWidth =>
+    value === THUMBNAIL_WIDTH ||
     (PAGE_WIDTHS as readonly number[]).includes(value);
 
 /**
