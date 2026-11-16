@@ -61,6 +61,7 @@ export const getStats = (db: Db) => {
 
     const recent = db.all<{
         userName: string;
+        userAvatarSeed: string | null;
         seriesId: number;
         seriesName: string;
         volumeId: number;
@@ -70,7 +71,8 @@ export const getStats = (db: Db) => {
         completed: number;
         updatedAt: number;
     }>(sql`
-        select u.name as userName, s.id as seriesId, s.name as seriesName,
+        select u.name as userName, u.avatar_seed as userAvatarSeed,
+            s.id as seriesId, s.name as seriesName,
             v.id as volumeId, v.number, rp.page, v.page_count as pageCount,
             rp.completed, rp.updated_at as updatedAt
         from read_progress rp
@@ -79,22 +81,6 @@ export const getStats = (db: Db) => {
         join series s on s.id = v.series_id
         order by rp.updated_at desc
         limit 10`);
-
-    const topSeries = db.all<{
-        id: number;
-        name: string;
-        readers: number;
-        completed: number;
-    }>(sql`
-        select s.id, s.name,
-            count(distinct rp.user_id) as readers,
-            coalesce(sum(rp.completed = 1), 0) as completed
-        from read_progress rp
-        join volumes v on v.id = rp.volume_id
-        join series s on s.id = v.series_id
-        group by s.id
-        order by readers desc, completed desc, s.name
-        limit 5`);
 
     // Dates : secondes (dernier scan, connexion) ou millisecondes (lecture).
     const fromSeconds = (value: number | null) =>
@@ -124,6 +110,5 @@ export const getStats = (db: Db) => {
             completed: r.completed === 1,
             updatedAt: fromMs(r.updatedAt)!,
         })),
-        topSeries,
     };
 };

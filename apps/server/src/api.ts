@@ -84,7 +84,6 @@ import { SEARCHED_SITES, answerProposal } from './library/sheetProposals';
 import { SheetRefresher } from './library/sheetRefresh';
 import { sheetSeen } from './library/sheets';
 import { readCover } from './library/smallCovers';
-import { getStats } from './library/stats';
 import { Bedetheque } from './metadata/bedetheque';
 import { MangaNews } from './metadata/mangaNews';
 import {
@@ -96,6 +95,7 @@ import {
 import type { Wikipedia } from './metadata/wikipedia';
 import { KavitaImport } from './migration/kavita';
 import { SettingsStore, settingsUpdateSchema } from './settings';
+import { createStatsRoutes } from './statsRoutes';
 import { AppError, badRequest, notFound } from './tools/errors';
 import type { Logger } from './tools/logger';
 import { zValidator } from './tools/validator';
@@ -834,13 +834,8 @@ export const createApi = ({
             },
         )
         // --- Gestion des fichiers (admin) : brouillons, ComicInfo, rangement.
-        // Statistiques de la bibliothèque et de la lecture (admin).
-        .get('/stats', requireAdmin, async (c) =>
-            c.json({
-                ...getStats(db),
-                pendingDrafts: await files.pendingSeries(),
-            }),
-        )
+        // Statistiques (module à part).
+        .route('/stats', createStatsRoutes(db, files))
         // Nombre de séries en attente (pastille de l'en-tête).
         .get('/drafts/pending', requireAdmin, async (c) =>
             c.json({ series: await files.pendingSeries() }),

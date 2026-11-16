@@ -9,6 +9,8 @@ import {
     randomAvatar,
 } from '@server/types';
 
+import type { StatsPeriod } from '@/components/stats/statsData';
+
 import { reachServer } from './network';
 
 /** Client typé de l'API (`/api`, servie par le même domaine). */
@@ -550,6 +552,66 @@ export const fetchToClassifyCount = () =>
 export const fetchStats = () => json(api.stats.$get());
 
 export type Stats = Awaited<ReturnType<typeof fetchStats>>;
+
+/** Décalage horaire de l'appareil, en minutes (Paris : 60 ou 120). */
+const timezoneOffset = () => String(-new Date().getTimezoneOffset());
+
+/** Lecture sur une période : activité par jour, moments, lecteurs. */
+export const fetchReadingStats = (period: StatsPeriod) =>
+    json(api.stats.reading.$get({ query: { period, tz: timezoneOffset() } }));
+
+export type ReadingStats = Awaited<ReturnType<typeof fetchReadingStats>>;
+
+/** La bibliothèque en chiffres : croissance, répartitions, séries dormantes. */
+export const fetchLibraryStats = () => json(api.stats.library.$get());
+
+export type LibraryStats = Awaited<ReturnType<typeof fetchLibraryStats>>;
+
+/** Classements de la période : séries les plus lues, notes et lecture. */
+export const fetchReadingRankings = (period: StatsPeriod) =>
+    json(api.stats.rankings.$get({ query: { period, tz: timezoneOffset() } }));
+
+export type ReadingRankings = Awaited<ReturnType<typeof fetchReadingRankings>>;
+
+/** Fiche d'un lecteur sur une période. */
+export const fetchReaderStats = (id: number, period: StatsPeriod) =>
+    json(
+        api.stats.readers[':id'].$get({
+            param: { id: String(id) },
+            query: { period, tz: timezoneOffset() },
+        }),
+    );
+
+export type ReaderStats = Awaited<ReturnType<typeof fetchReaderStats>>;
+
+/** Bilan d'une année d'un lecteur (la plus récente lue par défaut). */
+export const fetchReaderYear = (id: number, year?: number) =>
+    json(
+        api.stats.readers[':id'].year.$get({
+            param: { id: String(id) },
+            query: {
+                tz: timezoneOffset(),
+                ...(year && { year: String(year) }),
+            },
+        }),
+    );
+
+export type YearRecap = Awaited<ReturnType<typeof fetchReaderYear>>;
+
+/** Ses propres statistiques, pour chacun. */
+export const fetchMyStats = (period: StatsPeriod) =>
+    json(api.stats.me.$get({ query: { period, tz: timezoneOffset() } }));
+
+/** Son propre bilan de l'année. */
+export const fetchMyYear = (year?: number) =>
+    json(
+        api.stats.me.year.$get({
+            query: {
+                tz: timezoneOffset(),
+                ...(year && { year: String(year) }),
+            },
+        }),
+    );
 
 /** Statut de la future série d'un dossier de brouillons. */
 export const setDraftStatus = (
