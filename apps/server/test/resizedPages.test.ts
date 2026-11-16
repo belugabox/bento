@@ -5,7 +5,11 @@ import sharp from 'sharp';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { createApi } from '../src/api';
-import { pageWidthFor } from '../src/library/pageWidths';
+import {
+    THUMBNAIL_WIDTH,
+    isPageWidth,
+    pageWidthFor,
+} from '../src/library/pageWidths';
 import { ResizedPages } from '../src/library/resizedPages';
 import { authDeps, sessionCookie, setup, silent } from './helpers';
 
@@ -116,5 +120,14 @@ describe('pages resized to the screen', () => {
         expect(
             pageWidthFor({ width: 3840, height: 2160, pixelRatio: 1 }),
         ).toBeUndefined();
+    });
+
+    it('serves thumbnails, never picked for a screen', () => {
+        expect(isPageWidth(THUMBNAIL_WIDTH)).toBe(true);
+        expect(isPageWidth(500)).toBe(false);
+        // Même un tout petit écran reçoit une vraie page.
+        expect(pageWidthFor({ width: 240, height: 320, pixelRatio: 1 })).toBe(
+            800,
+        );
     });
 });

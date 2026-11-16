@@ -1,6 +1,7 @@
 import { cleanup } from '@testing-library/react';
 import { afterEach } from 'vitest';
 
+import { clearPrefetched } from '@/offline/reading';
 import { clearQueryCache } from '@/services/useQuery';
 
 // Sans `globals`, Testing Library ne démonte pas les rendus entre deux tests.
@@ -8,6 +9,7 @@ import { clearQueryCache } from '@/services/useQuery';
 afterEach(() => {
     cleanup();
     clearQueryCache();
+    clearPrefetched();
 });
 
 // API du navigateur absentes de jsdom, utilisées par Mantine.

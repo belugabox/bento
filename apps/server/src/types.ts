@@ -90,6 +90,7 @@ export {
 export {
     PAGE_WIDTHS,
     type PageWidth,
+    THUMBNAIL_WIDTH,
     isPageWidth,
     pageWidthFor,
 } from './library/pageWidths';

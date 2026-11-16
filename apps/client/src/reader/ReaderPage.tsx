@@ -4,9 +4,11 @@ import { notifications } from '@mantine/notifications';
 import { useCallback, useContext, useEffect, useRef } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 
+import { THUMBNAIL_WIDTH } from '@server/types';
+
 import { volumeLabel } from '@/components/readingStatus';
 import { saveLocalProgress, useDownloads } from '@/offline/downloads';
-import { loadPageSizes, loadVolume } from '@/offline/reading';
+import { loadPageSizes, loadVolume, prefetchVolume } from '@/offline/reading';
 import { saveProgressOrQueue } from '@/offline/syncQueue';
 import { pageUrl, saveProgress, screenPageWidth } from '@/services/api';
 import { UserContext, useReadOnly } from '@/services/auth';
@@ -20,6 +22,9 @@ import { useReadingTime } from './readingTime';
 
 // `?page=last` : dernière page (en revenant du tome suivant).
 const LAST_PAGE = 'last';
+
+// À tant de pages de la fin, le tome suivant se charge d'avance.
+export const PREFETCH_NEXT_PAGES = 5;
 
 // Pages à voir avant d'enregistrer quoi que ce soit : ouvrir un tome, ou
 // arriver sur sa dernière page depuis le suivant, ne le commence ni ne le
@@ -122,7 +127,34 @@ export const ReaderPage = () => {
             pageUrl(volumeId, volume?.version ?? 0, index, screenPageWidth()),
         [volumeId, volume?.version],
     );
+    // Vignettes de la planche : petites, sauf hors ligne (seules les pages
+    // téléchargées sont sur l'appareil).
+    const thumbSrc = useCallback(
+        (index: number) =>
+            online
+                ? pageUrl(
+                      volumeId,
+                      volume?.version ?? 0,
+                      index,
+                      THUMBNAIL_WIDTH,
+                  )
+                : pageSrc(index),
+        [online, volumeId, volume?.version, pageSrc],
+    );
     const loadSizes = useCallback(() => loadPageSizes(volumeId), [volumeId]);
+
+    // Près de la fin : le tome suivant se prépare (fiche, dimensions,
+    // premières pages), pour s'ouvrir sans attendre. En ligne seulement :
+    // un tome téléchargé est déjà sur l'appareil.
+    const nearEnd =
+        !!volume && pageCount - page <= PREFETCH_NEXT_PAGES && online;
+    const nextId = volume?.nextId;
+    useEffect(() => {
+        if (!nearEnd || !nextId) return;
+        void prefetchVolume(nextId, (next, index) =>
+            pageUrl(next.id, next.version, index, screenPageWidth()),
+        );
+    }, [nearEnd, nextId]);
     const onBeforeFirst = useCallback(() => {
         if (volume?.previousId) {
             navigate(`/read/${volume.previousId}?page=${LAST_PAGE}`);
@@ -169,6 +201,7 @@ export const ReaderPage = () => {
             title={`${volume.seriesName} — ${volumeLabel(volume)}`}
             pageCount={pageCount}
             pageSrc={pageSrc}
+            thumbSrc={thumbSrc}
             loadSizes={loadSizes}
             sizesKey={String(volume.id)}
             page={page}
