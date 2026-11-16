@@ -77,6 +77,11 @@ import {
 } from './library/progress';
 import { saveSourceRating } from './library/ratings';
 import { familyReaders, seriesReaders } from './library/readers';
+import {
+    STATS_PERIODS,
+    readerStats,
+    readingOverview,
+} from './library/readingStats';
 import { addReadingTime } from './library/readingTime';
 import { ResizedPages } from './library/resizedPages';
 import { type LibraryScanner, coverFile } from './library/scanner';
@@ -127,6 +132,11 @@ export type ApiDeps = {
 };
 
 const idParam = z.object({ id: z.coerce.number().int().positive() });
+// Période des statistiques et décalage horaire de l'appareil (minutes).
+const statsQuery = z.object({
+    period: z.enum(STATS_PERIODS).default('30d'),
+    tz: z.coerce.number().int().min(-840).max(840).default(0),
+});
 
 // Fichier d'une bibliothèque, relatif à sa racine.
 const fileQuery = z.object({ path: z.string().min(1) });
@@ -840,6 +850,28 @@ export const createApi = ({
                 ...getStats(db),
                 pendingDrafts: await files.pendingSeries(),
             }),
+        )
+        // Lecture sur une période : activité par jour, moments, lecteurs.
+        .get(
+            '/stats/reading',
+            requireAdmin,
+            zValidator('query', statsQuery),
+            (c) => c.json(readingOverview(db, c.req.valid('query'))),
+        )
+        // Fiche d'un lecteur.
+        .get(
+            '/stats/readers/:id',
+            requireAdmin,
+            zValidator('param', idParam),
+            zValidator('query', statsQuery),
+            (c) =>
+                c.json(
+                    readerStats(
+                        db,
+                        c.req.valid('param').id,
+                        c.req.valid('query'),
+                    ),
+                ),
         )
         // Nombre de séries en attente (pastille de l'en-tête).
         .get('/drafts/pending', requireAdmin, async (c) =>

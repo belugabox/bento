@@ -9,6 +9,8 @@ import {
     randomAvatar,
 } from '@server/types';
 
+import type { StatsPeriod } from '@/components/stats/statsData';
+
 import { reachServer } from './network';
 
 /** Client typé de l'API (`/api`, servie par le même domaine). */
@@ -550,6 +552,26 @@ export const fetchToClassifyCount = () =>
 export const fetchStats = () => json(api.stats.$get());
 
 export type Stats = Awaited<ReturnType<typeof fetchStats>>;
+
+/** Décalage horaire de l'appareil, en minutes (Paris : 60 ou 120). */
+const timezoneOffset = () => String(-new Date().getTimezoneOffset());
+
+/** Lecture sur une période : activité par jour, moments, lecteurs. */
+export const fetchReadingStats = (period: StatsPeriod) =>
+    json(api.stats.reading.$get({ query: { period, tz: timezoneOffset() } }));
+
+export type ReadingStats = Awaited<ReturnType<typeof fetchReadingStats>>;
+
+/** Fiche d'un lecteur sur une période. */
+export const fetchReaderStats = (id: number, period: StatsPeriod) =>
+    json(
+        api.stats.readers[':id'].$get({
+            param: { id: String(id) },
+            query: { period, tz: timezoneOffset() },
+        }),
+    );
+
+export type ReaderStats = Awaited<ReturnType<typeof fetchReaderStats>>;
 
 /** Statut de la future série d'un dossier de brouillons. */
 export const setDraftStatus = (

@@ -136,7 +136,12 @@ Par défaut, Bento suit le mode du système (clair ou sombre) en violet ; l'admi
 
 ### Statistiques (admin)
 
-Depuis le menu de l'avatar : chiffres de la bibliothèque, lecture par personne, activité récente, séries les plus lues, séries par tranche d'âge (et sans classification), statut des séries, et le bouton de scan de chaque bibliothèque.
+Depuis le menu de l'avatar : chiffres de la bibliothèque, activité récente, séries les plus lues, séries par tranche d'âge (et sans classification), statut des séries, et le bouton de scan de chaque bibliothèque.
+
+- **Lecture sur une période** (7 jours, 30 jours par défaut, 12 mois, tout ; gardée dans l'adresse) : temps de lecture, pages lues, tomes finis, lecteurs actifs ; graphique du temps de lecture par jour (par semaine sur 12 mois, par mois sur tout), une couleur par personne ; tableau par personne (temps, pages, jours de lecture, tomes finis).
+- **Une année de lecture** : un carré par jour, plus foncé les jours où on a lu le plus (toute la famille, ou une personne sur sa fiche).
+- **Moments de lecture** : jour de la semaine × heure. Seulement les séances lues dans Bento : Kavita ne donnait pas l'heure (ses séances commencent toutes à minuit).
+- **Fiche d'un lecteur** (un clic sur son nom) : temps, pages, tomes finis, séances et leur durée moyenne, pages par minute, jours d'affilée (en cours et record) ; son activité, son année et ses moments de lecture ; ses genres et formats préférés (temps de lecture) ; ses séries en cours, terminées et abandonnées (pas finies, pas ouvertes depuis 2 mois) ; son historique (20 derniers tomes, puis tout).
 
 ### Contrôle parental
 

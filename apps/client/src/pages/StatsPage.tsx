@@ -5,7 +5,6 @@ import {
     Button,
     Group,
     Loader,
-    Paper,
     Progress,
     SimpleGrid,
     Stack,
@@ -16,7 +15,7 @@ import {
 } from '@mantine/core';
 import { IconRefresh } from '@tabler/icons-react';
 import { useState } from 'react';
-import { Link } from 'react-router';
+import { Link, useSearchParams } from 'react-router';
 
 import { ageLabel, ageLimitLabel } from '@/components/ageLimits';
 import {
@@ -25,41 +24,23 @@ import {
     formatRelative,
     formatSize,
 } from '@/components/format';
-import { fetchStats, scanLibrary } from '@/services/api';
+import { StatTile } from '@/components/stats/StatTile';
+import {
+    ActivityChart,
+    HoursHeatmap,
+    PeriodControl,
+    ReadingCalendar,
+    StatsSection,
+} from '@/components/stats/StatsCharts';
+import {
+    DEFAULT_PERIOD,
+    STATS_PERIODS,
+    type StatsPeriod,
+    isStatsPeriod,
+    localDay,
+} from '@/components/stats/statsData';
+import { fetchReadingStats, fetchStats, scanLibrary } from '@/services/api';
 import { useQuery } from '@/services/useQuery';
-
-/** Chiffre clé : valeur en grand, libellé en dessous. */
-const StatTile = ({
-    label,
-    value,
-    hint,
-    to,
-}: {
-    label: string;
-    value: string;
-    hint?: string;
-    to?: string;
-}) => (
-    <Paper withBorder radius="md" p="md">
-        <Text size="xl" fw={700} lh={1.1}>
-            {to ? (
-                <Anchor component={Link} to={to} inherit c="inherit">
-                    {value}
-                </Anchor>
-            ) : (
-                value
-            )}
-        </Text>
-        <Text size="sm" c="dimmed">
-            {label}
-        </Text>
-        {hint && (
-            <Text size="xs" c="dimmed">
-                {hint}
-            </Text>
-        )}
-    </Paper>
-);
 
 const Section = ({
     title,
@@ -77,6 +58,13 @@ const Section = ({
 /** Statistiques de la bibliothèque et de la lecture (admin). */
 export const StatsPage = () => {
     const { data: stats, error, reload } = useQuery(fetchStats, []);
+    // Période de la lecture, gardée dans l'adresse (retour depuis une fiche).
+    const [params, setParams] = useSearchParams();
+    const requested = params.get('period');
+    const period: StatsPeriod = isStatsPeriod(requested)
+        ? requested
+        : DEFAULT_PERIOD;
+    const reading = useQuery(() => fetchReadingStats(period), [period]);
     const [scanning, setScanning] = useState<number>();
     const [scanReport, setScanReport] = useState<string>();
 
@@ -92,13 +80,12 @@ export const StatsPage = () => {
         }),
         { series: 0, volumes: 0, pages: 0, size: 0 },
     );
-    const readers = stats.readers.filter((r) => r.role === 'reader');
-    const read = stats.readers.reduce((n, r) => n + r.completed, 0);
-    const inProgress = stats.readers.reduce((n, r) => n + r.inProgress, 0);
-    const readingSeconds = stats.readers.reduce(
-        (n, r) => n + r.readingSeconds,
-        0,
-    );
+    const today = localDay(new Date());
+    const periodLabel = STATS_PERIODS.find((p) => p.value === period)!.label;
+    const periodReaders = reading.data?.readers ?? [];
+    const sum = (field: 'seconds' | 'pages' | 'completed') =>
+        periodReaders.reduce((n, r) => n + r[field], 0);
+    const maxAgeOf = (id: number) => stats.readers.find((r) => r.id === id);
 
     // Séries par tranche d'âge, dans l'ordre des âges, puis sans classification.
     const ratingRows = [
@@ -160,63 +147,139 @@ export const StatsPage = () => {
                 />
             </SimpleGrid>
 
-            <Section title="Lecture">
-                <SimpleGrid cols={{ base: 2, sm: 4 }}>
-                    <StatTile label="Tomes lus" value={formatNumber(read)} />
-                    <StatTile
-                        label="Tomes en cours"
-                        value={formatNumber(inProgress)}
+            <Stack gap="md">
+                <Group justify="space-between" gap="sm">
+                    <Title order={3}>Lecture</Title>
+                    <PeriodControl
+                        value={period}
+                        onChange={(value) =>
+                            setParams({ period: value }, { replace: true })
+                        }
                     />
-                    <StatTile
-                        label="Lecteurs"
-                        value={formatNumber(readers.length)}
-                    />
-                    <StatTile
-                        label="Temps de lecture"
-                        value={formatDuration(readingSeconds)}
-                    />
-                </SimpleGrid>
-                <Table.ScrollContainer minWidth={520}>
-                    <Table verticalSpacing="xs">
-                        <Table.Thead>
-                            <Table.Tr>
-                                <Table.Th>Personne</Table.Th>
-                                <Table.Th>Séries visibles</Table.Th>
-                                <Table.Th ta="right">Lus</Table.Th>
-                                <Table.Th ta="right">En cours</Table.Th>
-                                <Table.Th ta="right">Temps</Table.Th>
-                                <Table.Th>Dernière lecture</Table.Th>
-                            </Table.Tr>
-                        </Table.Thead>
-                        <Table.Tbody>
-                            {stats.readers.map((r) => (
-                                <Table.Tr key={r.id}>
-                                    <Table.Td>{r.name}</Table.Td>
-                                    <Table.Td>
-                                        {r.role === 'admin'
-                                            ? 'Toutes (admin)'
-                                            : ageLimitLabel(r.maxAge)}
-                                    </Table.Td>
-                                    <Table.Td ta="right">
-                                        {r.completed}
-                                    </Table.Td>
-                                    <Table.Td ta="right">
-                                        {r.inProgress}
-                                    </Table.Td>
-                                    <Table.Td ta="right">
-                                        {formatDuration(r.readingSeconds)}
-                                    </Table.Td>
-                                    <Table.Td>
-                                        <Text size="sm" c="dimmed">
-                                            {formatRelative(r.lastReadAt)}
-                                        </Text>
-                                    </Table.Td>
-                                </Table.Tr>
-                            ))}
-                        </Table.Tbody>
-                    </Table>
-                </Table.ScrollContainer>
-            </Section>
+                </Group>
+                {reading.error ? (
+                    <Alert color="red">{reading.error.message}</Alert>
+                ) : !reading.data ? (
+                    <Loader mx="auto" />
+                ) : (
+                    <>
+                        <SimpleGrid cols={{ base: 2, sm: 4 }}>
+                            <StatTile
+                                label="Temps de lecture"
+                                value={formatDuration(sum('seconds'))}
+                                hint={periodLabel}
+                            />
+                            <StatTile
+                                label="Pages lues"
+                                value={formatNumber(sum('pages'))}
+                                hint={periodLabel}
+                            />
+                            <StatTile
+                                label="Tomes finis"
+                                value={formatNumber(sum('completed'))}
+                                hint={periodLabel}
+                            />
+                            <StatTile
+                                label="Lecteurs actifs"
+                                value={formatNumber(
+                                    periodReaders.filter(
+                                        (r) => r.seconds > 0 || r.completed > 0,
+                                    ).length,
+                                )}
+                                hint={`sur ${periodReaders.length}`}
+                            />
+                        </SimpleGrid>
+
+                        <StatsSection title="Activité">
+                            <ActivityChart
+                                daily={reading.data.daily}
+                                period={period}
+                                start={reading.data.start}
+                                today={today}
+                                readers={periodReaders}
+                            />
+                        </StatsSection>
+
+                        <Table.ScrollContainer minWidth={640}>
+                            <Table verticalSpacing="xs">
+                                <Table.Thead>
+                                    <Table.Tr>
+                                        <Table.Th>Personne</Table.Th>
+                                        <Table.Th>Séries visibles</Table.Th>
+                                        <Table.Th ta="right">Temps</Table.Th>
+                                        <Table.Th ta="right">Pages</Table.Th>
+                                        <Table.Th ta="right">Jours</Table.Th>
+                                        <Table.Th ta="right">
+                                            Tomes finis
+                                        </Table.Th>
+                                        <Table.Th>Dernière lecture</Table.Th>
+                                    </Table.Tr>
+                                </Table.Thead>
+                                <Table.Tbody>
+                                    {periodReaders.map((r) => {
+                                        const account = maxAgeOf(r.id);
+                                        return (
+                                            <Table.Tr key={r.id}>
+                                                <Table.Td>
+                                                    <Anchor
+                                                        component={Link}
+                                                        to={`/stats/readers/${r.id}?period=${period}`}
+                                                        size="sm"
+                                                    >
+                                                        {r.name}
+                                                    </Anchor>
+                                                </Table.Td>
+                                                <Table.Td>
+                                                    {r.role === 'admin'
+                                                        ? 'Toutes (admin)'
+                                                        : ageLimitLabel(
+                                                              account?.maxAge ??
+                                                                  null,
+                                                          )}
+                                                </Table.Td>
+                                                <Table.Td ta="right">
+                                                    {formatDuration(r.seconds)}
+                                                </Table.Td>
+                                                <Table.Td ta="right">
+                                                    {formatNumber(r.pages)}
+                                                </Table.Td>
+                                                <Table.Td ta="right">
+                                                    {r.days}
+                                                </Table.Td>
+                                                <Table.Td ta="right">
+                                                    {r.completed}
+                                                </Table.Td>
+                                                <Table.Td>
+                                                    <Text size="sm" c="dimmed">
+                                                        {formatRelative(
+                                                            r.lastReadAt,
+                                                        )}
+                                                    </Text>
+                                                </Table.Td>
+                                            </Table.Tr>
+                                        );
+                                    })}
+                                </Table.Tbody>
+                            </Table>
+                        </Table.ScrollContainer>
+
+                        <Stack gap="xl">
+                            <StatsSection title="Une année de lecture">
+                                <ReadingCalendar
+                                    daily={reading.data.daily}
+                                    today={today}
+                                />
+                            </StatsSection>
+                            <StatsSection
+                                title="Moments de lecture"
+                                hint="Séances dans Bento seulement : Kavita ne donnait pas l’heure."
+                            >
+                                <HoursHeatmap hours={reading.data.hours} />
+                            </StatsSection>
+                        </Stack>
+                    </>
+                )}
+            </Stack>
 
             <SimpleGrid cols={{ base: 1, md: 2 }} spacing="xl">
                 <Section title="Activité récente">
