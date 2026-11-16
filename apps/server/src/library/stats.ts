@@ -61,6 +61,7 @@ export const getStats = (db: Db) => {
 
     const recent = db.all<{
         userName: string;
+        userAvatarSeed: string | null;
         seriesId: number;
         seriesName: string;
         volumeId: number;
@@ -70,7 +71,8 @@ export const getStats = (db: Db) => {
         completed: number;
         updatedAt: number;
     }>(sql`
-        select u.name as userName, s.id as seriesId, s.name as seriesName,
+        select u.name as userName, u.avatar_seed as userAvatarSeed,
+            s.id as seriesId, s.name as seriesName,
             v.id as volumeId, v.number, rp.page, v.page_count as pageCount,
             rp.completed, rp.updated_at as updatedAt
         from read_progress rp

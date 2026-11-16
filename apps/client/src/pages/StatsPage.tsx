@@ -17,6 +17,7 @@ import { IconRefresh } from '@tabler/icons-react';
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 
+import { UserAvatar } from '@/components/accounts/UserAvatar';
 import { ageLabel, ageLimitLabel } from '@/components/ageLimits';
 import {
     formatDuration,
@@ -221,13 +222,23 @@ export const StatsPage = () => {
                                         return (
                                             <Table.Tr key={r.id}>
                                                 <Table.Td>
-                                                    <Anchor
-                                                        component={Link}
-                                                        to={`/stats/readers/${r.id}?period=${period}`}
-                                                        size="sm"
+                                                    <Group
+                                                        gap="xs"
+                                                        wrap="nowrap"
                                                     >
-                                                        {r.name}
-                                                    </Anchor>
+                                                        <UserAvatar
+                                                            name={r.name}
+                                                            seed={r.avatarSeed}
+                                                            size={28}
+                                                        />
+                                                        <Anchor
+                                                            component={Link}
+                                                            to={`/stats/readers/${r.id}?period=${period}`}
+                                                            size="sm"
+                                                        >
+                                                            {r.name}
+                                                        </Anchor>
+                                                    </Group>
                                                 </Table.Td>
                                                 <Table.Td>
                                                     {r.role === 'admin'
@@ -295,22 +306,31 @@ export const StatsPage = () => {
                                     justify="space-between"
                                     wrap="nowrap"
                                 >
-                                    <Text size="sm" lineClamp={1}>
-                                        <b>{r.userName}</b> ·{' '}
-                                        <Anchor
-                                            component={Link}
-                                            to={`/series/${r.seriesId}`}
-                                            size="sm"
-                                        >
-                                            {r.seriesName}
-                                            {r.number ? ` T${r.number}` : ''}
-                                        </Anchor>{' '}
-                                        <Text span size="sm" c="dimmed">
-                                            {r.completed
-                                                ? 'lu'
-                                                : `p. ${r.page + 1}/${r.pageCount}`}
+                                    <Group gap={6} wrap="nowrap" miw={0}>
+                                        <UserAvatar
+                                            name={r.userName}
+                                            seed={r.userAvatarSeed}
+                                            size={22}
+                                        />
+                                        <Text size="sm" lineClamp={1}>
+                                            <b>{r.userName}</b> ·{' '}
+                                            <Anchor
+                                                component={Link}
+                                                to={`/series/${r.seriesId}`}
+                                                size="sm"
+                                            >
+                                                {r.seriesName}
+                                                {r.number
+                                                    ? ` T${r.number}`
+                                                    : ''}
+                                            </Anchor>{' '}
+                                            <Text span size="sm" c="dimmed">
+                                                {r.completed
+                                                    ? 'lu'
+                                                    : `p. ${r.page + 1}/${r.pageCount}`}
+                                            </Text>
                                         </Text>
-                                    </Text>
+                                    </Group>
                                     <Text
                                         size="xs"
                                         c="dimmed"

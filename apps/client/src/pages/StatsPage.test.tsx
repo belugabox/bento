@@ -48,6 +48,7 @@ const READING = {
         {
             id: 2,
             name: 'Alice',
+            avatarSeed: 'alice-seed',
             role: 'reader',
             seconds: 5400,
             pages: 300,
@@ -118,6 +119,10 @@ describe('StatsPage', () => {
         expect(
             screen.getByRole('link', { name: 'Alice' }).getAttribute('href'),
         ).toBe('/stats/readers/2?period=30d');
+        // Son avatar à côté de son nom.
+        expect(
+            screen.getByRole('img', { name: 'Alice' }).getAttribute('src'),
+        ).toContain('alice-seed');
         expect(
             requests.some((r) =>
                 r.startsWith('GET /api/stats/reading?period=30d&tz='),

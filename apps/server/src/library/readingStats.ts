@@ -116,6 +116,7 @@ export const readerTotals = (
         .all<{
             id: number;
             name: string;
+            avatarSeed: string | null;
             role: 'admin' | 'reader';
             seconds: number;
             pages: number;
@@ -125,7 +126,7 @@ export const readerTotals = (
             lastReadAt: number | null;
         }>(
             sql`
-        select u.id, u.name, u.role,
+        select u.id, u.name, u.avatar_seed as avatarSeed, u.role,
             coalesce(s.seconds, 0) as seconds,
             coalesce(s.pages, 0) as pages,
             coalesce(s.sessions, 0) as sessions,

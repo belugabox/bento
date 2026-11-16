@@ -15,6 +15,7 @@ import { IconArrowLeft } from '@tabler/icons-react';
 import { useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router';
 
+import { UserAvatar } from '@/components/accounts/UserAvatar';
 import {
     formatDuration,
     formatNumber,
@@ -116,7 +117,14 @@ export const ReaderStatsPage = () => {
                     </Group>
                 </Anchor>
                 <Group justify="space-between" gap="sm">
-                    <Title order={2}>{data.name}</Title>
+                    <Group gap="sm" wrap="nowrap">
+                        <UserAvatar
+                            name={data.name}
+                            seed={data.avatarSeed}
+                            size="lg"
+                        />
+                        <Title order={2}>{data.name}</Title>
+                    </Group>
                     <PeriodControl
                         value={period}
                         onChange={(value) =>
