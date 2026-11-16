@@ -26,6 +26,7 @@ import { useDisclosure } from '@mantine/hooks';
 import {
     IconActivity,
     IconChartBar,
+    IconChartLine,
     IconDownload,
     IconEye,
     IconInbox,
@@ -437,6 +438,13 @@ const UserMenu = () => {
                         leftSection={<IconDownload size={14} />}
                     >
                         Téléchargements
+                    </Menu.Item>
+                    <Menu.Item
+                        component={Link}
+                        to="/me/stats"
+                        leftSection={<IconChartLine size={14} />}
+                    >
+                        Mes statistiques
                     </Menu.Item>
                     {/* Partie admin : sans elle, pas de séparation en double. */}
                     {isAdmin && <Menu.Divider />}

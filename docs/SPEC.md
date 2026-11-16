@@ -130,7 +130,7 @@ Bento est le serveur de lecture et de gestion des mangas et BD de la maison. Il 
    6. **Automatique** (option de l'appareil) : les tomes suivants des séries en cours téléchargés en Wi-Fi ; tomes lus effacés après 30 jours.
    - Téléchargements liés au compte : effacés à la déconnexion (appareil partagé, contrôle parental). Pas de téléchargement en vue lecteur (simulation).
 10. **Tomes manquants et sorties** : trous dans la numérotation, tomes parus (Wikipédia, puis manga-news) absents de la bibliothèque.
-11. **Bascule** : retirer le module manga de beluga-box (la synchro vers `_draft` reste en place), arrêter Kavita.
+11. **Bascule** — faite le 16 novembre 2026 : module manga retiré de beluga-box (la synchro vers `_draft` reste en place), Kavita arrêté.
 
 ## Décisions de déploiement
 
