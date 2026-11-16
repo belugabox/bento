@@ -304,18 +304,23 @@ export const HoursHeatmap = ({
     );
 };
 
-/** Classement en barres (genres, formats), les plus lus d'abord. */
+/**
+ * Classement en barres, les premiers d'abord : temps de lecture par défaut,
+ * ou une autre valeur avec `format` (taille, nombre de séries).
+ */
 export const RankBars = ({
     rows,
     limit = 8,
     empty,
+    format = formatDuration,
 }: {
-    rows: { name: string; seconds: number }[];
+    rows: { name: string; value: number }[];
     limit?: number;
     empty: string;
+    format?: (value: number) => string;
 }) => {
     const shown = rows.slice(0, limit);
-    const max = Math.max(1, ...shown.map((r) => r.seconds));
+    const max = Math.max(1, ...shown.map((r) => r.value));
     if (shown.length === 0) {
         return (
             <Text size="sm" c="dimmed">
@@ -327,20 +332,26 @@ export const RankBars = ({
         <Stack gap={6}>
             {shown.map((row) => (
                 <Group key={row.name} wrap="nowrap" gap="sm">
-                    <Text size="sm" w={130} truncate="end">
+                    <Text size="sm" w={130} truncate="end" title={row.name}>
                         {row.name}
                     </Text>
-                    <Tooltip label={formatDuration(row.seconds)}>
+                    <Tooltip label={format(row.value)}>
                         <Progress
                             style={{ flex: 1 }}
                             size="lg"
                             radius="sm"
-                            value={(row.seconds / max) * 100}
-                            aria-label={`${row.name} : ${formatDuration(row.seconds)}`}
+                            value={(row.value / max) * 100}
+                            aria-label={`${row.name} : ${format(row.value)}`}
                         />
                     </Tooltip>
-                    <Text size="sm" w={70} ta="right" c="dimmed">
-                        {formatDuration(row.seconds)}
+                    <Text
+                        size="sm"
+                        w={80}
+                        ta="right"
+                        c="dimmed"
+                        style={{ whiteSpace: 'nowrap' }}
+                    >
+                        {format(row.value)}
                     </Text>
                 </Group>
             ))}

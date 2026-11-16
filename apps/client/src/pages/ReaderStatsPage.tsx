@@ -193,13 +193,19 @@ export const ReaderStatsPage = () => {
             <SimpleGrid cols={{ base: 1, md: 2 }} spacing="xl">
                 <StatsSection title="Genres préférés" hint="Temps de lecture">
                     <RankBars
-                        rows={data.genres}
+                        rows={data.genres.map(({ name, seconds }) => ({
+                            name,
+                            value: seconds,
+                        }))}
                         empty="Aucune lecture sur cette période."
                     />
                 </StatsSection>
                 <StatsSection title="Formats" hint="Temps de lecture">
                     <RankBars
-                        rows={data.formats}
+                        rows={data.formats.map(({ name, seconds }) => ({
+                            name,
+                            value: seconds,
+                        }))}
                         empty="Aucune lecture sur cette période."
                     />
                 </StatsSection>

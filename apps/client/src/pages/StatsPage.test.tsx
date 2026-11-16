@@ -36,7 +36,6 @@ const STATS = {
         },
     ],
     recent: [],
-    topSeries: [],
     pendingDrafts: 4,
 };
 
@@ -71,6 +70,72 @@ const READING = {
     ],
 };
 
+const LIBRARY = {
+    growth: [{ month: '2026-11', volumes: 40, size: 2 * 1024 ** 3, series: 3 }],
+    formats: [{ name: 'Manga', series: 3, volumes: 40, size: 2 * 1024 ** 3 }],
+    genres: [{ name: 'Action', series: 2, seconds: 5400 }],
+    publishers: [{ name: 'Tonkam', series: 2 }],
+    authors: [{ name: 'Hiroya Oku', series: 2 }],
+    dormant: [
+        {
+            id: 7,
+            name: 'Spirale',
+            volumes: 1,
+            size: 1024 ** 3,
+            addedAt: '2026-11-04T12:00:00.000Z',
+        },
+    ],
+};
+
+const RANKINGS = {
+    topSeries: [
+        {
+            id: 3,
+            name: 'Gantz',
+            seconds: 5400,
+            pages: 300,
+            readers: [{ id: 2, name: 'Alice', avatarSeed: 'alice-seed' }],
+        },
+    ],
+    perReader: [
+        {
+            id: 2,
+            name: 'Alice',
+            avatarSeed: 'alice-seed',
+            seconds: 5400,
+            series: [{ id: 3, name: 'Gantz', seconds: 5400 }],
+        },
+    ],
+    bestRated: [
+        {
+            id: 3,
+            name: 'Gantz',
+            readers: 1,
+            seconds: 5400,
+            rating: 4.2,
+            reviews: 300,
+        },
+        {
+            id: 7,
+            name: 'Spirale',
+            readers: 0,
+            seconds: 0,
+            rating: 4.1,
+            reviews: 40,
+        },
+    ],
+    unreadGems: [
+        {
+            id: 7,
+            name: 'Spirale',
+            readers: 0,
+            seconds: 0,
+            rating: 4.1,
+            reviews: 40,
+        },
+    ],
+};
+
 const respond = (body: unknown) =>
     new Response(JSON.stringify(body), {
         headers: { 'Content-Type': 'application/json' },
@@ -91,7 +156,11 @@ describe('StatsPage', () => {
                     ? respond({ added: 2, updated: 0, removed: 0, errors: [] })
                     : url.startsWith('/api/stats/reading')
                       ? respond(READING)
-                      : respond(STATS);
+                      : url.startsWith('/api/stats/library')
+                        ? respond(LIBRARY)
+                        : url.startsWith('/api/stats/rankings')
+                          ? respond(RANKINGS)
+                          : respond(STATS);
             },
         );
 
@@ -104,14 +173,8 @@ describe('StatsPage', () => {
         );
 
         expect(await screen.findByText('Statistiques')).toBeTruthy();
-        // Total et ligne de la bibliothèque.
-        expect(screen.getAllByText('2 Go')).toHaveLength(2);
         expect(screen.getByText('Séries en attente')).toBeTruthy();
-        expect(screen.getByLabelText('10+ : 1 séries')).toBeTruthy();
-        expect(
-            screen.getByLabelText('Sans classification : 2 séries'),
-        ).toBeTruthy();
-        expect(screen.getByText(/masquées aux comptes limités/)).toBeTruthy();
+        // Onglet Lecture par défaut.
         expect(await screen.findByText('Jusqu’à 10 ans')).toBeTruthy();
         // Lecture sur 30 jours par défaut, une fiche par personne.
         expect(screen.getByText('1,5 h', { selector: 'p' })).toBeTruthy();
@@ -143,6 +206,37 @@ describe('StatsPage', () => {
                 ),
             ).toBe(true),
         );
+
+        // Classements de la même période.
+        fireEvent.click(screen.getByRole('tab', { name: 'Classements' }));
+        expect(
+            await screen.findByText('Bien notées, jamais ouvertes'),
+        ).toBeTruthy();
+        expect(
+            requests.some((r) =>
+                r.startsWith('GET /api/stats/rankings?period=7d'),
+            ),
+        ).toBe(true);
+        expect(
+            screen.getByText('★ 4,2 (300 avis) · 1 lecteur, 1,5 h'),
+        ).toBeTruthy();
+        expect(
+            screen.getAllByText('★ 4,1 (40 avis) · jamais ouverte'),
+        ).toHaveLength(2);
+
+        // Bibliothèque : sans période.
+        fireEvent.click(screen.getByRole('tab', { name: 'Bibliothèque' }));
+        expect(await screen.findByText('Jamais ouvertes (1)')).toBeTruthy();
+        expect(screen.queryByText('7 jours')).toBeNull();
+        expect(screen.getByLabelText('Tonkam : 2 séries')).toBeTruthy();
+        expect(screen.getByLabelText('Hiroya Oku : 2 séries')).toBeTruthy();
+        // Total, format et ligne de la bibliothèque.
+        expect(screen.getAllByText('2 Go')).toHaveLength(3);
+        expect(screen.getByLabelText('10+ : 1 séries')).toBeTruthy();
+        expect(
+            screen.getByLabelText('Sans classification : 2 séries'),
+        ).toBeTruthy();
+        expect(screen.getByText(/masquées aux comptes limités/)).toBeTruthy();
 
         await act(async () => {
             fireEvent.click(screen.getByRole('button', { name: 'Scanner' }));

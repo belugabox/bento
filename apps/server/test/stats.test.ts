@@ -120,11 +120,6 @@ describe('GET /stats', () => {
                 )
                 .sort(),
         ).toEqual(['Gantz en cours', 'Gantz lu', 'Kids en cours']);
-        expect(stats.topSeries[0]).toMatchObject({
-            name: 'Gantz',
-            readers: 1,
-            completed: 1,
-        });
     });
 
     it('is for admins only', async () => {

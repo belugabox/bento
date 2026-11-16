@@ -562,6 +562,17 @@ export const fetchReadingStats = (period: StatsPeriod) =>
 
 export type ReadingStats = Awaited<ReturnType<typeof fetchReadingStats>>;
 
+/** La bibliothèque en chiffres : croissance, répartitions, séries dormantes. */
+export const fetchLibraryStats = () => json(api.stats.library.$get());
+
+export type LibraryStats = Awaited<ReturnType<typeof fetchLibraryStats>>;
+
+/** Classements de la période : séries les plus lues, notes et lecture. */
+export const fetchReadingRankings = (period: StatsPeriod) =>
+    json(api.stats.rankings.$get({ query: { period, tz: timezoneOffset() } }));
+
+export type ReadingRankings = Awaited<ReturnType<typeof fetchReadingRankings>>;
+
 /** Fiche d'un lecteur sur une période. */
 export const fetchReaderStats = (id: number, period: StatsPeriod) =>
     json(

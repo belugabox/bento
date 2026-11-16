@@ -136,11 +136,14 @@ Par défaut, Bento suit le mode du système (clair ou sombre) en violet ; l'admi
 
 ### Statistiques (admin)
 
-Depuis le menu de l'avatar : chiffres de la bibliothèque, activité récente, séries les plus lues, séries par tranche d'âge (et sans classification), statut des séries, et le bouton de scan de chaque bibliothèque.
+Depuis le menu de l'avatar : les chiffres de la bibliothèque en tête, puis trois onglets (gardés dans l'adresse, chacun chargé à son ouverture) : **Lecture**, **Bibliothèque** et **Classements**. L'avatar de chaque personne est à côté de son nom.
 
 - **Lecture sur une période** (7 jours, 30 jours par défaut, 12 mois, tout ; gardée dans l'adresse) : temps de lecture, pages lues, tomes finis, lecteurs actifs ; graphique du temps de lecture par jour (par semaine sur 12 mois, par mois sur tout), une couleur par personne ; tableau par personne (temps, pages, jours de lecture, tomes finis).
 - **Une année de lecture** : un carré par jour, plus foncé les jours où on a lu le plus (toute la famille, ou une personne sur sa fiche).
 - **Moments de lecture** : jour de la semaine × heure. Seulement les séances lues dans Bento : Kavita ne donnait pas l'heure (ses séances commencent toutes à minuit).
+- **Activité récente** : les derniers tomes ouverts, par qui.
+- **Bibliothèque** : tomes ajoutés chaque mois ; formats (place sur le disque, séries, tomes) ; genres possédés face aux genres lus (part des séries et part du temps de lecture de la famille) ; éditeurs et auteurs les plus présents (une personne par nom, « A / B » compte pour deux) ; séries que personne n'a jamais ouvertes (les plus anciennes d'abord, avec leur taille) ; séries par tranche d'âge, statut des séries, et le bouton de scan de chaque bibliothèque.
+- **Classements** (même période que la lecture) : séries les plus lues en temps, avec l'avatar de leurs lecteurs ; les séries les plus lues de chaque personne ; les mieux notées sur les sites (10 avis au moins) avec ce qu'en a fait la famille ; les bien notées (4 sur 5 au moins) que personne n'a ouvertes.
 - **Fiche d'un lecteur** (un clic sur son nom) : temps, pages, tomes finis, séances et leur durée moyenne, pages par minute, jours d'affilée (en cours et record) ; son activité, son année et ses moments de lecture ; ses genres et formats préférés (temps de lecture) ; ses séries en cours, terminées et abandonnées (pas finies, pas ouvertes depuis 2 mois) ; son historique (20 derniers tomes, puis tout).
 
 ### Contrôle parental
