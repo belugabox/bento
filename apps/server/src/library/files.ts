@@ -47,6 +47,7 @@ import {
     publicationPathOf,
     relativeTo,
     resolveInLibrary,
+    volumeKeyOf,
     volumeNumberOf,
 } from './paths';
 import { seriesRatingOf, sourceRatingsMap } from './ratings';
@@ -748,8 +749,11 @@ export class LibraryFiles {
         // Changement de casse seulement, sur un disque insensible à la casse.
         const sameFile = await isSameFile(sourcePath, destPath);
 
-        // Tomes rangés du même numéro sous un autre nom (« #12 » et « #12 (2024) »).
+        // Le même tome rangé sous une autre année (« #12 » et « #12 (2024) ») :
+        // même série, même groupe, même numéro. Seulement le numéro ne suffit
+        // pas : publier « Part 2 #01 » supprimait « Part 1 #01 ».
         const number = volumeNumberOf(path.basename(publicationPath));
+        const key = volumeKeyOf(path.basename(publicationPath));
         const sameNumber: string[] = [];
         if (number) {
             const entries = await readdir(destDir, {
@@ -759,7 +763,8 @@ export class LibraryFiles {
                 if (
                     !entry.isFile() ||
                     path.extname(entry.name).toLowerCase() !== '.cbz' ||
-                    volumeNumberOf(entry.name) !== number
+                    volumeNumberOf(entry.name) !== number ||
+                    volumeKeyOf(entry.name) !== key
                 ) {
                     continue;
                 }
