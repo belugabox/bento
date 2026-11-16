@@ -33,6 +33,9 @@ const SettingsPage = lazy(() =>
 const StatsPage = lazy(() =>
     import('@/pages/StatsPage').then((m) => ({ default: m.StatsPage })),
 );
+const MyStatsPage = lazy(() =>
+    import('@/pages/MyStatsPage').then((m) => ({ default: m.MyStatsPage })),
+);
 const ReaderStatsPage = lazy(() =>
     import('@/pages/ReaderStatsPage').then((m) => ({
         default: m.ReaderStatsPage,
@@ -139,6 +142,7 @@ export const App = () => (
                         </AdminOnly>
                     }
                 />
+                <Route path="me/stats" element={<MyStatsPage />} />
                 <Route
                     path="stats/readers/:id"
                     element={

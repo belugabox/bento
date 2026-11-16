@@ -10,6 +10,7 @@ import {
     STATS_PERIODS,
     readerStats,
     readingOverview,
+    yearRecap,
 } from './library/readingStats';
 import { getStats } from './library/stats';
 import { zValidator } from './tools/validator';
@@ -21,6 +22,12 @@ const statsQuery = z.object({
 });
 
 const idParam = z.object({ id: z.coerce.number().int().positive() });
+
+// Bilan d'une année (la plus récente lue par défaut).
+const yearQuery = z.object({
+    year: z.coerce.number().int().min(2000).max(2100).optional(),
+    tz: z.coerce.number().int().min(-840).max(840).default(0),
+});
 
 /**
  * Statistiques (`/stats`), à part de `api.ts` : la chaîne de routes de
@@ -60,4 +67,36 @@ export const createStatsRoutes = (db: Db, files: LibraryFiles) =>
                         c.req.valid('query'),
                     ),
                 ),
+        )
+        // Bilan d'une année d'un lecteur.
+        .get(
+            '/readers/:id/year',
+            requireAdmin,
+            zValidator('param', idParam),
+            zValidator('query', yearQuery),
+            (c) =>
+                c.json(
+                    yearRecap(
+                        db,
+                        c.req.valid('param').id,
+                        c.req.valid('query'),
+                    ),
+                ),
+        )
+        // Ses propres statistiques, pour chacun : seulement les séries qu'il
+        // voit (en vue lecteur, celles du compte simulé).
+        .get('/me', zValidator('query', statsQuery), (c) =>
+            c.json(
+                readerStats(
+                    db,
+                    c.var.user.id,
+                    c.req.valid('query'),
+                    c.var.user,
+                ),
+            ),
+        )
+        .get('/me/year', zValidator('query', yearQuery), (c) =>
+            c.json(
+                yearRecap(db, c.var.user.id, c.req.valid('query'), c.var.user),
+            ),
         );

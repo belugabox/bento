@@ -145,6 +145,12 @@ Depuis le menu de l'avatar : les chiffres de la bibliothèque en tête, puis tro
 - **Bibliothèque** : tomes ajoutés chaque mois ; formats (place sur le disque, séries, tomes) ; genres possédés face aux genres lus (part des séries et part du temps de lecture de la famille) ; éditeurs et auteurs les plus présents (une personne par nom, « A / B » compte pour deux) ; séries que personne n'a jamais ouvertes (les plus anciennes d'abord, avec leur taille) ; séries par tranche d'âge, statut des séries, et le bouton de scan de chaque bibliothèque.
 - **Classements** (même période que la lecture) : séries les plus lues en temps, avec l'avatar de leurs lecteurs ; les séries les plus lues de chaque personne ; les mieux notées sur les sites (10 avis au moins) avec ce qu'en a fait la famille ; les bien notées (4 sur 5 au moins) que personne n'a ouvertes.
 - **Fiche d'un lecteur** (un clic sur son nom) : temps, pages, tomes finis, séances et leur durée moyenne, pages par minute, jours d'affilée (en cours et record) ; son activité, son année et ses moments de lecture ; ses genres et formats préférés (temps de lecture) ; ses séries en cours, terminées et abandonnées (pas finies, pas ouvertes depuis 2 mois) ; son historique (20 derniers tomes, puis tout).
+- **Bilan de l'année** (second onglet de la fiche) : temps, pages, tomes finis, jours de lecture, record de jours d'affilée, plus longue séance ; la série de l'année (avec sa couverture) et les quatre suivantes ; genre préféré, mois le plus lu, moment préféré (jour et heure), nouvelles séries découvertes, séries terminées dans l'année. Une année au choix parmi celles où la personne a lu (heure de l'appareil : une lecture le 31 décembre à 23 h 30 compte pour l'année qui finit).
+
+### Mes statistiques (chacun)
+
+Dans le menu de l'avatar, pour tous les comptes : sa propre fiche (lecture sur une période et bilan de l'année), comme celle que voit l'admin. Elle ne montre que les séries visibles par le compte (une série lue avant qu'on abaisse sa limite d'âge n'y apparaît plus, son temps de lecture reste compté) ; en vue lecteur, celle du compte simulé.
+
 
 ### Contrôle parental
 

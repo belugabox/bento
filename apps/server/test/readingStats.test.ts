@@ -5,6 +5,7 @@ import { createApi } from '../src/api';
 import {
     readProgress,
     readingSessions,
+    series,
     users,
     volumes,
 } from '../src/db/schema';
@@ -13,6 +14,7 @@ import {
     readerStats,
     readingOverview,
     streaks,
+    yearRecap,
 } from '../src/library/readingStats';
 import { authDeps, sessionCookie, setup, silent, writeCbz } from './helpers';
 
@@ -286,5 +288,104 @@ describe('GET /stats/reading and /stats/readers/:id', () => {
             seconds: 0,
         });
         expect((await get('/stats/readers/9999')).status).toBe(404);
+    });
+});
+
+describe('year recap', () => {
+    it('sums a year of reading in local time, with its highlights', () => {
+        // 31 décembre 2025, 23 h 30 à Paris : encore 2025.
+        session('alice', 'Kids/Kids T01.cbz', '2025-12-31T22:30:00Z', 20, 30);
+        // 1er janvier 2026, 0 h 30 à Paris.
+        session('alice', 'Gantz/Gantz T01.cbz', '2025-12-31T23:30:00Z', 60, 90);
+        session('alice', 'Gantz/Gantz T02.cbz', '2026-01-02T09:00:00Z', 30, 40);
+        session('alice', 'Kids/Kids T01.cbz', '2026-03-10T17:00:00Z', 10, 15);
+        progress('alice', 'Gantz/Gantz T01.cbz', true, new Date('2026-01-01'));
+        progress('alice', 'Gantz/Gantz T02.cbz', true, new Date('2026-01-02'));
+
+        const recap = yearRecap(ctx.db, userId('alice'), { tz: PARIS });
+
+        expect(recap).toMatchObject({
+            year: 2026,
+            years: [2026, 2025],
+            seconds: 6000,
+            pages: 145,
+            sessions: 3,
+            longestSessionSeconds: 3600,
+            days: 3,
+            // 1er et 2 janvier.
+            bestStreak: 2,
+            completed: 2,
+            seriesCount: 2,
+            // Kids était déjà ouverte en 2025.
+            newSeries: 1,
+            finished: [{ name: 'Gantz' }],
+            busiestMonth: { month: '2026-01', seconds: 5400 },
+            favouriteMoment: { weekday: 4, hour: 0, seconds: 3600 },
+        });
+        expect(recap.topSeries.map((s) => [s.name, s.seconds])).toEqual([
+            ['Gantz', 5400],
+            ['Kids', 600],
+        ]);
+        expect(recap.topSeries[0]!.coverVolumeId).toBe(
+            volumeId('Gantz/Gantz T01.cbz'),
+        );
+        expect(recap.genres[0]!.name).toBe('Action');
+        expect(
+            yearRecap(ctx.db, userId('alice'), { year: 2025, tz: PARIS }),
+        ).toMatchObject({ seconds: 1200, newSeries: 1 });
+    });
+});
+
+describe('GET /stats/me', () => {
+    it('lets each person see their own figures, without the series they can no longer see', async () => {
+        ctx.db
+            .update(users)
+            .set({ maxAge: 10 })
+            .where(eq(users.id, userId('alice')))
+            .run();
+        ctx.db
+            .update(series)
+            .set({ age: 18 })
+            .where(eq(series.name, 'Gantz'))
+            .run();
+        ctx.db
+            .update(series)
+            .set({ age: 0 })
+            .where(eq(series.name, 'Kids'))
+            .run();
+        session('alice', 'Gantz/Gantz T01.cbz', '2026-11-15T10:00:00Z', 30, 60);
+        session('alice', 'Kids/Kids T01.cbz', '2026-11-15T12:00:00Z', 10, 5);
+        progress('alice', 'Gantz/Gantz T01.cbz', true, NOW);
+        progress('alice', 'Kids/Kids T01.cbz', true, NOW);
+        const alice = sessionCookie(ctx.db, 'reader', 'alice');
+        const get = (path: string, cookie = alice) =>
+            api.request(path, { headers: { Cookie: cookie } });
+
+        const response = await get('/stats/me?period=all&tz=60');
+        expect(response.status).toBe(200);
+        const sheet = (await response.json()) as {
+            seconds: number;
+            series: { name: string }[];
+            history: { seriesName: string }[];
+            genres: { name: string }[];
+        };
+        // Le temps reste compté, mais Gantz n'apparaît nulle part.
+        expect(sheet.seconds).toBe(2400);
+        expect(sheet.series.map((s) => s.name)).toEqual(['Kids']);
+        expect(sheet.history.map((h) => h.seriesName)).toEqual(['Kids']);
+        expect(sheet.genres.map((g) => g.name)).toEqual(['Aventure']);
+
+        const year = (await (await get('/stats/me/year?tz=60')).json()) as {
+            topSeries: { name: string }[];
+        };
+        expect(year.topSeries.map((s) => s.name)).toEqual(['Kids']);
+
+        // Le bilan d'une autre personne : réservé aux admins.
+        expect((await get(`/stats/readers/${userId('bob')}/year`)).status).toBe(
+            403,
+        );
+        expect(
+            (await get(`/stats/readers/${userId('alice')}/year`, admin)).status,
+        ).toBe(200);
     });
 });

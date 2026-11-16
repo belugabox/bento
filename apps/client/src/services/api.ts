@@ -584,6 +584,35 @@ export const fetchReaderStats = (id: number, period: StatsPeriod) =>
 
 export type ReaderStats = Awaited<ReturnType<typeof fetchReaderStats>>;
 
+/** Bilan d'une année d'un lecteur (la plus récente lue par défaut). */
+export const fetchReaderYear = (id: number, year?: number) =>
+    json(
+        api.stats.readers[':id'].year.$get({
+            param: { id: String(id) },
+            query: {
+                tz: timezoneOffset(),
+                ...(year && { year: String(year) }),
+            },
+        }),
+    );
+
+export type YearRecap = Awaited<ReturnType<typeof fetchReaderYear>>;
+
+/** Ses propres statistiques, pour chacun. */
+export const fetchMyStats = (period: StatsPeriod) =>
+    json(api.stats.me.$get({ query: { period, tz: timezoneOffset() } }));
+
+/** Son propre bilan de l'année. */
+export const fetchMyYear = (year?: number) =>
+    json(
+        api.stats.me.year.$get({
+            query: {
+                tz: timezoneOffset(),
+                ...(year && { year: String(year) }),
+            },
+        }),
+    );
+
 /** Statut de la future série d'un dossier de brouillons. */
 export const setDraftStatus = (
     library: number,
