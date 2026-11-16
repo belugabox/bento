@@ -73,4 +73,66 @@ describe('DraftsPage', () => {
 
         expect(await screen.findByText('→ #01')).toBeTruthy();
     });
+
+    it('waits for the PDF conversion, then opens the editor', async () => {
+        let folderReads = 0;
+        const file = (converting: boolean) => ({
+            path: `_draft/Inuyashiki/Tome 01.${converting ? 'pdf' : 'cbz'}`,
+            name: `Tome 01.${converting ? 'pdf' : 'cbz'}`,
+            folder: '_draft/Inuyashiki',
+            size: 10,
+            draft: true,
+            pageCount: converting ? 0 : 2,
+            comicInfo: converting ? {} : { Series: 'Inuyashiki', Number: '1' },
+            error: converting ? 'Conversion du PDF en cours…' : null,
+            ...(converting && { converting: true }),
+            publicationPath: converting
+                ? null
+                : 'Inuyashiki/Inuyashiki #01.cbz',
+        });
+        vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+            const url = String(input);
+            if (url === '/api/libraries') {
+                return respond([{ id: 1, name: 'Mangas', type: 'manga' }]);
+            }
+            if (url === '/api/libraries/1/drafts') {
+                return respond([
+                    {
+                        folder: '_draft/Inuyashiki',
+                        files: [
+                            {
+                                path: '_draft/Inuyashiki/Tome 01.pdf',
+                                name: 'Tome 01.pdf',
+                                size: 10,
+                            },
+                        ],
+                    },
+                ]);
+            }
+            if (url.startsWith('/api/libraries/1/drafts/files?')) {
+                folderReads++;
+                return respond([file(folderReads === 1)]);
+            }
+            throw new Error(`requête inattendue : ${url}`);
+        });
+
+        render(
+            <MantineProvider>
+                <MemoryRouter>
+                    <DraftsPage />
+                </MemoryRouter>
+            </MantineProvider>,
+        );
+        fireEvent.click(await screen.findByText('Inuyashiki'));
+
+        expect(
+            await screen.findByText('Conversion des PDF en CBZ…'),
+        ).toBeTruthy();
+        expect(screen.getByText(/0 \/ 1 fichiers prêts/)).toBeTruthy();
+        // Relu tout seul : l'éditeur s'ouvre une fois le PDF converti.
+        expect(
+            await screen.findByText('→ #01', undefined, { timeout: 5000 }),
+        ).toBeTruthy();
+        expect(folderReads).toBe(2);
+    });
 });
