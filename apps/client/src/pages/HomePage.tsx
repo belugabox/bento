@@ -5,6 +5,7 @@ import {
     Box,
     Button,
     Center,
+    Grid,
     Group,
     Image,
     Paper,
@@ -74,6 +75,9 @@ const seriesProgress = (volume: InProgressVolume) =>
 /** « 4 tomes lus sur 10 · 43 % de la série ». */
 const seriesProgressLabel = (volume: InProgressVolume) => {
     const read = volume.readCount;
+    if (volume.volumeCount <= 1) {
+        return `${Math.round(seriesProgress(volume) * 100)} % lu`;
+    }
     return `${read} tome${read > 1 ? 's' : ''} lu${read > 1 ? 's' : ''} sur ${volume.volumeCount} · ${Math.round(seriesProgress(volume) * 100)} % de la série`;
 };
 
@@ -96,6 +100,9 @@ const VolumeCover = ({ volume }: { volume: InProgressVolume }) => (
         />
     </AspectRatio>
 );
+
+// Tomes en cours à côté de la grande carte, sur tablette et ordinateur.
+const SIDE_LINES = 3;
 
 // Espace entre deux cartes des blocs (`spacing="sm"` de leur grille).
 const CARD_GAP = 12;
@@ -379,31 +386,47 @@ export const HomePage = () => {
                         { sort: 'lastRead' },
                     )}
                 >
-                    <SimpleGrid
-                        cols={{ base: 1, md: others.length ? 2 : 1 }}
-                        spacing="sm"
-                        data-testid="resume"
-                    >
-                        <ResumeHero
-                            volume={first}
-                            onChanged={reload}
-                            coverWidth={coverWidth}
-                        />
+                    {/* À partir d'une tablette : la grande carte (7/12)
+                        et, à côté, une colonne de trois autres tomes, à peu
+                        près de sa hauteur ; en dessous, ils prenaient la
+                        moitié de l'écran en portrait. */}
+                    <Grid gutter="sm" data-testid="resume">
+                        <Grid.Col
+                            span={{ base: 12, sm: others.length ? 7 : 12 }}
+                        >
+                            <ResumeHero
+                                volume={first}
+                                onChanged={reload}
+                                coverWidth={coverWidth}
+                            />
+                        </Grid.Col>
                         {others.length > 0 && (
-                            <SimpleGrid
-                                cols={{ base: 1, xs: 2 }}
-                                spacing={8}
-                                style={{ alignContent: 'start' }}
-                            >
-                                {others.slice(0, 6).map((volume) => (
-                                    <ResumeLine
-                                        key={volume.volumeId}
-                                        volume={volume}
-                                    />
-                                ))}
-                            </SimpleGrid>
+                            <Grid.Col span={{ base: 12, sm: 5 }}>
+                                <SimpleGrid
+                                    cols={{ base: 1, xs: 2, sm: 1 }}
+                                    spacing={8}
+                                >
+                                    {others.slice(0, 6).map((volume, index) =>
+                                        // Trois à côté de la carte ; les
+                                        // autres dans « Tout voir ».
+                                        index < SIDE_LINES ? (
+                                            <ResumeLine
+                                                key={volume.volumeId}
+                                                volume={volume}
+                                            />
+                                        ) : (
+                                            <Box
+                                                key={volume.volumeId}
+                                                hiddenFrom="sm"
+                                            >
+                                                <ResumeLine volume={volume} />
+                                            </Box>
+                                        ),
+                                    )}
+                                </SimpleGrid>
+                            </Grid.Col>
                         )}
-                    </SimpleGrid>
+                    </Grid>
                 </PageSection>
             )}
             <SuggestionRow
