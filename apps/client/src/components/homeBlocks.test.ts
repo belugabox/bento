@@ -46,6 +46,18 @@ describe('homeBlocks', () => {
         expect(ids(blocks.recent)).toEqual([6, 5]);
     });
 
+    it('sets aside only the cards shown, one row per block', () => {
+        const list = [
+            series(1, { toRead: true }),
+            series(2, { toRead: true }),
+            series(3, { toRead: true }),
+        ];
+        const blocks = homeBlocks(list, [], [], { perRow: 2 });
+        // « À lire » en montre deux ; la troisième reste aux ajouts récents.
+        expect(ids(blocks.toRead)).toEqual([3, 2, 1]);
+        expect(ids(blocks.recent)).toEqual([1]);
+    });
+
     it('shows the series read by the most people first, not the started ones', () => {
         const list = [
             series(1),

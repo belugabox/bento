@@ -331,6 +331,8 @@ export const HomePage = () => {
     const [first, ...others] = resume;
     const blocks = homeBlocks(series.data, resume, readers.data ?? [], {
         gems: gems.data,
+        // Une ligne par bloc : seules ces cartes sont montrées.
+        perRow,
     });
     const readersOf = (s: SeriesSummary) =>
         (readers.data ?? []).filter((r) => r.seriesIds.includes(s.id));

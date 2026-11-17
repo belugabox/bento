@@ -10,19 +10,27 @@ import type {
 export type Gem = { id: number; rating: number; reviews: number };
 
 /**
- * Blocs de l'accueil, dans cet ordre ; une série n'est que dans le premier.
- * `reasons` : la raison de chaque suggestion « Pour toi ».
+ * Blocs de l'accueil, dans cet ordre ; une série montrée dans un bloc ne
+ * revient pas dans les suivants. Seules les `perRow` premières cartes d'un
+ * bloc sont montrées (une ligne) : les autres restent possibles plus bas
+ * (sinon « Pour toi » et « Bien notées » vidaient « Récemment ajoutées »
+ * de ses vrais derniers ajouts, signalé). `reasons` : la raison de chaque
+ * suggestion « Pour toi ».
  */
 export const homeBlocks = (
     series: SeriesSummary[],
     inProgress: Pick<InProgressVolume, 'seriesId'>[],
     readers: Pick<FamilyReader, 'id' | 'seriesIds'>[],
-    { gems = [], now }: { gems?: Gem[]; now?: number } = {},
+    {
+        gems = [],
+        now,
+        perRow = Number.POSITIVE_INFINITY,
+    }: { gems?: Gem[]; now?: number; perRow?: number } = {},
 ) => {
     const shown = new Set(inProgress.map((v) => v.seriesId));
     const take = (list: SeriesSummary[]) => {
         const kept = list.filter((s) => !shown.has(s.id));
-        for (const s of kept) shown.add(s.id);
+        for (const s of kept.slice(0, perRow)) shown.add(s.id);
         return kept;
     };
     const readersOf = (s: SeriesSummary) =>
