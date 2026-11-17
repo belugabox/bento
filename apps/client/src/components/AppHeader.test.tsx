@@ -5,7 +5,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { type CurrentUser, UserContext } from '@/services/auth';
 
-import { AppHeader, PreviewBanner } from './AppHeader';
+import { AppHeader } from './AppHeader';
+import { ModeLine } from './ModeBadges';
 
 const user = (overrides: Partial<CurrentUser> = {}): CurrentUser => ({
     id: 1,
@@ -27,6 +28,8 @@ let accounts: unknown[] = [];
 // Tâches de fond renvoyées par le serveur.
 let tasks: unknown[] = [];
 const assign = vi.fn();
+// Copie de la prod sans fichiers (`/api/health`).
+let health = false;
 
 let address = '';
 const Address = () => {
@@ -41,7 +44,7 @@ const show = (current: CurrentUser, path = '/') =>
             <MemoryRouter initialEntries={[path]}>
                 <UserContext.Provider value={current}>
                     <AppHeader />
-                    <PreviewBanner />
+                    <ModeLine />
                     <Address />
                 </UserContext.Provider>
             </MemoryRouter>
@@ -59,13 +62,15 @@ beforeEach(() => {
             init?.body ? JSON.parse(String(init.body)) : undefined,
         ]);
         const url = String(input);
-        const body = url.endsWith('/drafts/pending')
-            ? { series: 3 }
-            : url.endsWith('/tasks')
-              ? tasks
-              : url.endsWith('/preview/accounts')
-                ? accounts
-                : { preview: null };
+        const body = url.endsWith('/health')
+            ? { status: 'ok', version: '1', offlineLibraries: health }
+            : url.endsWith('/drafts/pending')
+              ? { series: 3 }
+              : url.endsWith('/tasks')
+                ? tasks
+                : url.endsWith('/preview/accounts')
+                  ? accounts
+                  : { preview: null };
         return new Response(JSON.stringify(body), {
             headers: { 'Content-Type': 'application/json' },
         });
@@ -78,23 +83,32 @@ beforeEach(() => {
 
 afterEach(() => {
     vi.restoreAllMocks();
+    health = false;
     assign.mockReset();
 });
 
 describe('AppHeader', () => {
-    it('searches series from any page, on the home page', async () => {
+    it('opens the library search from the magnifier', async () => {
         show(user({ role: 'reader' }), '/series/4');
-        const input = screen.getByRole('textbox', {
-            name: 'Rechercher une série',
-        });
 
-        fireEvent.change(input, { target: { value: 'gantz' } });
-        expect(address).toBe('/?q=gantz');
-        fireEvent.click(
-            screen.getByRole('button', { name: 'Effacer la recherche' }),
-        );
-        expect(address).toBe('/');
-        expect((input as HTMLInputElement).value).toBe('');
+        fireEvent.click(screen.getByRole('button', { name: 'Rechercher' }));
+        expect(address).toBe('/library');
+    });
+
+    it('links the main pages, and « Moi » from the avatar', () => {
+        show(user({ role: 'reader' }), '/library?genre=Action');
+
+        expect(
+            screen
+                .getByRole('link', { name: 'Bibliothèque' })
+                .getAttribute('aria-current'),
+        ).toBe('page');
+        expect(
+            screen.getByRole('link', { name: 'Accueil' }).getAttribute('href'),
+        ).toBe('/');
+        expect(
+            screen.getByRole('link', { name: 'Moi' }).getAttribute('href'),
+        ).toBe('/me');
     });
 
     it('shows admins how many series wait in the drafts', async () => {
@@ -132,47 +146,40 @@ describe('AppHeader', () => {
         show(user({ role: 'reader' }));
 
         expect(screen.queryByRole('link', { name: 'Brouillons' })).toBeNull();
-        expect(requests).toEqual([]);
+        // Rien de l'admin (brouillons, tâches) ; l'état du serveur, oui.
+        expect(requests.filter(([, url]) => url !== '/api/health')).toEqual([]);
     });
 
-    it('lets an admin view the app as a reader of a given age', async () => {
-        show(user());
+    it('says in the header when the server is a copy of the production', async () => {
+        health = true;
+        const { container } = show(user());
 
-        fireEvent.click(screen.getByRole('button', { name: 'Mon compte' }));
-        fireEvent.click(await screen.findByText('Voir comme un lecteur…'));
-        // Âge proposé par défaut : 10 ans.
-        expect(await screen.findByDisplayValue('Jusqu’à 10 ans')).toBeTruthy();
-        await act(async () => {
-            fireEvent.click(screen.getByRole('button', { name: 'Voir' }));
-        });
-
-        expect(requests).toContainEqual([
-            'PUT',
-            '/api/preview',
-            { maxAge: 10 },
-        ]);
-        expect(assign).toHaveBeenCalledWith('/');
-    });
-
-    it('lets an admin see the app as one account, read-only', async () => {
-        accounts = [{ id: 5, name: 'Léa', avatarSeed: null, maxAge: 10 }];
-        show(user());
-
-        fireEvent.click(screen.getByRole('button', { name: 'Mon compte' }));
-        fireEvent.click(await screen.findByText('Voir comme un lecteur…'));
+        // Une pastille à côté du logo ; l'explication au toucher.
+        fireEvent.click(
+            await screen.findByRole('button', { name: 'Copie de la prod' }),
+        );
         expect(
-            await screen.findByDisplayValue('Léa · jusqu’à 10 ans'),
+            await screen.findByText(/fichiers des bibliothèques sont absents/),
         ).toBeTruthy();
-        expect(screen.getByText(/rien n’est enregistré/)).toBeTruthy();
-        await act(async () => {
-            fireEvent.click(screen.getByRole('button', { name: 'Voir' }));
-        });
-
-        expect(requests).toContainEqual(['PUT', '/api/preview', { userId: 5 }]);
-        expect(assign).toHaveBeenCalledWith('/');
+        // Et un liseré de sa couleur en haut de l'écran.
+        expect(
+            container.querySelector('[style*="--mantine-color-grape-6"]'),
+        ).toBeTruthy();
     });
 
-    it('reminds a simulated account', () => {
+    it('says nothing on a normal server', async () => {
+        const { container } = show(user());
+
+        await screen.findByText('3');
+        expect(
+            screen.queryByRole('button', { name: 'Copie de la prod' }),
+        ).toBeNull();
+        expect(
+            container.querySelector('[style*="-6)"][aria-hidden]'),
+        ).toBeNull();
+    });
+
+    it('reminds a simulated account in the header', async () => {
         show(
             user({
                 id: 5,
@@ -183,14 +190,19 @@ describe('AppHeader', () => {
             }),
         );
 
-        expect(screen.getByText(/en lecture seule/)).toBeTruthy();
-        expect(screen.getByText('Léa')).toBeTruthy();
+        fireEvent.click(screen.getByRole('button', { name: 'Vue de Léa' }));
+        expect(await screen.findByText(/en lecture seule/)).toBeTruthy();
     });
 
     it('reminds the reader view, and goes back to the admin view', async () => {
         show(user({ role: 'reader', maxAge: 10, preview: { maxAge: 10 } }));
 
-        expect(screen.getByText(/Vue lecteur : jusqu’à 10 ans/)).toBeTruthy();
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Vue jusqu’à 10 ans' }),
+        );
+        expect(
+            await screen.findByText(/Vue lecteur : jusqu’à 10 ans/),
+        ).toBeTruthy();
         await act(async () => {
             fireEvent.click(
                 screen.getByRole('button', { name: 'Revenir à la vue admin' }),

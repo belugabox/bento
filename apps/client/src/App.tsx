@@ -1,18 +1,25 @@
-import { AppShell, Container, Loader } from '@mantine/core';
+import { AppShell, Container } from '@mantine/core';
 import { Suspense, lazy } from 'react';
 import { Navigate, Outlet, Route, Routes } from 'react-router';
 
-import {
-    ActivationBanner,
-    AppHeader,
-    PreviewBanner,
-} from '@/components/AppHeader';
+import { ActivationBanner, AppHeader } from '@/components/AppHeader';
+import { BottomNav } from '@/components/AppNav';
+import { ModeLine } from '@/components/ModeBadges';
 import { OfflineBanner } from '@/components/OfflineBanner';
+import { PageLoader } from '@/components/PageLoader';
 import { RequireUser } from '@/components/RequireUser';
+import {
+    BOTTOM_NAV_HEIGHT,
+    useBottomNav,
+    useBrowsePage,
+} from '@/components/navigation';
+import { useScrollToTop } from '@/components/scrollToTop';
 import { DownloadsPage } from '@/pages/DownloadsPage';
+import { HomePage } from '@/pages/HomePage';
 import { JoinPage } from '@/pages/JoinPage';
 import { LibraryPage } from '@/pages/LibraryPage';
 import { LoginPage } from '@/pages/LoginPage';
+import { MePage } from '@/pages/MePage';
 import { SeriesPage } from '@/pages/SeriesPage';
 import { ReaderPage } from '@/reader/ReaderPage';
 import { useCurrentUser } from '@/services/auth';
@@ -56,29 +63,55 @@ const UsersPage = lazy(() =>
 /** Réservé aux admins ; les autres reviennent à l'accueil. */
 const AdminOnly = ({ children }: { children: React.ReactNode }) =>
     useCurrentUser().role === 'admin' ? (
-        <Suspense fallback={<Loader mx="auto" />}>{children}</Suspense>
+        <Suspense fallback={<PageLoader />}>{children}</Suspense>
     ) : (
         <Navigate to="/" replace />
     );
 
-/** Mise en page des écrans de navigation (le lecteur est en plein écran). */
-const Layout = () => (
-    <AppShell header={{ height: 56 }} padding="md">
-        <AppShell.Header>
-            <Container size="xl" h="100%">
-                <AppHeader />
-            </Container>
-        </AppShell.Header>
-        <AppShell.Main>
-            <Container size="xl">
-                <OfflineBanner />
-                <PreviewBanner />
-                <ActivationBanner />
-                <Outlet />
-            </Container>
-        </AppShell.Main>
-    </AppShell>
-);
+/**
+ * Mise en page des écrans de navigation (le lecteur est en plein écran) :
+ * l'en-tête, et sur téléphone et tablette la barre d'onglets du bas.
+ */
+const Layout = () => {
+    const bottomNav = useBottomNav();
+    // Une page ouverte commence en haut (pas au défilement de la précédente).
+    useScrollToTop();
+    // Retour d'une fiche série : la page parcourue avant.
+    useBrowsePage();
+    return (
+        <AppShell
+            header={{ height: 56 }}
+            footer={{
+                // Plus la marge du bas des téléphones sans bouton.
+                height: `calc(${BOTTOM_NAV_HEIGHT}px + env(safe-area-inset-bottom, 0px))`,
+                collapsed: !bottomNav,
+            }}
+            padding="md"
+        >
+            <AppShell.Header>
+                <Container size="xl" h="100%">
+                    <AppHeader />
+                </Container>
+            </AppShell.Header>
+            {bottomNav && (
+                <AppShell.Footer
+                    style={{
+                        paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+                    }}
+                >
+                    <BottomNav />
+                </AppShell.Footer>
+            )}
+            <AppShell.Main>
+                <Container size="xl">
+                    <OfflineBanner />
+                    <ActivationBanner />
+                    <Outlet />
+                </Container>
+            </AppShell.Main>
+        </AppShell>
+    );
+};
 
 export const App = () => (
     <Routes>
@@ -88,19 +121,23 @@ export const App = () => (
         <Route
             element={
                 <RequireUser>
+                    {/* Vue lecteur, copie de la prod : un liseré partout. */}
+                    <ModeLine />
                     <Outlet />
                 </RequireUser>
             }
         >
             <Route element={<Layout />}>
-                <Route index element={<LibraryPage />} />
+                <Route index element={<HomePage />} />
+                <Route path="library" element={<LibraryPage />} />
+                <Route path="me" element={<MePage />} />
                 <Route path="series/:id" element={<SeriesPage />} />
                 {/* Pas chargée à la demande : sert aussi hors ligne. */}
                 <Route path="downloads" element={<DownloadsPage />} />
                 <Route
                     path="account"
                     element={
-                        <Suspense fallback={<Loader mx="auto" />}>
+                        <Suspense fallback={<PageLoader />}>
                             <AccountPage />
                         </Suspense>
                     }

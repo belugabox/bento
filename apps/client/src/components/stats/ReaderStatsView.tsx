@@ -1,16 +1,8 @@
-import {
-    Alert,
-    Anchor,
-    Group,
-    Loader,
-    Select,
-    Stack,
-    Tabs,
-    Title,
-} from '@mantine/core';
-import { IconArrowLeft } from '@tabler/icons-react';
-import { Link, useSearchParams } from 'react-router';
+import { Alert, Group, Select, Stack, Tabs, Title } from '@mantine/core';
+import { useSearchParams } from 'react-router';
 
+import { PageHeader } from '@/components/PageHeader';
+import { PageLoader } from '@/components/PageLoader';
 import { UserAvatar } from '@/components/accounts/UserAvatar';
 import type { ReaderStats, YearRecap } from '@/services/api';
 import { useQuery } from '@/services/useQuery';
@@ -69,26 +61,22 @@ export const ReaderStatsView = ({
 
     return (
         <Stack gap="xl">
-            <Stack gap={4}>
-                {back && (
-                    <Anchor component={Link} to={back.to(period)} size="sm">
-                        <Group gap={4}>
-                            <IconArrowLeft size={14} />
-                            {back.label}
-                        </Group>
-                    </Anchor>
-                )}
-                <Group gap="sm" wrap="nowrap" mih={56}>
-                    {person && (
-                        <UserAvatar
-                            name={person.name}
-                            seed={person.avatarSeed}
-                            size="lg"
-                        />
-                    )}
-                    <Title order={2}>{title ?? person?.name}</Title>
-                </Group>
-            </Stack>
+            <PageHeader
+                back={back?.to(period)}
+                backLabel={back?.label}
+                title={
+                    <Group gap="sm" wrap="nowrap" mih={56}>
+                        {person && (
+                            <UserAvatar
+                                name={person.name}
+                                seed={person.avatarSeed}
+                                size="lg"
+                            />
+                        )}
+                        <Title order={2}>{title ?? person?.name}</Title>
+                    </Group>
+                }
+            />
 
             <Tabs
                 keepMounted={false}
@@ -128,7 +116,7 @@ export const ReaderStatsView = ({
                     ) : sheet.data ? (
                         <ReaderSheet data={sheet.data} period={period} />
                     ) : (
-                        <Loader mx="auto" />
+                        <PageLoader />
                     )}
                 </Tabs.Panel>
                 <Tabs.Panel value="year" pt="lg">
@@ -137,7 +125,7 @@ export const ReaderStatsView = ({
                     ) : recap.data ? (
                         <YearRecapView recap={recap.data} />
                     ) : (
-                        <Loader mx="auto" />
+                        <PageLoader />
                     )}
                 </Tabs.Panel>
             </Tabs>

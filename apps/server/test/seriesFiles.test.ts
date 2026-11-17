@@ -271,7 +271,7 @@ describe('a series put back in the drafts', () => {
                 back.id,
                 {},
             ),
-        ).toEqual({ toRead: true });
+        ).toEqual({ toRead: true, notForMe: false });
         // Dossier publié en entier : plus de réglages en attente.
         expect(await ctx.files.drafts(ctx.library.id)).toEqual([]);
     });

@@ -10,7 +10,8 @@
         "dev": "pnpm --parallel dev",
         "test": "pnpm -r test",
         "lint": "pnpm --filter client lint",
-        "start": "pnpm --filter server start"
+        "start": "pnpm --filter server start",
+        "prod-copy": "pnpm build && pnpm --filter server prod-copy"
     },
     "devDependencies": {
         "@trivago/prettier-plugin-sort-imports": "^5.2.2",

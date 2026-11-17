@@ -1,18 +1,11 @@
-import {
-    Alert,
-    Anchor,
-    Group,
-    Loader,
-    Menu,
-    Stack,
-    Text,
-    Title,
-} from '@mantine/core';
+import { Alert, Menu, Stack, Text } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
-import { IconArrowBackUp, IconArrowLeft, IconTrash } from '@tabler/icons-react';
+import { IconArrowBackUp, IconTrash } from '@tabler/icons-react';
 import { useState } from 'react';
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
+import { useNavigate, useParams, useSearchParams } from 'react-router';
 
+import { PageHeader } from '@/components/PageHeader';
+import { PageLoader } from '@/components/PageLoader';
 import {
     type SeriesFileAction,
     SeriesFileModal,
@@ -53,7 +46,7 @@ export const SeriesEditPage = () => {
     const queue = fromManage ? readManageQueue() : null;
 
     if (error) return <Alert color="red">{error.message}</Alert>;
-    if (!series) return <Loader mx="auto" />;
+    if (!series) return <PageLoader />;
 
     const first = series.volumes[0];
     const currentCover = first
@@ -81,30 +74,26 @@ export const SeriesEditPage = () => {
 
     return (
         <Stack>
-            <Anchor component={Link} to={`/series/${seriesId}`} size="sm">
-                <Group gap={4}>
-                    <IconArrowLeft size={14} /> {series.name}
-                </Group>
-            </Anchor>
-            <Group justify="space-between" align="baseline">
-                <Title order={2}>Modifier la série</Title>
-                {fromManage && (
-                    <Anchor
-                        component={Link}
-                        to={`/manage${queue?.search ? `?${queue.search}` : ''}`}
-                        size="sm"
-                    >
-                        <Group gap={4} wrap="nowrap">
-                            <IconArrowLeft size={14} /> Séries
-                            {place?.position && (
-                                <Text span size="xs" c="dimmed">
-                                    ({place.position} / {place.total})
-                                </Text>
-                            )}
-                        </Group>
-                    </Anchor>
+            {/* Ouverte depuis la page Séries : retour à sa liste (même
+                onglet, même tri), et la place dans la liste. */}
+            <PageHeader
+                back={
+                    fromManage
+                        ? `/manage${queue?.search ? `?${queue.search}` : ''}`
+                        : `/series/${seriesId}`
+                }
+                backLabel={
+                    fromManage ? 'Retour aux séries' : 'Retour à la série'
+                }
+                title="Modifier la série"
+                description={series.name}
+            >
+                {fromManage && place?.position && (
+                    <Text size="sm" c="dimmed" style={{ flexShrink: 0 }}>
+                        {place.position} / {place.total}
+                    </Text>
                 )}
-            </Group>
+            </PageHeader>
 
             <MetadataEditor
                 // Une autre série (« Suivante ») : un éditeur tout neuf.

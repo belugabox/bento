@@ -10,14 +10,20 @@ import { volumeLabel } from '@/components/readingStatus';
 import { saveLocalProgress, useDownloads } from '@/offline/downloads';
 import { loadPageSizes, loadVolume, prefetchVolume } from '@/offline/reading';
 import { saveProgressOrQueue } from '@/offline/syncQueue';
-import { pageUrl, saveProgress, screenPageWidth } from '@/services/api';
+import {
+    fetchSeries,
+    pageUrl,
+    saveProgress,
+    screenPageWidth,
+} from '@/services/api';
 import { UserContext, useReadOnly } from '@/services/auth';
 import { useOnline } from '@/services/network';
 import { useQuery } from '@/services/useQuery';
 
 import { Reader } from './Reader';
+import { SeriesProgress } from './SeriesProgress';
 import { exitFullscreen } from './fullscreen';
-import { type ReadingMode, clampPage } from './navigation';
+import { type ReadingMode, clampPage, navigationDirection } from './navigation';
 import { useReadingTime } from './readingTime';
 
 // `?page=last` : dernière page (en revenant du tome suivant).
@@ -45,6 +51,16 @@ export const ReaderPage = () => {
     // Tome précédent encore en mémoire pendant le chargement du suivant :
     // l'ignorer, sinon sa page (et son défilement) passent au nouveau tome.
     const volume = data?.id === volumeId ? data : undefined;
+    // Tomes de la série et leur progression (barre de la série) : en ligne
+    // seulement, relus à chaque tome (le précédent vient d'être lu).
+    const seriesId = volume?.seriesId;
+    const series = useQuery(
+        () =>
+            seriesId && online
+                ? fetchSeries(seriesId)
+                : Promise.resolve(undefined),
+        [seriesId, volumeId, online],
+    );
     // Mode de lecture réglable par série ; par défaut celui de la série.
     const [modes, setModes] = useLocalStorage<Record<string, ReadingMode>>({
         key: 'bento:reader:modes',
@@ -53,9 +69,12 @@ export const ReaderPage = () => {
 
     const pageCount = volume?.pageCount ?? 0;
     const rawPage = params.get('page');
-    // Sans page dans l'adresse : reprendre là où la personne s'était arrêtée.
+    // Sans page dans l'adresse : reprendre là où la personne s'était arrêtée,
+    // relecture comprise (tome lu, arrêté avant sa dernière page) ; un tome
+    // lu jusqu'au bout se relit depuis le début.
     const resumePage =
-        volume?.progress && !volume.progress.completed
+        volume?.progress &&
+        (!volume.progress.completed || volume.progress.page < pageCount - 1)
             ? volume.progress.page
             : 0;
     const page =
@@ -232,6 +251,17 @@ export const ReaderPage = () => {
                     : undefined,
                 next: nextReadable ? openNext : undefined,
             }}
+            seriesProgress={
+                series.data?.id === volume.seriesId && (
+                    <SeriesProgress
+                        volumes={series.data.volumes}
+                        currentId={volume.id}
+                        page={page}
+                        rtl={navigationDirection(mode) === 'rtl'}
+                        onOpen={(id) => void navigate(`/read/${id}`)}
+                    />
+                )
+            }
             end={
                 nextReadable ? (
                     <Button component={Link} to={`/read/${volume.nextId}`}>

@@ -118,11 +118,27 @@ export class LibraryScanner {
         private readonly logger: Logger,
         // Tâches de fond, partagées avec l'API (icône des tâches).
         readonly tasks = new TaskList(),
+        /**
+         * Fichiers absents (`LIBRARIES_OFFLINE`, copie de la prod) : aucun
+         * scan, qui croirait tous les tomes disparus et les effacerait.
+         */
+        readonly offline = false,
     ) {}
 
     isScanning = (libraryId: number) => this.running.has(libraryId);
 
     scan = (libraryId: number): Promise<ScanResult> => {
+        if (this.offline) {
+            this.logger.warn(
+                `Scan de la bibliothèque ${libraryId} ignoré : fichiers absents (LIBRARIES_OFFLINE)`,
+            );
+            return Promise.resolve({
+                added: 0,
+                updated: 0,
+                removed: 0,
+                errors: [],
+            });
+        }
         const current = this.running.get(libraryId);
         if (current) return current;
         const run = this.doScan(libraryId).finally(() =>

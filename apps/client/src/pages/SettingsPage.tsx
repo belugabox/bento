@@ -2,7 +2,6 @@ import {
     Alert,
     Button,
     Group,
-    Loader,
     NumberInput,
     Paper,
     Select,
@@ -10,7 +9,6 @@ import {
     Stack,
     Tabs,
     Text,
-    Title,
 } from '@mantine/core';
 import {
     IconAdjustments,
@@ -25,6 +23,8 @@ import { AgesSettings } from '@/components/AgesSettings';
 import { FormatsSettings } from '@/components/FormatsSettings';
 import { GenresSettings } from '@/components/GenresSettings';
 import { KavitaMigration } from '@/components/KavitaMigration';
+import { PageHeader } from '@/components/PageHeader';
+import { PageLoader } from '@/components/PageLoader';
 import { SheetRefreshSettings } from '@/components/SheetRefreshSettings';
 import { SourcePrioritySettings } from '@/components/SourcePrioritySettings';
 import { AccentPicker, ColorSchemeControl } from '@/components/ThemePickers';
@@ -298,11 +298,11 @@ export const SettingsPage = () => {
     const current = saved ?? data;
 
     if (error) return <Alert color="red">{error.message}</Alert>;
-    if (!current) return <Loader mx="auto" />;
+    if (!current) return <PageLoader />;
 
     return (
-        <Stack maw={720}>
-            <Title order={2}>Réglages</Title>
+        <Stack maw={720} mx="auto" w="100%">
+            <PageHeader back="/me" title="Réglages" />
             <Tabs
                 value={tab}
                 onChange={(value) =>

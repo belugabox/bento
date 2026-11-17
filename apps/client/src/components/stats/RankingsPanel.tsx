@@ -3,7 +3,6 @@ import {
     Anchor,
     Avatar,
     Group,
-    Loader,
     Paper,
     Progress,
     SimpleGrid,
@@ -12,6 +11,7 @@ import {
 } from '@mantine/core';
 import { Link } from 'react-router';
 
+import { PageLoader } from '@/components/PageLoader';
 import { UserAvatar } from '@/components/accounts/UserAvatar';
 import { formatDuration, ratingLabel, reviewsLabel } from '@/components/format';
 import { type ReadingRankings, fetchReadingRankings } from '@/services/api';
@@ -58,7 +58,7 @@ export const RankingsPanel = ({ period }: { period: StatsPeriod }) => {
     );
 
     if (error) return <Alert color="red">{error.message}</Alert>;
-    if (!data) return <Loader mx="auto" />;
+    if (!data) return <PageLoader />;
 
     const max = Math.max(1, ...data.topSeries.map((s) => s.seconds));
 
@@ -185,7 +185,7 @@ export const RankingsPanel = ({ period }: { period: StatsPeriod }) => {
 
             <SimpleGrid cols={{ base: 1, md: 2 }} spacing="xl">
                 <StatsSection
-                    title="Les mieux notées"
+                    title="Les mieux notés"
                     hint="Notes des sites (10 avis au moins), et la lecture de la famille depuis toujours"
                 >
                     {data.bestRated.length === 0 ? (
@@ -201,7 +201,7 @@ export const RankingsPanel = ({ period }: { period: StatsPeriod }) => {
                     )}
                 </StatsSection>
                 <StatsSection
-                    title="Bien notées, jamais ouvertes"
+                    title="Bien notés, jamais ouverts"
                     hint="4 sur 5 au moins : de quoi donner des idées"
                 >
                     {data.unreadGems.length === 0 ? (

@@ -11,7 +11,7 @@ import {
 } from '../src/db/schema';
 import { libraryStats } from '../src/library/libraryStats';
 import { saveProgress } from '../src/library/progress';
-import { readingRankings } from '../src/library/rankings';
+import { neverOpenedGems, readingRankings } from '../src/library/rankings';
 import { sessionCookie, setup, writeCbz } from './helpers';
 
 let ctx: Awaited<ReturnType<typeof setup>>;
@@ -223,5 +223,56 @@ describe('rankings', () => {
             ['Gantz', 4.2, 1],
         ]);
         expect(unreadGems.map((s) => s.name)).toEqual(['Inuyashiki']);
+    });
+
+    it('suggests the well rated series nobody opened, as seen by each one', () => {
+        for (const [name, value, count] of [
+            ['Gantz', 4.2, 300],
+            ['Inuyashiki', 4.5, 120],
+            // Trop peu d'avis, puis pas assez bien notée.
+            ['Spirale', 5, 3],
+        ] as const) {
+            ctx.db
+                .update(series)
+                .set({ sources: `manga-news:${name}` })
+                .where(eq(series.id, seriesId(name)))
+                .run();
+            ctx.db
+                .insert(sourceRatings)
+                .values({
+                    site: 'manga-news',
+                    sourceId: name,
+                    value,
+                    count,
+                    updatedAt: NOW,
+                })
+                .run();
+        }
+        const admin = {
+            id: userId('alice'),
+            role: 'admin' as const,
+            maxAge: null,
+        };
+        expect(neverOpenedGems(ctx.db, admin).map((s) => s.id)).toEqual([
+            seriesId('Inuyashiki'),
+            seriesId('Gantz'),
+        ]);
+
+        // Une page ouverte par quelqu'un : plus « jamais ouverte ».
+        saveProgress(ctx.db, userId('bob'), volumeId('Gantz/Gantz T02.cbz'), {
+            page: 0,
+        });
+        expect(neverOpenedGems(ctx.db, admin)).toEqual([
+            { id: seriesId('Inuyashiki'), rating: 4.5, reviews: 120 },
+        ]);
+
+        // Un compte limité ne voit pas les séries sans âge.
+        expect(
+            neverOpenedGems(ctx.db, {
+                id: userId('bob'),
+                role: 'reader',
+                maxAge: 10,
+            }),
+        ).toEqual([]);
     });
 });

@@ -37,6 +37,13 @@ const schema = z.object({
         .min(0)
         .max(7 * 24 * 60)
         .default(30),
+    // Fichiers des bibliothèques absents (copie de la prod sur un poste, pour
+    // parcourir) : ni alignement des bibliothèques sur LIBRARIES, ni scan,
+    // ni mise à jour de nuit des fiches ; sinon un scan effacerait tout.
+    LIBRARIES_OFFLINE: z
+        .enum(['0', '1', 'true', 'false'])
+        .default('0')
+        .transform((value) => value === '1' || value === 'true'),
     // Adresse publique de l'appli, sans « / » final : liens d'invitation,
     // cookies `Secure` en HTTPS.
     PUBLIC_URL: z

@@ -12,7 +12,6 @@ import {
     Select,
     Stack,
     Text,
-    Title,
 } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import {
@@ -26,6 +25,8 @@ import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router';
 
 import { DeleteDraftModal } from '@/components/DeleteDraftModal';
+import { PageHeader } from '@/components/PageHeader';
+import { PageLoader } from '@/components/PageLoader';
 import { completenessColor } from '@/components/completeness';
 import { CoverPicker } from '@/components/metadata/CoverPicker';
 import { MetadataEditor } from '@/components/metadata/MetadataEditor';
@@ -183,7 +184,7 @@ export const DraftsPage = () => {
     return (
         <Stack>
             <Group justify="space-between">
-                <Title order={2}>Brouillons</Title>
+                <PageHeader back="/me" title="Brouillons" />
                 {libraries.data && libraries.data.length > 1 && (
                     <Select
                         allowDeselect={false}
@@ -206,7 +207,7 @@ export const DraftsPage = () => {
                 #NN (Année).cbz » et apparaissent aux lecteurs.
             </Text>
             {drafts.error && <Alert color="red">{drafts.error.message}</Alert>}
-            {loadingFolders && !drafts.data && <Loader mx="auto" />}
+            {loadingFolders && !drafts.data && <PageLoader />}
             {!loadingFolders && drafts.data?.length === 0 && (
                 <Text c="dimmed" ta="center">
                     Aucun brouillon.

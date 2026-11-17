@@ -8,6 +8,7 @@ import { fetchMyStats, fetchMyYear } from '@/services/api';
 export const MyStatsPage = () => (
     <ReaderStatsView
         title="Mes statistiques"
+        back={{ label: 'Retour à Moi', to: () => '/me' }}
         loadSheet={fetchMyStats}
         loadYear={fetchMyYear}
     />

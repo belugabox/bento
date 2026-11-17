@@ -82,7 +82,7 @@ describe('personal lists', () => {
             method: 'PUT',
             json: { toRead: true },
         });
-        expect(set.body).toEqual({ toRead: true });
+        expect(set.body).toEqual({ toRead: true, notForMe: false });
 
         expect(await seriesOf(alice, 'Gantz')).toMatchObject({ toRead: true });
         expect(
@@ -97,6 +97,28 @@ describe('personal lists', () => {
         });
         expect(await seriesOf(alice, 'Gantz')).toMatchObject({
             toRead: false,
+        });
+    });
+
+    it('keeps the series taken out of the suggestions, per person', async () => {
+        const set = await call(`/series/${gantzSeries}/lists`, alice, {
+            method: 'PUT',
+            json: { notForMe: true },
+        });
+        expect(set.body).toEqual({ toRead: false, notForMe: true });
+        expect(await seriesOf(alice, 'Gantz')).toMatchObject({
+            notForMe: true,
+        });
+        expect(await seriesOf(bob, 'Gantz')).toMatchObject({
+            notForMe: false,
+        });
+
+        await call(`/series/${gantzSeries}/lists`, alice, {
+            method: 'PUT',
+            json: { notForMe: false },
+        });
+        expect(await seriesOf(alice, 'Gantz')).toMatchObject({
+            notForMe: false,
         });
     });
 

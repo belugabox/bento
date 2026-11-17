@@ -210,7 +210,7 @@ describe('StatsPage', () => {
         // Classements de la même période.
         fireEvent.click(screen.getByRole('tab', { name: 'Classements' }));
         expect(
-            await screen.findByText('Bien notées, jamais ouvertes'),
+            await screen.findByText('Bien notés, jamais ouverts'),
         ).toBeTruthy();
         expect(
             requests.some((r) =>

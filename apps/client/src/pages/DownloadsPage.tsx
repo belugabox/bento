@@ -29,6 +29,7 @@ import { type ReactNode, useEffect, useState } from 'react';
 import { Link } from 'react-router';
 
 import { CoverCard } from '@/components/CoverCard';
+import { PageHeader } from '@/components/PageHeader';
 import { formatSize } from '@/components/format';
 import { gridColumns, useLibraryDisplay } from '@/components/libraryDisplay';
 import { volumeLabel, volumeShortLabel } from '@/components/readingStatus';
@@ -584,7 +585,7 @@ export const DownloadsPage = () => {
     return (
         <Stack gap="xl">
             <div>
-                <Title order={2}>Téléchargements</Title>
+                <PageHeader back="/me" title="Téléchargements" />
                 <Text size="sm" c="dimmed">
                     Tomes gardés sur cet appareil, pour les lire sans réseau.
                     Ils sont effacés à la déconnexion.

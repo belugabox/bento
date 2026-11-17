@@ -59,7 +59,7 @@ describe('GET /health', () => {
     it('reports the server as up with its version', async () => {
         expect(await get('/health')).toEqual({
             status: 200,
-            body: { status: 'ok', version: '1.2.3' },
+            body: { status: 'ok', version: '1.2.3', offlineLibraries: false },
         });
     });
 });

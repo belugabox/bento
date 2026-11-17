@@ -47,7 +47,19 @@ if (recovery) {
     );
 }
 
-const scanner = new LibraryScanner(database.db, config.COVERS_PATH, logger);
+const offline = config.LIBRARIES_OFFLINE;
+if (offline) {
+    logger.warn(
+        'LIBRARIES_OFFLINE : fichiers des bibliothèques absents ; ni scan, ni mise à jour des bibliothèques ou des fiches',
+    );
+}
+const scanner = new LibraryScanner(
+    database.db,
+    config.COVERS_PATH,
+    logger,
+    undefined,
+    offline,
+);
 const pages = new PageReader();
 // Réglages de l'admin ; la variable SCAN_INTERVAL_MINUTES donne la valeur
 // par défaut de l'intervalle des scans.
@@ -66,7 +78,8 @@ const sheetRefresher = new SheetRefresher(
     settings,
     logger,
 );
-sheetRefresher.start();
+// Pas de requêtes vers les sites depuis une copie de la prod.
+if (!offline) sheetRefresher.start();
 
 /** Scanne les bibliothèques l'une après l'autre. */
 const scanAll = async (libraryIds: number[]) => {
@@ -127,8 +140,10 @@ const server = serve({ fetch: app.fetch, port: config.PORT }, (info) =>
     logger.info(`Bento ${version} démarré sur http://localhost:${info.port}`),
 );
 
-// Bibliothèques de la configuration, scannées au démarrage puis à intervalle.
+// Bibliothèques de la configuration, scannées au démarrage puis à intervalle
+// (rien sans les fichiers : la base garde ses bibliothèques telles quelles).
 void (async () => {
+    if (offline) return;
     const synced = await syncLibraries(
         database.db,
         config.LIBRARIES,

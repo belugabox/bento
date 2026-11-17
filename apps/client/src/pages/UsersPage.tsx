@@ -4,7 +4,6 @@ import {
     Badge,
     Button,
     Group,
-    Loader,
     Menu,
     Modal,
     SegmentedControl,
@@ -24,6 +23,8 @@ import {
 } from '@tabler/icons-react';
 import { useState } from 'react';
 
+import { PageHeader } from '@/components/PageHeader';
+import { PageLoader } from '@/components/PageLoader';
 import { ShareLink } from '@/components/accounts/ShareLink';
 import { UserAvatar } from '@/components/accounts/UserAvatar';
 import { usernameError } from '@/components/accounts/accountRules';
@@ -228,12 +229,12 @@ export const UsersPage = () => {
         });
 
     if (error) return <Alert color="red">{error.message}</Alert>;
-    if (!users) return <Loader mx="auto" />;
+    if (!users) return <PageLoader />;
 
     return (
         <Stack>
             <Group justify="space-between">
-                <Title order={2}>Comptes</Title>
+                <PageHeader back="/me" title="Comptes" />
                 <Button
                     leftSection={<IconUserPlus size={16} />}
                     onClick={() => setInviting(true)}

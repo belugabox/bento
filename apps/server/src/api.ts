@@ -97,6 +97,7 @@ import { KavitaImport } from './migration/kavita';
 import { createSeriesFileRoutes } from './seriesFileRoutes';
 import { SettingsStore, settingsUpdateSchema } from './settings';
 import { createStatsRoutes } from './statsRoutes';
+import { createSuggestionRoutes } from './suggestionRoutes';
 import { AppError, badRequest, notFound } from './tools/errors';
 import type { Logger } from './tools/logger';
 import { zValidator } from './tools/validator';
@@ -283,7 +284,12 @@ export const createApi = ({
         // Public : utilisé par le HEALTHCHECK Docker.
         .get('/health', (c) => {
             db.run(sql`select 1`);
-            return c.json({ status: 'ok' as const, version });
+            return c.json({
+                status: 'ok' as const,
+                version,
+                // Copie de la prod sans fichiers (bandeau de l'appli).
+                offlineLibraries: scanner.offline,
+            });
         })
         // Public : la page de connexion prend aussi le thème par défaut.
         .get('/appearance', (c) => c.json(settings.get().appearance))
@@ -506,11 +512,17 @@ export const createApi = ({
                     ),
                 ),
         )
-        // Liste « à lire » de la personne.
+        // Listes de la personne : « à lire », « pas pour moi ».
         .put(
             '/series/:id/lists',
             zValidator('param', idParam),
-            zValidator('json', z.object({ toRead: z.boolean().optional() })),
+            zValidator(
+                'json',
+                z.object({
+                    toRead: z.boolean().optional(),
+                    notForMe: z.boolean().optional(),
+                }),
+            ),
             (c) =>
                 c.json(
                     setSeriesLists(
@@ -837,6 +849,8 @@ export const createApi = ({
         // --- Gestion des fichiers (admin) : brouillons, ComicInfo, rangement.
         // Statistiques (module à part).
         .route('/stats', createStatsRoutes(db, files))
+        // Suggestions (module à part).
+        .route('/suggestions', createSuggestionRoutes(db))
         .route('/', createSeriesFileRoutes(files))
         // Nombre de séries en attente (pastille de l'en-tête).
         .get('/drafts/pending', requireAdmin, async (c) =>

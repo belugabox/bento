@@ -115,6 +115,7 @@ export const Reader = ({
     end,
     volumes,
     toolbarExtra,
+    seriesProgress,
 }: {
     title: string;
     pageCount: number;
@@ -145,6 +146,8 @@ export const Reader = ({
      */
     volumes?: { previous?: () => void; next?: () => void };
     toolbarExtra?: ReactNode;
+    /** Progression dans la série, au-dessus de la barre du bas. */
+    seriesProgress?: ReactNode;
 }) => {
     const [fit, setFit] = useLocalStorage<Fit>({
         key: 'bento:reader:fit',
@@ -686,66 +689,70 @@ export const Reader = ({
                         </Group>
                     </Group>
 
-                    <Group
+                    <Box
                         pos="fixed"
                         bottom={0}
                         left={0}
                         right={0}
-                        p="sm"
-                        gap={4}
-                        wrap="nowrap"
                         bg="rgba(0,0,0,0.75)"
                         onPointerDown={keepToolbar}
                     >
-                        {leftControls}
-                        {webtoon ? (
-                            <Box style={{ flex: 1 }} />
-                        ) : (
-                            <Slider
-                                style={{ flex: 1 }}
-                                min={1}
-                                max={Math.max(pageCount, 1)}
-                                value={sliderValue}
-                                onChange={(value) => {
-                                    keepToolbar();
-                                    goTo(
-                                        direction === 'rtl'
-                                            ? pageCount - value
-                                            : value - 1,
-                                    );
-                                }}
-                                label={null}
-                                color="gray"
-                                mx="xs"
-                            />
+                        {seriesProgress && (
+                            <Box px="md" pt={6}>
+                                {seriesProgress}
+                            </Box>
                         )}
-                        <UnstyledButton
-                            aria-label="Planche des pages"
-                            title="Planche des pages"
-                            disabled={webtoon}
-                            onClick={() => setThumbsOpened(true)}
-                            style={{ flexShrink: 0, minHeight: 44 }}
-                        >
-                            <Text
-                                c="white"
-                                size="sm"
-                                data-testid="page-label"
-                                style={{
-                                    whiteSpace: 'nowrap',
-                                    fontVariantNumeric: 'tabular-nums',
-                                    textAlign: 'center',
-                                    minWidth: `${widestLabel.length}ch`,
-                                    textDecoration: webtoon
-                                        ? undefined
-                                        : 'underline dotted',
-                                    textUnderlineOffset: 4,
-                                }}
+                        <Group p="sm" gap={4} wrap="nowrap">
+                            {leftControls}
+                            {webtoon ? (
+                                <Box style={{ flex: 1 }} />
+                            ) : (
+                                <Slider
+                                    style={{ flex: 1 }}
+                                    min={1}
+                                    max={Math.max(pageCount, 1)}
+                                    value={sliderValue}
+                                    onChange={(value) => {
+                                        keepToolbar();
+                                        goTo(
+                                            direction === 'rtl'
+                                                ? pageCount - value
+                                                : value - 1,
+                                        );
+                                    }}
+                                    label={null}
+                                    color="gray"
+                                    mx="xs"
+                                />
+                            )}
+                            <UnstyledButton
+                                aria-label="Planche des pages"
+                                title="Planche des pages"
+                                disabled={webtoon}
+                                onClick={() => setThumbsOpened(true)}
+                                style={{ flexShrink: 0, minHeight: 44 }}
                             >
-                                {pageLabel} / {pageCount}
-                            </Text>
-                        </UnstyledButton>
-                        {rightControls}
-                    </Group>
+                                <Text
+                                    c="white"
+                                    size="sm"
+                                    data-testid="page-label"
+                                    style={{
+                                        whiteSpace: 'nowrap',
+                                        fontVariantNumeric: 'tabular-nums',
+                                        textAlign: 'center',
+                                        minWidth: `${widestLabel.length}ch`,
+                                        textDecoration: webtoon
+                                            ? undefined
+                                            : 'underline dotted',
+                                        textUnderlineOffset: 4,
+                                    }}
+                                >
+                                    {pageLabel} / {pageCount}
+                                </Text>
+                            </UnstyledButton>
+                            {rightControls}
+                        </Group>
+                    </Box>
                 </>
             )}
 

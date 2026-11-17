@@ -43,6 +43,9 @@ export const json = async <T>(
 
 const id = (value: number) => ({ param: { id: String(value) } });
 
+/** État du serveur : version, et copie de la prod sans fichiers. */
+export const fetchHealth = () => json(api.health.$get());
+
 export const fetchLibraries = () => json(api.libraries.$get());
 
 export const scanLibrary = (libraryId: number) =>
@@ -186,9 +189,11 @@ export type InProgressVolume = Awaited<
     ReturnType<typeof fetchInProgress>
 >[number];
 
-/** Liste « à lire » de la personne. */
-export const setSeriesLists = (seriesId: number, lists: { toRead?: boolean }) =>
-    json(api.series[':id'].lists.$put({ ...id(seriesId), json: lists }));
+/** Listes de la personne : « à lire », « pas pour moi » (suggestions). */
+export const setSeriesLists = (
+    seriesId: number,
+    lists: { toRead?: boolean; notForMe?: boolean },
+) => json(api.series[':id'].lists.$put({ ...id(seriesId), json: lists }));
 
 // --- Comptes -------------------------------------------------------------------
 
@@ -552,6 +557,9 @@ export type ManagedSeries = Awaited<
 /** Nombre de séries à classer (menu de l'admin). */
 export const fetchToClassifyCount = () =>
     json(api.manage.series['to-classify'].$get());
+
+/** Bien notées, jamais ouvertes par la famille (accueil) : id, note, avis. */
+export const fetchSuggestionGems = () => json(api.suggestions.gems.$get());
 
 /** Statistiques de la bibliothèque et de la lecture (admin). */
 export const fetchStats = () => json(api.stats.$get());

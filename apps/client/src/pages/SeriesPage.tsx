@@ -7,7 +7,6 @@ import {
     Flex,
     Group,
     Image,
-    Loader,
     Menu,
     SimpleGrid,
     Stack,
@@ -18,7 +17,6 @@ import {
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import {
-    IconArrowLeft,
     IconBookmark,
     IconBookmarkFilled,
     IconCheck,
@@ -45,11 +43,15 @@ import { SeriesVolumeMenu } from '@/components/CardMenus';
 import { CompletenessBadge } from '@/components/CompletenessBadge';
 import { CoverCard } from '@/components/CoverCard';
 import { DownloadRing } from '@/components/DownloadIndicator';
+import { PageHeader } from '@/components/PageHeader';
+import { PageLoader } from '@/components/PageLoader';
 import { RatingBadge } from '@/components/RatingBadge';
 import { SeriesReaders } from '@/components/SeriesReaders';
+import { SeriesSuggestions } from '@/components/SeriesSuggestions';
 import { ageLabel, seriesAgeOf } from '@/components/ageLimits';
 import { completenessOf, fieldsFromVolumes } from '@/components/completeness';
 import { gridColumns, useLibraryDisplay } from '@/components/libraryDisplay';
+import { browseBackLink } from '@/components/navigation';
 import {
     countedVolumes,
     nextToRead,
@@ -129,6 +131,8 @@ export const SeriesPage = () => {
     const seriesId = Number(useParams().id);
     const user = useCurrentUser();
     const isAdmin = user.role === 'admin';
+    // Retour : l'accueil ou la bibliothèque, d'où la fiche a été ouverte.
+    const browseBack = browseBackLink();
     const { downloads, jobs } = useDownloads();
     const readOnly = useReadOnly();
     const { size } = useLibraryDisplay();
@@ -153,7 +157,7 @@ export const SeriesPage = () => {
         );
     }
     if (error) return <Alert color="red">{error.message}</Alert>;
-    if (!series) return <Loader mx="auto" />;
+    if (!series) return <PageLoader />;
 
     const first = series.volumes[0];
     const next = nextToRead(series.volumes);
@@ -250,11 +254,32 @@ export const SeriesPage = () => {
 
     return (
         <Stack>
-            <Anchor component={Link} to="/" size="sm">
-                <Group gap={4}>
-                    <IconArrowLeft size={14} /> {series.library.name}
-                </Group>
-            </Anchor>
+            <PageHeader
+                back={browseBack.to}
+                backLabel={browseBack.label}
+                title={
+                    // Modifier (admin) : un crayon discret à côté du nom.
+                    <Group gap={6} wrap="nowrap" style={{ minWidth: 0 }}>
+                        <Title order={2} lineClamp={2}>
+                            {series.name}
+                        </Title>
+                        {isAdmin && (
+                            <Tooltip label="Modifier les métadonnées">
+                                <ActionIcon
+                                    component={Link}
+                                    to={`/series/${series.id}/edit`}
+                                    variant="subtle"
+                                    color="gray"
+                                    size="sm"
+                                    aria-label="Modifier les métadonnées"
+                                >
+                                    <IconPencil size={16} />
+                                </ActionIcon>
+                            </Tooltip>
+                        )}
+                    </Group>
+                }
+            />
 
             <Flex gap="lg" direction={{ base: 'column', xs: 'row' }}>
                 {first && (
@@ -273,24 +298,6 @@ export const SeriesPage = () => {
                     />
                 )}
                 <Stack gap="xs" style={{ flex: 1, minWidth: 0 }}>
-                    {/* Modifier (admin) : un crayon discret à côté du nom. */}
-                    <Group gap={6} wrap="nowrap" align="center">
-                        <Title order={2}>{series.name}</Title>
-                        {isAdmin && (
-                            <Tooltip label="Modifier les métadonnées">
-                                <ActionIcon
-                                    component={Link}
-                                    to={`/series/${series.id}/edit`}
-                                    variant="subtle"
-                                    color="gray"
-                                    size="sm"
-                                    aria-label="Modifier les métadonnées"
-                                >
-                                    <IconPencil size={16} />
-                                </ActionIcon>
-                            </Tooltip>
-                        )}
-                    </Group>
                     {details.length > 0 && (
                         <Text c="dimmed" size="sm">
                             {details.join(' · ')}
@@ -633,6 +640,9 @@ export const SeriesPage = () => {
                     );
                 },
             )}
+
+            {/* Du même auteur, dans le même genre. */}
+            <SeriesSuggestions seriesId={series.id} isAdmin={isAdmin} />
         </Stack>
     );
 };

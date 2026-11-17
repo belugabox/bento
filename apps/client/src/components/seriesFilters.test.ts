@@ -2,10 +2,10 @@ import { describe, expect, it } from 'vitest';
 
 import {
     type ListedSeries,
-    filterSeries,
     genresByCount,
     readingStateOf,
     seriesDetails,
+    sortSeries,
 } from './seriesFilters';
 
 const series = (
@@ -35,17 +35,54 @@ describe('readingStateOf', () => {
     });
 });
 
-describe('filterSeries', () => {
-    it('keeps the server order by name, read series last', () => {
-        expect(names(filterSeries(list, { sort: 'name' }))).toEqual([
+describe('sortSeries', () => {
+    it('sorts by name, without reading rank', () => {
+        expect(names(sortSeries(list, 'name'))).toEqual([
             'Akira',
-            'Coq de combat',
             'Berserk',
+            'Coq de combat',
         ]);
     });
 
-    it('sorts by the last added volume, most recent first, read series last', () => {
-        expect(names(filterSeries(list, { sort: 'recent' }))).toEqual([
+    it('ignores the articles when sorting by name', () => {
+        expect(
+            names(
+                sortSeries(
+                    [series('Les Vieux Fourneaux', 0, null), list[1]!],
+                    'name',
+                ),
+            ),
+        ).toEqual(['Berserk', 'Les Vieux Fourneaux']);
+    });
+
+    it('sorts by the last added volume, most recent first', () => {
+        expect(names(sortSeries(list, 'recent'))).toEqual([
+            'Berserk',
+            'Coq de combat',
+            'Akira',
+        ]);
+    });
+
+    it('sorts by the last reading, never read last', () => {
+        const read = [
+            { ...list[0]!, lastReadAt: null },
+            { ...list[1]!, lastReadAt: 100 },
+            { ...list[2]!, lastReadAt: 300 },
+        ];
+        expect(names(sortSeries(read, 'lastRead'))).toEqual([
+            'Coq de combat',
+            'Berserk',
+            'Akira',
+        ]);
+    });
+
+    it('sorts by release year, the latest first, unknown last', () => {
+        const dated = [
+            { ...list[0]!, year: 1982 },
+            { ...list[1]!, year: null },
+            { ...list[2]!, year: 1999 },
+        ];
+        expect(names(sortSeries(dated, 'year'))).toEqual([
             'Coq de combat',
             'Akira',
             'Berserk',
@@ -54,7 +91,7 @@ describe('filterSeries', () => {
 
     it('does not modify the given list', () => {
         const copy = [...list];
-        filterSeries(list, { sort: 'recent' });
+        sortSeries(list, 'recent');
         expect(list).toEqual(copy);
     });
 });
@@ -67,7 +104,7 @@ describe('started series', () => {
     });
 });
 
-describe('list, format, genre and status filters', () => {
+describe('genresByCount', () => {
     const items: ListedSeries[] = [
         {
             ...series('Akira', 0, null),
@@ -89,23 +126,6 @@ describe('list, format, genre and status filters', () => {
             status: null,
         },
     ];
-    const kept = (options: Partial<Parameters<typeof filterSeries>[1]>) =>
-        names(filterSeries(items, { sort: 'name', ...options }));
-
-    it('puts the to-read list first', () => {
-        expect(kept({})).toEqual(['Berserk', 'Akira', 'Solo Leveling']);
-    });
-
-    it('keeps a genre', () => {
-        expect(kept({ genre: 'Action' })).toEqual(['Berserk', 'Akira']);
-        expect(kept({ genre: 'Fantasy' })).toEqual(['Berserk']);
-    });
-
-    it('keeps a status', () => {
-        expect(kept({ status: 'ongoing' })).toEqual(['Berserk']);
-        expect(kept({ status: 'completed' })).toEqual(['Akira']);
-    });
-
     it('lists the genres once each, the most frequent first', () => {
         expect(genresByCount(items)).toEqual([
             { name: 'Action', count: 2 },
@@ -154,7 +174,6 @@ describe('sort by rating', () => {
             { name: 'A', rating: 3.9 },
             { name: 'B', rating: null },
             { name: 'C', rating: 4.6 },
-            // « À lire » : pas avant une série mieux notée.
             { name: 'D', rating: 4.1, toRead: true },
             { name: 'E', rating: 4.1, ratingCount: 300 },
         ].map((s) => ({
@@ -164,9 +183,13 @@ describe('sort by rating', () => {
             startedCount: 0,
             lastAddedAt: null,
         }));
-        expect(
-            filterSeries(series, { sort: 'rating' }).map((s) => s.name),
-        ).toEqual(['C', 'E', 'D', 'A', 'B']);
+        expect(sortSeries(series, 'rating').map((s) => s.name)).toEqual([
+            'C',
+            'E',
+            'D',
+            'A',
+            'B',
+        ]);
     });
 });
 

@@ -61,6 +61,7 @@ export const CoverCard = ({
     layout = 'card',
     coversOnly = false,
     details = [],
+    subtitleLines = 1,
 }: {
     to: string;
     /** Adresse de l'image de couverture. */
@@ -95,6 +96,8 @@ export const CoverCard = ({
     coversOnly?: boolean;
     /** Lignes d'infos en plus, en mode liste (format, genres…). */
     details?: string[];
+    /** Lignes de la légende (raison d'une suggestion : deux). */
+    subtitleLines?: number;
 }) => {
     const shown = progress !== undefined && progress > 0;
     if (layout === 'row') {
@@ -231,16 +234,31 @@ export const CoverCard = ({
                     </Text>
                 )}
                 {!coversOnly && subtitle && (
-                    <Text
-                        size="xs"
-                        c="dimmed"
-                        lineClamp={1}
-                        pl="xs"
-                        pr={menu ? 30 : 'xs'}
-                        pb={6}
-                    >
-                        {subtitle}
-                    </Text>
+                    // La marge autour du texte, pas sur lui : une ligne de
+                    // trop ne déborde pas dans sa marge du bas.
+                    <Box pl="xs" pr={menu ? 30 : 'xs'} pb={6}>
+                        <Text
+                            size="xs"
+                            c="dimmed"
+                            // Une ligne : coupée par « … » sans passer à
+                            // la ligne ; plus : coupée après la dernière.
+                            truncate={subtitleLines === 1 ? 'end' : undefined}
+                            lineClamp={
+                                subtitleLines > 1 ? subtitleLines : undefined
+                            }
+                            // Coupée : entière au survol.
+                            title={subtitle}
+                            // Toujours la même hauteur : les cartes d'une
+                            // rangée restent alignées.
+                            mih={
+                                subtitleLines > 1
+                                    ? `calc(${subtitleLines} * var(--mantine-line-height-xs) * var(--mantine-font-size-xs))`
+                                    : undefined
+                            }
+                        >
+                            {subtitle}
+                        </Text>
+                    </Box>
                 )}
             </Card>
             {corner && (

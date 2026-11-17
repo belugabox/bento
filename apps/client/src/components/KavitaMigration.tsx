@@ -6,7 +6,6 @@ import {
     FileInput,
     Group,
     List,
-    Loader,
     Paper,
     Select,
     Spoiler,
@@ -18,6 +17,7 @@ import { IconDatabaseImport, IconTrash, IconUpload } from '@tabler/icons-react';
 import { type ReactNode, useEffect, useState } from 'react';
 import { Link } from 'react-router';
 
+import { PageLoader } from '@/components/PageLoader';
 import { ageLimitOptions, useAgeSteps } from '@/components/ageLimits';
 import { formatNumber } from '@/components/format';
 import {
@@ -215,7 +215,7 @@ export const KavitaMigration = () => {
         });
 
     if (error) return <Alert color="red">{error.message}</Alert>;
-    if (!data) return <Loader mx="auto" />;
+    if (!data) return <PageLoader />;
 
     const estimatedCount = current?.accounts.reduce(
         (n, a) => n + a.sessions.estimated,

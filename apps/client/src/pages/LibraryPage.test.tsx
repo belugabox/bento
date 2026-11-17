@@ -23,7 +23,7 @@ const SERIES = [
     startedCount: s.readCount,
     coverUpdatedAt: null,
     coverVolumeId: index + 10,
-    toRead: index === 1,
+    toRead: index === 0,
     genres: [
         ['Action', 'Aventure', 'Comédie', 'Drame', 'Fantasy', 'Horreur'],
         ['Action', 'Horreur'],
@@ -46,12 +46,12 @@ const Location = () => {
     return null;
 };
 
-/** Titre d'un bloc de l'accueil (couleur principale), et son nombre. */
+/** Bloc de la bibliothèque (titre discret), et son nombre. */
 const block = (title: string) => screen.queryByRole('region', { name: title });
 const countOf = (title: string) =>
     within(block(title)!).getByText(/^· \d+$/).textContent;
 
-/** Cartes de l'accueil dans l'ordre (les trois blocs de la grille). */
+/** Cartes dans l'ordre. */
 const hrefs = (zone: HTMLElement) =>
     within(zone)
         .queryAllByRole('link')
@@ -65,37 +65,6 @@ beforeEach(() => {
         if (url === '/api/libraries') {
             return respond([{ id: 1, name: 'Mangas', type: 'manga' }]);
         }
-        if (url === '/api/continue') {
-            return respond([
-                {
-                    volumeId: 42,
-                    seriesId: 3,
-                    seriesName: 'Coq de combat',
-                    number: '2',
-                    title: null,
-                    page: 9,
-                    pageCount: 20,
-                    updatedAt: '2026-03-02T00:00:00.000Z',
-                    readCount: 1,
-                    volumeCount: 3,
-                },
-                // Suite d'une série entamée : tome pas encore ouvert.
-                {
-                    volumeId: 51,
-                    seriesId: 1,
-                    seriesName: 'Akira',
-                    number: '4',
-                    title: null,
-                    page: null,
-                    pageCount: 20,
-                    updatedAt: '2026-03-01T00:00:00.000Z',
-                    readCount: 3,
-                    volumeCount: 6,
-                    // Deux tomes ajoutés depuis la dernière lecture.
-                    newCount: 2,
-                },
-            ]);
-        }
         if (url === '/api/readers') return respond(readers);
         if (url.startsWith('/api/series')) return respond(SERIES);
         throw new Error(`requête inattendue : ${url}`);
@@ -107,85 +76,90 @@ afterEach(() => {
     readers = [];
 });
 
-const show = () =>
+const show = (path = '/library') =>
     render(
         <MantineProvider>
-            <MemoryRouter>
+            <MemoryRouter initialEntries={[path]}>
                 <LibraryPage />
                 <Location />
             </MemoryRouter>
         </MantineProvider>,
     );
 
+/** Ouvre « Trier » (tri, groupement), puis touche un choix. */
+const displayChoice = async (name: string) => {
+    fireEvent.click(screen.getByRole('button', { name: 'Trier' }));
+    fireEvent.click(await screen.findByRole('radio', { name }));
+};
+
 describe('LibraryPage', () => {
-    it('shows what to resume, then the other series, in one grid', async () => {
+    it('lists every series by name, in one grid without titles', async () => {
         show();
 
-        // Le tome en cours, et l'avancement dans la série.
-        expect(await screen.findByText('T2 · 1/3 lus')).toBeTruthy();
-        // Un tome lu sur trois, plus la moitié du deuxième.
-        expect(
-            screen
-                .getAllByLabelText('Avancement')[0]!
-                .getAttribute('aria-valuenow'),
-        ).toBe('50');
-        // Tomes à reprendre d'abord, puis les séries qu'ils ne montrent pas
-        // déjà ; pas de titre de zone.
         await vi.waitFor(() =>
-            expect(titles()).toEqual(['/read/42', '/read/51', '/series/2']),
+            expect(titles()).toEqual(['/series/1', '/series/2', '/series/3']),
         );
-        expect(screen.queryByText('Reprendre la lecture')).toBeNull();
-        // Tomes à reprendre : marqués d'un ▶ (et d'un contour).
-        expect(screen.getAllByLabelText('Tome à reprendre')).toHaveLength(2);
-        expect(screen.queryByText('Séries')).toBeNull();
-        // Les icônes sont dans le lien de la carte : un clic l'ouvre.
+        // Pas de cartes de reprise (elles sont sur l'accueil).
+        expect(screen.queryByLabelText('Tome à reprendre')).toBeNull();
+        expect(screen.queryByText(/En cours/)).toBeNull();
+        expect(screen.getByText('3 séries')).toBeTruthy();
+        // Série commencée : sa barre d'avancement ; lue : marquée.
         expect(
-            screen.getAllByLabelText('Tome à reprendre')[0]!.closest('a'),
-        ).toBeTruthy();
-        // Série entièrement lue : marquée, à la fin, légèrement grisée.
-        const read = screen.getByLabelText('Série lue');
-        expect(read.closest('[style*="opacity"]')).toBeTruthy();
-        // Le scan n'est plus sur l'accueil.
-        expect(screen.queryByRole('button', { name: /scanner/i })).toBeNull();
+            Number(
+                screen
+                    .getByLabelText('Avancement')
+                    .getAttribute('aria-valuenow'),
+            ),
+        ).toBeCloseTo(33.3, 0);
+        expect(screen.getByLabelText('Série lue')).toBeTruthy();
+        expect(screen.getByLabelText('À lire')).toBeTruthy();
     });
 
-    it('splits the grid: in progress, not read, finished', async () => {
-        // Série 2 lue en entier : elle passe dans le dernier bloc.
+    it('groups by reading state: in progress, not read, finished', async () => {
+        localStorage.setItem(
+            'bento:display',
+            JSON.stringify({ libraryGroupBy: 'reading' }),
+        );
         show();
 
-        expect(hrefs(await screen.findByTestId('resume-grid'))).toEqual([
-            '/read/42',
-            '/read/51',
+        expect(hrefs(await screen.findByTestId('started-grid'))).toEqual([
+            '/series/3',
         ]);
-        expect(screen.queryByTestId('unread-grid')).toBeNull();
+        expect(hrefs(screen.getByTestId('unread-grid'))).toEqual(['/series/1']);
         expect(hrefs(screen.getByTestId('read-grid'))).toEqual(['/series/2']);
-        // Un titre discret par bloc, avec son nombre de cartes.
-        expect(countOf('En cours')).toBe('· 2');
-        expect(countOf('Déjà lues')).toBe('· 1');
-        expect(screen.queryByText(/À découvrir/)).toBeNull();
+        expect(countOf('En cours')).toBe('· 1');
+        expect(countOf('Déjà lus')).toBe('· 1');
+    });
+
+    it('is not grouped by default, even with a grouping of the old home page', async () => {
+        localStorage.setItem(
+            'bento:display',
+            JSON.stringify({ groupBy: 'reading' }),
+        );
+        show();
+
+        await vi.waitFor(() => expect(titles()).toHaveLength(3));
+        expect(screen.queryByText(/En cours/)).toBeNull();
+        expect(screen.queryByTestId('started-grid')).toBeNull();
     });
 
     it('hides the series already read, on this device', async () => {
         show();
-        await vi.waitFor(() =>
-            expect(titles()).toEqual(['/read/42', '/read/51', '/series/2']),
-        );
+        await vi.waitFor(() => expect(titles()).toHaveLength(3));
 
+        fireEvent.click(screen.getByRole('button', { name: 'Affichage' }));
         fireEvent.click(
-            screen.getByRole('button', { name: 'Trier les séries' }),
-        );
-        fireEvent.click(
-            await screen.findByRole('menuitem', { name: 'Masquer' }),
+            await screen.findByRole('switch', {
+                name: 'Masquer les séries lues',
+            }),
         );
 
         await vi.waitFor(() =>
-            expect(titles()).toEqual(['/read/42', '/read/51']),
+            expect(titles()).toEqual(['/series/1', '/series/3']),
         );
         expect(
             JSON.parse(localStorage.getItem('bento:display')!),
-        ).toMatchObject({
-            hideRead: true,
-        });
+        ).toMatchObject({ hideRead: true });
     });
 
     it('groups the series by reader, remembered on this device', async () => {
@@ -193,29 +167,13 @@ describe('LibraryPage', () => {
         show();
         await vi.waitFor(() => expect(titles()).toHaveLength(3));
 
-        fireEvent.click(
-            screen.getByRole('button', { name: 'Grouper les séries' }),
-        );
-        fireEvent.click(
-            await screen.findByRole('menuitem', { name: 'Lecteur' }),
-        );
+        await displayChoice('Lecteur');
 
         await vi.waitFor(() => expect(countOf('Lu par Léa')).toBe('· 1'));
-        // Pas de bloc « En cours » : les séries en cours sont dans leur bloc,
-        // avec leur carte de reprise (jamais à deux endroits).
-        expect(block('En cours')).toBeNull();
-        expect(
-            within(block('Lues par personne d’autre')!)
-                .getAllByRole('link')
-                .map((link) => link.getAttribute('href')),
-        ).toEqual(['/read/51', '/read/42']);
+        expect(countOf('Lus par personne d’autre')).toBe('· 2');
         expect(
             JSON.parse(localStorage.getItem('bento:display')!),
-        ).toMatchObject({ groupBy: 'reader' });
-        // Plus de filtre « Lu par » dans la barre.
-        expect(
-            screen.queryByRole('button', { name: 'Filtrer par lecteur' }),
-        ).toBeNull();
+        ).toMatchObject({ libraryGroupBy: 'reader' });
     });
 
     it('loads the series of the last library without waiting', async () => {
@@ -239,22 +197,7 @@ describe('LibraryPage', () => {
         );
     });
 
-    it('shows no titles when grouping by nothing', async () => {
-        localStorage.setItem(
-            'bento:display',
-            JSON.stringify({ groupBy: 'none' }),
-        );
-        show();
-
-        // Une seule grille, dans l'ordre du tri (en cours compris).
-        await vi.waitFor(() =>
-            expect(titles()).toEqual(['/read/51', '/read/42', '/series/2']),
-        );
-        expect(screen.queryByText(/En cours/)).toBeNull();
-        expect(screen.queryByText(/Déjà lues/)).toBeNull();
-    });
-
-    it('shows covers only, or a list, as chosen in Appearance', async () => {
+    it('shows covers only, or a list, as chosen', async () => {
         localStorage.setItem(
             'bento:display',
             JSON.stringify({ coversOnly: true }),
@@ -276,12 +219,14 @@ describe('LibraryPage', () => {
         expect(screen.getByText('Action, Horreur')).toBeTruthy();
     });
 
-    it('switches between grid and list from the bottom bar', async () => {
+    it('switches to the list from « Affichage »', async () => {
         show();
         await vi.waitFor(() => expect(titles()).toHaveLength(3));
         expect(screen.queryByText('Action, Horreur')).toBeNull();
 
-        fireEvent.click(screen.getByLabelText('Liste'));
+        fireEvent.click(screen.getByRole('button', { name: 'Affichage' }));
+        fireEvent.click(await screen.findByLabelText('Liste'));
+
         expect(await screen.findByText('Action, Horreur')).toBeTruthy();
         expect(JSON.parse(localStorage.getItem('bento:display')!)).toEqual({
             layout: 'list',
@@ -290,117 +235,166 @@ describe('LibraryPage', () => {
 
     it('sorts by recent additions, in the address', async () => {
         show();
-        await screen.findByTestId('series-grid');
         await vi.waitFor(() => expect(titles()).toHaveLength(3));
 
-        fireEvent.click(
-            screen.getByRole('button', { name: 'Trier les séries' }),
-        );
-        fireEvent.click(await screen.findByText('Ajouts récents'));
-        await vi.waitFor(() => expect(location).toBe('?sort=recent'));
-        expect(titles()).toEqual(['/read/42', '/read/51', '/series/2']);
-        // Plus de menu « Lecture ».
-        expect(
-            screen.queryByRole('button', { name: 'État de lecture' }),
-        ).toBeNull();
-    });
+        await displayChoice('Ajouts récents');
 
-    it('resumes with the next volume of a series, in the same row', async () => {
-        show();
-
-        // Pastille des tomes ajoutés depuis la dernière lecture.
-        expect(
-            (await screen.findByLabelText('2 nouveaux tomes')).textContent,
-        ).toBe('+2');
-
-        expect(await screen.findByText('T4 · 3/6 lus')).toBeTruthy();
-        expect(screen.queryByText('La suite de tes séries')).toBeNull();
-        expect(
-            screen
-                .getAllByLabelText('Avancement')[1]!
-                .getAttribute('aria-valuenow'),
-        ).toBe('50');
-        expect(
-            screen
-                .getAllByRole('link')
-                .some((link) => link.getAttribute('href') === '/read/51'),
-        ).toBe(true);
-    });
-
-    it('filters by genre with chips, the most frequent first', async () => {
-        show();
-        await screen.findByTestId('series-grid');
-        await vi.waitFor(() => expect(titles()).toHaveLength(3));
-
-        // Trois pastilles, les genres aux plus de séries d'abord ; les autres
-        // dans « Plus », avec leur nombre de séries.
-        const genres = within(screen.getByLabelText('Genres'))
-            .getAllByRole('button')
-            .map((button) => button.textContent);
-        expect(genres).toEqual(['Action', 'Horreur', 'Aventure', 'Plus']);
-
-        fireEvent.click(screen.getByRole('button', { name: 'Plus' }));
-        const more = await screen.findAllByRole('menuitem');
-        expect(more.map((item) => item.textContent)).toEqual([
-            'Comédie1',
-            'Drame1',
-            'Fantasy1',
-            'Sport1',
-        ]);
-        fireEvent.click(more[3]!);
-        await vi.waitFor(() => expect(titles()).toEqual(['/read/42']));
-        expect(location).toBe('?genre=Sport');
-        // Genre choisi dans « Plus » : montré en pastille, qui le retire.
-        fireEvent.click(screen.getByRole('button', { name: 'Sport' }));
-        await vi.waitFor(() => expect(location).toBe(''));
-    });
-
-    it('offers every genre in one menu on narrow screens', async () => {
-        show();
-        await vi.waitFor(() => expect(titles()).toHaveLength(3));
-        fireEvent.click(
-            screen.getByRole('button', { name: 'Choisir un genre' }),
-        );
-        fireEvent.click(
-            await screen.findByRole('menuitem', { name: /^Sport/ }),
-        );
-        await vi.waitFor(() => expect(location).toBe('?genre=Sport'));
-        fireEvent.click(
-            screen.getByRole('button', { name: 'Choisir un genre' }),
-        );
-        fireEvent.click(
-            await screen.findByRole('menuitem', { name: 'Tous les genres' }),
-        );
-        await vi.waitFor(() => expect(location).toBe(''));
-    });
-
-    it('removes a genre chip with a second click', async () => {
-        show();
-        await vi.waitFor(() => expect(titles()).toHaveLength(3));
-        fireEvent.click(screen.getByRole('button', { name: 'Horreur' }));
         await vi.waitFor(() =>
-            expect(titles()).toEqual(['/read/51', '/series/2']),
+            expect(titles()).toEqual(['/series/2', '/series/3', '/series/1']),
         );
-        fireEvent.click(screen.getByRole('button', { name: 'Horreur' }));
-        await vi.waitFor(() => expect(location).toBe(''));
+        expect(location).toBe('?sort=recent');
+        // Rappelé sous la barre ; la croix revient au tri par nom.
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Revenir au tri par nom' }),
+        );
+        expect(location).toBe('');
     });
 
-    it('keeps the release status in the sort menu', async () => {
+    it('recalls the grouping and the hidden read series, until undone', async () => {
+        localStorage.setItem(
+            'bento:display',
+            JSON.stringify({ libraryGroupBy: 'format', hideRead: true }),
+        );
         show();
-        await screen.findByTestId('series-grid');
+
+        expect(await screen.findByText('Groupés : Format')).toBeTruthy();
+        expect(screen.getByText('Lus masqués')).toBeTruthy();
+        expect(screen.getByLabelText('Trier modifié')).toBeTruthy();
+        expect(screen.getByLabelText('Affichage modifié')).toBeTruthy();
         fireEvent.click(
-            screen.getByRole('button', { name: 'Trier les séries' }),
+            screen.getByRole('button', { name: 'Ne plus grouper' }),
         );
         fireEvent.click(
-            await screen.findByRole('menuitem', { name: 'Terminées' }),
+            screen.getByRole('button', { name: 'Afficher les séries lues' }),
         );
-        await vi.waitFor(() => expect(location).toBe('?status=completed'));
+
+        await vi.waitFor(() => expect(titles()).toHaveLength(3));
+        expect(screen.queryByText('Groupés : Format')).toBeNull();
+        expect(screen.queryByLabelText('Trier modifié')).toBeNull();
+        expect(screen.queryByLabelText('Affichage modifié')).toBeNull();
+    });
+
+    it('shows the rating instead of the volumes when sorted by rating', async () => {
+        show('/library?sort=rating');
+
+        await vi.waitFor(() => expect(titles()).toHaveLength(3));
+        expect(screen.getAllByText('Pas de note')).toHaveLength(3);
+    });
+
+    it('shows the release years when sorted by release', async () => {
+        show('/library?sort=year');
+
+        await vi.waitFor(() => expect(titles()).toHaveLength(3));
+        expect(screen.getAllByText('Année inconnue')).toHaveLength(3);
+    });
+
+    it('filters from the drawer, in the address, with removable chips', async () => {
+        show();
+        await vi.waitFor(() => expect(titles()).toHaveLength(3));
+
+        fireEvent.click(screen.getByRole('button', { name: 'Filtres' }));
+        const genres = await screen.findByRole('group', {
+            name: 'Genres et thèmes',
+        });
+        // Les plus fréquents d'abord, avec leur nombre de séries.
         expect(
-            await screen.findByText('Aucune série dans ce filtre.'),
+            within(genres)
+                .getAllByRole('checkbox')
+                .map((chip) => chip.closest('div')!.textContent),
+        ).toEqual(expect.arrayContaining(['Action 2', 'Sport 1']));
+        fireEvent.click(within(genres).getByLabelText(/^Horreur/));
+        fireEvent.click(within(genres).getByLabelText(/^Sport/));
+
+        expect(location).toBe('?genre=Horreur&genre=Sport');
+        await vi.waitFor(() => expect(titles()).toHaveLength(3));
+        fireEvent.click(within(genres).getByLabelText(/^Horreur/));
+        await vi.waitFor(() => expect(titles()).toEqual(['/series/3']));
+        expect(
+            screen.getByRole('button', { name: 'Voir 1 série' }),
+        ).toBeTruthy();
+
+        // La pastille sous la barre retire le filtre.
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Retirer le filtre Sport' }),
+        );
+        expect(location).toBe('');
+        await vi.waitFor(() => expect(titles()).toHaveLength(3));
+    });
+
+    it('reads the filters from the address (« Tout voir » of the home page)', async () => {
+        show('/library?reading=toread');
+
+        await vi.waitFor(() => expect(titles()).toEqual(['/series/1']));
+        expect(
+            screen.getByRole('button', { name: 'Retirer le filtre À lire' }),
+        ).toBeTruthy();
+        expect(screen.getByText('1 série')).toBeTruthy();
+    });
+
+    it('shows the suggestions « Pour toi » with their reason (« Tout voir » of the home page)', async () => {
+        show('/library?reading=foryou');
+
+        // Berserk est lue : Akira, qui partage ses genres, est suggérée.
+        await vi.waitFor(() => expect(titles()).toEqual(['/series/1']));
+        expect(screen.getByText('Comme Berserk')).toBeTruthy();
+        expect(
+            screen.getByRole('button', { name: 'Retirer le filtre Pour toi' }),
+        ).toBeTruthy();
+    });
+
+    it('says when no series matches the filters', async () => {
+        show('/library?reading=new');
+
+        expect(
+            await screen.findByText('Aucune série dans ces filtres.'),
         ).toBeTruthy();
         fireEvent.click(
             screen.getByRole('button', { name: 'Effacer les filtres' }),
         );
         await vi.waitFor(() => expect(titles()).toHaveLength(3));
+    });
+
+    it('searches, in the address', async () => {
+        show();
+        await vi.waitFor(() => expect(titles()).toHaveLength(3));
+
+        fireEvent.change(
+            screen.getByRole('searchbox', { name: 'Rechercher une série' }),
+            { target: { value: 'gantz' } },
+        );
+        expect(location).toBe('?q=gantz');
+        await vi.waitFor(() =>
+            expect(
+                vi
+                    .mocked(fetch)
+                    .mock.calls.some(([url]) =>
+                        String(url).includes('search=gantz'),
+                    ),
+            ).toBe(true),
+        );
+    });
+
+    it('offers an A–Z index when sorted by name', async () => {
+        show();
+        await vi.waitFor(() => expect(titles()).toHaveLength(3));
+
+        const index = screen.getByRole('navigation', {
+            name: 'Index alphabétique',
+        });
+        expect(
+            within(index)
+                .getAllByRole('button')
+                .filter((button) => !(button as HTMLButtonElement).disabled)
+                .map((button) => button.textContent),
+        ).toEqual(['A', 'B', 'C']);
+
+        await displayChoice('Ajouts récents');
+        await vi.waitFor(() =>
+            expect(
+                screen.queryByRole('navigation', {
+                    name: 'Index alphabétique',
+                }),
+            ).toBeNull(),
+        );
     });
 });
