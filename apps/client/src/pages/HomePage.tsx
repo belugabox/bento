@@ -89,7 +89,8 @@ const ResumeHero = ({
             <Box
                 component={Link}
                 to={`/read/${volume.volumeId}`}
-                w={{ base: 92, sm: 124 }}
+                // Au moins la taille des cartes des autres blocs (signalé).
+                w={{ base: 120, xs: 140, sm: 170 }}
                 style={{ flexShrink: 0 }}
                 aria-label={`Lire ${volume.seriesName}`}
             >

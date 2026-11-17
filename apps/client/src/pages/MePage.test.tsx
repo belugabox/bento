@@ -80,12 +80,17 @@ describe('MePage', () => {
             .map((region) => region.getAttribute('aria-label'));
         // « Mon compte » avant ce qui est sur l'appareil (demandé).
         expect(sections).toEqual(
-            ['Mon compte', 'Sur cet appareil', 'Administration', null].filter(
-                (name) => name !== null,
-            ),
+            [
+                'Mon compte',
+                'Ma lecture',
+                'Sur cet appareil',
+                'Administration',
+                null,
+            ].filter((name) => name !== null),
         );
         for (const [name, href] of [
             ['Mon compte', '/account'],
+            ['Mes statistiques', '/me/stats'],
             ['Téléchargements', '/downloads'],
             ['Séries', '/manage'],
             ['Brouillons', '/drafts'],

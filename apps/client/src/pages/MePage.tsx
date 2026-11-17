@@ -12,6 +12,7 @@ import { useDisclosure } from '@mantine/hooks';
 import {
     IconArrowBackUp,
     IconChartBar,
+    IconChartLine,
     IconChevronRight,
     IconDownload,
     IconEye,
@@ -27,11 +28,11 @@ import { Link } from 'react-router';
 
 import { AppearanceModal } from '@/components/AppearanceModal';
 import { PreviewModal } from '@/components/PreviewModal';
-import { WeekLine } from '@/components/WeekLine';
 import { UserAvatar } from '@/components/accounts/UserAvatar';
 import { ageLimitLabel } from '@/components/ageLimits';
 import { formatSize } from '@/components/format';
 import { switchView } from '@/components/switchView';
+import { useWeekLabel } from '@/components/weekLabel';
 import { useDownloads } from '@/offline/downloads';
 import {
     fetchPendingDrafts,
@@ -155,6 +156,7 @@ export const MePage = () => {
     const user = useCurrentUser();
     const isAdmin = user.role === 'admin';
     const { downloads } = useDownloads();
+    const week = useWeekLabel();
     const [previewOpened, previewModal] = useDisclosure(false);
     const [appearanceOpened, appearanceModal] = useDisclosure(false);
     const bytes = downloads.reduce((sum, volume) => sum + volume.bytes, 0);
@@ -222,7 +224,14 @@ export const MePage = () => {
                 />
             </Paper>
 
-            <WeekLine />
+            <LinkGroup title="Ma lecture">
+                <PageLink
+                    to="/me/stats"
+                    icon={<IconChartLine size={18} />}
+                    label="Mes statistiques"
+                    description={week}
+                />
+            </LinkGroup>
 
             <LinkGroup title="Sur cet appareil">
                 <PageLink

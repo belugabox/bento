@@ -61,9 +61,19 @@ const isSize = (value: unknown): value is number =>
     (value as number) >= 0 &&
     (value as number) < CARD_SIZES.length;
 
+/**
+ * Ce qui est gardé sur l'appareil. Le groupement de la bibliothèque a sa
+ * propre clé : celui de l'ancien accueil (`groupBy`, « Lecture » par
+ * défaut) ne s'applique pas à la bibliothèque, qui n'est groupée que si on
+ * le choisit (demandé).
+ */
+type SavedDisplay = Partial<Omit<LibraryDisplay, 'groupBy'>> & {
+    libraryGroupBy?: unknown;
+};
+
 /** Réglage d'affichage de cet appareil (« Thème et affichage »), suivi partout. */
 export const useLibraryDisplay = () => {
-    const [saved, setSaved] = useLocalStorage<Partial<LibraryDisplay>>({
+    const [saved, setSaved] = useLocalStorage<SavedDisplay>({
         key: 'bento:display',
         defaultValue: {},
         getInitialValueInEffect: false,
@@ -79,13 +89,17 @@ export const useLibraryDisplay = () => {
             typeof saved?.hideRead === 'boolean'
                 ? saved.hideRead
                 : DEFAULT_DISPLAY.hideRead,
-        groupBy: isGrouping(saved?.groupBy)
-            ? saved.groupBy
+        groupBy: isGrouping(saved?.libraryGroupBy)
+            ? saved.libraryGroupBy
             : DEFAULT_DISPLAY.groupBy,
     };
     return {
         ...display,
-        set: (changes: Partial<LibraryDisplay>) =>
-            setSaved((current) => ({ ...current, ...changes })),
+        set: ({ groupBy, ...changes }: Partial<LibraryDisplay>) =>
+            setSaved((current) => ({
+                ...current,
+                ...changes,
+                ...(groupBy !== undefined && { libraryGroupBy: groupBy }),
+            })),
     };
 };

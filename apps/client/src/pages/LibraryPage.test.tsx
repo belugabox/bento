@@ -118,7 +118,7 @@ describe('LibraryPage', () => {
     it('groups by reading state: in progress, not read, finished', async () => {
         localStorage.setItem(
             'bento:display',
-            JSON.stringify({ groupBy: 'reading' }),
+            JSON.stringify({ libraryGroupBy: 'reading' }),
         );
         show();
 
@@ -129,6 +129,18 @@ describe('LibraryPage', () => {
         expect(hrefs(screen.getByTestId('read-grid'))).toEqual(['/series/2']);
         expect(countOf('En cours')).toBe('· 1');
         expect(countOf('Déjà lues')).toBe('· 1');
+    });
+
+    it('is not grouped by default, even with a grouping of the old home page', async () => {
+        localStorage.setItem(
+            'bento:display',
+            JSON.stringify({ groupBy: 'reading' }),
+        );
+        show();
+
+        await vi.waitFor(() => expect(titles()).toHaveLength(3));
+        expect(screen.queryByText(/En cours/)).toBeNull();
+        expect(screen.queryByTestId('started-grid')).toBeNull();
     });
 
     it('hides the series already read, on this device', async () => {
@@ -161,7 +173,7 @@ describe('LibraryPage', () => {
         expect(countOf('Lues par personne d’autre')).toBe('· 2');
         expect(
             JSON.parse(localStorage.getItem('bento:display')!),
-        ).toMatchObject({ groupBy: 'reader' });
+        ).toMatchObject({ libraryGroupBy: 'reader' });
     });
 
     it('loads the series of the last library without waiting', async () => {
