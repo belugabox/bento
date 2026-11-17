@@ -98,9 +98,12 @@ describe('SeriesEditPage', () => {
         });
         show('/series/1/edit?from=manage');
 
-        const back = await screen.findByRole('link', { name: /Séries/ });
+        // Le retour en haut à gauche ramène à la liste, à sa place.
+        const back = await screen.findByRole('link', {
+            name: 'Retour aux séries',
+        });
         expect(back.getAttribute('href')).toBe('/manage?sheet=bedetheque');
-        expect(back.textContent).toContain('(2 / 3)');
+        expect(screen.getByText('2 / 3')).toBeTruthy();
         // Plus de « Séries à classer : 0 ».
         expect(screen.queryByText(/Séries à classer/)).toBeNull();
 
@@ -116,7 +119,14 @@ describe('SeriesEditPage', () => {
         show('/series/1/edit');
         await screen.findByText('Modifier la série');
         expect(screen.queryByRole('button', { name: /Suivante/ })).toBeNull();
-        expect(screen.queryByRole('link', { name: /^Séries/ })).toBeNull();
+        expect(
+            screen.queryByRole('link', { name: 'Retour aux séries' }),
+        ).toBeNull();
+        expect(
+            screen
+                .getByRole('link', { name: 'Retour à la série' })
+                .getAttribute('href'),
+        ).toBe('/series/1');
     });
 
     it('keeps compression and the file actions in the « ⋯ » menu', async () => {

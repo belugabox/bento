@@ -17,6 +17,7 @@ import { IconRefresh } from '@tabler/icons-react';
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 
+import { PageHeader } from '@/components/PageHeader';
 import { PageLoader } from '@/components/PageLoader';
 import { UserAvatar } from '@/components/accounts/UserAvatar';
 import { ageLabel, ageLimitLabel } from '@/components/ageLimits';
@@ -148,7 +149,7 @@ export const StatsPage = () => {
 
     return (
         <Stack gap="xl">
-            <Title order={2}>Statistiques</Title>
+            <PageHeader back="/me" title="Statistiques" />
 
             <SimpleGrid cols={{ base: 2, sm: 3, md: 5 }}>
                 <StatTile label="Séries" value={formatNumber(totals.series)} />

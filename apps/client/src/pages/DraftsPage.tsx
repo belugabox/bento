@@ -12,7 +12,6 @@ import {
     Select,
     Stack,
     Text,
-    Title,
 } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import {
@@ -26,6 +25,7 @@ import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router';
 
 import { DeleteDraftModal } from '@/components/DeleteDraftModal';
+import { PageHeader } from '@/components/PageHeader';
 import { PageLoader } from '@/components/PageLoader';
 import { completenessColor } from '@/components/completeness';
 import { CoverPicker } from '@/components/metadata/CoverPicker';
@@ -184,7 +184,7 @@ export const DraftsPage = () => {
     return (
         <Stack>
             <Group justify="space-between">
-                <Title order={2}>Brouillons</Title>
+                <PageHeader back="/me" title="Brouillons" />
                 {libraries.data && libraries.data.length > 1 && (
                     <Select
                         allowDeselect={false}

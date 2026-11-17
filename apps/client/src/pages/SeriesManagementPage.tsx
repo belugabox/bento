@@ -16,7 +16,6 @@ import {
     Tabs,
     Text,
     TextInput,
-    Title,
     Tooltip,
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
@@ -41,6 +40,7 @@ import {
 } from '@server/types';
 
 import { CompletenessBadge } from '@/components/CompletenessBadge';
+import { PageHeader } from '@/components/PageHeader';
 import { PageLoader } from '@/components/PageLoader';
 import { ageLabel, useAgeSteps } from '@/components/ageLimits';
 import {
@@ -814,7 +814,7 @@ export const SeriesManagementPage = () => {
     return (
         <Stack gap="sm">
             <div>
-                <Title order={2}>Séries</Title>
+                <PageHeader back="/me" title="Séries" />
                 <Text size="sm" c="dimmed">
                     Chaque onglet est une file de séries à traiter. Sans âge,
                     une série est masquée aux comptes limités.

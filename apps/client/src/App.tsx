@@ -11,7 +11,11 @@ import { BottomNav } from '@/components/AppNav';
 import { OfflineBanner } from '@/components/OfflineBanner';
 import { PageLoader } from '@/components/PageLoader';
 import { RequireUser } from '@/components/RequireUser';
-import { BOTTOM_NAV_HEIGHT, useBottomNav } from '@/components/navigation';
+import {
+    BOTTOM_NAV_HEIGHT,
+    useBottomNav,
+    useBrowsePage,
+} from '@/components/navigation';
 import { useScrollToTop } from '@/components/scrollToTop';
 import { DownloadsPage } from '@/pages/DownloadsPage';
 import { HomePage } from '@/pages/HomePage';
@@ -75,6 +79,8 @@ const Layout = () => {
     const bottomNav = useBottomNav();
     // Une page ouverte commence en haut (pas au défilement de la précédente).
     useScrollToTop();
+    // Retour d'une fiche série : la page parcourue avant.
+    useBrowsePage();
     return (
         <AppShell
             header={{ height: 56 }}

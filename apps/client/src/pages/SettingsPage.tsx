@@ -9,7 +9,6 @@ import {
     Stack,
     Tabs,
     Text,
-    Title,
 } from '@mantine/core';
 import {
     IconAdjustments,
@@ -24,6 +23,7 @@ import { AgesSettings } from '@/components/AgesSettings';
 import { FormatsSettings } from '@/components/FormatsSettings';
 import { GenresSettings } from '@/components/GenresSettings';
 import { KavitaMigration } from '@/components/KavitaMigration';
+import { PageHeader } from '@/components/PageHeader';
 import { PageLoader } from '@/components/PageLoader';
 import { SheetRefreshSettings } from '@/components/SheetRefreshSettings';
 import { SourcePrioritySettings } from '@/components/SourcePrioritySettings';
@@ -302,7 +302,7 @@ export const SettingsPage = () => {
 
     return (
         <Stack maw={720}>
-            <Title order={2}>Réglages</Title>
+            <PageHeader back="/me" title="Réglages" />
             <Tabs
                 value={tab}
                 onChange={(value) =>

@@ -12,6 +12,7 @@ import {
 import { notifications } from '@mantine/notifications';
 import { type FormEvent, type ReactNode, useState } from 'react';
 
+import { PageHeader } from '@/components/PageHeader';
 import {
     NewPasswordInputs,
     UsernameInput,
@@ -269,7 +270,7 @@ export const AccountPage = () => {
     const user = useCurrentUser();
     return (
         <Stack maw={560}>
-            <Title order={2}>Mon compte</Title>
+            <PageHeader back="/me" title="Mon compte" />
             {user.preview?.user ? (
                 <Alert color="orange" variant="light">
                     Vue de {user.preview.user.name} : son compte ne se modifie

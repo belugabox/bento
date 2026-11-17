@@ -1,4 +1,6 @@
 import { useMediaQuery } from '@mantine/hooks';
+import { useEffect } from 'react';
+import { useLocation } from 'react-router';
 
 /** Pages principales : l'accueil, la bibliothèque, et « Moi ». */
 export const NAV_ITEMS = [
@@ -48,3 +50,24 @@ export const useBottomNav = () =>
 
 /** Hauteur de la barre d'onglets, sans la marge du bas de l'écran. */
 export const BOTTOM_NAV_HEIGHT = 60;
+
+// Dernière page parcourue : l'accueil, ou la bibliothèque avec ses filtres.
+let browsePage = '/library';
+
+/** Garde la page parcourue (dans la mise en page, à chaque page). */
+export const useBrowsePage = () => {
+    const { pathname, search } = useLocation();
+    useEffect(() => {
+        if (pathname === '/') browsePage = '/';
+        else if (pathname === '/library') browsePage = `/library${search}`;
+    }, [pathname, search]);
+};
+
+/**
+ * Retour de la fiche d'une série : là d'où on l'a ouverte (l'accueil, ou la
+ * bibliothèque avec ses filtres et son tri).
+ */
+export const browseBackLink = () =>
+    browsePage === '/'
+        ? { to: '/', label: 'Retour à l’accueil' }
+        : { to: browsePage, label: 'Retour à la bibliothèque' };

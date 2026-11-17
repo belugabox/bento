@@ -23,6 +23,7 @@ import {
 } from '@tabler/icons-react';
 import { useState } from 'react';
 
+import { PageHeader } from '@/components/PageHeader';
 import { PageLoader } from '@/components/PageLoader';
 import { ShareLink } from '@/components/accounts/ShareLink';
 import { UserAvatar } from '@/components/accounts/UserAvatar';
@@ -233,7 +234,7 @@ export const UsersPage = () => {
     return (
         <Stack>
             <Group justify="space-between">
-                <Title order={2}>Comptes</Title>
+                <PageHeader back="/me" title="Comptes" />
                 <Button
                     leftSection={<IconUserPlus size={16} />}
                     onClick={() => setInviting(true)}
