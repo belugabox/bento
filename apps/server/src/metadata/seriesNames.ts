@@ -20,10 +20,15 @@ export const sameSeriesName = (a: string, b: string) =>
 
 /**
  * Autre écriture d'un nom à chercher, si le site ne trouve pas la première :
- * « & » pour « et », et l'inverse ; undefined sans « et » ni « & ».
+ * sans points (« Dr. Stone », « Last.Hero.Inuyashiki » : Wikipédia les
+ * ignore, pas Manga-news ni Bedetheque), et « & » pour « et », et l'inverse ;
+ * undefined si rien ne change.
  */
 export const nameVariant = (name: string) => {
-    if (/\s&\s/.test(name)) return name.replace(/\s&\s/g, ' et ');
-    if (/\set\s/i.test(name)) return name.replace(/\set\s/gi, ' & ');
-    return undefined;
+    let variant = name.replace(/\.+/g, ' ').replace(/\s+/g, ' ').trim();
+    if (/\s&\s/.test(variant)) variant = variant.replace(/\s&\s/g, ' et ');
+    else if (/\set\s/i.test(variant)) {
+        variant = variant.replace(/\set\s/gi, ' & ');
+    }
+    return variant === name.trim() ? undefined : variant;
 };

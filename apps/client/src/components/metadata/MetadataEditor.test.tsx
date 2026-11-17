@@ -617,6 +617,35 @@ describe('MetadataEditor', () => {
         ).toBeTruthy();
     });
 
+    it('searches again without the dots when a site finds nothing', async () => {
+        const searched: string[] = [];
+        mockServer({
+            // « Dr. Stone » : rien ; « Dr Stone » : la série.
+            'manga-news/search': (url: string) => {
+                const q = new URL(url, 'http://x').searchParams.get('q')!;
+                searched.push(q);
+                return q === 'Dr Stone'
+                    ? [{ id: 'Dr-Stone', title: 'Dr. Stone' }]
+                    : [];
+            },
+            'wikipedia/search': [],
+            'bedetheque/search': [],
+        });
+        render(<Editor />);
+        fireEvent.click(screen.getByRole('button', { name: /Remplir/ }));
+        const query = (await screen.findByPlaceholderText(
+            'Nom de la série',
+        )) as HTMLInputElement;
+        fireEvent.change(query, { target: { value: 'Dr. Stone' } });
+        fireEvent.click(screen.getByRole('button', { name: 'Rechercher' }));
+
+        const mangaNews = await screen.findByRole('region', {
+            name: 'Manga-news',
+        });
+        expect(await within(mangaNews).findByText('Dr. Stone')).toBeTruthy();
+        expect(searched).toEqual(['Dr. Stone', 'Dr Stone']);
+    });
+
     it('takes the period from the sheets, and saves it in Bento', async () => {
         mockServer({
             'manga-news/series': { ...MANGA_NEWS_GANTZ, year: 2000 },

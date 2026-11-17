@@ -266,8 +266,8 @@ const SERIES_TEXT_FIELDS: { field: SeriesField; label: string }[] = [
  */
 /** Champs d'un tome et leur largeur (sur 24) : téléphone, puis plus grand. */
 const FIELD_COLUMNS = [
-    { label: 'Type', span: { base: 12, sm: 4 } },
     { label: 'Groupe', span: { base: 12, sm: 8 } },
+    { label: 'Type', span: { base: 12, sm: 4 } },
     { label: 'Numéro', span: { base: 6, sm: 3 } },
     { label: 'Titre', span: { base: 12, sm: 6 } },
     { label: 'Année', span: { base: 6, sm: 3 } },
@@ -1596,6 +1596,27 @@ export const MetadataEditor = ({
                                 </Group>
                                 <Grid columns={24} gutter="xs">
                                     <Grid.Col span={FIELD_COLUMNS[0].span}>
+                                        <Autocomplete
+                                            size="xs"
+                                            disabled={!!volume.error}
+                                            aria-label={`Groupe de ${volume.name}`}
+                                            // Libre : « Part 1 - Rouge, Bleu
+                                            // et Jaune », « Guides »… ;
+                                            // chaque groupe a sa numérotation.
+                                            placeholder="Groupe"
+                                            {...volumeField(
+                                                volume.path,
+                                                'StoryArc',
+                                            )}
+                                            value={info.StoryArc ?? ''}
+                                            // Les groupes des autres tomes.
+                                            data={groups}
+                                            onChange={(value) =>
+                                                set('StoryArc', value)
+                                            }
+                                        />
+                                    </Grid.Col>
+                                    <Grid.Col span={FIELD_COLUMNS[1].span}>
                                         <Select
                                             size="xs"
                                             disabled={!!volume.error}
@@ -1643,27 +1664,6 @@ export const MetadataEditor = ({
                                                         ),
                                                 },
                                             )}
-                                        />
-                                    </Grid.Col>
-                                    <Grid.Col span={FIELD_COLUMNS[1].span}>
-                                        <Autocomplete
-                                            size="xs"
-                                            disabled={!!volume.error}
-                                            aria-label={`Groupe de ${volume.name}`}
-                                            // Libre : « Part 1 - Rouge, Bleu
-                                            // et Jaune », « Guides »… ;
-                                            // chaque groupe a sa numérotation.
-                                            placeholder="Groupe"
-                                            {...volumeField(
-                                                volume.path,
-                                                'StoryArc',
-                                            )}
-                                            value={info.StoryArc ?? ''}
-                                            // Les groupes des autres tomes.
-                                            data={groups}
-                                            onChange={(value) =>
-                                                set('StoryArc', value)
-                                            }
                                         />
                                     </Grid.Col>
                                     <Grid.Col span={FIELD_COLUMNS[2].span}>
