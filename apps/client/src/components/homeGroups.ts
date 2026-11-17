@@ -148,7 +148,7 @@ export const groupSeries = <T extends Groupable>(
                     {
                         key: 'nobody',
                         title: readers.length
-                            ? 'Lues par personne d’autre'
+                            ? 'Lus par personne d’autre'
                             : 'Séries',
                         list: series.filter((s) => !read.has(s.id)),
                     },
@@ -174,7 +174,7 @@ export const groupSeries = <T extends Groupable>(
                     },
                     {
                         key: 'read',
-                        title: 'Déjà lues',
+                        title: 'Déjà lus',
                         list: series.filter(
                             (s) => readingStateOf(s) === 'read',
                         ),

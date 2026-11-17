@@ -116,10 +116,17 @@ describe('HomePage', () => {
         });
         expect(continueLink.getAttribute('href')).toBe('/read/42');
         expect(screen.getByText('Tome 2 · page 45 / 190')).toBeTruthy();
+        // L'avancement : celui de la série (1 tome lu sur 5, plus le quart
+        // du tome 2), pas celui du tome.
+        expect(
+            screen.getByText('1 tome lu sur 5 · 25 % de la série'),
+        ).toBeTruthy();
         // Tome suivant pas encore ouvert : « à commencer ».
         const resumeZone = screen.getByTestId('resume');
         expect(hrefs(resumeZone)).toContain('/read/51');
-        expect(within(resumeZone).getByText('T4 · à commencer')).toBeTruthy();
+        expect(
+            within(resumeZone).getByText('T4 · à commencer · 3 / 5 lus'),
+        ).toBeTruthy();
     });
 
     it('shows one-row blocks, each leading to the filtered library', async () => {
@@ -135,7 +142,7 @@ describe('HomePage', () => {
         const family = block('Lu par la famille');
         expect(hrefs(family)).toContain('/series/4');
         expect(within(family).getByText('Lu par Léa')).toBeTruthy();
-        expect(hrefs(block('Récemment ajoutées'))).toContain('/series/5');
+        expect(hrefs(block('Récemment ajoutés'))).toContain('/series/5');
 
         expect(
             screen
@@ -187,7 +194,7 @@ describe('HomePage', () => {
         show();
 
         const mine = await screen.findByRole('region', { name: 'Pour toi' });
-        expect(hrefs(mine)).toEqual(['/series/5']);
+        expect(hrefs(mine)).toEqual(['/for-you', '/series/5']);
         expect(within(mine).getByText('Comme Berserk')).toBeTruthy();
         // Jamais à deux endroits sur l'accueil.
         expect(
@@ -202,10 +209,27 @@ describe('HomePage', () => {
         show();
 
         const rated = await screen.findByRole('region', {
-            name: 'Bien notées, jamais ouvertes',
+            name: 'Bien notés, jamais ouverts',
         });
         expect(hrefs(rated)).toContain('/series/5');
         expect(within(rated).getByText('★ 4,6 · 230 avis')).toBeTruthy();
+    });
+
+    it('leads from « Pour toi » to all the suggestions', async () => {
+        series = SERIES.map((s) =>
+            s.name === 'Berserk' || s.name === 'Eden'
+                ? { ...s, genres: ['Fantasy'] }
+                : s,
+        );
+        show();
+
+        expect(
+            (
+                await screen.findByRole('link', {
+                    name: 'Tout voir : Pour toi',
+                })
+            ).getAttribute('href'),
+        ).toBe('/for-you');
     });
 
     it('says when the library is empty', async () => {

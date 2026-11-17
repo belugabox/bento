@@ -36,7 +36,7 @@ describe('groupSeries', () => {
         expect(shape(groupSeries(list, 'reading'))).toEqual([
             ['En cours', [3]],
             ['À découvrir', [1]],
-            ['Déjà lues', [2]],
+            ['Déjà lus', [2]],
         ]);
     });
 
@@ -98,7 +98,7 @@ describe('groupSeries', () => {
         expect(shape(groupSeries(list, 'reader', { readers }))).toEqual([
             ['Lu par Léa', [1, 2]],
             ['Lu par Tom', [2]],
-            ['Lues par personne d’autre', [3]],
+            ['Lus par personne d’autre', [3]],
         ]);
     });
 

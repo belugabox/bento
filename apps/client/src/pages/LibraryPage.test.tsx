@@ -86,9 +86,9 @@ const show = (path = '/library') =>
         </MantineProvider>,
     );
 
-/** Ouvre « Affichage », puis touche un choix. */
+/** Ouvre « Trier » (tri, groupement), puis touche un choix. */
 const displayChoice = async (name: string) => {
-    fireEvent.click(screen.getByRole('button', { name: 'Affichage' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Trier' }));
     fireEvent.click(await screen.findByRole('radio', { name }));
 };
 
@@ -128,7 +128,7 @@ describe('LibraryPage', () => {
         expect(hrefs(screen.getByTestId('unread-grid'))).toEqual(['/series/1']);
         expect(hrefs(screen.getByTestId('read-grid'))).toEqual(['/series/2']);
         expect(countOf('En cours')).toBe('· 1');
-        expect(countOf('Déjà lues')).toBe('· 1');
+        expect(countOf('Déjà lus')).toBe('· 1');
     });
 
     it('is not grouped by default, even with a grouping of the old home page', async () => {
@@ -170,7 +170,7 @@ describe('LibraryPage', () => {
         await displayChoice('Lecteur');
 
         await vi.waitFor(() => expect(countOf('Lu par Léa')).toBe('· 1'));
-        expect(countOf('Lues par personne d’autre')).toBe('· 2');
+        expect(countOf('Lus par personne d’autre')).toBe('· 2');
         expect(
             JSON.parse(localStorage.getItem('bento:display')!),
         ).toMatchObject({ libraryGroupBy: 'reader' });
@@ -257,8 +257,9 @@ describe('LibraryPage', () => {
         );
         show();
 
-        expect(await screen.findByText('Groupées : Format')).toBeTruthy();
-        expect(screen.getByText('Lues masquées')).toBeTruthy();
+        expect(await screen.findByText('Groupés : Format')).toBeTruthy();
+        expect(screen.getByText('Lus masqués')).toBeTruthy();
+        expect(screen.getByLabelText('Trier modifié')).toBeTruthy();
         expect(screen.getByLabelText('Affichage modifié')).toBeTruthy();
         fireEvent.click(
             screen.getByRole('button', { name: 'Ne plus grouper' }),
@@ -268,7 +269,8 @@ describe('LibraryPage', () => {
         );
 
         await vi.waitFor(() => expect(titles()).toHaveLength(3));
-        expect(screen.queryByText('Groupées : Format')).toBeNull();
+        expect(screen.queryByText('Groupés : Format')).toBeNull();
+        expect(screen.queryByLabelText('Trier modifié')).toBeNull();
         expect(screen.queryByLabelText('Affichage modifié')).toBeNull();
     });
 
@@ -277,6 +279,13 @@ describe('LibraryPage', () => {
 
         await vi.waitFor(() => expect(titles()).toHaveLength(3));
         expect(screen.getAllByText('Pas de note')).toHaveLength(3);
+    });
+
+    it('shows the release years when sorted by release', async () => {
+        show('/library?sort=year');
+
+        await vi.waitFor(() => expect(titles()).toHaveLength(3));
+        expect(screen.getAllByText('Année inconnue')).toHaveLength(3);
     });
 
     it('filters from the drawer, in the address, with removable chips', async () => {

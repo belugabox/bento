@@ -285,8 +285,8 @@ export const SeriesCardMenu = ({
             await setSeriesLists(series.id, { toRead });
             return {
                 message: toRead
-                    ? 'Ajoutée à « À lire ».'
-                    : 'Retirée de « À lire ».',
+                    ? 'Ajouté à « À lire ».'
+                    : 'Retiré de « À lire ».',
                 undo: () => setSeriesLists(series.id, { toRead: !toRead }),
             };
         }, onChanged);
@@ -297,8 +297,8 @@ export const SeriesCardMenu = ({
             await setSeriesLists(series.id, { notForMe });
             return {
                 message: notForMe
-                    ? 'Retirée des suggestions.'
-                    : 'Remise dans les suggestions.',
+                    ? 'Retiré des suggestions.'
+                    : 'Remis dans les suggestions.',
                 undo: () => setSeriesLists(series.id, { notForMe: !notForMe }),
             };
         }, onChanged);

@@ -7,10 +7,10 @@ export type ReadingFilter =
 
 export const READING_FILTERS: { value: ReadingFilter; label: string }[] = [
     { value: 'toread', label: 'À lire' },
-    { value: 'unread', label: 'Pas commencées' },
+    { value: 'unread', label: 'Pas commencés' },
     { value: 'started', label: 'En cours' },
     { value: 'new', label: 'Nouveaux tomes' },
-    { value: 'read', label: 'Lues' },
+    { value: 'read', label: 'Lus' },
     // Retirées des suggestions : de quoi les y remettre.
     { value: 'notforme', label: 'Pas pour moi' },
 ];

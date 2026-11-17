@@ -185,7 +185,7 @@ export const RankingsPanel = ({ period }: { period: StatsPeriod }) => {
 
             <SimpleGrid cols={{ base: 1, md: 2 }} spacing="xl">
                 <StatsSection
-                    title="Les mieux notées"
+                    title="Les mieux notés"
                     hint="Notes des sites (10 avis au moins), et la lecture de la famille depuis toujours"
                 >
                     {data.bestRated.length === 0 ? (
@@ -201,7 +201,7 @@ export const RankingsPanel = ({ period }: { period: StatsPeriod }) => {
                     )}
                 </StatsSection>
                 <StatsSection
-                    title="Bien notées, jamais ouvertes"
+                    title="Bien notés, jamais ouverts"
                     hint="4 sur 5 au moins : de quoi donner des idées"
                 >
                     {data.unreadGems.length === 0 ? (

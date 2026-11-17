@@ -25,7 +25,10 @@ import { useContext, useEffect, useRef, useState } from 'react';
 import { useLocation, useSearchParams } from 'react-router';
 
 import { AlphabetIndex } from '@/components/AlphabetIndex';
-import { LibraryDisplayMenu } from '@/components/LibraryDisplayMenu';
+import {
+    LibraryDisplayMenu,
+    LibrarySortMenu,
+} from '@/components/LibraryDisplayMenu';
 import { LibraryFiltersDrawer } from '@/components/LibraryFiltersDrawer';
 import { PageLoader } from '@/components/PageLoader';
 import { PageSection } from '@/components/PageSection';
@@ -44,6 +47,7 @@ import {
     writeFilters,
 } from '@/components/libraryFilters';
 import { useScrollMemory } from '@/components/scrollMemory';
+import { releaseLabel } from '@/components/seriesCardParts';
 import {
     SERIES_SORTS,
     type SeriesSort,
@@ -210,14 +214,14 @@ export const LibraryPage = () => {
         display.groupBy !== 'none' && {
             key: 'group',
             icon: <IconLayoutRows size={12} />,
-            label: `Groupées : ${GROUPINGS.find((g) => g.value === display.groupBy)?.label}`,
+            label: `Groupés : ${GROUPINGS.find((g) => g.value === display.groupBy)?.label}`,
             reset: 'Ne plus grouper',
             onReset: () => display.set({ groupBy: 'none' }),
         },
         display.hideRead && {
             key: 'hide-read',
             icon: <IconEyeOff size={12} />,
-            label: 'Lues masquées',
+            label: 'Lus masqués',
             reset: 'Afficher les séries lues',
             onReset: () => display.set({ hideRead: false }),
         },
@@ -310,11 +314,12 @@ export const LibraryPage = () => {
                             Filtres
                         </Box>
                     </Button>
-                    <LibraryDisplayMenu
+                    <LibrarySortMenu
                         display={display}
                         sort={sort}
                         onSort={(value) => setParam('sort', value, 'name')}
                     />
+                    <LibraryDisplayMenu display={display} />
                 </Group>
                 {series.data && (
                     <Group
@@ -436,14 +441,18 @@ export const LibraryPage = () => {
                                             isAdmin={isAdmin}
                                             onChanged={series.reload}
                                             coversOnly={display.coversOnly}
-                                            // Triée par note : la note à la
-                                            // place des tomes.
+                                            // Trié par note ou par parution :
+                                            // la valeur du tri à la place des
+                                            // tomes.
                                             subtitle={
                                                 sort === 'rating'
                                                     ? item.rating != null
                                                         ? `${ratingLabel(item.rating)} · ${reviewsLabel(item.ratingCount ?? 0)}`
                                                         : 'Pas de note'
-                                                    : undefined
+                                                    : sort === 'year'
+                                                      ? releaseLabel(item) ||
+                                                        'Année inconnue'
+                                                      : undefined
                                             }
                                         />
                                     </div>

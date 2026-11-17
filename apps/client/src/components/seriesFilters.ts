@@ -65,8 +65,8 @@ export type SeriesSort = 'name' | 'recent' | 'lastRead' | 'rating' | 'year';
 export const SERIES_SORTS: { value: SeriesSort; label: string }[] = [
     { value: 'name', label: 'Nom' },
     { value: 'recent', label: 'Ajouts récents' },
-    { value: 'lastRead', label: 'Lues récemment' },
-    { value: 'rating', label: 'Mieux notées' },
+    { value: 'lastRead', label: 'Lus récemment' },
+    { value: 'rating', label: 'Mieux notés' },
     { value: 'year', label: 'Parution' },
 ];
 

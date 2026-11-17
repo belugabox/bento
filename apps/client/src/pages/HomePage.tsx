@@ -59,6 +59,24 @@ const volumeProgress = (volume: InProgressVolume) =>
         ? 0
         : Math.min(1, (volume.page + 1) / volume.pageCount);
 
+/**
+ * Avancement dans la série (demandé, plutôt que dans le tome) : tomes lus,
+ * plus la part lue du tome en cours.
+ */
+const seriesProgress = (volume: InProgressVolume) =>
+    volume.volumeCount
+        ? Math.min(
+              1,
+              (volume.readCount + volumeProgress(volume)) / volume.volumeCount,
+          )
+        : 0;
+
+/** « 4 tomes lus sur 10 · 43 % de la série ». */
+const seriesProgressLabel = (volume: InProgressVolume) => {
+    const read = volume.readCount;
+    return `${read} tome${read > 1 ? 's' : ''} lu${read > 1 ? 's' : ''} sur ${volume.volumeCount} · ${Math.round(seriesProgress(volume) * 100)} % de la série`;
+};
+
 /** « Tome 5 · page 45 / 190 », ou « Tome 6 · à commencer ». */
 const resumeLabel = (volume: InProgressVolume) =>
     `${volumeLabel(volume)} · ${
@@ -129,14 +147,15 @@ const ResumeHero = ({
                 <Text size="sm" c="dimmed">
                     {resumeLabel(volume)}
                 </Text>
-                {volume.page !== null && (
-                    <Progress
-                        size="sm"
-                        maw={320}
-                        value={volumeProgress(volume) * 100}
-                        aria-label="Avancement du tome"
-                    />
-                )}
+                <Progress
+                    size="sm"
+                    maw={320}
+                    value={seriesProgress(volume) * 100}
+                    aria-label="Avancement dans la série"
+                />
+                <Text size="xs" c="dimmed">
+                    {seriesProgressLabel(volume)}
+                </Text>
                 <Group gap={6} mt={4}>
                     <Button
                         component={Link}
@@ -177,15 +196,14 @@ const ResumeLine = ({ volume }: { volume: InProgressVolume }) => (
                     {volumeShortLabel(volume)} ·{' '}
                     {volume.page === null
                         ? 'à commencer'
-                        : `${Math.round(volumeProgress(volume) * 100)} %`}
+                        : `page ${volume.page + 1}`}{' '}
+                    · {volume.readCount} / {volume.volumeCount} lus
                 </Text>
-                {volume.page !== null && (
-                    <Progress
-                        size="xs"
-                        value={volumeProgress(volume) * 100}
-                        aria-label="Avancement du tome"
-                    />
-                )}
+                <Progress
+                    size="xs"
+                    value={seriesProgress(volume) * 100}
+                    aria-label="Avancement dans la série"
+                />
             </Stack>
         </Group>
     </Paper>
@@ -408,6 +426,7 @@ export const HomePage = () => {
             <SuggestionRow
                 {...row}
                 title="Pour toi"
+                more="/for-you"
                 items={blocks.forYou.map((s) => ({
                     series: s,
                     reason: blocks.reasons.get(s.id),
@@ -429,7 +448,7 @@ export const HomePage = () => {
             />
             <SuggestionRow
                 {...row}
-                title="Bien notées, jamais ouvertes"
+                title="Bien notés, jamais ouverts"
                 count={blocks.gems.length}
                 more={libraryLink({ reading: ['unread'] }, { sort: 'rating' })}
                 items={blocks.gems.map((s) => {
@@ -442,7 +461,7 @@ export const HomePage = () => {
             />
             <SuggestionRow
                 {...row}
-                title="Récemment ajoutées"
+                title="Récemment ajoutés"
                 more={libraryLink({}, { sort: 'recent' })}
                 items={blocks.recent.map((s) => ({ series: s }))}
             />

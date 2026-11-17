@@ -16,7 +16,11 @@ import { Link } from 'react-router';
 import { SeriesCardMenu } from '@/components/CardMenus';
 import { SeriesCard } from '@/components/SeriesCard';
 import { ratingLabel } from '@/components/format';
-import { newBadge, seriesSubtitle } from '@/components/seriesCardParts';
+import {
+    newBadge,
+    releaseLabel,
+    seriesSubtitle,
+} from '@/components/seriesCardParts';
 import {
     type SeriesSort,
     creditsOf,
@@ -32,16 +36,6 @@ const STATUS_LABELS = {
     ongoing: 'En cours',
     completed: 'Terminée',
 } as const;
-
-/** « 1997 – 2003 », « depuis 2019 », « 2009 » ; rien sans année. */
-const releaseLabel = (s: Pick<SeriesSummary, 'year' | 'endYear' | 'status'>) =>
-    !s.year
-        ? ''
-        : s.endYear && s.endYear !== s.year
-          ? `${s.year} – ${s.endYear}`
-          : s.status === 'ongoing'
-            ? `depuis ${s.year}`
-            : String(s.year);
 
 /** En-tête de colonne : un clic trie par elle. */
 const SortHeader = ({

@@ -38,7 +38,7 @@ const SERIES_STATES = [
     {
         state: 'abandoned',
         title: 'Abandonnées',
-        hint: 'Pas finies, pas ouvertes depuis 2 mois.',
+        hint: 'Pas finis, pas ouverts depuis 2 mois.',
     },
 ] as const;
 

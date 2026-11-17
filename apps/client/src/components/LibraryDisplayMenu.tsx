@@ -14,10 +14,11 @@ import {
 } from '@mantine/core';
 import {
     IconAdjustmentsHorizontal,
+    IconArrowsSort,
     IconLayoutGrid,
     IconList,
 } from '@tabler/icons-react';
-import type { ReactNode } from 'react';
+import type { ComponentPropsWithRef, ReactNode } from 'react';
 
 import { GROUPINGS, type Grouping } from '@/components/homeGroups';
 import {
@@ -26,6 +27,8 @@ import {
     type useLibraryDisplay,
 } from '@/components/libraryDisplay';
 import { SERIES_SORTS, type SeriesSort } from '@/components/seriesFilters';
+
+type Display = ReturnType<typeof useLibraryDisplay>;
 
 const Section = ({
     label,
@@ -43,45 +46,121 @@ const Section = ({
 );
 
 /**
- * « Affichage » de la bibliothèque : grille ou liste, taille des cartes,
- * tri (dans l'adresse), groupement et séries lues (gardés sur l'appareil).
+ * Bouton d'un menu de la barre : l'icône seule sur un téléphone, et un
+ * point quand le réglage n'est pas celui par défaut. Les autres propriétés
+ * (clic, référence) viennent du menu qui l'ouvre.
  */
-export const LibraryDisplayMenu = ({
+const MenuButton = ({
+    label,
+    icon,
+    changed,
+    ...others
+}: {
+    label: string;
+    icon: ReactNode;
+    changed: boolean;
+} & ComponentPropsWithRef<'div'>) => (
+    <Indicator
+        {...others}
+        size={9}
+        offset={4}
+        disabled={!changed}
+        aria-label={changed ? `${label} modifié` : undefined}
+    >
+        <Button
+            variant="default"
+            radius="xl"
+            leftSection={icon}
+            aria-label={label}
+            px={{ base: 10, xs: 14 }}
+        >
+            <Box component="span" visibleFrom="xs">
+                {label}
+            </Box>
+        </Button>
+    </Indicator>
+);
+
+/**
+ * « Trier » : l'ordre des séries (dans l'adresse) et leur groupement (gardé
+ * sur l'appareil). À part d'« Affichage » (demandé).
+ */
+export const LibrarySortMenu = ({
     display,
     sort,
     onSort,
 }: {
-    display: ReturnType<typeof useLibraryDisplay>;
+    display: Display;
     sort: SeriesSort;
     onSort: (sort: SeriesSort) => void;
-}) => {
+}) => (
+    <Popover position="bottom-end" shadow="md" width={300} withinPortal>
+        <Popover.Target>
+            <MenuButton
+                label="Trier"
+                icon={<IconArrowsSort size={16} />}
+                changed={sort !== 'name' || display.groupBy !== 'none'}
+            />
+        </Popover.Target>
+        <Popover.Dropdown>
+            <Stack gap="md">
+                <Section label="Trier par">
+                    <Chip.Group
+                        value={sort}
+                        onChange={(value) => onSort(value as SeriesSort)}
+                    >
+                        <Group gap={6}>
+                            {SERIES_SORTS.map((option) => (
+                                <Chip
+                                    key={option.value}
+                                    value={option.value}
+                                    size="xs"
+                                >
+                                    {option.label}
+                                </Chip>
+                            ))}
+                        </Group>
+                    </Chip.Group>
+                </Section>
+                <Section label="Grouper par">
+                    <Chip.Group
+                        value={display.groupBy}
+                        onChange={(value) =>
+                            display.set({ groupBy: value as Grouping })
+                        }
+                    >
+                        <Group gap={6}>
+                            {GROUPINGS.map((option) => (
+                                <Chip
+                                    key={option.value}
+                                    value={option.value}
+                                    size="xs"
+                                >
+                                    {option.label}
+                                </Chip>
+                            ))}
+                        </Group>
+                    </Chip.Group>
+                </Section>
+            </Stack>
+        </Popover.Dropdown>
+    </Popover>
+);
+
+/**
+ * « Affichage » de la bibliothèque, gardé sur l'appareil : grille ou
+ * liste, taille des cartes, couvertures seules, séries lues masquées.
+ */
+export const LibraryDisplayMenu = ({ display }: { display: Display }) => {
     const list = display.layout === 'list';
-    // Tri, groupement ou séries lues masquées autres que par défaut.
-    const changed =
-        sort !== 'name' || display.groupBy !== 'none' || display.hideRead;
     return (
         <Popover position="bottom-end" shadow="md" width={300} withinPortal>
             <Popover.Target>
-                {/* Un point quand l'affichage n'est pas celui par défaut
-                    (visible aussi sur téléphone, bouton sans texte). */}
-                <Indicator
-                    size={9}
-                    offset={4}
-                    disabled={!changed}
-                    aria-label={changed ? 'Affichage modifié' : undefined}
-                >
-                    <Button
-                        variant="default"
-                        radius="xl"
-                        leftSection={<IconAdjustmentsHorizontal size={16} />}
-                        aria-label="Affichage"
-                        px={{ base: 10, xs: 14 }}
-                    >
-                        <Box component="span" visibleFrom="xs">
-                            Affichage
-                        </Box>
-                    </Button>
-                </Indicator>
+                <MenuButton
+                    label="Affichage"
+                    icon={<IconAdjustmentsHorizontal size={16} />}
+                    changed={display.hideRead}
+                />
             </Popover.Target>
             <Popover.Dropdown>
                 <Stack gap="md">
@@ -140,44 +219,6 @@ export const LibraryDisplayMenu = ({
                             />
                         </Section>
                     )}
-                    <Section label="Trier par">
-                        <Chip.Group
-                            value={sort}
-                            onChange={(value) => onSort(value as SeriesSort)}
-                        >
-                            <Group gap={6}>
-                                {SERIES_SORTS.map((option) => (
-                                    <Chip
-                                        key={option.value}
-                                        value={option.value}
-                                        size="xs"
-                                    >
-                                        {option.label}
-                                    </Chip>
-                                ))}
-                            </Group>
-                        </Chip.Group>
-                    </Section>
-                    <Section label="Grouper par">
-                        <Chip.Group
-                            value={display.groupBy}
-                            onChange={(value) =>
-                                display.set({ groupBy: value as Grouping })
-                            }
-                        >
-                            <Group gap={6}>
-                                {GROUPINGS.map((option) => (
-                                    <Chip
-                                        key={option.value}
-                                        value={option.value}
-                                        size="xs"
-                                    >
-                                        {option.label}
-                                    </Chip>
-                                ))}
-                            </Group>
-                        </Chip.Group>
-                    </Section>
                     <Switch
                         size="sm"
                         label="Masquer les séries lues"

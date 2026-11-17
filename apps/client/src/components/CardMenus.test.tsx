@@ -119,9 +119,7 @@ describe('SeriesCardMenu', () => {
         expect(requests).toEqual([
             ['PUT', '/api/series/3/lists', { notForMe: true }],
         ]);
-        expect(
-            await screen.findByText('Retirée des suggestions.'),
-        ).toBeTruthy();
+        expect(await screen.findByText('Retiré des suggestions.')).toBeTruthy();
         unmount();
 
         // Retirée : le menu propose de l'y remettre.
