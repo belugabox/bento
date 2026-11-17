@@ -85,7 +85,7 @@ describe('MePage', () => {
             ),
         );
         for (const [name, href] of [
-            ['Compte(?!s)', '/account'],
+            ['Mon compte', '/account'],
             ['Téléchargements', '/downloads'],
             ['Séries', '/manage'],
             ['Brouillons', '/drafts'],

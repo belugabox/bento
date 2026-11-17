@@ -45,6 +45,22 @@ const volume = (mode: Mode, progress: Saved | null = null) => ({
     progress,
 });
 
+// Tomes de la série (barre de la série) : le 6 lu, le 7 ouvert, le 8 pas
+// commencé.
+const SERIES = {
+    id: 3,
+    name: 'Spy x Family',
+    volumes: [6, 7, 8].map((id) => ({
+        id,
+        number: String(id - 5),
+        title: null,
+        kind: 'volume',
+        group: null,
+        pageCount: 3,
+        progress: id === 6 ? { page: 2, completed: true } : null,
+    })),
+};
+
 // Progressions envoyées au serveur (PUT /api/volumes/7/progress).
 let saved: Saved[] = [];
 // Adresses demandées au serveur (tome 7, et le 8 chargé d'avance).
@@ -82,16 +98,18 @@ const open = async (
                   { progress: null })
                 : url.endsWith('/page-sizes')
                   ? PAGE_SIZES
-                  : next
-                    ? {
-                          ...volume(direction),
-                          id: 8,
-                          number: '2',
-                          previousId: 7,
-                          nextId: null,
-                      }
-                    : { ...volume(direction, progress), ...extra };
-        expect(url).toMatch(/^\/api\/volumes\/[78]/);
+                  : url === '/api/series/3'
+                    ? SERIES
+                    : next
+                      ? {
+                            ...volume(direction),
+                            id: 8,
+                            number: '2',
+                            previousId: 7,
+                            nextId: null,
+                        }
+                      : { ...volume(direction, progress), ...extra };
+        expect(url).toMatch(/^\/api\/(volumes\/[78]|series\/3$)/);
         return new Response(JSON.stringify(body), {
             headers: { 'Content-Type': 'application/json' },
         });
@@ -442,6 +460,39 @@ describe('ReaderPage', () => {
 
         expect(shownPage()).toBe(
             '/api/volumes/7/pages/0?v=1700000000000&w=800',
+        );
+    });
+
+    it('shows the progress in the series above the bottom bar', async () => {
+        await open('ltr', '/read/7?page=2');
+
+        const bar = await screen.findByTestId('series-progress');
+        // Tome 1 lu (3 pages), tome 2 ouvert à la page 2 sur 3 : 5 / 9.
+        expect(bar.textContent).toContain('Tome 2 · 2 / 3 · série lue à 55 %');
+        const segments = screen
+            .getAllByRole('button', { name: /^Tome \d :/ })
+            .map((s) => s.getAttribute('aria-label'));
+        expect(segments).toEqual([
+            'Tome 1 : Lu',
+            'Tome 2 : Lu à 67 %',
+            'Tome 3 : Pas commencé',
+        ]);
+
+        // Un toucher sur un segment : son tome, et « Ouvrir ».
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Tome 3 : Pas commencé' }),
+        );
+        fireEvent.click(await screen.findByRole('button', { name: 'Ouvrir' }));
+        await vi.waitFor(() => expect(location).toMatch(/^\/read\/8/));
+    });
+
+    it('puts the first volume on the right when reading right to left', async () => {
+        await open('rtl', '/read/7?page=1');
+
+        await screen.findByTestId('series-progress');
+        const first = screen.getByRole('button', { name: 'Tome 1 : Lu' });
+        expect((first.parentElement as HTMLElement).style.flexDirection).toBe(
+            'row-reverse',
         );
     });
 

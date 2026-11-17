@@ -15,7 +15,11 @@ import {
     Title,
     useMatches,
 } from '@mantine/core';
-import { IconBook, IconBooks, IconPlayerPlayFilled } from '@tabler/icons-react';
+import {
+    IconBook,
+    IconChevronRight,
+    IconPlayerPlayFilled,
+} from '@tabler/icons-react';
 import { useContext } from 'react';
 import { Link } from 'react-router';
 
@@ -23,7 +27,6 @@ import { VolumeCardMenu } from '@/components/CardMenus';
 import { PageLoader } from '@/components/PageLoader';
 import { PageSection } from '@/components/PageSection';
 import { SeriesCard } from '@/components/SeriesCard';
-import { WeekLine } from '@/components/WeekLine';
 import { UserAvatar } from '@/components/accounts/UserAvatar';
 import { homeBlocks } from '@/components/homeBlocks';
 import { gridColumns, useLibraryDisplay } from '@/components/libraryDisplay';
@@ -31,6 +34,7 @@ import { libraryLink } from '@/components/libraryFilters';
 import { volumeLabel, volumeShortLabel } from '@/components/readingStatus';
 import { useScrollMemory } from '@/components/scrollMemory';
 import { newBadge } from '@/components/seriesCardParts';
+import { sortSeries } from '@/components/seriesFilters';
 import { DownloadedVolumes } from '@/pages/DownloadsPage';
 import {
     type FamilyReader,
@@ -40,6 +44,7 @@ import {
     fetchFamilyReaders,
     fetchInProgress,
     fetchSeriesList,
+    seriesCoverUrl,
 } from '@/services/api';
 import { UserContext } from '@/services/auth';
 import { useOnline } from '@/services/network';
@@ -175,6 +180,67 @@ const ResumeLine = ({ volume }: { volume: InProgressVolume }) => (
         </Group>
     </Paper>
 );
+
+/**
+ * Vers toute la bibliothèque, en bas de l'accueil : un éventail des
+ * couvertures des derniers ajouts, le nombre de séries et de tomes.
+ */
+const LibraryLink = ({ series }: { series: SeriesSummary[] }) => {
+    const covers = sortSeries(series, 'recent')
+        .map((s) => seriesCoverUrl(s, 'small'))
+        .filter((cover) => cover !== null)
+        .slice(0, 3);
+    const volumes = series.reduce((sum, s) => sum + s.volumeCount, 0);
+    return (
+        <Paper
+            withBorder
+            radius="md"
+            p="md"
+            component={Link}
+            to="/library"
+            aria-label="Toute la bibliothèque"
+            style={{ color: 'inherit', textDecoration: 'none' }}
+        >
+            <Group wrap="nowrap" gap="lg">
+                {/* Les couvertures se chevauchent, la plus récente devant. */}
+                <Box
+                    pos="relative"
+                    h={72}
+                    w={48 + 22 * Math.max(covers.length - 1, 0)}
+                    style={{ flexShrink: 0 }}
+                >
+                    {covers.map((cover, index) => (
+                        <Image
+                            key={cover}
+                            src={cover}
+                            alt=""
+                            w={48}
+                            h={72}
+                            fit="cover"
+                            radius="sm"
+                            pos="absolute"
+                            top={0}
+                            left={22 * (covers.length - 1 - index)}
+                            style={{
+                                zIndex: covers.length - index,
+                                transform: `rotate(${(covers.length - 1 - index) * 4}deg)`,
+                                boxShadow: '0 2px 6px rgba(0, 0, 0, 0.35)',
+                            }}
+                        />
+                    ))}
+                </Box>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                    <Text fw={600}>Toute la bibliothèque</Text>
+                    <Text size="sm" c="dimmed">
+                        {series.length} série{series.length > 1 ? 's' : ''} ·{' '}
+                        {volumes} tome{volumes > 1 ? 's' : ''}
+                    </Text>
+                </div>
+                <IconChevronRight size={18} />
+            </Group>
+        </Paper>
+    );
+};
 
 /** « Lu par Lou », « Lu par Lou et Tom », « Lu par Lou, Tom et Léa ». */
 const readByLabel = (names: string[]) =>
@@ -392,17 +458,7 @@ export const HomePage = () => {
                     />
                 </PageSection>
             )}
-            <WeekLine />
-            <Button
-                component={Link}
-                to="/library"
-                variant="default"
-                size="md"
-                leftSection={<IconBooks size={18} />}
-            >
-                Parcourir la bibliothèque · {series.data.length} série
-                {series.data.length > 1 ? 's' : ''}
-            </Button>
+            <LibraryLink series={series.data} />
         </Stack>
     );
 };

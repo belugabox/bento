@@ -161,16 +161,16 @@ describe('HomePage', () => {
         expect(within(fresh).getByText('+2 · 3 / 5 lus')).toBeTruthy();
     });
 
-    it('shows the reading of the week and the way to the library', async () => {
+    it('leads to the whole library, without the reading of the week', async () => {
         show();
 
-        expect(await screen.findByText('3,3 h')).toBeTruthy();
-        expect(screen.getByText(/2 tomes finis/)).toBeTruthy();
-        expect(
-            screen
-                .getByRole('link', { name: /Parcourir la bibliothèque/ })
-                .getAttribute('href'),
-        ).toBe('/library');
+        const library = await screen.findByRole('link', {
+            name: 'Toute la bibliothèque',
+        });
+        expect(library.getAttribute('href')).toBe('/library');
+        expect(library.textContent).toContain('5 séries · 25 tomes');
+        // La lecture de la semaine est dans « Moi ».
+        expect(screen.queryByText(/de lecture cette semaine/)).toBeNull();
     });
 
     it('says when the library is empty', async () => {

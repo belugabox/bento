@@ -6,6 +6,7 @@ import {
     Stack,
     Text,
     Title,
+    UnstyledButton,
 } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import {
@@ -19,7 +20,6 @@ import {
     IconPalette,
     IconSettings,
     IconTags,
-    IconUserCircle,
     IconUsers,
 } from '@tabler/icons-react';
 import type { ReactNode } from 'react';
@@ -166,43 +166,63 @@ export const MePage = () => {
                 opened={appearanceOpened}
                 onClose={appearanceModal.close}
             />
-            <Group gap="md" wrap="nowrap">
-                <UserAvatar
-                    name={user.name}
-                    seed={user.avatarSeed}
-                    size={64}
-                    radius="xl"
-                />
-                <div>
-                    <Title order={2}>{user.name}</Title>
-                    <Text size="sm" c="dimmed">
-                        {user.preview?.user
-                            ? 'Vue simulée · lecture seule'
-                            : user.preview
-                              ? `Vue lecteur · ${ageLimitLabel(user.preview.maxAge)}`
-                              : isAdmin
-                                ? 'Administrateur'
-                                : 'Lecteur'}
-                    </Text>
-                </div>
-            </Group>
-
-            <WeekLine />
-
-            <LinkGroup title="Mon compte">
-                <PageLink
+            {/* Son compte, avec son avatar et son nom (demandé) : un
+                toucher ouvre « Mon compte » ; dessous, le thème. */}
+            <Paper
+                withBorder
+                radius="md"
+                component="section"
+                aria-label="Mon compte"
+                style={{ overflow: 'hidden' }}
+            >
+                <UnstyledButton
+                    component={Link}
                     to="/account"
-                    icon={<IconUserCircle size={18} />}
-                    label="Compte"
-                    description="Identifiant, mot de passe, avatar"
-                />
+                    aria-label="Mon compte"
+                    p="md"
+                    w="100%"
+                    style={{ display: 'block' }}
+                >
+                    <Group gap="md" wrap="nowrap">
+                        <UserAvatar
+                            name={user.name}
+                            seed={user.avatarSeed}
+                            size={64}
+                            radius="xl"
+                        />
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                            <Title order={2} lineClamp={1}>
+                                {user.name}
+                            </Title>
+                            <Text size="sm" c="dimmed">
+                                {user.preview?.user
+                                    ? 'Vue simulée · lecture seule'
+                                    : user.preview
+                                      ? `Vue lecteur · ${ageLimitLabel(user.preview.maxAge)}`
+                                      : isAdmin
+                                        ? 'Administrateur'
+                                        : 'Lecteur'}
+                            </Text>
+                            <Text size="xs" c="dimmed">
+                                Identifiant, mot de passe, avatar
+                            </Text>
+                        </div>
+                        <IconChevronRight size={16} />
+                    </Group>
+                </UnstyledButton>
                 <NavLink
                     component="button"
                     leftSection={<IconPalette size={18} />}
                     label="Thème et affichage…"
                     onClick={appearanceModal.open}
+                    style={{
+                        borderTop:
+                            '1px solid var(--mantine-color-default-border)',
+                    }}
                 />
-            </LinkGroup>
+            </Paper>
+
+            <WeekLine />
 
             <LinkGroup title="Sur cet appareil">
                 <PageLink
