@@ -28,11 +28,13 @@ import { switchView } from '@/components/switchView';
 import {
     DRAFTS_CHANGED,
     type Task,
+    fetchHealth,
     fetchPendingDrafts,
     fetchTasks,
     stopPreview,
 } from '@/services/api';
 import { useCurrentUser } from '@/services/auth';
+import { useQuery } from '@/services/useQuery';
 
 const REFRESH_MS = 60_000;
 // Tâches : suivies de près pendant qu'il y en a, sinon de temps en temps.
@@ -357,6 +359,24 @@ export const PreviewBanner = () => {
                     Revenir à la vue admin
                 </Button>
             </Group>
+        </Alert>
+    );
+};
+
+/**
+ * Copie de la prod sur un poste (`LIBRARIES_OFFLINE`) : pour parcourir, pas
+ * pour lire ; à ne pas confondre avec le serveur de dev.
+ */
+export const ProductionCopyBanner = () => {
+    const { data } = useQuery(fetchHealth, [], { cacheKey: 'health' });
+    if (!data?.offlineLibraries) return null;
+    return (
+        <Alert color="grape" variant="light" mb="md" py="xs">
+            <Text size="sm">
+                Copie de la prod : les fichiers des bibliothèques sont absents.
+                On parcourt, sans lire de tome ; aucun scan ni mise à jour des
+                fiches.
+            </Text>
         </Alert>
     );
 };

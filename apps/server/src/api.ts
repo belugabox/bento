@@ -284,7 +284,12 @@ export const createApi = ({
         // Public : utilisé par le HEALTHCHECK Docker.
         .get('/health', (c) => {
             db.run(sql`select 1`);
-            return c.json({ status: 'ok' as const, version });
+            return c.json({
+                status: 'ok' as const,
+                version,
+                // Copie de la prod sans fichiers (bandeau de l'appli).
+                offlineLibraries: scanner.offline,
+            });
         })
         // Public : la page de connexion prend aussi le thème par défaut.
         .get('/appearance', (c) => c.json(settings.get().appearance))

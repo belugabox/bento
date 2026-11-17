@@ -40,6 +40,18 @@ Toute la configuration passe par des variables d'environnement :
 | `LIBRARIES` | `[]` | Bibliothèques, en JSON : `[{"name":"Mangas","path":"/manga","type":"manga"}]`. Type `manga` ou `comics` : mode de lecture par défaut « Manga (gauche → droite) » ou « BD » |
 | `SCAN_INTERVAL_MINUTES` | `30` | Scan automatique des bibliothèques (`0` = seulement au démarrage et à la demande) |
 | `PUBLIC_URL` | — (requis) | Adresse publique de Bento : liens d'invitation, cookies `Secure` en HTTPS |
+| `LIBRARIES_OFFLINE` | `0` | `1` : fichiers des bibliothèques absents (copie de la prod sur un poste). Ni alignement des bibliothèques sur `LIBRARIES`, ni scan (au démarrage, périodique ou demandé), ni mise à jour de nuit des fiches ; un bandeau le rappelle. Sans cela, le premier scan croirait tous les tomes disparus et les effacerait de la copie |
+
+### Parcourir une copie de la prod
+
+Avec une copie du dossier de données de la prod (`bento.db` et ses fichiers `-wal` et `-shm`, `covers/`) dans un dossier à part, jamais celui du développement. Le serveur y applique les migrations de la branche et y ouvre des sessions : garder une autre copie pour recommencer. Après `pnpm build` :
+
+```sh
+cd apps/server
+PORT=3200 DATA_PATH=O:/PERSO/bento-prod LIBRARIES='[]' LIBRARIES_OFFLINE=1 PUBLIC_URL=http://127.0.0.1:3200 node dist/main.js
+```
+
+Ouvrir `http://127.0.0.1:3200` (pas `localhost` : le cookie de session serait celui du serveur de développement) et se connecter avec son compte de la prod. Accueil, bibliothèque, fiches, statistiques et suggestions marchent ; les tomes ne se lisent pas (pages absentes, sauf celles déjà réduites dans `pages/`).
 
 ### Gestion des tomes (admin)
 

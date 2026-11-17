@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { type CurrentUser, UserContext } from '@/services/auth';
 
-import { AppHeader, PreviewBanner } from './AppHeader';
+import { AppHeader, PreviewBanner, ProductionCopyBanner } from './AppHeader';
 
 const user = (overrides: Partial<CurrentUser> = {}): CurrentUser => ({
     id: 1,
@@ -27,6 +27,8 @@ let accounts: unknown[] = [];
 // Tâches de fond renvoyées par le serveur.
 let tasks: unknown[] = [];
 const assign = vi.fn();
+// Copie de la prod sans fichiers (`/api/health`).
+let health = false;
 
 let address = '';
 const Address = () => {
@@ -42,6 +44,7 @@ const show = (current: CurrentUser, path = '/') =>
                 <UserContext.Provider value={current}>
                     <AppHeader />
                     <PreviewBanner />
+                    <ProductionCopyBanner />
                     <Address />
                 </UserContext.Provider>
             </MemoryRouter>
@@ -59,13 +62,15 @@ beforeEach(() => {
             init?.body ? JSON.parse(String(init.body)) : undefined,
         ]);
         const url = String(input);
-        const body = url.endsWith('/drafts/pending')
-            ? { series: 3 }
-            : url.endsWith('/tasks')
-              ? tasks
-              : url.endsWith('/preview/accounts')
-                ? accounts
-                : { preview: null };
+        const body = url.endsWith('/health')
+            ? { status: 'ok', version: '1', offlineLibraries: health }
+            : url.endsWith('/drafts/pending')
+              ? { series: 3 }
+              : url.endsWith('/tasks')
+                ? tasks
+                : url.endsWith('/preview/accounts')
+                  ? accounts
+                  : { preview: null };
         return new Response(JSON.stringify(body), {
             headers: { 'Content-Type': 'application/json' },
         });
@@ -78,6 +83,7 @@ beforeEach(() => {
 
 afterEach(() => {
     vi.restoreAllMocks();
+    health = false;
     assign.mockReset();
 });
 
@@ -140,7 +146,22 @@ describe('AppHeader', () => {
         show(user({ role: 'reader' }));
 
         expect(screen.queryByRole('link', { name: 'Brouillons' })).toBeNull();
-        expect(requests).toEqual([]);
+        // Rien de l'admin (brouillons, tâches) ; l'état du serveur, oui.
+        expect(requests.filter(([, url]) => url !== '/api/health')).toEqual([]);
+    });
+
+    it('says when the server is a copy of the production without files', async () => {
+        health = true;
+        show(user());
+
+        expect(await screen.findByText(/Copie de la prod/)).toBeTruthy();
+    });
+
+    it('says nothing on a normal server', async () => {
+        show(user());
+
+        await screen.findByText('3');
+        expect(screen.queryByText(/Copie de la prod/)).toBeNull();
     });
 
     it('reminds a simulated account', () => {

@@ -6,6 +6,7 @@ import {
     ActivationBanner,
     AppHeader,
     PreviewBanner,
+    ProductionCopyBanner,
 } from '@/components/AppHeader';
 import { BottomNav } from '@/components/AppNav';
 import { OfflineBanner } from '@/components/OfflineBanner';
@@ -107,6 +108,7 @@ const Layout = () => {
             )}
             <AppShell.Main>
                 <Container size="xl">
+                    <ProductionCopyBanner />
                     <OfflineBanner />
                     <PreviewBanner />
                     <ActivationBanner />

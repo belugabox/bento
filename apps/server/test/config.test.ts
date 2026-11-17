@@ -17,6 +17,16 @@ describe('loadConfig', () => {
         expect(config.DB_FILE).toBe(path.resolve('./data/bento.db'));
     });
 
+    it('reads whether the library files are absent (copy of the production)', () => {
+        expect(loadConfig({}).LIBRARIES_OFFLINE).toBe(false);
+        expect(loadConfig({ LIBRARIES_OFFLINE: '1' }).LIBRARIES_OFFLINE).toBe(
+            true,
+        );
+        expect(() => loadConfig({ LIBRARIES_OFFLINE: 'oui' })).toThrow(
+            /LIBRARIES_OFFLINE/,
+        );
+    });
+
     it('rejects an invalid value with a readable message', () => {
         expect(() => loadConfig({ LOG_LEVEL: 'verbose' })).toThrow(
             /Configuration invalide : LOG_LEVEL/,

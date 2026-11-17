@@ -43,6 +43,9 @@ export const json = async <T>(
 
 const id = (value: number) => ({ param: { id: String(value) } });
 
+/** État du serveur : version, et copie de la prod sans fichiers. */
+export const fetchHealth = () => json(api.health.$get());
+
 export const fetchLibraries = () => json(api.libraries.$get());
 
 export const scanLibrary = (libraryId: number) =>
