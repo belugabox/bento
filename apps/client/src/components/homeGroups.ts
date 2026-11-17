@@ -8,13 +8,13 @@ import { type ListedSeries, readingStateOf } from '@/components/seriesFilters';
  * l'appareil ; « Aucun » par défaut.
  */
 export const GROUPINGS = [
+    { value: 'none', label: 'Aucun' },
     { value: 'reading', label: 'Lecture' },
     { value: 'format', label: 'Format' },
     { value: 'age', label: 'Âge' },
     { value: 'letter', label: 'Lettre' },
     { value: 'added', label: 'Date d’ajout' },
     { value: 'reader', label: 'Lecteur' },
-    { value: 'none', label: 'Aucun' },
 ] as const;
 export type Grouping = (typeof GROUPINGS)[number]['value'];
 

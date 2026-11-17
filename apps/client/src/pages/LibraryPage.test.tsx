@@ -233,6 +233,13 @@ describe('LibraryPage', () => {
         expect(location).toBe('?sort=recent');
     });
 
+    it('shows the rating instead of the volumes when sorted by rating', async () => {
+        show('/library?sort=rating');
+
+        await vi.waitFor(() => expect(titles()).toHaveLength(3));
+        expect(screen.getAllByText('Pas de note')).toHaveLength(3);
+    });
+
     it('filters from the drawer, in the address, with removable chips', async () => {
         show();
         await vi.waitFor(() => expect(titles()).toHaveLength(3));

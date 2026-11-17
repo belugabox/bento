@@ -28,6 +28,8 @@ describe('homeBlocks', () => {
             series(1, { newCount: 2, toRead: true }),
             series(2, { newCount: 1, toRead: true, readCount: 1 }),
             series(3, { toRead: true }),
+            // Lue : plus dans « À lire ».
+            series(6, { toRead: true, readCount: 3, startedCount: 3 }),
             series(4),
             series(5),
         ];
@@ -41,7 +43,7 @@ describe('homeBlocks', () => {
         expect(ids(blocks.toRead)).toEqual([3]);
         expect(ids(blocks.family)).toEqual([4]);
         // Le reste, les ajouts les plus récents d'abord.
-        expect(ids(blocks.recent)).toEqual([5]);
+        expect(ids(blocks.recent)).toEqual([6, 5]);
     });
 
     it('shows the series read by the most people first, not the started ones', () => {

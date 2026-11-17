@@ -24,6 +24,7 @@ import { PageLoader } from '@/components/PageLoader';
 import { PageSection } from '@/components/PageSection';
 import { SeriesCard } from '@/components/SeriesCard';
 import { SeriesListView } from '@/components/SeriesListView';
+import { ratingLabel, reviewsLabel } from '@/components/format';
 import { groupSeries, letterOf } from '@/components/homeGroups';
 import { gridColumns, useLibraryDisplay } from '@/components/libraryDisplay';
 import {
@@ -383,6 +384,15 @@ export const LibraryPage = () => {
                                             isAdmin={isAdmin}
                                             onChanged={series.reload}
                                             coversOnly={display.coversOnly}
+                                            // Triée par note : la note à la
+                                            // place des tomes.
+                                            subtitle={
+                                                sort === 'rating'
+                                                    ? item.rating != null
+                                                        ? `${ratingLabel(item.rating)} · ${reviewsLabel(item.ratingCount ?? 0)}`
+                                                        : 'Pas de note'
+                                                    : undefined
+                                            }
                                         />
                                     </div>
                                 ))}

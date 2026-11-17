@@ -1,4 +1,4 @@
-import { sortSeries } from '@/components/seriesFilters';
+import { readingStateOf, sortSeries } from '@/components/seriesFilters';
 import type {
     FamilyReader,
     InProgressVolume,
@@ -27,7 +27,8 @@ export const homeBlocks = (
     );
     const toRead = take(
         sortSeries(
-            series.filter((s) => s.toRead),
+            // Déjà lues : plus à lire.
+            series.filter((s) => s.toRead && readingStateOf(s) !== 'read'),
             'recent',
         ),
     );
