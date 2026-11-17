@@ -227,4 +227,81 @@ describe('DraftsPage', () => {
             await screen.findByRole('button', { name: /Archivés \(1\)/ }),
         ).toBeTruthy();
     });
+
+    it('deletes a draft from the disk once confirmed', async () => {
+        let deleted = false;
+        const requests: string[] = [];
+        vi.spyOn(globalThis, 'fetch').mockImplementation(
+            async (input, init) => {
+                const url = String(input);
+                requests.push(`${init?.method ?? 'GET'} ${url}`);
+                if (url === '/api/libraries') {
+                    return respond([{ id: 1, name: 'Mangas', type: 'manga' }]);
+                }
+                if (init?.method === 'DELETE') {
+                    deleted = true;
+                    return respond({ deleted: 1 });
+                }
+                if (url === '/api/libraries/1/drafts') {
+                    return respond(
+                        deleted
+                            ? []
+                            : [
+                                  {
+                                      folder: '_draft/Gantz',
+                                      files: [
+                                          {
+                                              path: '_draft/Gantz/T01.cbz',
+                                              name: 'T01.cbz',
+                                              size: 10,
+                                          },
+                                      ],
+                                      archivedAt: null,
+                                  },
+                              ],
+                    );
+                }
+                if (url.startsWith('/api/libraries/1/drafts/files?')) {
+                    return respond([
+                        {
+                            path: '_draft/Gantz/T01.cbz',
+                            name: 'T01.cbz',
+                            folder: '_draft/Gantz',
+                            size: 10,
+                            draft: true,
+                            pageCount: 2,
+                            comicInfo: { Series: 'Gantz', Number: '1' },
+                            error: null,
+                            publicationPath: 'Gantz/Gantz #01.cbz',
+                        },
+                    ]);
+                }
+                if (url === '/api/drafts/pending')
+                    return respond({ series: 0 });
+                throw new Error(`requête inattendue : ${url}`);
+            },
+        );
+
+        render(
+            <MantineProvider>
+                <MemoryRouter
+                    initialEntries={['/drafts?library=1&folder=_draft%2FGantz']}
+                >
+                    <DraftsPage />
+                </MemoryRouter>
+            </MantineProvider>,
+        );
+
+        fireEvent.click(
+            await screen.findByRole('button', { name: 'Supprimer du disque' }),
+        );
+        fireEvent.click(
+            await screen.findByRole('button', { name: 'Supprimer 1 tome' }),
+        );
+
+        expect(await screen.findByText('Aucun brouillon.')).toBeTruthy();
+        expect(requests).toContain(
+            'DELETE /api/libraries/1/drafts?folder=_draft%2FGantz',
+        );
+    });
 });

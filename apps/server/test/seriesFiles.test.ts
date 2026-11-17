@@ -1,5 +1,5 @@
 import { eq } from 'drizzle-orm';
-import { access } from 'node:fs/promises';
+import { access, writeFile } from 'node:fs/promises';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { createApi } from '../src/api';
@@ -7,13 +7,7 @@ import { readingSessions, series, users, volumes } from '../src/db/schema';
 import { setSeriesLists } from '../src/library/lists';
 import { getProgress, saveProgress } from '../src/library/progress';
 import { addReadingTime } from '../src/library/readingTime';
-import {
-    authDeps,
-    sessionCookie,
-    setup,
-    silent,
-    writeCbz,
-} from './helpers';
+import { authDeps, sessionCookie, setup, silent, writeCbz } from './helpers';
 
 let ctx: Awaited<ReturnType<typeof setup>>;
 let api: ReturnType<typeof createApi>;
@@ -117,6 +111,59 @@ describe('archived drafts', () => {
             json: { folder: '_draft/Gantz', archived: false },
         });
         expect(await ctx.files.pendingSeries()).toBe(2);
+    });
+});
+
+describe('a draft deleted from the disk', () => {
+    it('loses its volumes and the other files of its folder, not a nested draft', async () => {
+        await writeCbz(ctx.file('_draft/Gantz/Gantz T01.cbz'));
+        await writeCbz(ctx.file('_draft/Gantz/Gantz T02.cbz'));
+        await writeFile(ctx.file('_draft/Gantz/release.nfo'), 'scantrad');
+        await writeCbz(ctx.file('_draft/Gantz/Bonus/Bonus T01.cbz'));
+        await writeCbz(ctx.file('_draft/Spirale.cbz'));
+        ctx.files.archiveDraft(ctx.library.id, '_draft/Gantz', true);
+
+        const { status, body } = await call(
+            `/libraries/${ctx.library.id}/drafts?folder=${encodeURIComponent('_draft/Gantz')}`,
+            { method: 'DELETE' },
+        );
+
+        expect(status).toBe(200);
+        expect(body).toEqual({ deleted: 2 });
+        expect(await exists('_draft/Gantz/Gantz T01.cbz')).toBe(false);
+        expect(await exists('_draft/Gantz/release.nfo')).toBe(false);
+        expect(await exists('_draft/Gantz/Bonus/Bonus T01.cbz')).toBe(true);
+        expect(
+            (await ctx.files.drafts(ctx.library.id)).map((d) => d.folder),
+        ).toEqual(['_draft/Gantz/Bonus', '_draft/Spirale.cbz']);
+    });
+
+    it('can be a lone volume at the root of _draft, and its folder empties', async () => {
+        await writeCbz(ctx.file('_draft/Spirale.cbz'));
+        await writeCbz(ctx.file('_draft/Solo/Solo T01.cbz'));
+
+        await call(
+            `/libraries/${ctx.library.id}/drafts?folder=${encodeURIComponent('_draft/Spirale.cbz')}`,
+            { method: 'DELETE' },
+        );
+        await call(
+            `/libraries/${ctx.library.id}/drafts?folder=${encodeURIComponent('_draft/Solo')}`,
+            { method: 'DELETE' },
+        );
+
+        expect(await exists('_draft/Spirale.cbz')).toBe(false);
+        expect(await exists('_draft/Solo')).toBe(false);
+        expect(await ctx.files.drafts(ctx.library.id)).toEqual([]);
+    });
+
+    it('never leaves _draft', async () => {
+        await writeCbz(ctx.file('Gantz/Gantz #01.cbz'));
+        const { status } = await call(
+            `/libraries/${ctx.library.id}/drafts?folder=${encodeURIComponent('_draft/../Gantz')}`,
+            { method: 'DELETE' },
+        );
+        expect(status).toBe(404);
+        expect(await exists('Gantz/Gantz #01.cbz')).toBe(true);
     });
 });
 

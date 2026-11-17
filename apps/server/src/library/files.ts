@@ -40,6 +40,7 @@ import { completenessOf, fieldsFromVolumes } from './completeness';
 import { draftCoverFile, seriesCoverFile } from './covers';
 import {
     type DraftSettings,
+    checkDraftFolder,
     deleteDraftSettings,
     draftSettingsOf,
     saveDraftSettings,
@@ -527,6 +528,58 @@ export class LibraryFiles {
         saveDraftSettings(this.db, libraryId, folder, {
             archivedAt: archived ? new Date() : null,
         });
+    };
+
+    /**
+     * Supprime un brouillon du disque : ses tomes (.cbz, .cbr, .pdf), les
+     * autres fichiers de son dossier (images, .nfo…), puis le dossier s'il
+     * est vide ; un sous-dossier, autre brouillon, reste.
+     */
+    deleteDraft = async (libraryId: number, folder: string) => {
+        const library = this.library(libraryId);
+        checkDraftFolder(folder);
+        if (folder === DRAFT_FOLDER) {
+            throw notFound('Dossier de brouillons introuvable');
+        }
+        const archives = (
+            await this.archivesUnder(
+                library.path,
+                path.join(library.path, DRAFT_FOLDER),
+            )
+        ).filter((archive) => draftGroupOf(archive.path) === folder);
+        if (archives.length === 0) {
+            throw notFound('Dossier de brouillons introuvable');
+        }
+        if (archives.some((a) => this.pdfConverting.has(a.fullPath))) {
+            throw conflict('Conversion d’un PDF en cours : réessaie à la fin');
+        }
+        for (const archive of archives) {
+            await unlink(archive.fullPath);
+            this.cache.delete(archive.fullPath);
+            this.infos.delete(archive.fullPath);
+            this.conversionErrors.delete(archive.fullPath);
+            await rm(this.coverPath(archive.fullPath), { force: true });
+        }
+        // Un dossier (pas un tome seul à la racine de _draft).
+        const dir = path.join(library.path, ...folder.split('/'));
+        const isFolder = await stat(dir).then(
+            (stats) => stats.isDirectory(),
+            () => false,
+        );
+        if (isFolder) {
+            for (const entry of await readdir(dir, { withFileTypes: true })) {
+                if (entry.isFile()) await unlink(path.join(dir, entry.name));
+            }
+            await rmdir(dir).catch(() => {});
+        }
+        deleteDraftSettings(this.db, libraryId, folder);
+        await rm(draftCoverFile(this.coversPath, libraryId, folder), {
+            force: true,
+        });
+        this.logger.info(
+            `Brouillon supprimé du disque : ${folder} (${archives.length} tome(s))`,
+        );
+        return { deleted: archives.length };
     };
 
     /** Tomes d'une série et sa bibliothèque (opérations sur ses fichiers). */

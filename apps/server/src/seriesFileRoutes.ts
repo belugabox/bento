@@ -32,6 +32,20 @@ export const createSeriesFileRoutes = (files: LibraryFiles) =>
                 return c.json({ archived });
             },
         )
+        // Brouillon supprimé du disque, pour de bon.
+        .delete(
+            '/libraries/:id/drafts',
+            requireAdmin,
+            zValidator('param', idParam),
+            zValidator('query', z.object({ folder: z.string().min(1) })),
+            async (c) =>
+                c.json(
+                    await files.deleteDraft(
+                        c.req.valid('param').id,
+                        c.req.valid('query').folder,
+                    ),
+                ),
+        )
         // Série remise en brouillon : ses fichiers vont dans `_draft`.
         .post(
             '/series/:id/draft',

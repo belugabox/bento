@@ -631,6 +631,15 @@ export const setDraftArchived = (
         }),
     );
 
+/** Brouillon supprimé du disque (ses tomes et son dossier). */
+export const deleteDraft = (library: number, folder: string) =>
+    json(
+        api.libraries[':id'].drafts.$delete({
+            ...libraryId(library),
+            query: { folder },
+        }),
+    );
+
 /** Série remise en brouillon : son dossier dans `_draft`. */
 export const seriesToDraft = (seriesId: number) =>
     json(api.series[':id'].draft.$post(id(seriesId)));

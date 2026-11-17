@@ -24,6 +24,7 @@ import {
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router';
 
+import { DeleteDraftButton } from '@/components/DeleteDraftButton';
 import { completenessColor } from '@/components/completeness';
 import { CoverPicker } from '@/components/metadata/CoverPicker';
 import { MetadataEditor } from '@/components/metadata/MetadataEditor';
@@ -316,6 +317,21 @@ export const DraftsPage = () => {
                                                 ? 'Remettre en attente'
                                                 : 'Archiver'}
                                         </Button>
+                                        <DeleteDraftButton
+                                            libraryId={libraryId}
+                                            folder={selected}
+                                            label={folderLabel(selected)}
+                                            volumeCount={files.length}
+                                            size={files.reduce(
+                                                (sum, f) => sum + f.size,
+                                                0,
+                                            )}
+                                            onDeleted={() => {
+                                                setSelected(undefined);
+                                                drafts.reload();
+                                                notifyDraftsChanged();
+                                            }}
+                                        />
                                     </Group>
                                     <MetadataEditor
                                         cover={{
