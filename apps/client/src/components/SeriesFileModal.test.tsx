@@ -3,7 +3,7 @@ import { fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { SeriesFileActions } from './SeriesFileActions';
+import { type SeriesFileAction, SeriesFileModal } from './SeriesFileModal';
 
 const respond = (body: unknown) =>
     new Response(JSON.stringify(body), {
@@ -17,7 +17,7 @@ const Where = () => {
     return null;
 };
 
-const renderActions = () =>
+const renderModal = (action: SeriesFileAction) =>
     render(
         <MantineProvider>
             <MemoryRouter initialEntries={['/series/4/edit']}>
@@ -26,7 +26,9 @@ const renderActions = () =>
                         path="*"
                         element={
                             <>
-                                <SeriesFileActions
+                                <SeriesFileModal
+                                    action={action}
+                                    onClose={() => {}}
                                     seriesId={4}
                                     name="Gantz"
                                     volumeCount={2}
@@ -45,18 +47,15 @@ afterEach(() => {
     vi.restoreAllMocks();
 });
 
-describe('SeriesFileActions', () => {
+describe('SeriesFileModal', () => {
     it('puts the series back in the drafts, then opens its folder', async () => {
         const fetch = vi
             .spyOn(globalThis, 'fetch')
             .mockResolvedValue(
                 respond({ libraryId: 1, folder: '_draft/Gantz' }),
             );
-        renderActions();
+        renderModal('draft');
 
-        fireEvent.click(
-            screen.getByRole('button', { name: 'Remettre en brouillon' }),
-        );
         const dialog = await screen.findByRole('dialog');
         fireEvent.click(
             within(dialog).getByRole('button', {
@@ -75,11 +74,8 @@ describe('SeriesFileActions', () => {
         const fetch = vi
             .spyOn(globalThis, 'fetch')
             .mockResolvedValue(respond({ deleted: 2, failures: [] }));
-        renderActions();
+        renderModal('delete');
 
-        fireEvent.click(
-            screen.getByRole('button', { name: 'Supprimer du disque' }),
-        );
         const confirm = await screen.findByRole('button', {
             name: 'Supprimer 2 tomes',
         });

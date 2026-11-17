@@ -2,10 +2,10 @@ import {
     Accordion,
     Alert,
     Badge,
-    Button,
     Grid,
     Group,
     Loader,
+    Menu,
     NavLink,
     Paper,
     Progress,
@@ -20,11 +20,12 @@ import {
     IconArchiveOff,
     IconFile,
     IconFolder,
+    IconTrash,
 } from '@tabler/icons-react';
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router';
 
-import { DeleteDraftButton } from '@/components/DeleteDraftButton';
+import { DeleteDraftModal } from '@/components/DeleteDraftModal';
 import { completenessColor } from '@/components/completeness';
 import { CoverPicker } from '@/components/metadata/CoverPicker';
 import { MetadataEditor } from '@/components/metadata/MetadataEditor';
@@ -73,7 +74,7 @@ export const DraftsPage = () => {
     const [selected, setSelected] = useState<string | undefined>(
         () => params.get('folder') ?? undefined,
     );
-    const [archiving, setArchiving] = useState(false);
+    const [deleteOpened, setDeleteOpened] = useState(false);
     const [coverOpened, cover] = useDisclosure(false);
 
     // Liste des dossiers : rapide (les archives ne sont pas ouvertes).
@@ -127,14 +128,9 @@ export const DraftsPage = () => {
 
     const archive = async (value: boolean) => {
         if (!libraryId || !selected) return;
-        setArchiving(true);
-        try {
-            await setDraftArchived(libraryId, selected, value);
-            drafts.reload();
-            notifyDraftsChanged();
-        } finally {
-            setArchiving(false);
-        }
+        await setDraftArchived(libraryId, selected, value);
+        drafts.reload();
+        notifyDraftsChanged();
     };
 
     const draftLink = (f: DraftFolder) => (
@@ -297,42 +293,6 @@ export const DraftsPage = () => {
                             libraryId &&
                             library && (
                                 <Stack>
-                                    <Group justify="flex-end">
-                                        <Button
-                                            variant="default"
-                                            size="xs"
-                                            loading={archiving}
-                                            leftSection={
-                                                draft?.archivedAt ? (
-                                                    <IconArchiveOff size={14} />
-                                                ) : (
-                                                    <IconArchive size={14} />
-                                                )
-                                            }
-                                            onClick={() =>
-                                                void archive(!draft?.archivedAt)
-                                            }
-                                        >
-                                            {draft?.archivedAt
-                                                ? 'Remettre en attente'
-                                                : 'Archiver'}
-                                        </Button>
-                                        <DeleteDraftButton
-                                            libraryId={libraryId}
-                                            folder={selected}
-                                            label={folderLabel(selected)}
-                                            volumeCount={files.length}
-                                            size={files.reduce(
-                                                (sum, f) => sum + f.size,
-                                                0,
-                                            )}
-                                            onDeleted={() => {
-                                                setSelected(undefined);
-                                                drafts.reload();
-                                                notifyDraftsChanged();
-                                            }}
-                                        />
-                                    </Group>
                                     <MetadataEditor
                                         cover={{
                                             src: currentCover,
@@ -394,6 +354,60 @@ export const DraftsPage = () => {
                                                   ),
                                         }))}
                                         onChanged={reload}
+                                        menu={
+                                            <>
+                                                <Menu.Item
+                                                    leftSection={
+                                                        draft?.archivedAt ? (
+                                                            <IconArchiveOff
+                                                                size={16}
+                                                            />
+                                                        ) : (
+                                                            <IconArchive
+                                                                size={16}
+                                                            />
+                                                        )
+                                                    }
+                                                    onClick={() =>
+                                                        void archive(
+                                                            !draft?.archivedAt,
+                                                        )
+                                                    }
+                                                >
+                                                    {draft?.archivedAt
+                                                        ? 'Remettre en attente'
+                                                        : 'Archiver'}
+                                                </Menu.Item>
+                                                <Menu.Item
+                                                    color="red"
+                                                    leftSection={
+                                                        <IconTrash size={16} />
+                                                    }
+                                                    onClick={() =>
+                                                        setDeleteOpened(true)
+                                                    }
+                                                >
+                                                    Supprimer du disque
+                                                </Menu.Item>
+                                            </>
+                                        }
+                                    />
+                                    <DeleteDraftModal
+                                        opened={deleteOpened}
+                                        onClose={() => setDeleteOpened(false)}
+                                        libraryId={libraryId}
+                                        folder={selected}
+                                        label={folderLabel(selected)}
+                                        volumeCount={files.length}
+                                        size={files.reduce(
+                                            (sum, f) => sum + f.size,
+                                            0,
+                                        )}
+                                        onDeleted={() => {
+                                            setSelected(undefined);
+                                            drafts.reload();
+                                            notifyDraftsChanged();
+                                        }}
                                     />
                                     <CoverPicker
                                         key={`cover:${selected}`}

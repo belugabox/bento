@@ -118,4 +118,26 @@ describe('SeriesEditPage', () => {
         expect(screen.queryByRole('button', { name: /Suivante/ })).toBeNull();
         expect(screen.queryByRole('link', { name: /^Séries/ })).toBeNull();
     });
+
+    it('keeps compression and the file actions in the « ⋯ » menu', async () => {
+        show('/series/1/edit');
+        await screen.findByText('Modifier la série');
+        expect(screen.queryByRole('button', { name: /Compresser/ })).toBeNull();
+
+        fireEvent.click(screen.getByRole('button', { name: 'Plus d’actions' }));
+        expect(
+            await screen.findByRole('menuitem', { name: /Compresser/ }),
+        ).toBeTruthy();
+        expect(
+            screen.getByRole('menuitem', { name: 'Remettre en brouillon' }),
+        ).toBeTruthy();
+        fireEvent.click(
+            screen.getByRole('menuitem', { name: 'Supprimer du disque' }),
+        );
+        expect(
+            await screen.findByLabelText(
+                'Pour confirmer, tape le nom de la série',
+            ),
+        ).toBeTruthy();
+    });
 });

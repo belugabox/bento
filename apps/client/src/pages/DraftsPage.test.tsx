@@ -5,6 +5,14 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { DraftsPage } from './DraftsPage';
 
+/** Une action du menu « ⋯ » de l'éditeur. */
+const menuAction = async (name: string) => {
+    fireEvent.click(
+        await screen.findByRole('button', { name: 'Plus d’actions' }),
+    );
+    fireEvent.click(await screen.findByRole('menuitem', { name }));
+};
+
 const respond = (body: unknown) =>
     new Response(JSON.stringify(body), {
         headers: { 'Content-Type': 'application/json' },
@@ -206,14 +214,11 @@ describe('DraftsPage', () => {
         );
 
         // Le dossier de l'adresse, ouvert ; sa liste repliée, dépliée.
-        const remettre = await screen.findByRole('button', {
-            name: 'Remettre en attente',
-        });
         expect(
-            screen.getByRole('button', { name: /Archivés \(1\)/ }),
+            await screen.findByRole('button', { name: /Archivés \(1\)/ }),
         ).toBeTruthy();
 
-        fireEvent.click(remettre);
+        await menuAction('Remettre en attente');
         await vi.waitFor(() =>
             expect(
                 screen.queryByRole('button', { name: /Archivés/ }),
@@ -222,7 +227,7 @@ describe('DraftsPage', () => {
         expect(sent).toEqual([{ folder: '_draft/Spirale', archived: false }]);
 
         // Et de nouveau archivé.
-        fireEvent.click(screen.getByRole('button', { name: 'Archiver' }));
+        await menuAction('Archiver');
         expect(
             await screen.findByRole('button', { name: /Archivés \(1\)/ }),
         ).toBeTruthy();
@@ -292,9 +297,7 @@ describe('DraftsPage', () => {
             </MantineProvider>,
         );
 
-        fireEvent.click(
-            await screen.findByRole('button', { name: 'Supprimer du disque' }),
-        );
+        await menuAction('Supprimer du disque');
         fireEvent.click(
             await screen.findByRole('button', { name: 'Supprimer 1 tome' }),
         );

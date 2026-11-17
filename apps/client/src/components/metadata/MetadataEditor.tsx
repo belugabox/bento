@@ -11,6 +11,7 @@ import {
     Grid,
     Group,
     Image,
+    Menu,
     NumberInput,
     Paper,
     Popover,
@@ -29,6 +30,7 @@ import {
     IconArrowRight,
     IconCheck,
     IconCopy,
+    IconDots,
     IconEye,
     IconFileText,
     IconFileZip,
@@ -37,7 +39,7 @@ import {
     IconUpload,
     IconWand,
 } from '@tabler/icons-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 
 import {
     type ComicInfo,
@@ -348,6 +350,7 @@ export const MetadataEditor = ({
     cover,
     autoFill = false,
     next,
+    menu,
 }: {
     libraryId: number;
     kind: 'manga' | 'comics';
@@ -395,6 +398,11 @@ export const MetadataEditor = ({
     autoFill?: boolean;
     /** Série suivante à traiter (ordre de la page Séries). */
     next?: { name: string; go: () => void };
+    /**
+     * Actions de la page (`Menu.Item` : archiver, supprimer…), dans le menu
+     * « ⋯ » de la barre, après « Compresser… ».
+     */
+    menu?: ReactNode;
 }) => {
     // Contenu des données reçues : le parent peut recréer la liste à chaque
     // rendu, seule une vraie nouveauté (enregistrement) doit tout reprendre.
@@ -956,14 +964,33 @@ export const MetadataEditor = ({
                             Mettre à jour
                         </Button>
                     )}
-                    <Button
-                        variant="default"
-                        leftSection={<IconFileZip size={16} />}
-                        disabled={readable.length === 0}
-                        onClick={compression.open}
-                    >
-                        Compresser…
-                    </Button>
+                    <Menu position="bottom-start" withinPortal>
+                        <Menu.Target>
+                            <ActionIcon
+                                variant="default"
+                                size={36}
+                                aria-label="Plus d’actions"
+                                title="Plus d’actions"
+                            >
+                                <IconDots size={18} />
+                            </ActionIcon>
+                        </Menu.Target>
+                        <Menu.Dropdown>
+                            <Menu.Item
+                                leftSection={<IconFileZip size={16} />}
+                                disabled={readable.length === 0}
+                                onClick={compression.open}
+                            >
+                                Compresser…
+                            </Menu.Item>
+                            {menu && (
+                                <>
+                                    <Menu.Divider />
+                                    {menu}
+                                </>
+                            )}
+                        </Menu.Dropdown>
+                    </Menu>
                 </Group>
                 <Group gap="xs">
                     <Button
