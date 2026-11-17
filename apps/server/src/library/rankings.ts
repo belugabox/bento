@@ -1,9 +1,11 @@
-import { sql } from 'drizzle-orm';
+import { and, isNotNull, sql } from 'drizzle-orm';
 
 import type { Db } from '../db';
+import { series } from '../db/schema';
 import { parseSources } from '../metadata/sourceLink';
 import { seriesRatingOf, sourceRatingsMap } from './ratings';
 import { type StatsOptions, periodStart } from './readingStats';
+import { type Viewer, visibleTo } from './visibility';
 
 // Requêtes en SQL brut, comme stats.ts (agrégats sur plusieurs tables).
 
@@ -151,4 +153,34 @@ export const readingRankings = (db: Db, options: StatsOptions) => {
             .filter((s) => s.readers === 0 && s.rating >= GOOD_RATING)
             .slice(0, TOP),
     };
+};
+
+/**
+ * « Bien notées, jamais ouvertes » (accueil) : séries visibles par la
+ * personne, bien notées par les sites (assez d'avis), que personne de la
+ * famille n'a ouvertes ; les mieux notées d'abord.
+ */
+export const neverOpenedGems = (db: Db, viewer: Viewer) => {
+    const ratings = sourceRatingsMap(db);
+    return db
+        .select({ id: series.id, sources: series.sources })
+        .from(series)
+        .where(
+            and(
+                isNotNull(series.sources),
+                visibleTo(viewer),
+                // SQL brut : Drizzle ne préfixerait pas `series.id`.
+                sql`not exists (select 1 from volumes v cross join read_progress rp on rp.volume_id = v.id where v.series_id = series.id)`,
+            ),
+        )
+        .all()
+        .flatMap(({ id, sources }) => {
+            const rating = seriesRatingOf(parseSources(sources), ratings);
+            return rating &&
+                rating.count >= MIN_REVIEWS &&
+                rating.value >= GOOD_RATING
+                ? [{ id, rating: rating.value, reviews: rating.count }]
+                : [];
+        })
+        .sort((a, b) => b.rating - a.rating || b.reviews - a.reviews);
 };

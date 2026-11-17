@@ -61,6 +61,8 @@ const RESUME = [
 
 let resume: unknown[] = RESUME;
 let series: unknown[] = SERIES;
+// Bien notées, jamais ouvertes (serveur).
+let gems: unknown[] = [];
 
 const respond = (body: unknown) =>
     new Response(JSON.stringify(body), {
@@ -70,6 +72,7 @@ const respond = (body: unknown) =>
 beforeEach(() => {
     resume = RESUME;
     series = SERIES;
+    gems = [];
     vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
         const url = String(input);
         if (url === '/api/continue') return respond(resume);
@@ -78,6 +81,7 @@ beforeEach(() => {
                 { id: 7, name: 'Léa', avatarSeed: null, seriesIds: [4] },
             ]);
         }
+        if (url === '/api/suggestions/gems') return respond(gems);
         if (url.startsWith('/api/stats/me')) {
             return respond({ seconds: 12_000, completed: 2 });
         }
@@ -171,6 +175,37 @@ describe('HomePage', () => {
         expect(library.textContent).toContain('5 séries · 25 tomes');
         // La lecture de la semaine est dans « Moi ».
         expect(screen.queryByText(/de lecture cette semaine/)).toBeNull();
+    });
+
+    it('suggests series like the ones read, and says why', async () => {
+        // Berserk lu ; Eden partage son genre, Coq de combat non.
+        series = SERIES.map((s) =>
+            s.name === 'Berserk' || s.name === 'Eden'
+                ? { ...s, genres: ['Fantasy'] }
+                : s,
+        );
+        show();
+
+        const mine = await screen.findByRole('region', { name: 'Pour toi' });
+        expect(hrefs(mine)).toEqual(['/series/5']);
+        expect(within(mine).getByText('Comme Berserk')).toBeTruthy();
+        // Jamais à deux endroits sur l'accueil.
+        expect(
+            screen
+                .getAllByRole('link')
+                .filter((link) => link.getAttribute('href') === '/series/5'),
+        ).toHaveLength(1);
+    });
+
+    it('shows the well rated series nobody opened, with their rating', async () => {
+        gems = [{ id: 5, rating: 4.6, reviews: 230 }];
+        show();
+
+        const rated = await screen.findByRole('region', {
+            name: 'Bien notées, jamais ouvertes',
+        });
+        expect(hrefs(rated)).toContain('/series/5');
+        expect(within(rated).getByText('★ 4,6 · 230 avis')).toBeTruthy();
     });
 
     it('says when the library is empty', async () => {

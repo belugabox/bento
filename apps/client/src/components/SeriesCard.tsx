@@ -24,6 +24,7 @@ export const SeriesCard = ({
     layout = 'card',
     coversOnly = false,
     details,
+    subtitleLines,
 }: {
     series: SeriesSummary;
     isAdmin: boolean;
@@ -36,6 +37,8 @@ export const SeriesCard = ({
     coversOnly?: boolean;
     /** Lignes d'infos en plus, en mode liste. */
     details?: string[];
+    /** Lignes de la légende (raison d'une suggestion : deux). */
+    subtitleLines?: number;
 }) => {
     const state = readingStateOf(series);
     return (
@@ -61,6 +64,7 @@ export const SeriesCard = ({
             layout={layout}
             coversOnly={coversOnly}
             details={details}
+            subtitleLines={subtitleLines}
         />
     );
 };

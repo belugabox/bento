@@ -13,7 +13,6 @@ import {
     Stack,
     Text,
     Title,
-    useMatches,
 } from '@mantine/core';
 import {
     IconBook,
@@ -26,10 +25,10 @@ import { Link } from 'react-router';
 import { VolumeCardMenu } from '@/components/CardMenus';
 import { PageLoader } from '@/components/PageLoader';
 import { PageSection } from '@/components/PageSection';
-import { SeriesCard } from '@/components/SeriesCard';
+import { SuggestionRow } from '@/components/SuggestionRow';
 import { UserAvatar } from '@/components/accounts/UserAvatar';
+import { ratingLabel, reviewsLabel } from '@/components/format';
 import { homeBlocks } from '@/components/homeBlocks';
-import { gridColumns, useLibraryDisplay } from '@/components/libraryDisplay';
 import { libraryLink } from '@/components/libraryFilters';
 import { volumeLabel, volumeShortLabel } from '@/components/readingStatus';
 import { useScrollMemory } from '@/components/scrollMemory';
@@ -44,6 +43,7 @@ import {
     fetchFamilyReaders,
     fetchInProgress,
     fetchSeriesList,
+    fetchSuggestionGems,
     seriesCoverUrl,
 } from '@/services/api';
 import { UserContext } from '@/services/auth';
@@ -266,34 +266,16 @@ const ReadersTag = ({ readers }: { readers: FamilyReader[] }) => (
     </Avatar.Group>
 );
 
-/** Une ligne de cartes : autant que la grille en met côte à côte. */
-const CardsRow = ({
-    series,
-    columns,
-    render,
-}: {
-    series: SeriesSummary[];
-    columns: ReturnType<typeof gridColumns>;
-    render: (s: SeriesSummary) => React.ReactNode;
-}) => (
-    <SimpleGrid cols={columns} spacing="sm">
-        {series.map(render)}
-    </SimpleGrid>
-);
-
 /**
  * Accueil : ce qui concerne la personne. Le tome à reprendre en grand (les
  * autres à côté), puis des blocs d'une ligne : nouveaux tomes, liste « à
- * lire », séries lues par la famille, ajouts récents. « Tout voir » ouvre
+ * lire », « Pour toi », séries lues par la famille, bien notées jamais
+ * ouvertes, ajouts récents. « Tout voir » ouvre
  * la bibliothèque déjà filtrée. Un bloc vide n'apparaît pas.
  */
 export const HomePage = () => {
     const isAdmin = useContext(UserContext)?.role === 'admin';
     const online = useOnline();
-    const display = useLibraryDisplay();
-    const columns = gridColumns(display.size);
-    // Cartes par ligne à cette largeur : chaque bloc en montre autant.
-    const perRow = useMatches(columns);
     // Gardées en mémoire : revenir à l'accueil l'affiche tout de suite.
     const inProgress = useQuery(fetchInProgress, [], {
         cacheKey: 'continue',
@@ -304,6 +286,8 @@ export const HomePage = () => {
     const readers = useQuery(fetchFamilyReaders, [], {
         cacheKey: 'readers',
     });
+    // Bien notées, jamais ouvertes : le bloc vient quand elles arrivent.
+    const gems = useQuery(fetchSuggestionGems, [], { cacheKey: 'gems' });
     useScrollMemory(!!series.data && !!inProgress.data);
 
     const reload = () => {
@@ -326,31 +310,13 @@ export const HomePage = () => {
 
     const resume = inProgress.data;
     const [first, ...others] = resume;
-    const blocks = homeBlocks(series.data, resume, readers.data ?? []);
+    const blocks = homeBlocks(series.data, resume, readers.data ?? [], {
+        gems: gems.data,
+    });
     const readersOf = (s: SeriesSummary) =>
         (readers.data ?? []).filter((r) => r.seriesIds.includes(s.id));
-    const card =
-        (
-            options: {
-                subtitle?: (s: SeriesSummary) => string;
-                family?: boolean;
-            } = {},
-        ) =>
-        (s: SeriesSummary) => (
-            <SeriesCard
-                key={s.id}
-                series={s}
-                isAdmin={isAdmin}
-                onChanged={reload}
-                coversOnly={display.coversOnly}
-                subtitle={options.subtitle?.(s)}
-                tag={
-                    options.family ? (
-                        <ReadersTag readers={readersOf(s)} />
-                    ) : undefined
-                }
-            />
-        );
+    const gemOf = new Map((gems.data ?? []).map((g) => [g.id, g]));
+    const row = { isAdmin, onChanged: reload };
 
     if (series.data.length === 0 && resume.length === 0) {
         return (
@@ -397,67 +363,64 @@ export const HomePage = () => {
                     </SimpleGrid>
                 </PageSection>
             )}
-            {blocks.fresh.length > 0 && (
-                <PageSection
-                    title="Nouveaux tomes"
-                    count={blocks.fresh.length}
-                    more={libraryLink({ reading: ['new'] })}
-                >
-                    <CardsRow
-                        series={blocks.fresh.slice(0, perRow)}
-                        columns={columns}
-                        render={card({
-                            subtitle: (s) =>
-                                `+${s.newCount} · ${s.readCount} / ${s.volumeCount} lus`,
-                        })}
-                    />
-                </PageSection>
-            )}
-            {blocks.toRead.length > 0 && (
-                <PageSection
-                    title="À lire"
-                    count={blocks.toRead.length}
-                    more={libraryLink({ reading: ['toread'] })}
-                >
-                    <CardsRow
-                        series={blocks.toRead.slice(0, perRow)}
-                        columns={columns}
-                        render={card()}
-                    />
-                </PageSection>
-            )}
-            {blocks.family.length > 0 && (
-                <PageSection
-                    title="Lu par la famille"
-                    count={blocks.family.length}
-                    more={libraryLink({
-                        reading: ['unread'],
-                        readers: (readers.data ?? []).map((r) => r.id),
-                    })}
-                >
-                    <CardsRow
-                        series={blocks.family.slice(0, perRow)}
-                        columns={columns}
-                        render={card({
-                            family: true,
-                            subtitle: (s) =>
-                                readByLabel(readersOf(s).map((r) => r.name)),
-                        })}
-                    />
-                </PageSection>
-            )}
-            {blocks.recent.length > 0 && (
-                <PageSection
-                    title="Récemment ajoutées"
-                    more={libraryLink({}, { sort: 'recent' })}
-                >
-                    <CardsRow
-                        series={blocks.recent.slice(0, perRow)}
-                        columns={columns}
-                        render={card()}
-                    />
-                </PageSection>
-            )}
+            <SuggestionRow
+                {...row}
+                title="Nouveaux tomes"
+                count={blocks.fresh.length}
+                more={libraryLink({ reading: ['new'] })}
+                items={blocks.fresh.map((s) => ({
+                    series: s,
+                    reason: `+${s.newCount} · ${s.readCount} / ${s.volumeCount} lus`,
+                }))}
+            />
+            <SuggestionRow
+                {...row}
+                title="À lire"
+                count={blocks.toRead.length}
+                more={libraryLink({ reading: ['toread'] })}
+                items={blocks.toRead.map((s) => ({ series: s }))}
+            />
+            <SuggestionRow
+                {...row}
+                title="Pour toi"
+                items={blocks.forYou.map((s) => ({
+                    series: s,
+                    reason: blocks.reasons.get(s.id),
+                }))}
+            />
+            <SuggestionRow
+                {...row}
+                title="Lu par la famille"
+                count={blocks.family.length}
+                more={libraryLink({
+                    reading: ['unread'],
+                    readers: (readers.data ?? []).map((r) => r.id),
+                })}
+                items={blocks.family.map((s) => ({
+                    series: s,
+                    reason: readByLabel(readersOf(s).map((r) => r.name)),
+                }))}
+                tag={(s) => <ReadersTag readers={readersOf(s)} />}
+            />
+            <SuggestionRow
+                {...row}
+                title="Bien notées, jamais ouvertes"
+                count={blocks.gems.length}
+                more={libraryLink({ reading: ['unread'] }, { sort: 'rating' })}
+                items={blocks.gems.map((s) => {
+                    const gem = gemOf.get(s.id)!;
+                    return {
+                        series: s,
+                        reason: `${ratingLabel(gem.rating)} · ${reviewsLabel(gem.reviews)}`,
+                    };
+                })}
+            />
+            <SuggestionRow
+                {...row}
+                title="Récemment ajoutées"
+                more={libraryLink({}, { sort: 'recent' })}
+                items={blocks.recent.map((s) => ({ series: s }))}
+            />
             <LibraryLink series={series.data} />
         </Stack>
     );

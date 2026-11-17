@@ -1,5 +1,5 @@
 import { MantineProvider } from '@mantine/core';
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -57,8 +57,16 @@ const SERIES = {
     volumes: [volume(1, true), volume(2, null), volume(7, null, 'hors-serie')],
 };
 
+/** Réponse de la liste des séries (suggestions de la fiche). */
+let seriesList: unknown[] = [];
+const listResponse = () =>
+    new Response(JSON.stringify(seriesList), {
+        headers: { 'Content-Type': 'application/json' },
+    });
+
 afterEach(() => {
     vi.restoreAllMocks();
+    seriesList = [];
 });
 
 describe('SeriesPage', () => {
@@ -66,6 +74,8 @@ describe('SeriesPage', () => {
         const requests: [string, string, unknown][] = [];
         vi.spyOn(globalThis, 'fetch').mockImplementation(
             async (input, init) => {
+                // Liste des séries (suggestions) : vide ici.
+                if (String(input) === '/api/series') return listResponse();
                 requests.push([
                     init?.method ?? 'GET',
                     String(input),
@@ -142,6 +152,8 @@ describe('SeriesPage', () => {
         const requests: [string, string, unknown][] = [];
         vi.spyOn(globalThis, 'fetch').mockImplementation(
             async (input, init) => {
+                // Liste des séries (suggestions) : vide ici.
+                if (String(input) === '/api/series') return listResponse();
                 const body = init?.body
                     ? JSON.parse(String(init.body))
                     : undefined;
@@ -196,21 +208,23 @@ describe('SeriesPage', () => {
     });
 
     it('shows a one-shot without its volume', async () => {
-        vi.spyOn(globalThis, 'fetch').mockImplementation(
-            async () =>
-                new Response(
-                    JSON.stringify({
-                        ...SERIES,
-                        volumes: [
-                            {
-                                ...volume(1, null),
-                                number: null,
-                                kind: 'one-shot',
-                            },
-                        ],
-                    }),
-                    { headers: { 'Content-Type': 'application/json' } },
-                ),
+        vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) =>
+            // Liste des séries (suggestions) : vide ici.
+            String(input) === '/api/series'
+                ? listResponse()
+                : new Response(
+                      JSON.stringify({
+                          ...SERIES,
+                          volumes: [
+                              {
+                                  ...volume(1, null),
+                                  number: null,
+                                  kind: 'one-shot',
+                              },
+                          ],
+                      }),
+                      { headers: { 'Content-Type': 'application/json' } },
+                  ),
         );
         render(
             <MantineProvider>
@@ -236,19 +250,21 @@ describe('SeriesPage', () => {
     });
 
     it('links its online sheets at the end of the summary', async () => {
-        vi.spyOn(globalThis, 'fetch').mockImplementation(
-            async () =>
-                new Response(
-                    JSON.stringify({
-                        ...SERIES,
-                        summary: 'Des aliens.',
-                        sources: [
-                            { site: 'wikipedia', id: '7' },
-                            { site: 'bedetheque', id: '500' },
-                        ],
-                    }),
-                    { headers: { 'Content-Type': 'application/json' } },
-                ),
+        vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) =>
+            // Liste des séries (suggestions) : vide ici.
+            String(input) === '/api/series'
+                ? listResponse()
+                : new Response(
+                      JSON.stringify({
+                          ...SERIES,
+                          summary: 'Des aliens.',
+                          sources: [
+                              { site: 'wikipedia', id: '7' },
+                              { site: 'bedetheque', id: '500' },
+                          ],
+                      }),
+                      { headers: { 'Content-Type': 'application/json' } },
+                  ),
         );
         render(
             <MantineProvider>
@@ -284,20 +300,22 @@ describe('SeriesPage', () => {
             number: string,
             kind: 'volume' | 'hors-serie' = 'volume',
         ) => ({ ...volume(id, null, kind), number, group });
-        vi.spyOn(globalThis, 'fetch').mockImplementation(
-            async () =>
-                new Response(
-                    JSON.stringify({
-                        ...SERIES,
-                        volumes: [
-                            grouped(1, 'Part 1 - Rouge, Bleu et Jaune', '1'),
-                            grouped(2, 'Part 1 - Rouge, Bleu et Jaune', '2'),
-                            grouped(3, 'Part 2 - Or et Argent', '1'),
-                            grouped(4, 'Guides', '1', 'hors-serie'),
-                        ],
-                    }),
-                    { headers: { 'Content-Type': 'application/json' } },
-                ),
+        vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) =>
+            // Liste des séries (suggestions) : vide ici.
+            String(input) === '/api/series'
+                ? listResponse()
+                : new Response(
+                      JSON.stringify({
+                          ...SERIES,
+                          volumes: [
+                              grouped(1, 'Part 1 - Rouge, Bleu et Jaune', '1'),
+                              grouped(2, 'Part 1 - Rouge, Bleu et Jaune', '2'),
+                              grouped(3, 'Part 2 - Or et Argent', '1'),
+                              grouped(4, 'Guides', '1', 'hors-serie'),
+                          ],
+                      }),
+                      { headers: { 'Content-Type': 'application/json' } },
+                  ),
         );
         render(
             <MantineProvider>
@@ -330,11 +348,13 @@ describe('SeriesPage', () => {
     });
 
     it('offers the downloads in their own small menu', async () => {
-        vi.spyOn(globalThis, 'fetch').mockImplementation(
-            async () =>
-                new Response(JSON.stringify(SERIES), {
-                    headers: { 'Content-Type': 'application/json' },
-                }),
+        vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) =>
+            // Liste des séries (suggestions) : vide ici.
+            String(input) === '/api/series'
+                ? listResponse()
+                : new Response(JSON.stringify(SERIES), {
+                      headers: { 'Content-Type': 'application/json' },
+                  }),
         );
         render(
             <MantineProvider>
@@ -376,6 +396,8 @@ describe('SeriesPage', () => {
         const requests: [string, string, unknown][] = [];
         vi.spyOn(globalThis, 'fetch').mockImplementation(
             async (input, init) => {
+                // Liste des séries (suggestions) : vide ici.
+                if (String(input) === '/api/series') return listResponse();
                 requests.push([
                     init?.method ?? 'GET',
                     String(input),
@@ -436,5 +458,76 @@ describe('SeriesPage', () => {
             '/api/series/3/read',
             { read: true, upTo: 2 },
         ]);
+    });
+
+    it('suggests the series of the same author, then of the same genre', async () => {
+        const listed = (id: number, name: string, extra: object) => ({
+            id,
+            name,
+            libraryId: 1,
+            volumeCount: 2,
+            readCount: 0,
+            startedCount: 0,
+            lastAddedAt: null,
+            coverUpdatedAt: null,
+            coverVolumeId: id * 10,
+            genres: [],
+            themes: [],
+            format: 'Manga',
+            writer: null,
+            penciller: null,
+            ...extra,
+        });
+        seriesList = [
+            listed(3, 'Gantz', {
+                genres: ['Action', 'Sport'],
+                themes: ['boxe'],
+                writer: 'Hiroya Oku',
+            }),
+            listed(4, 'Inuyashiki', { writer: 'Hiroya Oku' }),
+            listed(5, 'Hajime no Ippo', {
+                genres: ['Sport'],
+                themes: ['boxe'],
+            }),
+            listed(6, 'Blacksad', { genres: ['Polar'] }),
+        ];
+        vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) =>
+            String(input) === '/api/series'
+                ? listResponse()
+                : new Response(JSON.stringify(SERIES), {
+                      headers: { 'Content-Type': 'application/json' },
+                  }),
+        );
+        render(
+            <MantineProvider>
+                <UserContext.Provider value={READER}>
+                    <MemoryRouter initialEntries={['/series/3']}>
+                        <Routes>
+                            <Route
+                                path="/series/:id"
+                                element={<SeriesPage />}
+                            />
+                        </Routes>
+                    </MemoryRouter>
+                </UserContext.Provider>
+            </MantineProvider>,
+        );
+
+        const author = await screen.findByRole('region', {
+            name: 'Du même auteur',
+        });
+        expect(within(author).getByText('Inuyashiki')).toBeTruthy();
+        expect(within(author).getByText('Hiroya Oku')).toBeTruthy();
+        expect(
+            within(author)
+                .getByRole('link', { name: 'Tout voir : Du même auteur' })
+                .getAttribute('href'),
+        ).toBe('/library?q=Hiroya+Oku');
+        const genre = screen.getByRole('region', {
+            name: 'Dans le même genre',
+        });
+        expect(within(genre).getByText('Hajime no Ippo')).toBeTruthy();
+        expect(within(genre).getByText('boxe · Sport')).toBeTruthy();
+        expect(within(genre).queryByText('Blacksad')).toBeNull();
     });
 });

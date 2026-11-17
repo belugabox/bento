@@ -553,6 +553,9 @@ export type ManagedSeries = Awaited<
 export const fetchToClassifyCount = () =>
     json(api.manage.series['to-classify'].$get());
 
+/** Bien notées, jamais ouvertes par la famille (accueil) : id, note, avis. */
+export const fetchSuggestionGems = () => json(api.suggestions.gems.$get());
+
 /** Statistiques de la bibliothèque et de la lecture (admin). */
 export const fetchStats = () => json(api.stats.$get());
 

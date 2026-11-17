@@ -47,6 +47,7 @@ import { PageHeader } from '@/components/PageHeader';
 import { PageLoader } from '@/components/PageLoader';
 import { RatingBadge } from '@/components/RatingBadge';
 import { SeriesReaders } from '@/components/SeriesReaders';
+import { SeriesSuggestions } from '@/components/SeriesSuggestions';
 import { ageLabel, seriesAgeOf } from '@/components/ageLimits';
 import { completenessOf, fieldsFromVolumes } from '@/components/completeness';
 import { gridColumns, useLibraryDisplay } from '@/components/libraryDisplay';
@@ -639,6 +640,9 @@ export const SeriesPage = () => {
                     );
                 },
             )}
+
+            {/* Du même auteur, dans le même genre. */}
+            <SeriesSuggestions seriesId={series.id} isAdmin={isAdmin} />
         </Stack>
     );
 };

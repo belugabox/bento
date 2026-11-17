@@ -61,6 +61,7 @@ export const CoverCard = ({
     layout = 'card',
     coversOnly = false,
     details = [],
+    subtitleLines = 1,
 }: {
     to: string;
     /** Adresse de l'image de couverture. */
@@ -95,6 +96,8 @@ export const CoverCard = ({
     coversOnly?: boolean;
     /** Lignes d'infos en plus, en mode liste (format, genres…). */
     details?: string[];
+    /** Lignes de la légende (raison d'une suggestion : deux). */
+    subtitleLines?: number;
 }) => {
     const shown = progress !== undefined && progress > 0;
     if (layout === 'row') {
@@ -234,10 +237,19 @@ export const CoverCard = ({
                     <Text
                         size="xs"
                         c="dimmed"
-                        lineClamp={1}
+                        lineClamp={subtitleLines}
+                        // Coupée : entière au survol.
+                        title={subtitle}
                         pl="xs"
                         pr={menu ? 30 : 'xs'}
                         pb={6}
+                        // Toujours la même hauteur : les cartes d'une
+                        // rangée restent alignées.
+                        mih={
+                            subtitleLines > 1
+                                ? `calc(${subtitleLines} * var(--mantine-line-height-xs) * var(--mantine-font-size-xs) + 6px)`
+                                : undefined
+                        }
                     >
                         {subtitle}
                     </Text>
