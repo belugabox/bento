@@ -51,6 +51,7 @@ import {
     useAgeSteps,
 } from '@/components/ageLimits';
 import {
+    DRAFTS_CHANGED,
     type Task,
     fetchPendingDrafts,
     fetchSimulableAccounts,
@@ -89,7 +90,11 @@ const DraftsIndicator = () => {
                 .catch(() => undefined);
         void load();
         const timer = setInterval(() => void load(), REFRESH_MS);
-        return () => clearInterval(timer);
+        window.addEventListener(DRAFTS_CHANGED, load);
+        return () => {
+            clearInterval(timer);
+            window.removeEventListener(DRAFTS_CHANGED, load);
+        };
     }, [location.pathname]);
 
     return (

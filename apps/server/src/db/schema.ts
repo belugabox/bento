@@ -284,6 +284,11 @@ export const draftSettings = sqliteTable(
         endYear: integer('end_year'),
         // Couverture choisie (fichier covers/drafts/…) ; null = aucune.
         coverUpdatedAt: integer('cover_updated_at', { mode: 'timestamp_ms' }),
+        // Mis de côté (liste repliée, pas compté en attente) ; null = non.
+        archivedAt: integer('archived_at', { mode: 'timestamp_ms' }),
+        // Série remise en brouillon : lectures, séances et listes de ses
+        // tomes, rendues à la publication (JSON, `library/seriesFiles.ts`).
+        kept: text('kept'),
     },
     (t) => [primaryKey({ columns: [t.libraryId, t.folder] })],
 );

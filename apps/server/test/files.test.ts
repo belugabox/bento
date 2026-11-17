@@ -165,6 +165,7 @@ describe('drafts', () => {
                 sources: [],
                 rating: null,
                 coverUpdatedAt: null,
+                archivedAt: null,
                 completeness: null,
             },
             {
@@ -183,6 +184,7 @@ describe('drafts', () => {
                 sources: [],
                 rating: null,
                 coverUpdatedAt: null,
+                archivedAt: null,
                 completeness: expect.objectContaining({ percent: 0 }),
             },
             {
@@ -204,6 +206,7 @@ describe('drafts', () => {
                 sources: [],
                 rating: null,
                 coverUpdatedAt: null,
+                archivedAt: null,
                 completeness: null,
             },
         ]);
@@ -548,6 +551,8 @@ describe('publishing', () => {
             endYear: null,
             sources: null,
             coverUpdatedAt: null,
+            archivedAt: null,
+            kept: null,
         });
     });
 

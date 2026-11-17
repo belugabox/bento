@@ -489,6 +489,11 @@ export const seriesCoverUrl = (
 /** Séries en attente dans les brouillons (pastille de l'en-tête). */
 export const fetchPendingDrafts = () => json(api.drafts.pending.$get());
 
+/** Brouillons publiés ou archivés : la pastille de l'en-tête se recompte. */
+export const DRAFTS_CHANGED = 'bento:drafts-changed';
+export const notifyDraftsChanged = () =>
+    window.dispatchEvent(new Event(DRAFTS_CHANGED));
+
 /** Tâches de fond en cours : scan, compression… (icône de l'en-tête). */
 export const fetchTasks = () => json(api.tasks.$get());
 
@@ -612,6 +617,27 @@ export const fetchMyYear = (year?: number) =>
             },
         }),
     );
+
+/** Brouillon mis de côté (liste repliée), ou de nouveau en attente. */
+export const setDraftArchived = (
+    library: number,
+    folder: string,
+    archived: boolean,
+) =>
+    json(
+        api.libraries[':id'].drafts.archive.$put({
+            ...libraryId(library),
+            json: { folder, archived },
+        }),
+    );
+
+/** Série remise en brouillon : son dossier dans `_draft`. */
+export const seriesToDraft = (seriesId: number) =>
+    json(api.series[':id'].draft.$post(id(seriesId)));
+
+/** Série supprimée du disque, fichiers compris. */
+export const deleteSeriesFiles = (seriesId: number) =>
+    json(api.series[':id'].files.$delete(id(seriesId)));
 
 /** Statut de la future série d'un dossier de brouillons. */
 export const setDraftStatus = (

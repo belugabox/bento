@@ -11,6 +11,7 @@ import { useDisclosure } from '@mantine/hooks';
 import { IconArrowLeft } from '@tabler/icons-react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 
+import { SeriesFileActions } from '@/components/SeriesFileActions';
 import { queuePosition, readManageQueue } from '@/components/manageQueue';
 import { CoverPicker } from '@/components/metadata/CoverPicker';
 import { MetadataEditor } from '@/components/metadata/MetadataEditor';
@@ -150,6 +151,13 @@ export const SeriesEditPage = () => {
                         : [],
                 )}
                 onChanged={(moved) => void afterChange(moved)}
+            />
+
+            <SeriesFileActions
+                seriesId={series.id}
+                name={series.name}
+                volumeCount={series.volumes.length}
+                size={series.volumes.reduce((sum, v) => sum + (v.size ?? 0), 0)}
             />
 
             <CoverPicker

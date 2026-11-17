@@ -1,6 +1,8 @@
 import {
+    Accordion,
     Alert,
     Badge,
+    Button,
     Grid,
     Group,
     Loader,
@@ -13,19 +15,28 @@ import {
     Title,
 } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
-import { IconFile, IconFolder } from '@tabler/icons-react';
+import {
+    IconArchive,
+    IconArchiveOff,
+    IconFile,
+    IconFolder,
+} from '@tabler/icons-react';
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router';
 
 import { completenessColor } from '@/components/completeness';
 import { CoverPicker } from '@/components/metadata/CoverPicker';
 import { MetadataEditor } from '@/components/metadata/MetadataEditor';
 import {
+    type DraftFolder,
     draftCoverUrl,
     fetchDraftFolder,
     fetchDrafts,
     fetchLibraries,
     fileCoverUrl,
     filePageUrl,
+    notifyDraftsChanged,
+    setDraftArchived,
     setDraftClassification,
     setDraftCover,
     setDraftReadingMode,
@@ -50,10 +61,18 @@ const CONVERSION_POLL_MS = 3000;
 /** Tomes à préparer (`_draft`) : métadonnées puis publication. */
 export const DraftsPage = () => {
     const libraries = useQuery(fetchLibraries, []);
-    const [chosenLibrary, setChosenLibrary] = useState<number>();
+    // `?library=1&folder=_draft/Gantz` : ce dossier ouvert (série remise
+    // en brouillon).
+    const [params] = useSearchParams();
+    const [chosenLibrary, setChosenLibrary] = useState<number | undefined>(
+        () => Number(params.get('library')) || undefined,
+    );
     const libraryId = chosenLibrary ?? libraries.data?.[0]?.id;
     const library = libraries.data?.find((l) => l.id === libraryId);
-    const [selected, setSelected] = useState<string>();
+    const [selected, setSelected] = useState<string | undefined>(
+        () => params.get('folder') ?? undefined,
+    );
+    const [archiving, setArchiving] = useState(false);
     const [coverOpened, cover] = useDisclosure(false);
 
     // Liste des dossiers : rapide (les archives ne sont pas ouvertes).
@@ -82,6 +101,7 @@ export const DraftsPage = () => {
     const reload = () => {
         drafts.reload();
         folderFiles.reload();
+        notifyDraftsChanged();
     };
 
     // PDF convertis en arrière-plan par le serveur : le dossier est relu
@@ -100,6 +120,56 @@ export const DraftsPage = () => {
 
     const loadingFolders = libraries.loading || drafts.loading;
     const draft = drafts.data?.find((f) => f.folder === selected);
+    // Mis de côté : en bas, sous une liste repliée.
+    const waiting = drafts.data?.filter((f) => !f.archivedAt) ?? [];
+    const archived = drafts.data?.filter((f) => f.archivedAt) ?? [];
+
+    const archive = async (value: boolean) => {
+        if (!libraryId || !selected) return;
+        setArchiving(true);
+        try {
+            await setDraftArchived(libraryId, selected, value);
+            drafts.reload();
+            notifyDraftsChanged();
+        } finally {
+            setArchiving(false);
+        }
+    };
+
+    const draftLink = (f: DraftFolder) => (
+        <NavLink
+            key={f.folder}
+            active={f.folder === selected}
+            onClick={() => setSelected(f.folder)}
+            leftSection={
+                isLoneFile(f.folder) ? (
+                    <IconFile size={16} />
+                ) : (
+                    <IconFolder size={16} />
+                )
+            }
+            label={folderLabel(f.folder)}
+            description={`${f.files.length} tome(s)`}
+            // Fiche de la future série, comme dans l'éditeur (enregistrée).
+            rightSection={
+                f.completeness && (
+                    <Badge
+                        size="sm"
+                        variant="light"
+                        color={completenessColor(f.completeness.percent)}
+                        aria-label={`Fiche complète à ${f.completeness.percent} %`}
+                        title={
+                            f.completeness.missing.length
+                                ? `À compléter : ${f.completeness.missing.join(', ')}`
+                                : undefined
+                        }
+                    >
+                        {f.completeness.percent} %
+                    </Badge>
+                )
+            }
+        />
+    );
     const readableFiles = files?.filter((file) => !file.error) ?? [];
     // Couverture choisie, sinon celle du premier fichier.
     const currentCover =
@@ -149,45 +219,41 @@ export const DraftsPage = () => {
                 <Grid>
                     <Grid.Col span={{ base: 12, md: 3 }}>
                         <Paper withBorder radius="md">
-                            {drafts.data.map((f) => (
-                                <NavLink
-                                    key={f.folder}
-                                    active={f.folder === selected}
-                                    onClick={() => setSelected(f.folder)}
-                                    leftSection={
-                                        isLoneFile(f.folder) ? (
-                                            <IconFile size={16} />
-                                        ) : (
-                                            <IconFolder size={16} />
-                                        )
-                                    }
-                                    label={folderLabel(f.folder)}
-                                    description={`${f.files.length} tome(s)`}
-                                    // Fiche de la future série, comme dans
-                                    // l'éditeur (enregistrée).
-                                    rightSection={
-                                        f.completeness && (
-                                            <Badge
-                                                size="sm"
-                                                variant="light"
-                                                color={completenessColor(
-                                                    f.completeness.percent,
-                                                )}
-                                                aria-label={`Fiche complète à ${f.completeness.percent} %`}
-                                                title={
-                                                    f.completeness.missing
-                                                        .length
-                                                        ? `À compléter : ${f.completeness.missing.join(', ')}`
-                                                        : undefined
-                                                }
-                                            >
-                                                {f.completeness.percent} %
-                                            </Badge>
-                                        )
-                                    }
-                                />
-                            ))}
+                            {waiting.map(draftLink)}
+                            {waiting.length === 0 && (
+                                <Text size="sm" c="dimmed" p="sm">
+                                    Aucun brouillon en attente.
+                                </Text>
+                            )}
                         </Paper>
+                        {archived.length > 0 && (
+                            <Accordion
+                                mt="sm"
+                                variant="contained"
+                                radius="md"
+                                // Ouverte si le dossier choisi y est.
+                                defaultValue={
+                                    archived.some((f) => f.folder === selected)
+                                        ? 'archived'
+                                        : null
+                                }
+                            >
+                                <Accordion.Item value="archived">
+                                    <Accordion.Control
+                                        icon={<IconArchive size={16} />}
+                                    >
+                                        Archivés ({archived.length})
+                                    </Accordion.Control>
+                                    <Accordion.Panel
+                                        styles={{
+                                            content: { padding: 0 },
+                                        }}
+                                    >
+                                        {archived.map(draftLink)}
+                                    </Accordion.Panel>
+                                </Accordion.Item>
+                            </Accordion>
+                        )}
                     </Grid.Col>
                     <Grid.Col span={{ base: 12, md: 9 }}>
                         {!selected ? (
@@ -230,6 +296,27 @@ export const DraftsPage = () => {
                             libraryId &&
                             library && (
                                 <Stack>
+                                    <Group justify="flex-end">
+                                        <Button
+                                            variant="default"
+                                            size="xs"
+                                            loading={archiving}
+                                            leftSection={
+                                                draft?.archivedAt ? (
+                                                    <IconArchiveOff size={14} />
+                                                ) : (
+                                                    <IconArchive size={14} />
+                                                )
+                                            }
+                                            onClick={() =>
+                                                void archive(!draft?.archivedAt)
+                                            }
+                                        >
+                                            {draft?.archivedAt
+                                                ? 'Remettre en attente'
+                                                : 'Archiver'}
+                                        </Button>
+                                    </Group>
                                     <MetadataEditor
                                         cover={{
                                             src: currentCover,

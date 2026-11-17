@@ -145,4 +145,86 @@ describe('DraftsPage', () => {
         ).toBeTruthy();
         expect(folderReads).toBe(2);
     });
+
+    it('keeps archived drafts under a folded list, opened from the address', async () => {
+        const archived: Record<string, boolean> = { '_draft/Spirale': true };
+        const sent: unknown[] = [];
+        const draft = (name: string) => ({
+            folder: `_draft/${name}`,
+            files: [
+                { path: `_draft/${name}/T01.cbz`, name: 'T01.cbz', size: 10 },
+            ],
+            archivedAt: archived[`_draft/${name}`] ? 1700000000000 : null,
+        });
+        vi.spyOn(globalThis, 'fetch').mockImplementation(
+            async (input, init) => {
+                const url = String(input);
+                if (url === '/api/libraries') {
+                    return respond([{ id: 1, name: 'Mangas', type: 'manga' }]);
+                }
+                if (url === '/api/libraries/1/drafts/archive') {
+                    const body = JSON.parse(String(init!.body));
+                    sent.push(body);
+                    archived[body.folder] = body.archived;
+                    return respond({ archived: body.archived });
+                }
+                if (url === '/api/libraries/1/drafts') {
+                    return respond([draft('Gantz'), draft('Spirale')]);
+                }
+                if (url.startsWith('/api/libraries/1/drafts/files?')) {
+                    const folder = new URL(url, 'http://x').searchParams.get(
+                        'folder',
+                    )!;
+                    return respond([
+                        {
+                            path: `${folder}/T01.cbz`,
+                            name: 'T01.cbz',
+                            folder,
+                            size: 10,
+                            draft: true,
+                            pageCount: 2,
+                            comicInfo: { Series: 'X', Number: '1' },
+                            error: null,
+                            publicationPath: 'X/X #01.cbz',
+                        },
+                    ]);
+                }
+                throw new Error(`requête inattendue : ${url}`);
+            },
+        );
+
+        render(
+            <MantineProvider>
+                <MemoryRouter
+                    initialEntries={[
+                        '/drafts?library=1&folder=_draft%2FSpirale',
+                    ]}
+                >
+                    <DraftsPage />
+                </MemoryRouter>
+            </MantineProvider>,
+        );
+
+        // Le dossier de l'adresse, ouvert ; sa liste repliée, dépliée.
+        const remettre = await screen.findByRole('button', {
+            name: 'Remettre en attente',
+        });
+        expect(
+            screen.getByRole('button', { name: /Archivés \(1\)/ }),
+        ).toBeTruthy();
+
+        fireEvent.click(remettre);
+        await vi.waitFor(() =>
+            expect(
+                screen.queryByRole('button', { name: /Archivés/ }),
+            ).toBeNull(),
+        );
+        expect(sent).toEqual([{ folder: '_draft/Spirale', archived: false }]);
+
+        // Et de nouveau archivé.
+        fireEvent.click(screen.getByRole('button', { name: 'Archiver' }));
+        expect(
+            await screen.findByRole('button', { name: /Archivés \(1\)/ }),
+        ).toBeTruthy();
+    });
 });
