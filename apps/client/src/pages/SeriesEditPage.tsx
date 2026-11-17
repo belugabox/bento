@@ -3,14 +3,20 @@ import {
     Anchor,
     Group,
     Loader,
+    Menu,
     Stack,
     Text,
     Title,
 } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
-import { IconArrowLeft } from '@tabler/icons-react';
+import { IconArrowBackUp, IconArrowLeft, IconTrash } from '@tabler/icons-react';
+import { useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 
+import {
+    type SeriesFileAction,
+    SeriesFileModal,
+} from '@/components/SeriesFileModal';
 import { queuePosition, readManageQueue } from '@/components/manageQueue';
 import { CoverPicker } from '@/components/metadata/CoverPicker';
 import { MetadataEditor } from '@/components/metadata/MetadataEditor';
@@ -39,6 +45,8 @@ export const SeriesEditPage = () => {
         reload,
     } = useQuery(() => fetchSeries(seriesId), [seriesId]);
     const [coverOpened, cover] = useDisclosure(false);
+    // Remettre en brouillon, supprimer : confirmation ouverte du menu « ⋯ ».
+    const [fileAction, setFileAction] = useState<SeriesFileAction>();
     // Depuis la page Séries : sa liste (ordre, filtres), pour passer à la
     // suivante et y revenir.
     const fromManage = params.get('from') === 'manage';
@@ -150,6 +158,32 @@ export const SeriesEditPage = () => {
                         : [],
                 )}
                 onChanged={(moved) => void afterChange(moved)}
+                menu={
+                    <>
+                        <Menu.Item
+                            leftSection={<IconArrowBackUp size={16} />}
+                            onClick={() => setFileAction('draft')}
+                        >
+                            Remettre en brouillon
+                        </Menu.Item>
+                        <Menu.Item
+                            color="red"
+                            leftSection={<IconTrash size={16} />}
+                            onClick={() => setFileAction('delete')}
+                        >
+                            Supprimer du disque
+                        </Menu.Item>
+                    </>
+                }
+            />
+
+            <SeriesFileModal
+                action={fileAction}
+                onClose={() => setFileAction(undefined)}
+                seriesId={series.id}
+                name={series.name}
+                volumeCount={series.volumes.length}
+                size={series.volumes.reduce((sum, v) => sum + (v.size ?? 0), 0)}
             />
 
             <CoverPicker

@@ -15,6 +15,8 @@ export type DraftSettings = Pick<
     | 'endYear'
     | 'sources'
     | 'coverUpdatedAt'
+    | 'archivedAt'
+    | 'kept'
 >;
 
 const NONE: DraftSettings = {
@@ -26,6 +28,8 @@ const NONE: DraftSettings = {
     endYear: null,
     sources: null,
     coverUpdatedAt: null,
+    archivedAt: null,
+    kept: null,
 };
 
 /** Refuse un dossier hors de `_draft` (« _draft/../Gantz »). */

@@ -24,5 +24,11 @@ describe('series names from one site to another', () => {
         expect(nameVariant('Gloutons et Dragons')).toBe('Gloutons & Dragons');
         expect(nameVariant('Gloutons & Dragons')).toBe('Gloutons et Dragons');
         expect(nameVariant('Gantz')).toBeUndefined();
+        // Points : Manga-news et Bedetheque ne les ignorent pas.
+        expect(nameVariant('Dr. Stone')).toBe('Dr Stone');
+        expect(nameVariant('Last.Hero.Inuyashiki')).toBe(
+            'Last Hero Inuyashiki',
+        );
+        expect(nameVariant('M. & Mme Dupont')).toBe('M et Mme Dupont');
     });
 });

@@ -426,12 +426,14 @@ export const SeriesPage = () => {
                                     )}
                                 </ActionIcon>
                             </Tooltip>
+                            {/* Lecture de la série et téléchargement. */}
                             <Menu position="bottom-start">
                                 <Menu.Target>
                                     <ActionIcon
                                         variant="default"
                                         size="lg"
-                                        aria-label="Lecture de la série"
+                                        aria-label="Plus d’actions"
+                                        title="Plus d’actions"
                                         disabled={readOnly}
                                     >
                                         <IconDots size={18} />
@@ -456,26 +458,10 @@ export const SeriesPage = () => {
                                     >
                                         Marquer toute la série comme non lue
                                     </Menu.Item>
-                                </Menu.Dropdown>
-                            </Menu>
-                            {/* Télécharger : son propre petit menu. */}
-                            <Menu position="bottom-start">
-                                <Tooltip label="Télécharger sur l’appareil">
-                                    <Menu.Target>
-                                        <ActionIcon
-                                            variant="default"
-                                            size="lg"
-                                            aria-label="Télécharger"
-                                            disabled={
-                                                readOnly ||
-                                                toDownload.length === 0
-                                            }
-                                        >
-                                            <IconDownload size={18} />
-                                        </ActionIcon>
-                                    </Menu.Target>
-                                </Tooltip>
-                                <Menu.Dropdown>
+                                    <Menu.Divider />
+                                    <Menu.Label>
+                                        Télécharger sur l’appareil
+                                    </Menu.Label>
                                     {[
                                         ...NEXT_VOLUME_COUNTS.map((count) => ({
                                             count,
@@ -488,6 +474,10 @@ export const SeriesPage = () => {
                                     ].map((option) => (
                                         <Menu.Item
                                             key={option.label}
+                                            leftSection={
+                                                <IconDownload size={14} />
+                                            }
+                                            disabled={toDownload.length === 0}
                                             onClick={() =>
                                                 downloadNext(option.count)
                                             }

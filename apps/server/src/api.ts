@@ -94,6 +94,7 @@ import {
 } from './metadata/sourceLink';
 import type { Wikipedia } from './metadata/wikipedia';
 import { KavitaImport } from './migration/kavita';
+import { createSeriesFileRoutes } from './seriesFileRoutes';
 import { SettingsStore, settingsUpdateSchema } from './settings';
 import { createStatsRoutes } from './statsRoutes';
 import { AppError, badRequest, notFound } from './tools/errors';
@@ -836,6 +837,7 @@ export const createApi = ({
         // --- Gestion des fichiers (admin) : brouillons, ComicInfo, rangement.
         // Statistiques (module à part).
         .route('/stats', createStatsRoutes(db, files))
+        .route('/', createSeriesFileRoutes(files))
         // Nombre de séries en attente (pastille de l'en-tête).
         .get('/drafts/pending', requireAdmin, async (c) =>
             c.json({ series: await files.pendingSeries() }),

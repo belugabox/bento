@@ -11,6 +11,7 @@ import {
     Grid,
     Group,
     Image,
+    Menu,
     NumberInput,
     Paper,
     Popover,
@@ -29,6 +30,7 @@ import {
     IconArrowRight,
     IconCheck,
     IconCopy,
+    IconDots,
     IconEye,
     IconFileText,
     IconFileZip,
@@ -37,7 +39,7 @@ import {
     IconUpload,
     IconWand,
 } from '@tabler/icons-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 
 import {
     type ComicInfo,
@@ -266,8 +268,8 @@ const SERIES_TEXT_FIELDS: { field: SeriesField; label: string }[] = [
  */
 /** Champs d'un tome et leur largeur (sur 24) : téléphone, puis plus grand. */
 const FIELD_COLUMNS = [
-    { label: 'Type', span: { base: 12, sm: 4 } },
     { label: 'Groupe', span: { base: 12, sm: 8 } },
+    { label: 'Type', span: { base: 12, sm: 4 } },
     { label: 'Numéro', span: { base: 6, sm: 3 } },
     { label: 'Titre', span: { base: 12, sm: 6 } },
     { label: 'Année', span: { base: 6, sm: 3 } },
@@ -348,6 +350,7 @@ export const MetadataEditor = ({
     cover,
     autoFill = false,
     next,
+    menu,
 }: {
     libraryId: number;
     kind: 'manga' | 'comics';
@@ -395,6 +398,11 @@ export const MetadataEditor = ({
     autoFill?: boolean;
     /** Série suivante à traiter (ordre de la page Séries). */
     next?: { name: string; go: () => void };
+    /**
+     * Actions de la page (`Menu.Item` : archiver, supprimer…), dans le menu
+     * « ⋯ » de la barre, après « Compresser… ».
+     */
+    menu?: ReactNode;
 }) => {
     // Contenu des données reçues : le parent peut recréer la liste à chaque
     // rendu, seule une vraie nouveauté (enregistrement) doit tout reprendre.
@@ -956,14 +964,33 @@ export const MetadataEditor = ({
                             Mettre à jour
                         </Button>
                     )}
-                    <Button
-                        variant="default"
-                        leftSection={<IconFileZip size={16} />}
-                        disabled={readable.length === 0}
-                        onClick={compression.open}
-                    >
-                        Compresser…
-                    </Button>
+                    <Menu position="bottom-start" withinPortal>
+                        <Menu.Target>
+                            <ActionIcon
+                                variant="default"
+                                size={36}
+                                aria-label="Plus d’actions"
+                                title="Plus d’actions"
+                            >
+                                <IconDots size={18} />
+                            </ActionIcon>
+                        </Menu.Target>
+                        <Menu.Dropdown>
+                            <Menu.Item
+                                leftSection={<IconFileZip size={16} />}
+                                disabled={readable.length === 0}
+                                onClick={compression.open}
+                            >
+                                Compresser…
+                            </Menu.Item>
+                            {menu && (
+                                <>
+                                    <Menu.Divider />
+                                    {menu}
+                                </>
+                            )}
+                        </Menu.Dropdown>
+                    </Menu>
                 </Group>
                 <Group gap="xs">
                     <Button
@@ -1596,6 +1623,27 @@ export const MetadataEditor = ({
                                 </Group>
                                 <Grid columns={24} gutter="xs">
                                     <Grid.Col span={FIELD_COLUMNS[0].span}>
+                                        <Autocomplete
+                                            size="xs"
+                                            disabled={!!volume.error}
+                                            aria-label={`Groupe de ${volume.name}`}
+                                            // Libre : « Part 1 - Rouge, Bleu
+                                            // et Jaune », « Guides »… ;
+                                            // chaque groupe a sa numérotation.
+                                            placeholder="Groupe"
+                                            {...volumeField(
+                                                volume.path,
+                                                'StoryArc',
+                                            )}
+                                            value={info.StoryArc ?? ''}
+                                            // Les groupes des autres tomes.
+                                            data={groups}
+                                            onChange={(value) =>
+                                                set('StoryArc', value)
+                                            }
+                                        />
+                                    </Grid.Col>
+                                    <Grid.Col span={FIELD_COLUMNS[1].span}>
                                         <Select
                                             size="xs"
                                             disabled={!!volume.error}
@@ -1643,27 +1691,6 @@ export const MetadataEditor = ({
                                                         ),
                                                 },
                                             )}
-                                        />
-                                    </Grid.Col>
-                                    <Grid.Col span={FIELD_COLUMNS[1].span}>
-                                        <Autocomplete
-                                            size="xs"
-                                            disabled={!!volume.error}
-                                            aria-label={`Groupe de ${volume.name}`}
-                                            // Libre : « Part 1 - Rouge, Bleu
-                                            // et Jaune », « Guides »… ;
-                                            // chaque groupe a sa numérotation.
-                                            placeholder="Groupe"
-                                            {...volumeField(
-                                                volume.path,
-                                                'StoryArc',
-                                            )}
-                                            value={info.StoryArc ?? ''}
-                                            // Les groupes des autres tomes.
-                                            data={groups}
-                                            onChange={(value) =>
-                                                set('StoryArc', value)
-                                            }
                                         />
                                     </Grid.Col>
                                     <Grid.Col span={FIELD_COLUMNS[2].span}>

@@ -6,6 +6,7 @@ import {
     mkdir,
     readdir,
     rename,
+    rm,
     rmdir,
     stat,
     unlink,
@@ -28,18 +29,30 @@ import {
 import { COVER_QUALITY, COVER_SIZE, readImage } from '../archive/image';
 import { convertPdfToCbz, isPdf } from '../archive/pdf';
 import { updateComicInfo } from '../archive/write';
+import { classify } from '../classification';
 import type { Db } from '../db';
 import { libraries, series, volumes } from '../db/schema';
 import { parseSources, sourcesText } from '../metadata/sourceLink';
 import { conflict, notFound } from '../tools/errors';
 import type { Logger } from '../tools/logger';
+import { minAgeOf } from './ageRating';
+import { completenessOf, fieldsFromVolumes } from './completeness';
 import { draftCoverFile, seriesCoverFile } from './covers';
 import {
     type DraftSettings,
+    checkDraftFolder,
     deleteDraftSettings,
     draftSettingsOf,
     saveDraftSettings,
 } from './draftSettings';
+import { genreCatalog } from './genres';
+import {
+    type KeptReading,
+    keepReading,
+    parseKept,
+    restoreKeptLists,
+    restoreVolumeReading,
+} from './keptReading';
 import { listsSnapshot, restoreLists } from './lists';
 import {
     DRAFT_FOLDER,
@@ -121,6 +134,11 @@ export class LibraryFiles {
             info: Pick<FileInfo, 'pageCount' | 'comicInfo' | 'error'>;
         }
     >();
+    // ComicInfo seuls (complétude de la liste des brouillons), même clé.
+    private infos = new Map<
+        string,
+        { key: string; info: Pick<FileInfo, 'comicInfo'> }
+    >();
     // .cbr ou .pdf dont la conversion a échoué : pas retentée tant qu'il ne
     // change pas.
     private conversionErrors = new Map<
@@ -194,6 +212,25 @@ export class LibraryFiles {
         // Une archive illisible est réessayée à chaque lecture.
         if (!info.error) this.cache.set(fullPath, { key, info });
         return { ...info, size: stats.size };
+    };
+
+    /**
+     * ComicInfo seul (liste des brouillons) : sans couverture ni pages,
+     * repris de `read` s'il a déjà lu le fichier ; null s'il est illisible.
+     */
+    private comicInfoOnly = async (fullPath: string) => {
+        const stats = await stat(fullPath).catch(() => undefined);
+        if (!stats) return null;
+        const key = `${stats.size}:${stats.mtimeMs}`;
+        const known = this.cache.get(fullPath) ?? this.infos.get(fullPath);
+        if (known?.key === key) return known.info.comicInfo;
+        try {
+            const comicInfo = await readComicInfo(await readArchive(fullPath));
+            this.infos.set(fullPath, { key, info: { comicInfo } });
+            return comicInfo;
+        } catch {
+            return null;
+        }
     };
 
     private infoOf = async (
@@ -341,6 +378,7 @@ export class LibraryFiles {
     pendingSeries = async () => {
         let count = 0;
         for (const library of this.db.select().from(libraries).all()) {
+            const settings = draftSettingsOf(this.db, library.id);
             const draftRoot = path.join(library.path, DRAFT_FOLDER);
             const entries = await readdir(draftRoot, {
                 withFileTypes: true,
@@ -357,13 +395,15 @@ export class LibraryFiles {
                 ) {
                     continue;
                 }
-                const atRoot =
-                    path.resolve(entry.parentPath) === path.resolve(draftRoot);
-                folders.add(
-                    atRoot
-                        ? path.join(entry.parentPath, entry.name)
-                        : entry.parentPath,
+                // Groupe du tome (dossier, ou tome seul à la racine) ; les
+                // brouillons archivés ne sont pas en attente.
+                const group = draftGroupOf(
+                    relativeTo(
+                        library.path,
+                        path.join(entry.parentPath, entry.name),
+                    ),
                 );
+                if (!settings.get(group)?.archivedAt) folders.add(group);
             }
             count += folders.size;
         }
@@ -402,8 +442,9 @@ export class LibraryFiles {
     };
 
     /**
-     * Dossiers de brouillons et leurs fichiers (nom, taille), sans ouvrir
-     * les archives : rapide, même avec des centaines de tomes.
+     * Dossiers de brouillons et leurs fichiers (nom, taille), avec la
+     * complétude de leur future série : seul le ComicInfo des archives est
+     * lu (gardé tant que le fichier ne change pas).
      */
     drafts = async (libraryId: number) => {
         const library = this.library(libraryId);
@@ -415,6 +456,9 @@ export class LibraryFiles {
             string,
             { path: string; name: string; size: number }[]
         >();
+        // ComicInfo des .cbz de chaque dossier (.cbr et .pdf pas encore
+        // convertis : illisibles pour l'éditeur aussi).
+        const infos = new Map<string, ComicInfo[]>();
         for (const archive of archives) {
             const { size } = await stat(archive.fullPath).catch(() => ({
                 size: 0,
@@ -424,26 +468,269 @@ export class LibraryFiles {
                 ...(folders.get(group) ?? []),
                 { path: archive.path, name: path.basename(archive.path), size },
             ]);
+            const info =
+                isCbr(archive.path) || isPdf(archive.path)
+                    ? null
+                    : await this.comicInfoOnly(archive.fullPath);
+            if (info) infos.set(group, [...(infos.get(group) ?? []), info]);
         }
+        const catalog = genreCatalog(this.db);
         const settings = draftSettingsOf(this.db, libraryId);
         const ratings = sourceRatingsMap(this.db);
-        return [...folders].map(([folder, files]) => ({
-            folder,
-            files,
-            status: settings.get(folder)?.status ?? null,
-            readingMode: settings.get(folder)?.readingMode ?? null,
-            formatId: settings.get(folder)?.formatId ?? null,
-            age: settings.get(folder)?.age ?? null,
-            startYear: settings.get(folder)?.startYear ?? null,
-            endYear: settings.get(folder)?.endYear ?? null,
-            sources: parseSources(settings.get(folder)?.sources),
+        return [...folders].map(([folder, files]) => {
+            const draft = settings.get(folder);
+            const sources = parseSources(draft?.sources);
             // Note de ses fiches (gardée à leur lecture), comme une série.
-            rating: seriesRatingOf(
-                parseSources(settings.get(folder)?.sources),
-                ratings,
-            ),
-            coverUpdatedAt: settings.get(folder)?.coverUpdatedAt ?? null,
-        }));
+            const rating = seriesRatingOf(sources, ratings);
+            const volumeInfos = infos.get(folder) ?? [];
+            const fields = fieldsFromVolumes(volumeInfos);
+            const ageRating = volumeInfos
+                .map((info) => info.AgeRating)
+                .find((value) => !!value?.trim());
+            return {
+                folder,
+                files,
+                status: draft?.status ?? null,
+                readingMode: draft?.readingMode ?? null,
+                formatId: draft?.formatId ?? null,
+                age: draft?.age ?? null,
+                startYear: draft?.startYear ?? null,
+                endYear: draft?.endYear ?? null,
+                sources,
+                rating,
+                coverUpdatedAt: draft?.coverUpdatedAt ?? null,
+                // Mis de côté : liste repliée, pas compté en attente.
+                archivedAt: draft?.archivedAt ?? null,
+                // Comme l'éditeur l'affiche (« Fiche à 72 % ») ; null sans
+                // tome lisible.
+                completeness: volumeInfos.length
+                    ? completenessOf({
+                          ...fields,
+                          hasFormat: !!draft?.formatId,
+                          hasAge: (draft?.age ?? minAgeOf(ageRating)) !== null,
+                          hasStatus: !!draft?.status,
+                          hasRating: rating !== null,
+                          hasPeriod: !!draft?.startYear,
+                          genreCount: classify(
+                              fields.genre ?? '',
+                              fields.tags ?? '',
+                              catalog,
+                          ).genres.length,
+                      })
+                    : null,
+            };
+        });
+    };
+
+    /** Met un dossier de brouillons de côté, ou l'en sort. */
+    archiveDraft = (libraryId: number, folder: string, archived: boolean) => {
+        this.library(libraryId);
+        saveDraftSettings(this.db, libraryId, folder, {
+            archivedAt: archived ? new Date() : null,
+        });
+    };
+
+    /**
+     * Supprime un brouillon du disque : ses tomes (.cbz, .cbr, .pdf), les
+     * autres fichiers de son dossier (images, .nfo…), puis le dossier s'il
+     * est vide ; un sous-dossier, autre brouillon, reste.
+     */
+    deleteDraft = async (libraryId: number, folder: string) => {
+        const library = this.library(libraryId);
+        checkDraftFolder(folder);
+        if (folder === DRAFT_FOLDER) {
+            throw notFound('Dossier de brouillons introuvable');
+        }
+        const archives = (
+            await this.archivesUnder(
+                library.path,
+                path.join(library.path, DRAFT_FOLDER),
+            )
+        ).filter((archive) => draftGroupOf(archive.path) === folder);
+        if (archives.length === 0) {
+            throw notFound('Dossier de brouillons introuvable');
+        }
+        if (archives.some((a) => this.pdfConverting.has(a.fullPath))) {
+            throw conflict('Conversion d’un PDF en cours : réessaie à la fin');
+        }
+        for (const archive of archives) {
+            await unlink(archive.fullPath);
+            this.cache.delete(archive.fullPath);
+            this.infos.delete(archive.fullPath);
+            this.conversionErrors.delete(archive.fullPath);
+            await rm(this.coverPath(archive.fullPath), { force: true });
+        }
+        // Un dossier (pas un tome seul à la racine de _draft).
+        const dir = path.join(library.path, ...folder.split('/'));
+        const isFolder = await stat(dir).then(
+            (stats) => stats.isDirectory(),
+            () => false,
+        );
+        if (isFolder) {
+            for (const entry of await readdir(dir, { withFileTypes: true })) {
+                if (entry.isFile()) await unlink(path.join(dir, entry.name));
+            }
+            await rmdir(dir).catch(() => {});
+        }
+        deleteDraftSettings(this.db, libraryId, folder);
+        await rm(draftCoverFile(this.coversPath, libraryId, folder), {
+            force: true,
+        });
+        this.logger.info(
+            `Brouillon supprimé du disque : ${folder} (${archives.length} tome(s))`,
+        );
+        return { deleted: archives.length };
+    };
+
+    /** Tomes d'une série et sa bibliothèque (opérations sur ses fichiers). */
+    private seriesFiles = (seriesId: number) => {
+        const row = this.db
+            .select()
+            .from(series)
+            .where(eq(series.id, seriesId))
+            .get();
+        if (!row) throw notFound('Série introuvable');
+        const library = this.library(row.libraryId);
+        const files = this.db
+            .select({ id: volumes.id, file: volumes.file })
+            .from(volumes)
+            .where(eq(volumes.seriesId, seriesId))
+            .all();
+        return { row, library, files };
+    };
+
+    /** Retire les dossiers vidés (et seulement vides) d'une série. */
+    private removeEmptyFolders = async (
+        libraryPath: string,
+        files: string[],
+    ) => {
+        const folders = [
+            ...new Set(files.map((file) => path.posix.dirname(file))),
+        ].filter((folder) => folder !== '.');
+        for (const folder of folders) {
+            await rmdir(path.join(libraryPath, ...folder.split('/'))).catch(
+                () => {},
+            );
+        }
+    };
+
+    /**
+     * Supprime les fichiers d'une série du disque, puis la série (scan).
+     * Les séances de lecture restent dans les statistiques, sans leur tome.
+     */
+    deleteSeries = async (seriesId: number) => {
+        const { row, library, files } = this.seriesFiles(seriesId);
+        const failures: Failure[] = [];
+        let deleted = 0;
+        for (const { file } of files) {
+            try {
+                await unlink(resolveInLibrary(library.path, file));
+                deleted++;
+            } catch (error) {
+                failures.push({ path: file, reason: reasonOf(error) });
+            }
+        }
+        await this.removeEmptyFolders(
+            library.path,
+            files.map((f) => f.file),
+        );
+        await rm(seriesCoverFile(this.coversPath, seriesId), { force: true });
+        await this.scanner.scan(library.id);
+        this.logger.info(
+            `Série supprimée du disque : ${row.name} (${deleted} tome(s))`,
+        );
+        return { deleted, failures };
+    };
+
+    /**
+     * Remet une série en brouillon : ses fichiers vont dans
+     * `_draft/<dossier>`, ses réglages (statut, format, âge, fiches,
+     * couverture…) dans ceux du brouillon, et ses lectures de côté, rendues
+     * à la publication.
+     */
+    seriesToDraft = async (seriesId: number) => {
+        const { row, library, files } = this.seriesFiles(seriesId);
+        if (files.length === 0) throw notFound('Série sans tome');
+        const names = files.map((f) => path.posix.basename(f.file));
+        if (new Set(names.map((n) => n.toLowerCase())).size < names.length) {
+            throw conflict(
+                'Deux tomes de la série ont le même nom de fichier : impossible de les réunir dans un dossier',
+            );
+        }
+        // Nom du dossier de la série, sinon de la série ; un dossier de
+        // brouillons du même nom n'est jamais mélangé.
+        const base =
+            path.posix.basename(path.posix.dirname(files[0]!.file)) || row.name;
+        let folder = `${DRAFT_FOLDER}/${base === '.' ? row.name : base}`;
+        for (let n = 2; await exists(path.join(library.path, folder)); n++) {
+            folder = `${DRAFT_FOLDER}/${base} (${n})`;
+        }
+        const draftPath = (file: string) =>
+            `${folder}/${path.posix.basename(file)}`;
+        const kept: KeptReading = keepReading(
+            this.db,
+            seriesId,
+            files.map((f) => ({ id: f.id, draftPath: draftPath(f.file) })),
+        );
+
+        await mkdir(path.join(library.path, ...folder.split('/')), {
+            recursive: true,
+        });
+        const moved: string[] = [];
+        try {
+            for (const { file } of files) {
+                await rename(
+                    resolveInLibrary(library.path, file),
+                    path.join(library.path, ...draftPath(file).split('/')),
+                );
+                moved.push(file);
+            }
+        } catch (error) {
+            // Rien à moitié : les tomes déjà déplacés reviennent.
+            for (const file of moved) {
+                await rename(
+                    path.join(library.path, ...draftPath(file).split('/')),
+                    resolveInLibrary(library.path, file),
+                ).catch(() => {});
+            }
+            await rmdir(path.join(library.path, ...folder.split('/'))).catch(
+                () => {},
+            );
+            throw error;
+        }
+        await this.removeEmptyFolders(
+            library.path,
+            files.map((f) => f.file),
+        );
+
+        // Couverture choisie : celle du futur brouillon.
+        const cover =
+            row.coverUpdatedAt &&
+            (await copyFile(
+                seriesCoverFile(this.coversPath, seriesId),
+                draftCoverFile(this.coversPath, library.id, folder),
+            ).then(
+                () => new Date(),
+                () => null,
+            ));
+        saveDraftSettings(this.db, library.id, folder, {
+            status: row.status,
+            readingMode: row.readingMode,
+            formatId: row.formatId,
+            age: row.age,
+            startYear: row.startYear,
+            endYear: row.endYear,
+            sources: row.sources,
+            coverUpdatedAt: cover || null,
+            archivedAt: null,
+            kept: JSON.stringify(kept),
+        });
+        await this.scanner.scan(library.id);
+        await rm(seriesCoverFile(this.coversPath, seriesId), { force: true });
+        this.logger.info(
+            `Série remise en brouillon : ${row.name} → ${folder} (${files.length} tome(s))`,
+        );
+        return { libraryId: library.id, folder };
     };
 
     /** Réglages de la future série d'un dossier de brouillons. */
@@ -621,7 +908,7 @@ export class LibraryFiles {
         const applied = new Set<string>();
         for (const { from, to } of published) {
             const moved = this.db
-                .select({ seriesId: volumes.seriesId })
+                .select({ id: volumes.id, seriesId: volumes.seriesId })
                 .from(volumes)
                 .where(
                     and(eq(volumes.libraryId, libraryId), eq(volumes.file, to)),
@@ -630,6 +917,9 @@ export class LibraryFiles {
             if (!moved) continue;
             const folder = draftGroupOf(from);
             const draft = drafts.get(folder);
+            // Série remise en brouillon : ses lectures reviennent.
+            const kept = parseKept(draft?.kept);
+            if (kept) restoreVolumeReading(this.db, kept, from, moved.id);
             // Une fois par dossier et par série.
             if (!applied.has(`${folder}\n${moved.seriesId}`)) {
                 applied.add(`${folder}\n${moved.seriesId}`);
@@ -639,6 +929,7 @@ export class LibraryFiles {
                     draft,
                     moved.seriesId,
                 );
+                if (kept) restoreKeptLists(this.db, kept, moved.seriesId);
             }
             // Un tome publié déplacé garde les réglages de son ancienne série.
             const old = previous.get(from);

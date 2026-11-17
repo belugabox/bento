@@ -19,3 +19,7 @@ export const missingHint = (item: string) =>
               : /^Année/.test(item)
                 ? 'Dans l’éditeur, ou lue dans les noms de fichiers (« (2021) »).'
                 : 'À saisir, ou avec « Remplir » depuis une fiche en ligne.';
+
+/** Couleur d'une complétude : verte, orange, puis rouge. */
+export const completenessColor = (percent: number) =>
+    percent === 100 ? 'green' : percent >= 60 ? 'orange' : 'red';

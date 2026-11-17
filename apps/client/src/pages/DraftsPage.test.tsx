@@ -5,6 +5,14 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { DraftsPage } from './DraftsPage';
 
+/** Une action du menu « ⋯ » de l'éditeur. */
+const menuAction = async (name: string) => {
+    fireEvent.click(
+        await screen.findByRole('button', { name: 'Plus d’actions' }),
+    );
+    fireEvent.click(await screen.findByRole('menuitem', { name }));
+};
+
 const respond = (body: unknown) =>
     new Response(JSON.stringify(body), {
         headers: { 'Content-Type': 'application/json' },
@@ -32,6 +40,10 @@ describe('DraftsPage', () => {
                                 size: 10,
                             },
                         ],
+                        completeness: {
+                            percent: 41,
+                            missing: ['Format', 'Résumé'],
+                        },
                     },
                 ]);
             }
@@ -68,6 +80,12 @@ describe('DraftsPage', () => {
         expect(await screen.findByText('Gantz')).toBeTruthy();
         // Jamais « aucun brouillon » pendant le chargement.
         expect(screen.queryByText('Aucun brouillon.')).toBeNull();
+        // La fiche de la future série, rappelée dans la liste.
+        expect(
+            screen
+                .getByLabelText('Fiche complète à 41 %')
+                .getAttribute('title'),
+        ).toBe('À compléter : Format, Résumé');
 
         fireEvent.click(screen.getByText('Gantz'));
 
@@ -134,5 +152,159 @@ describe('DraftsPage', () => {
             await screen.findByText('→ #01', undefined, { timeout: 5000 }),
         ).toBeTruthy();
         expect(folderReads).toBe(2);
+    });
+
+    it('keeps archived drafts under a folded list, opened from the address', async () => {
+        const archived: Record<string, boolean> = { '_draft/Spirale': true };
+        const sent: unknown[] = [];
+        const draft = (name: string) => ({
+            folder: `_draft/${name}`,
+            files: [
+                { path: `_draft/${name}/T01.cbz`, name: 'T01.cbz', size: 10 },
+            ],
+            archivedAt: archived[`_draft/${name}`] ? 1700000000000 : null,
+        });
+        vi.spyOn(globalThis, 'fetch').mockImplementation(
+            async (input, init) => {
+                const url = String(input);
+                if (url === '/api/libraries') {
+                    return respond([{ id: 1, name: 'Mangas', type: 'manga' }]);
+                }
+                if (url === '/api/libraries/1/drafts/archive') {
+                    const body = JSON.parse(String(init!.body));
+                    sent.push(body);
+                    archived[body.folder] = body.archived;
+                    return respond({ archived: body.archived });
+                }
+                if (url === '/api/libraries/1/drafts') {
+                    return respond([draft('Gantz'), draft('Spirale')]);
+                }
+                if (url.startsWith('/api/libraries/1/drafts/files?')) {
+                    const folder = new URL(url, 'http://x').searchParams.get(
+                        'folder',
+                    )!;
+                    return respond([
+                        {
+                            path: `${folder}/T01.cbz`,
+                            name: 'T01.cbz',
+                            folder,
+                            size: 10,
+                            draft: true,
+                            pageCount: 2,
+                            comicInfo: { Series: 'X', Number: '1' },
+                            error: null,
+                            publicationPath: 'X/X #01.cbz',
+                        },
+                    ]);
+                }
+                throw new Error(`requête inattendue : ${url}`);
+            },
+        );
+
+        render(
+            <MantineProvider>
+                <MemoryRouter
+                    initialEntries={[
+                        '/drafts?library=1&folder=_draft%2FSpirale',
+                    ]}
+                >
+                    <DraftsPage />
+                </MemoryRouter>
+            </MantineProvider>,
+        );
+
+        // Le dossier de l'adresse, ouvert ; sa liste repliée, dépliée.
+        expect(
+            await screen.findByRole('button', { name: /Archivés \(1\)/ }),
+        ).toBeTruthy();
+
+        await menuAction('Remettre en attente');
+        await vi.waitFor(() =>
+            expect(
+                screen.queryByRole('button', { name: /Archivés/ }),
+            ).toBeNull(),
+        );
+        expect(sent).toEqual([{ folder: '_draft/Spirale', archived: false }]);
+
+        // Et de nouveau archivé.
+        await menuAction('Archiver');
+        expect(
+            await screen.findByRole('button', { name: /Archivés \(1\)/ }),
+        ).toBeTruthy();
+    });
+
+    it('deletes a draft from the disk once confirmed', async () => {
+        let deleted = false;
+        const requests: string[] = [];
+        vi.spyOn(globalThis, 'fetch').mockImplementation(
+            async (input, init) => {
+                const url = String(input);
+                requests.push(`${init?.method ?? 'GET'} ${url}`);
+                if (url === '/api/libraries') {
+                    return respond([{ id: 1, name: 'Mangas', type: 'manga' }]);
+                }
+                if (init?.method === 'DELETE') {
+                    deleted = true;
+                    return respond({ deleted: 1 });
+                }
+                if (url === '/api/libraries/1/drafts') {
+                    return respond(
+                        deleted
+                            ? []
+                            : [
+                                  {
+                                      folder: '_draft/Gantz',
+                                      files: [
+                                          {
+                                              path: '_draft/Gantz/T01.cbz',
+                                              name: 'T01.cbz',
+                                              size: 10,
+                                          },
+                                      ],
+                                      archivedAt: null,
+                                  },
+                              ],
+                    );
+                }
+                if (url.startsWith('/api/libraries/1/drafts/files?')) {
+                    return respond([
+                        {
+                            path: '_draft/Gantz/T01.cbz',
+                            name: 'T01.cbz',
+                            folder: '_draft/Gantz',
+                            size: 10,
+                            draft: true,
+                            pageCount: 2,
+                            comicInfo: { Series: 'Gantz', Number: '1' },
+                            error: null,
+                            publicationPath: 'Gantz/Gantz #01.cbz',
+                        },
+                    ]);
+                }
+                if (url === '/api/drafts/pending')
+                    return respond({ series: 0 });
+                throw new Error(`requête inattendue : ${url}`);
+            },
+        );
+
+        render(
+            <MantineProvider>
+                <MemoryRouter
+                    initialEntries={['/drafts?library=1&folder=_draft%2FGantz']}
+                >
+                    <DraftsPage />
+                </MemoryRouter>
+            </MantineProvider>,
+        );
+
+        await menuAction('Supprimer du disque');
+        fireEvent.click(
+            await screen.findByRole('button', { name: 'Supprimer 1 tome' }),
+        );
+
+        expect(await screen.findByText('Aucun brouillon.')).toBeTruthy();
+        expect(requests).toContain(
+            'DELETE /api/libraries/1/drafts?folder=_draft%2FGantz',
+        );
     });
 });
