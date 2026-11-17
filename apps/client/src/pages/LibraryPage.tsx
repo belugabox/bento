@@ -13,7 +13,14 @@ import {
     Title,
 } from '@mantine/core';
 import { useDebouncedValue, useDisclosure } from '@mantine/hooks';
-import { IconFilter, IconSearch, IconX } from '@tabler/icons-react';
+import {
+    IconArrowsSort,
+    IconEyeOff,
+    IconFilter,
+    IconLayoutRows,
+    IconSearch,
+    IconX,
+} from '@tabler/icons-react';
 import { useContext, useEffect, useRef, useState } from 'react';
 import { useLocation, useSearchParams } from 'react-router';
 
@@ -25,7 +32,7 @@ import { PageSection } from '@/components/PageSection';
 import { SeriesCard } from '@/components/SeriesCard';
 import { SeriesListView } from '@/components/SeriesListView';
 import { ratingLabel, reviewsLabel } from '@/components/format';
-import { groupSeries, letterOf } from '@/components/homeGroups';
+import { GROUPINGS, groupSeries, letterOf } from '@/components/homeGroups';
 import { gridColumns, useLibraryDisplay } from '@/components/libraryDisplay';
 import {
     type LibraryFilters,
@@ -38,6 +45,7 @@ import {
 } from '@/components/libraryFilters';
 import { useScrollMemory } from '@/components/scrollMemory';
 import {
+    SERIES_SORTS,
     type SeriesSort,
     genresByCount,
     isSeriesSort,
@@ -190,6 +198,30 @@ export const LibraryPage = () => {
         readers: readers.data,
     });
     const chips = activeFilters(filters, readers.data);
+    // Affichage autre que celui par défaut (nom, sans groupement).
+    const displayChips = [
+        sort !== 'name' && {
+            key: 'sort',
+            icon: <IconArrowsSort size={12} />,
+            label: `Tri : ${SERIES_SORTS.find((s) => s.value === sort)?.label}`,
+            reset: 'Revenir au tri par nom',
+            onReset: () => setParam('sort', 'name', 'name'),
+        },
+        display.groupBy !== 'none' && {
+            key: 'group',
+            icon: <IconLayoutRows size={12} />,
+            label: `Groupées : ${GROUPINGS.find((g) => g.value === display.groupBy)?.label}`,
+            reset: 'Ne plus grouper',
+            onReset: () => display.set({ groupBy: 'none' }),
+        },
+        display.hideRead && {
+            key: 'hide-read',
+            icon: <IconEyeOff size={12} />,
+            label: 'Lues masquées',
+            reset: 'Afficher les séries lues',
+            onReset: () => display.set({ hideRead: false }),
+        },
+    ].filter((chip) => chip !== false);
     const count = filterCount(filters);
     // Index A–Z : trié par nom, sans autre groupement que la lettre ; un
     // repère sur la première série de chaque lettre.
@@ -319,6 +351,26 @@ export const LibraryPage = () => {
                                 Tout effacer
                             </Button>
                         )}
+                        {/* Tri, groupement et séries lues masquées, quand
+                            ce n'est pas l'affichage par défaut : la croix y
+                            revient. */}
+                        {displayChips.map((chip) => (
+                            <Button
+                                key={chip.key}
+                                size="compact-sm"
+                                radius="xl"
+                                variant="default"
+                                fw={500}
+                                leftSection={chip.icon}
+                                rightSection={<IconX size={12} />}
+                                aria-label={chip.reset}
+                                title={chip.reset}
+                                onClick={chip.onReset}
+                                style={{ flexShrink: 0 }}
+                            >
+                                {chip.label}
+                            </Button>
+                        ))}
                     </Group>
                 )}
             </Stack>

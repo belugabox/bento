@@ -243,6 +243,33 @@ describe('LibraryPage', () => {
             expect(titles()).toEqual(['/series/2', '/series/3', '/series/1']),
         );
         expect(location).toBe('?sort=recent');
+        // Rappelé sous la barre ; la croix revient au tri par nom.
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Revenir au tri par nom' }),
+        );
+        expect(location).toBe('');
+    });
+
+    it('recalls the grouping and the hidden read series, until undone', async () => {
+        localStorage.setItem(
+            'bento:display',
+            JSON.stringify({ libraryGroupBy: 'format', hideRead: true }),
+        );
+        show();
+
+        expect(await screen.findByText('Groupées : Format')).toBeTruthy();
+        expect(screen.getByText('Lues masquées')).toBeTruthy();
+        expect(screen.getByLabelText('Affichage modifié')).toBeTruthy();
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Ne plus grouper' }),
+        );
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Afficher les séries lues' }),
+        );
+
+        await vi.waitFor(() => expect(titles()).toHaveLength(3));
+        expect(screen.queryByText('Groupées : Format')).toBeNull();
+        expect(screen.queryByLabelText('Affichage modifié')).toBeNull();
     });
 
     it('shows the rating instead of the volumes when sorted by rating', async () => {

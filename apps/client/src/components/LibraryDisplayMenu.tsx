@@ -4,6 +4,7 @@ import {
     Center,
     Chip,
     Group,
+    Indicator,
     Popover,
     SegmentedControl,
     Slider,
@@ -55,20 +56,32 @@ export const LibraryDisplayMenu = ({
     onSort: (sort: SeriesSort) => void;
 }) => {
     const list = display.layout === 'list';
+    // Tri, groupement ou séries lues masquées autres que par défaut.
+    const changed =
+        sort !== 'name' || display.groupBy !== 'none' || display.hideRead;
     return (
         <Popover position="bottom-end" shadow="md" width={300} withinPortal>
             <Popover.Target>
-                <Button
-                    variant="default"
-                    radius="xl"
-                    leftSection={<IconAdjustmentsHorizontal size={16} />}
-                    aria-label="Affichage"
-                    px={{ base: 10, xs: 14 }}
+                {/* Un point quand l'affichage n'est pas celui par défaut
+                    (visible aussi sur téléphone, bouton sans texte). */}
+                <Indicator
+                    size={9}
+                    offset={4}
+                    disabled={!changed}
+                    aria-label={changed ? 'Affichage modifié' : undefined}
                 >
-                    <Box component="span" visibleFrom="xs">
-                        Affichage
-                    </Box>
-                </Button>
+                    <Button
+                        variant="default"
+                        radius="xl"
+                        leftSection={<IconAdjustmentsHorizontal size={16} />}
+                        aria-label="Affichage"
+                        px={{ base: 10, xs: 14 }}
+                    >
+                        <Box component="span" visibleFrom="xs">
+                            Affichage
+                        </Box>
+                    </Button>
+                </Indicator>
             </Popover.Target>
             <Popover.Dropdown>
                 <Stack gap="md">
