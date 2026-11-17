@@ -3,7 +3,6 @@ import {
     Anchor,
     Avatar,
     Group,
-    Loader,
     Paper,
     Progress,
     SimpleGrid,
@@ -12,6 +11,7 @@ import {
 } from '@mantine/core';
 import { Link } from 'react-router';
 
+import { PageLoader } from '@/components/PageLoader';
 import { UserAvatar } from '@/components/accounts/UserAvatar';
 import { formatDuration, ratingLabel, reviewsLabel } from '@/components/format';
 import { type ReadingRankings, fetchReadingRankings } from '@/services/api';
@@ -58,7 +58,7 @@ export const RankingsPanel = ({ period }: { period: StatsPeriod }) => {
     );
 
     if (error) return <Alert color="red">{error.message}</Alert>;
-    if (!data) return <Loader mx="auto" />;
+    if (!data) return <PageLoader />;
 
     const max = Math.max(1, ...data.topSeries.map((s) => s.seconds));
 

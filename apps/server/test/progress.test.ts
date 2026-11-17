@@ -138,11 +138,16 @@ describe('reading progress', () => {
         expect(
             list.find((s: { name: string }) => s.name === 'Gantz'),
         ).toMatchObject({ volumeCount: 3, readCount: 1, startedCount: 2 });
+        // Dernière lecture de la personne (tri « Lues récemment »).
+        const { lastReadAt } = list.find(
+            (s: { name: string }) => s.name === 'Gantz',
+        );
+        expect(Math.abs(Date.now() - lastReadAt)).toBeLessThan(60_000);
         expect(
             (await call('/series', bob)).body.find(
                 (s: { name: string }) => s.name === 'Gantz',
             ),
-        ).toMatchObject({ readCount: 0 });
+        ).toMatchObject({ readCount: 0, lastReadAt: null });
 
         const details = (await call(`/series/${gantzSeries}`, alice)).body;
         expect(

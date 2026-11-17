@@ -237,6 +237,11 @@ export const listSeries = (
             readCount: sql<number>`(select count(*) from volumes v cross join read_progress rp on rp.volume_id = v.id and rp.user_id = ${viewer.id} where v.series_id = series.id and rp.completed = 1 and ${countedVolume('v')})`,
             // Tomes ouverts (lus ou en cours) : série commencée.
             startedCount: sql<number>`(select count(*) from volumes v cross join read_progress rp on rp.volume_id = v.id and rp.user_id = ${viewer.id} where v.series_id = series.id)`,
+            // Dernière lecture de la personne dans la série, en ms (tri
+            // « Lues récemment ») ; null : jamais ouverte.
+            lastReadAt: sql<
+                number | null
+            >`(select max(rp.updated_at) from volumes v cross join read_progress rp on rp.volume_id = v.id and rp.user_id = ${viewer.id} where v.series_id = series.id)`,
             ...listsOf(viewer),
             // Auteurs des tomes (scénario, dessin), seulement pour chercher.
             authors: text

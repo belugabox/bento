@@ -21,6 +21,9 @@ export type ListedSeries = {
     ratingCount?: number;
     // Tomes ajoutés depuis la dernière lecture (pastille « +2 »).
     newCount?: number;
+    // Dernière lecture de la personne dans la série (ms), tri « Lues
+    // récemment ».
+    lastReadAt?: number | null;
     year?: number | null;
     // Fin de parution (série finie), après `year`.
     endYear?: number | null;
@@ -54,20 +57,19 @@ export const creditsOf = (s: Pick<ListedSeries, 'writer' | 'penciller'>) => {
 
 /** État de lecture d'une série pour la personne. */
 export type ReadingState = 'unread' | 'started' | 'read';
-export type SeriesSort = 'name' | 'recent' | 'rating';
-export type StatusFilter = 'all' | 'ongoing' | 'completed';
+export type SeriesSort = 'name' | 'recent' | 'lastRead' | 'rating' | 'year';
 
+/** Tris de la bibliothèque (bouton « Affichage », en-têtes de la liste). */
 export const SERIES_SORTS: { value: SeriesSort; label: string }[] = [
     { value: 'name', label: 'Nom' },
     { value: 'recent', label: 'Ajouts récents' },
+    { value: 'lastRead', label: 'Lues récemment' },
     { value: 'rating', label: 'Mieux notées' },
+    { value: 'year', label: 'Parution' },
 ];
 
-export const STATUS_FILTERS: { value: StatusFilter; label: string }[] = [
-    { value: 'all', label: 'Toutes' },
-    { value: 'ongoing', label: 'En cours de parution' },
-    { value: 'completed', label: 'Terminées' },
-];
+export const isSeriesSort = (value: unknown): value is SeriesSort =>
+    SERIES_SORTS.some((s) => s.value === value);
 
 const STATUS_LABELS = {
     ongoing: 'En cours de parution',
@@ -120,52 +122,32 @@ export const genresByCount = (series: Pick<ListedSeries, 'genres'>[]) => {
         );
 };
 
-/**
- * Rang d'une série sur l'accueil : celles de la liste « à lire » d'abord,
- * les séries entièrement lues à la fin.
- */
-const readingRank = (s: ListedSeries, sort: SeriesSort) =>
-    readingStateOf(s) === 'read'
-        ? 2
-        : // « Mieux notées » : la note avant la liste « à lire ».
-          s.toRead && sort !== 'rating'
-          ? 0
-          : 1;
+/** Les valeurs absentes à la fin, les plus grandes d'abord. */
+const descending = (
+    a: number | null | undefined,
+    b: number | null | undefined,
+) => (a == null ? (b == null ? 0 : 1) : b == null ? -1 : b - a);
 
 /**
- * Séries à afficher, filtrées (genre, statut) puis triées : « à lire »
- * d'abord, puis les autres, les séries lues à la fin ; dans chaque groupe,
- * par nom ou par ajouts récents.
+ * Séries triées pour la bibliothèque, sans rang de lecture : par nom (sans
+ * les articles), par ajout ou lecture la plus récente, par note (la plus
+ * donnée à note égale) ou par parution (la plus récente) ; les valeurs
+ * absentes à la fin, puis par nom.
  */
-export const filterSeries = <T extends ListedSeries>(
+export const sortSeries = <T extends ListedSeries>(
     series: T[],
-    {
-        sort,
-        genre = null,
-        status = 'all',
-    }: {
-        sort: SeriesSort;
-        genre?: string | null;
-        status?: StatusFilter;
-    },
-): T[] => {
-    const kept = series.filter(
-        (s) =>
-            (!genre || (s.genres ?? []).includes(genre)) &&
-            (status === 'all' || s.status === status),
-    );
-    // Tri stable : l'ordre par nom du serveur est gardé dans chaque groupe.
-    return kept.sort(
+    sort: SeriesSort,
+): T[] =>
+    [...series].sort(
         (a, b) =>
-            readingRank(a, sort) - readingRank(b, sort) ||
             (sort === 'recent'
-                ? (b.lastAddedAt ?? '').localeCompare(a.lastAddedAt ?? '') ||
-                  compareNames(a.name, b.name)
-                : sort === 'rating'
-                  ? // Sans note à la fin ; à note égale, la plus
-                    // donnée d'abord.
-                    (b.rating ?? -1) - (a.rating ?? -1) ||
-                    (b.ratingCount ?? 0) - (a.ratingCount ?? 0)
-                  : 0),
+                ? (b.lastAddedAt ?? '').localeCompare(a.lastAddedAt ?? '')
+                : sort === 'lastRead'
+                  ? descending(a.lastReadAt, b.lastReadAt)
+                  : sort === 'rating'
+                    ? descending(a.rating, b.rating) ||
+                      (b.ratingCount ?? 0) - (a.ratingCount ?? 0)
+                    : sort === 'year'
+                      ? descending(a.year, b.year)
+                      : 0) || compareNames(a.name, b.name),
     );
-};

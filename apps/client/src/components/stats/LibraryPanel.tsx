@@ -4,7 +4,6 @@ import {
     Anchor,
     Button,
     Group,
-    Loader,
     SimpleGrid,
     Stack,
     Text,
@@ -12,6 +11,7 @@ import {
 import { useState } from 'react';
 import { Link } from 'react-router';
 
+import { PageLoader } from '@/components/PageLoader';
 import { formatRelative, formatSize } from '@/components/format';
 import { fetchLibraryStats } from '@/services/api';
 import { useQuery } from '@/services/useQuery';
@@ -49,7 +49,7 @@ export const LibraryPanel = () => {
     const [allDormant, setAllDormant] = useState(false);
 
     if (error) return <Alert color="red">{error.message}</Alert>;
-    if (!data) return <Loader mx="auto" />;
+    if (!data) return <PageLoader />;
 
     const genres = data.genres.slice(0, GENRES_SHOWN);
     const ownedShare = shares(data.genres, (g) => g.series);

@@ -2,7 +2,6 @@ import {
     Alert,
     Anchor,
     Group,
-    Loader,
     Select,
     Stack,
     Tabs,
@@ -11,6 +10,7 @@ import {
 import { IconArrowLeft } from '@tabler/icons-react';
 import { Link, useSearchParams } from 'react-router';
 
+import { PageLoader } from '@/components/PageLoader';
 import { UserAvatar } from '@/components/accounts/UserAvatar';
 import type { ReaderStats, YearRecap } from '@/services/api';
 import { useQuery } from '@/services/useQuery';
@@ -128,7 +128,7 @@ export const ReaderStatsView = ({
                     ) : sheet.data ? (
                         <ReaderSheet data={sheet.data} period={period} />
                     ) : (
-                        <Loader mx="auto" />
+                        <PageLoader />
                     )}
                 </Tabs.Panel>
                 <Tabs.Panel value="year" pt="lg">
@@ -137,7 +137,7 @@ export const ReaderStatsView = ({
                     ) : recap.data ? (
                         <YearRecapView recap={recap.data} />
                     ) : (
-                        <Loader mx="auto" />
+                        <PageLoader />
                     )}
                 </Tabs.Panel>
             </Tabs>

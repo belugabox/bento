@@ -1,18 +1,10 @@
-import {
-    Alert,
-    Anchor,
-    Group,
-    Loader,
-    Menu,
-    Stack,
-    Text,
-    Title,
-} from '@mantine/core';
+import { Alert, Anchor, Group, Menu, Stack, Text, Title } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { IconArrowBackUp, IconArrowLeft, IconTrash } from '@tabler/icons-react';
 import { useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 
+import { PageLoader } from '@/components/PageLoader';
 import {
     type SeriesFileAction,
     SeriesFileModal,
@@ -53,7 +45,7 @@ export const SeriesEditPage = () => {
     const queue = fromManage ? readManageQueue() : null;
 
     if (error) return <Alert color="red">{error.message}</Alert>;
-    if (!series) return <Loader mx="auto" />;
+    if (!series) return <PageLoader />;
 
     const first = series.volumes[0];
     const currentCover = first

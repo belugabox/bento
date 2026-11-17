@@ -82,19 +82,27 @@ afterEach(() => {
 });
 
 describe('AppHeader', () => {
-    it('searches series from any page, on the home page', async () => {
+    it('opens the library search from the magnifier', async () => {
         show(user({ role: 'reader' }), '/series/4');
-        const input = screen.getByRole('textbox', {
-            name: 'Rechercher une série',
-        });
 
-        fireEvent.change(input, { target: { value: 'gantz' } });
-        expect(address).toBe('/?q=gantz');
-        fireEvent.click(
-            screen.getByRole('button', { name: 'Effacer la recherche' }),
-        );
-        expect(address).toBe('/');
-        expect((input as HTMLInputElement).value).toBe('');
+        fireEvent.click(screen.getByRole('button', { name: 'Rechercher' }));
+        expect(address).toBe('/library');
+    });
+
+    it('links the main pages, and « Moi » from the avatar', () => {
+        show(user({ role: 'reader' }), '/library?genre=Action');
+
+        expect(
+            screen
+                .getByRole('link', { name: 'Bibliothèque' })
+                .getAttribute('aria-current'),
+        ).toBe('page');
+        expect(
+            screen.getByRole('link', { name: 'Accueil' }).getAttribute('href'),
+        ).toBe('/');
+        expect(
+            screen.getByRole('link', { name: 'Moi' }).getAttribute('href'),
+        ).toBe('/me');
     });
 
     it('shows admins how many series wait in the drafts', async () => {
@@ -133,43 +141,6 @@ describe('AppHeader', () => {
 
         expect(screen.queryByRole('link', { name: 'Brouillons' })).toBeNull();
         expect(requests).toEqual([]);
-    });
-
-    it('lets an admin view the app as a reader of a given age', async () => {
-        show(user());
-
-        fireEvent.click(screen.getByRole('button', { name: 'Mon compte' }));
-        fireEvent.click(await screen.findByText('Voir comme un lecteur…'));
-        // Âge proposé par défaut : 10 ans.
-        expect(await screen.findByDisplayValue('Jusqu’à 10 ans')).toBeTruthy();
-        await act(async () => {
-            fireEvent.click(screen.getByRole('button', { name: 'Voir' }));
-        });
-
-        expect(requests).toContainEqual([
-            'PUT',
-            '/api/preview',
-            { maxAge: 10 },
-        ]);
-        expect(assign).toHaveBeenCalledWith('/');
-    });
-
-    it('lets an admin see the app as one account, read-only', async () => {
-        accounts = [{ id: 5, name: 'Léa', avatarSeed: null, maxAge: 10 }];
-        show(user());
-
-        fireEvent.click(screen.getByRole('button', { name: 'Mon compte' }));
-        fireEvent.click(await screen.findByText('Voir comme un lecteur…'));
-        expect(
-            await screen.findByDisplayValue('Léa · jusqu’à 10 ans'),
-        ).toBeTruthy();
-        expect(screen.getByText(/rien n’est enregistré/)).toBeTruthy();
-        await act(async () => {
-            fireEvent.click(screen.getByRole('button', { name: 'Voir' }));
-        });
-
-        expect(requests).toContainEqual(['PUT', '/api/preview', { userId: 5 }]);
-        expect(assign).toHaveBeenCalledWith('/');
     });
 
     it('reminds a simulated account', () => {

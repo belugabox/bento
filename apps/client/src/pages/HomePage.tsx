@@ -1,0 +1,408 @@
+import {
+    Alert,
+    AspectRatio,
+    Avatar,
+    Box,
+    Button,
+    Center,
+    Group,
+    Image,
+    Paper,
+    Progress,
+    SimpleGrid,
+    Stack,
+    Text,
+    Title,
+    useMatches,
+} from '@mantine/core';
+import { IconBook, IconBooks, IconPlayerPlayFilled } from '@tabler/icons-react';
+import { useContext } from 'react';
+import { Link } from 'react-router';
+
+import { VolumeCardMenu } from '@/components/CardMenus';
+import { PageLoader } from '@/components/PageLoader';
+import { PageSection } from '@/components/PageSection';
+import { SeriesCard } from '@/components/SeriesCard';
+import { WeekLine } from '@/components/WeekLine';
+import { UserAvatar } from '@/components/accounts/UserAvatar';
+import { homeBlocks } from '@/components/homeBlocks';
+import { gridColumns, useLibraryDisplay } from '@/components/libraryDisplay';
+import { libraryLink } from '@/components/libraryFilters';
+import { volumeLabel, volumeShortLabel } from '@/components/readingStatus';
+import { useScrollMemory } from '@/components/scrollMemory';
+import { newBadge } from '@/components/seriesCardParts';
+import { DownloadedVolumes } from '@/pages/DownloadsPage';
+import {
+    type FamilyReader,
+    type InProgressVolume,
+    type SeriesSummary,
+    coverUrl,
+    fetchFamilyReaders,
+    fetchInProgress,
+    fetchSeriesList,
+} from '@/services/api';
+import { UserContext } from '@/services/auth';
+import { useOnline } from '@/services/network';
+import { useQuery } from '@/services/useQuery';
+
+/** Part lue d'un tome (rien pour un tome pas encore ouvert). */
+const volumeProgress = (volume: InProgressVolume) =>
+    volume.page === null || !volume.pageCount
+        ? 0
+        : Math.min(1, (volume.page + 1) / volume.pageCount);
+
+/** « Tome 5 · page 45 / 190 », ou « Tome 6 · à commencer ». */
+const resumeLabel = (volume: InProgressVolume) =>
+    `${volumeLabel(volume)} · ${
+        volume.page === null
+            ? 'à commencer'
+            : `page ${volume.page + 1} / ${volume.pageCount}`
+    }`;
+
+/** Couverture d'un tome, au format d'un livre. */
+const VolumeCover = ({ volume }: { volume: InProgressVolume }) => (
+    <AspectRatio ratio={2 / 3}>
+        <Image
+            src={coverUrl(volume.volumeId, volume.version, 'small')}
+            alt=""
+            radius="sm"
+            fit="cover"
+        />
+    </AspectRatio>
+);
+
+/** Grande carte du dernier tome en cours : « Continuer ». */
+const ResumeHero = ({
+    volume,
+    onChanged,
+}: {
+    volume: InProgressVolume;
+    onChanged: () => void;
+}) => (
+    <Paper withBorder radius="md" p={{ base: 'sm', sm: 'md' }}>
+        <Group wrap="nowrap" align="center" gap="md">
+            <Box
+                component={Link}
+                to={`/read/${volume.volumeId}`}
+                w={{ base: 92, sm: 124 }}
+                style={{ flexShrink: 0 }}
+                aria-label={`Lire ${volume.seriesName}`}
+            >
+                <VolumeCover volume={volume} />
+            </Box>
+            <Stack gap={6} style={{ flex: 1, minWidth: 0 }}>
+                <Text
+                    size="xs"
+                    c="dimmed"
+                    fw={600}
+                    tt="uppercase"
+                    style={{ letterSpacing: '0.08em' }}
+                >
+                    Reprendre
+                </Text>
+                <Group gap={8} wrap="nowrap">
+                    <Text
+                        fw={700}
+                        fz={{ base: 'lg', sm: 'xl' }}
+                        lh={1.2}
+                        lineClamp={2}
+                    >
+                        {volume.seriesName}
+                    </Text>
+                    {newBadge(volume.newCount)}
+                </Group>
+                <Text size="sm" c="dimmed">
+                    {resumeLabel(volume)}
+                </Text>
+                {volume.page !== null && (
+                    <Progress
+                        size="sm"
+                        maw={320}
+                        value={volumeProgress(volume) * 100}
+                        aria-label="Avancement du tome"
+                    />
+                )}
+                <Group gap={6} mt={4}>
+                    <Button
+                        component={Link}
+                        to={`/read/${volume.volumeId}`}
+                        leftSection={<IconPlayerPlayFilled size={14} />}
+                    >
+                        {volume.page === null ? 'Commencer' : 'Continuer'}
+                    </Button>
+                    <VolumeCardMenu volume={volume} onChanged={onChanged} />
+                </Group>
+            </Stack>
+        </Group>
+    </Paper>
+);
+
+/** Autre tome en cours : une petite ligne qui ouvre le lecteur. */
+const ResumeLine = ({ volume }: { volume: InProgressVolume }) => (
+    <Paper
+        withBorder
+        radius="md"
+        p={8}
+        component={Link}
+        to={`/read/${volume.volumeId}`}
+        style={{ color: 'inherit', textDecoration: 'none' }}
+    >
+        <Group gap="sm" wrap="nowrap">
+            <Box w={40} style={{ flexShrink: 0 }}>
+                <VolumeCover volume={volume} />
+            </Box>
+            <Stack gap={4} style={{ flex: 1, minWidth: 0 }}>
+                <Group gap={6} wrap="nowrap">
+                    <Text size="sm" fw={500} truncate>
+                        {volume.seriesName}
+                    </Text>
+                    {newBadge(volume.newCount)}
+                </Group>
+                <Text size="xs" c="dimmed" truncate>
+                    {volumeShortLabel(volume)} ·{' '}
+                    {volume.page === null
+                        ? 'à commencer'
+                        : `${Math.round(volumeProgress(volume) * 100)} %`}
+                </Text>
+                {volume.page !== null && (
+                    <Progress
+                        size="xs"
+                        value={volumeProgress(volume) * 100}
+                        aria-label="Avancement du tome"
+                    />
+                )}
+            </Stack>
+        </Group>
+    </Paper>
+);
+
+/** « Lu par Lou », « Lu par Lou et Tom », « Lu par Lou, Tom et Léa ». */
+const readByLabel = (names: string[]) =>
+    `Lu par ${
+        names.length > 1
+            ? `${names.slice(0, -1).join(', ')} et ${names.at(-1)}`
+            : names[0]
+    }`;
+
+/** Avatars de ceux qui l'ont lue, en haut à gauche de la couverture. */
+const ReadersTag = ({ readers }: { readers: FamilyReader[] }) => (
+    <Avatar.Group spacing={8}>
+        {readers.slice(0, 3).map((reader) => (
+            <UserAvatar
+                key={reader.id}
+                name={reader.name}
+                seed={reader.avatarSeed}
+                size={24}
+                radius="xl"
+                style={{ border: '2px solid var(--mantine-color-body)' }}
+            />
+        ))}
+    </Avatar.Group>
+);
+
+/** Une ligne de cartes : autant que la grille en met côte à côte. */
+const CardsRow = ({
+    series,
+    columns,
+    render,
+}: {
+    series: SeriesSummary[];
+    columns: ReturnType<typeof gridColumns>;
+    render: (s: SeriesSummary) => React.ReactNode;
+}) => (
+    <SimpleGrid cols={columns} spacing="sm">
+        {series.map(render)}
+    </SimpleGrid>
+);
+
+/**
+ * Accueil : ce qui concerne la personne. Le tome à reprendre en grand (les
+ * autres à côté), puis des blocs d'une ligne : nouveaux tomes, liste « à
+ * lire », séries lues par la famille, ajouts récents. « Tout voir » ouvre
+ * la bibliothèque déjà filtrée. Un bloc vide n'apparaît pas.
+ */
+export const HomePage = () => {
+    const isAdmin = useContext(UserContext)?.role === 'admin';
+    const online = useOnline();
+    const display = useLibraryDisplay();
+    const columns = gridColumns(display.size);
+    // Cartes par ligne à cette largeur : chaque bloc en montre autant.
+    const perRow = useMatches(columns);
+    // Gardées en mémoire : revenir à l'accueil l'affiche tout de suite.
+    const inProgress = useQuery(fetchInProgress, [], {
+        cacheKey: 'continue',
+    });
+    const series = useQuery(() => fetchSeriesList(), [], {
+        cacheKey: 'series:all',
+    });
+    const readers = useQuery(fetchFamilyReaders, [], {
+        cacheKey: 'readers',
+    });
+    useScrollMemory(!!series.data && !!inProgress.data);
+
+    const reload = () => {
+        inProgress.reload();
+        series.reload();
+    };
+
+    // Hors ligne (et rien en mémoire) : les tomes téléchargés.
+    if (!online && !series.data) {
+        return (
+            <Stack>
+                <Title order={2}>Sur cet appareil</Title>
+                <DownloadedVolumes />
+            </Stack>
+        );
+    }
+    const error = series.error ?? inProgress.error;
+    if (error) return <Alert color="red">{error.message}</Alert>;
+    if (!series.data || !inProgress.data) return <PageLoader />;
+
+    const resume = inProgress.data;
+    const [first, ...others] = resume;
+    const blocks = homeBlocks(series.data, resume, readers.data ?? []);
+    const readersOf = (s: SeriesSummary) =>
+        (readers.data ?? []).filter((r) => r.seriesIds.includes(s.id));
+    const card =
+        (
+            options: {
+                subtitle?: (s: SeriesSummary) => string;
+                family?: boolean;
+            } = {},
+        ) =>
+        (s: SeriesSummary) => (
+            <SeriesCard
+                key={s.id}
+                series={s}
+                isAdmin={isAdmin}
+                onChanged={reload}
+                coversOnly={display.coversOnly}
+                subtitle={options.subtitle?.(s)}
+                tag={
+                    options.family ? (
+                        <ReadersTag readers={readersOf(s)} />
+                    ) : undefined
+                }
+            />
+        );
+
+    if (series.data.length === 0 && resume.length === 0) {
+        return (
+            <Center py="xl">
+                <Stack align="center" gap={6}>
+                    <IconBook size={32} />
+                    <Text c="dimmed">Bibliothèque vide.</Text>
+                </Stack>
+            </Center>
+        );
+    }
+
+    return (
+        <Stack gap="xl">
+            {first && (
+                <PageSection
+                    title="En cours"
+                    count={resume.length}
+                    more={libraryLink(
+                        { reading: ['started'] },
+                        { sort: 'lastRead' },
+                    )}
+                >
+                    <SimpleGrid
+                        cols={{ base: 1, md: others.length ? 2 : 1 }}
+                        spacing="sm"
+                        data-testid="resume"
+                    >
+                        <ResumeHero volume={first} onChanged={reload} />
+                        {others.length > 0 && (
+                            <SimpleGrid
+                                cols={{ base: 1, xs: 2 }}
+                                spacing={8}
+                                style={{ alignContent: 'start' }}
+                            >
+                                {others.slice(0, 6).map((volume) => (
+                                    <ResumeLine
+                                        key={volume.volumeId}
+                                        volume={volume}
+                                    />
+                                ))}
+                            </SimpleGrid>
+                        )}
+                    </SimpleGrid>
+                </PageSection>
+            )}
+            {blocks.fresh.length > 0 && (
+                <PageSection
+                    title="Nouveaux tomes"
+                    count={blocks.fresh.length}
+                    more={libraryLink({ reading: ['new'] })}
+                >
+                    <CardsRow
+                        series={blocks.fresh.slice(0, perRow)}
+                        columns={columns}
+                        render={card({
+                            subtitle: (s) =>
+                                `+${s.newCount} · ${s.readCount} / ${s.volumeCount} lus`,
+                        })}
+                    />
+                </PageSection>
+            )}
+            {blocks.toRead.length > 0 && (
+                <PageSection
+                    title="À lire"
+                    count={blocks.toRead.length}
+                    more={libraryLink({ reading: ['toread'] })}
+                >
+                    <CardsRow
+                        series={blocks.toRead.slice(0, perRow)}
+                        columns={columns}
+                        render={card()}
+                    />
+                </PageSection>
+            )}
+            {blocks.family.length > 0 && (
+                <PageSection
+                    title="Lu par la famille"
+                    count={blocks.family.length}
+                    more={libraryLink({
+                        reading: ['unread'],
+                        readers: (readers.data ?? []).map((r) => r.id),
+                    })}
+                >
+                    <CardsRow
+                        series={blocks.family.slice(0, perRow)}
+                        columns={columns}
+                        render={card({
+                            family: true,
+                            subtitle: (s) =>
+                                readByLabel(readersOf(s).map((r) => r.name)),
+                        })}
+                    />
+                </PageSection>
+            )}
+            {blocks.recent.length > 0 && (
+                <PageSection
+                    title="Récemment ajoutées"
+                    more={libraryLink({}, { sort: 'recent' })}
+                >
+                    <CardsRow
+                        series={blocks.recent.slice(0, perRow)}
+                        columns={columns}
+                        render={card()}
+                    />
+                </PageSection>
+            )}
+            <WeekLine />
+            <Button
+                component={Link}
+                to="/library"
+                variant="default"
+                size="md"
+                leftSection={<IconBooks size={18} />}
+            >
+                Parcourir la bibliothèque · {series.data.length} série
+                {series.data.length > 1 ? 's' : ''}
+            </Button>
+        </Stack>
+    );
+};

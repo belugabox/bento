@@ -7,7 +7,6 @@ import {
     Flex,
     Group,
     Image,
-    Loader,
     Menu,
     SimpleGrid,
     Stack,
@@ -45,6 +44,7 @@ import { SeriesVolumeMenu } from '@/components/CardMenus';
 import { CompletenessBadge } from '@/components/CompletenessBadge';
 import { CoverCard } from '@/components/CoverCard';
 import { DownloadRing } from '@/components/DownloadIndicator';
+import { PageLoader } from '@/components/PageLoader';
 import { RatingBadge } from '@/components/RatingBadge';
 import { SeriesReaders } from '@/components/SeriesReaders';
 import { ageLabel, seriesAgeOf } from '@/components/ageLimits';
@@ -153,7 +153,7 @@ export const SeriesPage = () => {
         );
     }
     if (error) return <Alert color="red">{error.message}</Alert>;
-    if (!series) return <Loader mx="auto" />;
+    if (!series) return <PageLoader />;
 
     const first = series.volumes[0];
     const next = nextToRead(series.volumes);

@@ -4,7 +4,6 @@ import {
     Badge,
     Button,
     Group,
-    Loader,
     Progress,
     SimpleGrid,
     Stack,
@@ -18,6 +17,7 @@ import { IconRefresh } from '@tabler/icons-react';
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 
+import { PageLoader } from '@/components/PageLoader';
 import { UserAvatar } from '@/components/accounts/UserAvatar';
 import { ageLabel, ageLimitLabel } from '@/components/ageLimits';
 import {
@@ -88,7 +88,7 @@ export const StatsPage = () => {
     const [scanReport, setScanReport] = useState<string>();
 
     if (error) return <Alert color="red">{error.message}</Alert>;
-    if (!stats) return <Loader mx="auto" />;
+    if (!stats) return <PageLoader />;
 
     const totals = stats.libraries.reduce(
         (sum, l) => ({
@@ -191,7 +191,7 @@ export const StatsPage = () => {
                         {reading.error ? (
                             <Alert color="red">{reading.error.message}</Alert>
                         ) : !reading.data ? (
-                            <Loader mx="auto" />
+                            <PageLoader />
                         ) : (
                             <>
                                 <SimpleGrid cols={{ base: 2, sm: 4 }}>

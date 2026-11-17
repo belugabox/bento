@@ -4,7 +4,6 @@ import {
     Badge,
     Button,
     Group,
-    Loader,
     Menu,
     Modal,
     SegmentedControl,
@@ -24,6 +23,7 @@ import {
 } from '@tabler/icons-react';
 import { useState } from 'react';
 
+import { PageLoader } from '@/components/PageLoader';
 import { ShareLink } from '@/components/accounts/ShareLink';
 import { UserAvatar } from '@/components/accounts/UserAvatar';
 import { usernameError } from '@/components/accounts/accountRules';
@@ -228,7 +228,7 @@ export const UsersPage = () => {
         });
 
     if (error) return <Alert color="red">{error.message}</Alert>;
-    if (!users) return <Loader mx="auto" />;
+    if (!users) return <PageLoader />;
 
     return (
         <Stack>

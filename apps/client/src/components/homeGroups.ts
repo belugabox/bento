@@ -4,8 +4,8 @@ import { ageLabel } from '@/components/ageLimits';
 import { type ListedSeries, readingStateOf } from '@/components/seriesFilters';
 
 /**
- * Groupements de l'accueil (menu de tri), gardés sur l'appareil. Le bloc
- * « En cours » reste toujours en tête ; le reste des séries est rangé ainsi.
+ * Groupements de la bibliothèque (bouton « Affichage »), gardés sur
+ * l'appareil ; « Aucun » par défaut.
  */
 export const GROUPINGS = [
     { value: 'reading', label: 'Lecture' },
@@ -21,7 +21,7 @@ export type Grouping = (typeof GROUPINGS)[number]['value'];
 export const isGrouping = (value: unknown): value is Grouping =>
     GROUPINGS.some((g) => g.value === value);
 
-/** Bloc de l'accueil : un titre (aucun pour « Aucun »), et ses séries. */
+/** Bloc de la bibliothèque : un titre (aucun pour « Aucun »), et ses séries. */
 export type HomeGroup<T> = { key: string; title: string | null; list: T[] };
 
 type Groupable = ListedSeries & { id: number; age?: number | null };
@@ -78,8 +78,8 @@ const PERIOD_RANK = (key: string) =>
     key === 'month' ? 1e5 : key === 'year' ? 1e5 - 1 : Number(key);
 
 /**
- * Séries de l'accueil (sans celles du bloc « En cours ») rangées en blocs,
- * selon le groupement choisi ; les blocs vides n'apparaissent pas.
+ * Séries de la bibliothèque rangées en blocs, selon le groupement choisi ;
+ * les blocs vides n'apparaissent pas.
  */
 export const groupSeries = <T extends Groupable>(
     series: T[],
@@ -159,10 +159,17 @@ export const groupSeries = <T extends Groupable>(
             default:
                 return [
                     {
+                        key: 'started',
+                        title: 'En cours',
+                        list: series.filter(
+                            (s) => readingStateOf(s) === 'started',
+                        ),
+                    },
+                    {
                         key: 'unread',
                         title: 'À découvrir',
                         list: series.filter(
-                            (s) => readingStateOf(s) !== 'read',
+                            (s) => readingStateOf(s) === 'unread',
                         ),
                     },
                     {

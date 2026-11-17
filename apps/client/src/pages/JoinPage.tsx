@@ -1,7 +1,8 @@
-import { Alert, Button, Loader, Stack, Text, TextInput } from '@mantine/core';
+import { Alert, Button, Stack, Text, TextInput } from '@mantine/core';
 import { type FormEvent, useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 
+import { PageLoader } from '@/components/PageLoader';
 import {
     NewPasswordInputs,
     UsernameInput,
@@ -64,7 +65,7 @@ export const JoinPage = () => {
     if (!link) {
         return (
             <PublicFrame title="Bento">
-                <Loader mx="auto" />
+                <PageLoader />
             </PublicFrame>
         );
     }

@@ -10,6 +10,7 @@ const series = (
         age: number | null;
         lastAddedAt: string | null;
         readCount: number;
+        startedCount: number;
     }> = {},
 ) => ({
     id,
@@ -26,9 +27,14 @@ const shape = (groups: ReturnType<typeof groupSeries>) =>
     groups.map((g) => [g.title, g.list.map((s) => s.id)]);
 
 describe('groupSeries', () => {
-    it('groups by reading state, the current grouping', () => {
-        const list = [series(1, 'A'), series(2, 'B', { readCount: 2 })];
+    it('groups by reading state: in progress, not read, finished', () => {
+        const list = [
+            series(1, 'A'),
+            series(2, 'B', { readCount: 2, startedCount: 2 }),
+            series(3, 'C', { readCount: 1, startedCount: 1 }),
+        ];
         expect(shape(groupSeries(list, 'reading'))).toEqual([
+            ['En cours', [3]],
             ['À découvrir', [1]],
             ['Déjà lues', [2]],
         ]);

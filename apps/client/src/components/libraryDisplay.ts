@@ -11,9 +11,9 @@ export type LibraryDisplay = {
     size: number;
     /** Grille de couvertures, sans titre dessous. */
     coversOnly: boolean;
-    /** Accueil : séries entièrement lues masquées (menu de tri). */
+    /** Bibliothèque : séries entièrement lues masquées (« Affichage »). */
     hideRead: boolean;
-    /** Accueil : blocs des séries (lecture, format, âge…). */
+    /** Bibliothèque : blocs des séries (lecture, format, âge…). */
     groupBy: Grouping;
 };
 
@@ -22,7 +22,7 @@ export const DEFAULT_DISPLAY: LibraryDisplay = {
     size: 2,
     coversOnly: false,
     hideRead: false,
-    groupBy: 'reading',
+    groupBy: 'none',
 };
 
 export const LAYOUT_OPTIONS: { value: LibraryLayout; label: string }[] = [

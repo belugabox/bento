@@ -7,7 +7,6 @@ import {
     Group,
     Image,
     Indicator,
-    Loader,
     Menu,
     Paper,
     Popover,
@@ -40,6 +39,7 @@ import {
 } from '@server/types';
 
 import { CompletenessBadge } from '@/components/CompletenessBadge';
+import { PageLoader } from '@/components/PageLoader';
 import { ageLabel } from '@/components/ageLimits';
 import {
     formatSize,
@@ -429,7 +429,7 @@ export const SeriesManagementPage = () => {
         );
 
     if (error) return <Alert color="red">{error.message}</Alert>;
-    if (!data) return <Loader mx="auto" />;
+    if (!data) return <PageLoader />;
 
     const rows = data.map(toRow);
     const counts = Object.fromEntries(
