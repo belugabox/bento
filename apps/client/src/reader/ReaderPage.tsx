@@ -53,9 +53,12 @@ export const ReaderPage = () => {
 
     const pageCount = volume?.pageCount ?? 0;
     const rawPage = params.get('page');
-    // Sans page dans l'adresse : reprendre là où la personne s'était arrêtée.
+    // Sans page dans l'adresse : reprendre là où la personne s'était arrêtée,
+    // relecture comprise (tome lu, arrêté avant sa dernière page) ; un tome
+    // lu jusqu'au bout se relit depuis le début.
     const resumePage =
-        volume?.progress && !volume.progress.completed
+        volume?.progress &&
+        (!volume.progress.completed || volume.progress.page < pageCount - 1)
             ? volume.progress.page
             : 0;
     const page =

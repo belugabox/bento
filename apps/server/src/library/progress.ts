@@ -199,8 +199,19 @@ export const saveProgress = (
 };
 
 /**
- * Tomes commencés et pas finis, du plus récemment lu au plus ancien : un
- * seul par série, avec l'avancement dans la série (tomes lus sur le total).
+ * Tome en cours : pas fini, ou relu (déjà lu, mais arrêté avant sa dernière
+ * page ; un tome marqué lu est sur sa dernière page). SQL brut, `alias` :
+ * la table de la lecture, `volume` : celle du tome.
+ */
+const inProgressSql = (alias: string, volume: string) =>
+    sql.raw(
+        `(${alias}.completed = 0 or ${alias}.page < ${volume}.page_count - 1)`,
+    );
+
+/**
+ * Tomes commencés et pas finis (ou relus), du plus récemment lu au plus
+ * ancien : un seul par série, avec l'avancement dans la série (tomes lus
+ * sur le total).
  */
 export const listInProgress = (db: Db, viewer: Viewer, limit = 12) => {
     const rows = db
@@ -226,11 +237,13 @@ export const listInProgress = (db: Db, viewer: Viewer, limit = 12) => {
         .where(
             and(
                 eq(readProgress.userId, viewer.id),
-                eq(readProgress.completed, false),
+                // Relecture comprise : le tome reste « lu », mais il est en
+                // cours.
+                inProgressSql('read_progress', 'volumes'),
                 visibleTo(viewer),
                 // Seul le tome en cours le plus récent de sa série : les
                 // comptes ci-dessus ne sont faits que pour les lignes gardées.
-                sql`not exists (select 1 from volumes v cross join read_progress rp on rp.volume_id = v.id and rp.user_id = ${viewer.id} where v.series_id = series.id and rp.completed = 0 and (rp.updated_at > read_progress.updated_at or (rp.updated_at = read_progress.updated_at and rp.volume_id > read_progress.volume_id)))`,
+                sql`not exists (select 1 from volumes v cross join read_progress rp on rp.volume_id = v.id and rp.user_id = ${viewer.id} where v.series_id = series.id and ${inProgressSql('rp', 'v')} and (rp.updated_at > read_progress.updated_at or (rp.updated_at = read_progress.updated_at and rp.volume_id > read_progress.volume_id)))`,
             ),
         )
         .orderBy(desc(readProgress.updatedAt))
@@ -322,6 +335,7 @@ export const listNextVolumes = (db: Db, viewer: Viewer, limit = 12) => {
             title: volumes.title,
             pageCount: volumes.pageCount,
             completed: readProgress.completed,
+            page: readProgress.page,
             updatedAt: readProgress.updatedAt,
             addedAt: volumes.addedAt,
         })
@@ -351,11 +365,21 @@ export const listNextVolumes = (db: Db, viewer: Viewer, limit = 12) => {
     }
     const next = [];
     for (const items of bySeries.values()) {
-        if (items.some((v) => v.updatedAt && !v.completed)) continue;
+        // Un tome en cours (ou relu) : la série est dans `listInProgress`.
+        if (
+            items.some(
+                (v) =>
+                    v.updatedAt &&
+                    (!v.completed || (v.page ?? 0) < v.pageCount - 1),
+            )
+        ) {
+            continue;
+        }
         const unread = items.find((v) => !v.updatedAt);
         if (!unread) continue;
         const {
             completed: _completed,
+            page: _page,
             updatedAt: _updatedAt,
             addedAt: _addedAt,
             ...volume

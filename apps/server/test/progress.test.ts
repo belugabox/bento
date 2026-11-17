@@ -195,6 +195,37 @@ describe('reading progress', () => {
         expect(resume).toHaveLength(14);
     });
 
+    it('lists a volume being reread, until its last page', async () => {
+        for (const id of gantz) await save(id, { completed: true });
+        // Tout lu : rien à reprendre.
+        expect((await call('/continue', alice)).body).toEqual([]);
+
+        // Relecture du tome 1 : il reste lu, et il est en cours.
+        await save(gantz[0]!, { page: 1 });
+        const { body } = await call('/continue', alice);
+        expect(body).toHaveLength(1);
+        expect(body[0]).toMatchObject({
+            volumeId: gantz[0],
+            page: 1,
+            readCount: 3,
+        });
+
+        // Relu jusqu'au bout : plus en cours.
+        await save(gantz[0]!, { page: 2 });
+        expect((await call('/continue', alice)).body).toEqual([]);
+    });
+
+    it('lists a reread volume once, even with an unread volume after it', async () => {
+        await save(gantz[0]!, { completed: true });
+        await save(gantz[0]!, { page: 0 });
+
+        const { body } = await call('/continue', alice);
+        // Le tome relu, pas aussi le tome 2 à ouvrir.
+        expect(body.map((v: { volumeId: number }) => v.volumeId)).toEqual([
+            gantz[0],
+        ]);
+    });
+
     it('keeps only the latest volume of each series to resume', async () => {
         await save(gantz[0]!, { page: 1 });
         await save(gantz[1]!, { page: 1 });

@@ -445,6 +445,15 @@ describe('ReaderPage', () => {
         );
     });
 
+    it('resumes a volume being reread where the person stopped', async () => {
+        // Lu, puis relu jusqu'à la page 2 sur 3.
+        await open('rtl', '/read/7', { page: 1, completed: true });
+
+        expect(shownPage()).toBe(
+            '/api/volumes/7/pages/1?v=1700000000000&w=800',
+        );
+    });
+
     it('turns the page with a swipe, following the direction', async () => {
         await open('ltr');
 
