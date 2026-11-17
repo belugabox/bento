@@ -1,5 +1,6 @@
 import {
     Alert,
+    Badge,
     Grid,
     Group,
     Loader,
@@ -15,6 +16,7 @@ import { useDisclosure } from '@mantine/hooks';
 import { IconFile, IconFolder } from '@tabler/icons-react';
 import { useEffect, useState } from 'react';
 
+import { completenessColor } from '@/components/completeness';
 import { CoverPicker } from '@/components/metadata/CoverPicker';
 import { MetadataEditor } from '@/components/metadata/MetadataEditor';
 import {
@@ -161,6 +163,28 @@ export const DraftsPage = () => {
                                     }
                                     label={folderLabel(f.folder)}
                                     description={`${f.files.length} tome(s)`}
+                                    // Fiche de la future série, comme dans
+                                    // l'éditeur (enregistrée).
+                                    rightSection={
+                                        f.completeness && (
+                                            <Badge
+                                                size="sm"
+                                                variant="light"
+                                                color={completenessColor(
+                                                    f.completeness.percent,
+                                                )}
+                                                aria-label={`Fiche complète à ${f.completeness.percent} %`}
+                                                title={
+                                                    f.completeness.missing
+                                                        .length
+                                                        ? `À compléter : ${f.completeness.missing.join(', ')}`
+                                                        : undefined
+                                                }
+                                            >
+                                                {f.completeness.percent} %
+                                            </Badge>
+                                        )
+                                    }
                                 />
                             ))}
                         </Paper>

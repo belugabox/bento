@@ -138,7 +138,7 @@ describe('publicationPathOf', () => {
 });
 
 describe('drafts', () => {
-    it('lists draft folders quickly, without reading the archives', async () => {
+    it('lists draft folders, with only the ComicInfo of their archives read', async () => {
         await writeCbz(ctx.file('_draft/Gantz (01-18)/Gantz T01.cbz'));
         await writeFile(ctx.file('_draft/broken.cbz'), 'pas une archive');
         await writeFile(ctx.file('_draft/Spirale.cbr'), 'pas lu ici');
@@ -165,6 +165,7 @@ describe('drafts', () => {
                 sources: [],
                 rating: null,
                 coverUpdatedAt: null,
+                completeness: null,
             },
             {
                 folder: '_draft/Gantz (01-18)',
@@ -182,6 +183,7 @@ describe('drafts', () => {
                 sources: [],
                 rating: null,
                 coverUpdatedAt: null,
+                completeness: expect.objectContaining({ percent: 0 }),
             },
             {
                 // Nommé comme le .cbz qu'il deviendra.
@@ -202,8 +204,41 @@ describe('drafts', () => {
                 sources: [],
                 rating: null,
                 coverUpdatedAt: null,
+                completeness: null,
             },
         ]);
+    });
+
+    it('gives the completeness of the future series, as the editor shows it', async () => {
+        await writeCbz(ctx.file('_draft/Spy/Spy T01.cbz'), {
+            comicInfo:
+                '<Series>Spy</Series><Number>1</Number><Writer>Endo</Writer><AgeRating>Teen</AgeRating>',
+        });
+        await writeCbz(ctx.file('_draft/Spy/Spy T02.cbz'), {
+            comicInfo: '<Series>Spy</Series>',
+        });
+        await call(`/libraries/${ctx.library.id}/drafts/status`, {
+            method: 'PUT',
+            json: { folder: '_draft/Spy', status: 'ongoing' },
+        });
+
+        const [spy] = (await call(`/libraries/${ctx.library.id}/drafts`)).body;
+
+        // Nom, âge (des fichiers), statut, scénario, et un tome numéroté
+        // sur deux : 4,5 sur 12.
+        expect(spy.completeness).toEqual({
+            percent: 37,
+            missing: [
+                'Format',
+                'Parution',
+                'Genres',
+                'Dessin',
+                'Éditeur',
+                'Résumé',
+                'Note',
+                'Numéro de 1 tome',
+            ],
+        });
     });
 
     it('reads one folder with its ComicInfo and problems', async () => {

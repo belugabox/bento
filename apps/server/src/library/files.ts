@@ -28,11 +28,14 @@ import {
 import { COVER_QUALITY, COVER_SIZE, readImage } from '../archive/image';
 import { convertPdfToCbz, isPdf } from '../archive/pdf';
 import { updateComicInfo } from '../archive/write';
+import { classify } from '../classification';
 import type { Db } from '../db';
 import { libraries, series, volumes } from '../db/schema';
 import { parseSources, sourcesText } from '../metadata/sourceLink';
 import { conflict, notFound } from '../tools/errors';
 import type { Logger } from '../tools/logger';
+import { minAgeOf } from './ageRating';
+import { completenessOf, fieldsFromVolumes } from './completeness';
 import { draftCoverFile, seriesCoverFile } from './covers';
 import {
     type DraftSettings,
@@ -40,6 +43,7 @@ import {
     draftSettingsOf,
     saveDraftSettings,
 } from './draftSettings';
+import { genreCatalog } from './genres';
 import { listsSnapshot, restoreLists } from './lists';
 import {
     DRAFT_FOLDER,
@@ -121,6 +125,11 @@ export class LibraryFiles {
             info: Pick<FileInfo, 'pageCount' | 'comicInfo' | 'error'>;
         }
     >();
+    // ComicInfo seuls (complétude de la liste des brouillons), même clé.
+    private infos = new Map<
+        string,
+        { key: string; info: Pick<FileInfo, 'comicInfo'> }
+    >();
     // .cbr ou .pdf dont la conversion a échoué : pas retentée tant qu'il ne
     // change pas.
     private conversionErrors = new Map<
@@ -194,6 +203,25 @@ export class LibraryFiles {
         // Une archive illisible est réessayée à chaque lecture.
         if (!info.error) this.cache.set(fullPath, { key, info });
         return { ...info, size: stats.size };
+    };
+
+    /**
+     * ComicInfo seul (liste des brouillons) : sans couverture ni pages,
+     * repris de `read` s'il a déjà lu le fichier ; null s'il est illisible.
+     */
+    private comicInfoOnly = async (fullPath: string) => {
+        const stats = await stat(fullPath).catch(() => undefined);
+        if (!stats) return null;
+        const key = `${stats.size}:${stats.mtimeMs}`;
+        const known = this.cache.get(fullPath) ?? this.infos.get(fullPath);
+        if (known?.key === key) return known.info.comicInfo;
+        try {
+            const comicInfo = await readComicInfo(await readArchive(fullPath));
+            this.infos.set(fullPath, { key, info: { comicInfo } });
+            return comicInfo;
+        } catch {
+            return null;
+        }
     };
 
     private infoOf = async (
@@ -402,8 +430,9 @@ export class LibraryFiles {
     };
 
     /**
-     * Dossiers de brouillons et leurs fichiers (nom, taille), sans ouvrir
-     * les archives : rapide, même avec des centaines de tomes.
+     * Dossiers de brouillons et leurs fichiers (nom, taille), avec la
+     * complétude de leur future série : seul le ComicInfo des archives est
+     * lu (gardé tant que le fichier ne change pas).
      */
     drafts = async (libraryId: number) => {
         const library = this.library(libraryId);
@@ -415,6 +444,9 @@ export class LibraryFiles {
             string,
             { path: string; name: string; size: number }[]
         >();
+        // ComicInfo des .cbz de chaque dossier (.cbr et .pdf pas encore
+        // convertis : illisibles pour l'éditeur aussi).
+        const infos = new Map<string, ComicInfo[]>();
         for (const archive of archives) {
             const { size } = await stat(archive.fullPath).catch(() => ({
                 size: 0,
@@ -424,26 +456,56 @@ export class LibraryFiles {
                 ...(folders.get(group) ?? []),
                 { path: archive.path, name: path.basename(archive.path), size },
             ]);
+            const info =
+                isCbr(archive.path) || isPdf(archive.path)
+                    ? null
+                    : await this.comicInfoOnly(archive.fullPath);
+            if (info) infos.set(group, [...(infos.get(group) ?? []), info]);
         }
+        const catalog = genreCatalog(this.db);
         const settings = draftSettingsOf(this.db, libraryId);
         const ratings = sourceRatingsMap(this.db);
-        return [...folders].map(([folder, files]) => ({
-            folder,
-            files,
-            status: settings.get(folder)?.status ?? null,
-            readingMode: settings.get(folder)?.readingMode ?? null,
-            formatId: settings.get(folder)?.formatId ?? null,
-            age: settings.get(folder)?.age ?? null,
-            startYear: settings.get(folder)?.startYear ?? null,
-            endYear: settings.get(folder)?.endYear ?? null,
-            sources: parseSources(settings.get(folder)?.sources),
+        return [...folders].map(([folder, files]) => {
+            const draft = settings.get(folder);
+            const sources = parseSources(draft?.sources);
             // Note de ses fiches (gardée à leur lecture), comme une série.
-            rating: seriesRatingOf(
-                parseSources(settings.get(folder)?.sources),
-                ratings,
-            ),
-            coverUpdatedAt: settings.get(folder)?.coverUpdatedAt ?? null,
-        }));
+            const rating = seriesRatingOf(sources, ratings);
+            const volumeInfos = infos.get(folder) ?? [];
+            const fields = fieldsFromVolumes(volumeInfos);
+            const ageRating = volumeInfos
+                .map((info) => info.AgeRating)
+                .find((value) => !!value?.trim());
+            return {
+                folder,
+                files,
+                status: draft?.status ?? null,
+                readingMode: draft?.readingMode ?? null,
+                formatId: draft?.formatId ?? null,
+                age: draft?.age ?? null,
+                startYear: draft?.startYear ?? null,
+                endYear: draft?.endYear ?? null,
+                sources,
+                rating,
+                coverUpdatedAt: draft?.coverUpdatedAt ?? null,
+                // Comme l'éditeur l'affiche (« Fiche à 72 % ») ; null sans
+                // tome lisible.
+                completeness: volumeInfos.length
+                    ? completenessOf({
+                          ...fields,
+                          hasFormat: !!draft?.formatId,
+                          hasAge: (draft?.age ?? minAgeOf(ageRating)) !== null,
+                          hasStatus: !!draft?.status,
+                          hasRating: rating !== null,
+                          hasPeriod: !!draft?.startYear,
+                          genreCount: classify(
+                              fields.genre ?? '',
+                              fields.tags ?? '',
+                              catalog,
+                          ).genres.length,
+                      })
+                    : null,
+            };
+        });
     };
 
     /** Réglages de la future série d'un dossier de brouillons. */

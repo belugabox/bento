@@ -10,11 +10,11 @@ import {
 import { IconInfoCircle } from '@tabler/icons-react';
 import type { ReactNode } from 'react';
 
-import { type Completeness, missingHint } from '@/components/completeness';
-
-/** Couleur d'une complétude : verte, orange, puis rouge. */
-const colorOf = (percent: number) =>
-    percent === 100 ? 'green' : percent >= 60 ? 'orange' : 'red';
+import {
+    type Completeness,
+    completenessColor,
+    missingHint,
+} from '@/components/completeness';
 
 /**
  * Pastille « Fiche à 72 % » : un clic montre ce qui manque, et `action`
@@ -45,8 +45,8 @@ export const CompletenessBadge = ({
                         ta="left"
                         style={{
                             borderRadius: 'var(--mantine-radius-md)',
-                            background: `var(--mantine-color-${colorOf(percent)}-light)`,
-                            color: `var(--mantine-color-${colorOf(percent)}-light-color)`,
+                            background: `var(--mantine-color-${completenessColor(percent)}-light)`,
+                            color: `var(--mantine-color-${completenessColor(percent)}-light-color)`,
                             cursor: 'pointer',
                             // Les raisons passent à la ligne.
                             whiteSpace: 'normal',
@@ -60,7 +60,7 @@ export const CompletenessBadge = ({
                 ) : (
                     <Badge
                         variant="light"
-                        color={colorOf(percent)}
+                        color={completenessColor(percent)}
                         // On voit qu'elle s'ouvre (ce qui manque).
                         rightSection={
                             missing.length > 0 && <IconInfoCircle size={12} />

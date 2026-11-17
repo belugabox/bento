@@ -32,6 +32,10 @@ describe('DraftsPage', () => {
                                 size: 10,
                             },
                         ],
+                        completeness: {
+                            percent: 41,
+                            missing: ['Format', 'Résumé'],
+                        },
                     },
                 ]);
             }
@@ -68,6 +72,12 @@ describe('DraftsPage', () => {
         expect(await screen.findByText('Gantz')).toBeTruthy();
         // Jamais « aucun brouillon » pendant le chargement.
         expect(screen.queryByText('Aucun brouillon.')).toBeNull();
+        // La fiche de la future série, rappelée dans la liste.
+        expect(
+            screen
+                .getByLabelText('Fiche complète à 41 %')
+                .getAttribute('title'),
+        ).toBe('À compléter : Format, Résumé');
 
         fireEvent.click(screen.getByText('Gantz'));
 
