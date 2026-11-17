@@ -194,7 +194,7 @@ describe('HomePage', () => {
         show();
 
         const mine = await screen.findByRole('region', { name: 'Pour toi' });
-        expect(hrefs(mine)).toEqual(['/for-you', '/series/5']);
+        expect(hrefs(mine)).toEqual(['/library?reading=foryou', '/series/5']);
         expect(within(mine).getByText('Comme Berserk')).toBeTruthy();
         // Jamais à deux endroits sur l'accueil.
         expect(
@@ -215,7 +215,7 @@ describe('HomePage', () => {
         expect(within(rated).getByText('★ 4,6 · 230 avis')).toBeTruthy();
     });
 
-    it('leads from « Pour toi » to all the suggestions', async () => {
+    it('leads from « Pour toi » to the library, filtered on the suggestions', async () => {
         series = SERIES.map((s) =>
             s.name === 'Berserk' || s.name === 'Eden'
                 ? { ...s, genres: ['Fantasy'] }
@@ -229,7 +229,7 @@ describe('HomePage', () => {
                     name: 'Tout voir : Pour toi',
                 })
             ).getAttribute('href'),
-        ).toBe('/for-you');
+        ).toBe('/library?reading=foryou');
     });
 
     it('says when the library is empty', async () => {

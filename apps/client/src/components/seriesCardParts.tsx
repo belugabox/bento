@@ -38,14 +38,20 @@ export const seriesSubtitle = (s: SeriesSummary) =>
         ? `${s.readCount} / ${s.volumeCount} lus`
         : seriesVolumesLabel(s.volumeCount, s.volumeKinds);
 
-/** « 1997 – 2003 », « depuis 2019 », « 2009 » ; rien sans année. */
+/**
+ * « 1997 – 2003 », « depuis 2019 », « 2009 » ; rien sans année. `compact` :
+ * « 1997–2003 », pour tenir sous une carte.
+ */
 export const releaseLabel = (
     s: Pick<SeriesSummary, 'year' | 'endYear' | 'status'>,
+    { compact = false }: { compact?: boolean } = {},
 ) =>
     !s.year
         ? ''
         : s.endYear && s.endYear !== s.year
-          ? `${s.year} – ${s.endYear}`
+          ? compact
+              ? `${s.year}–${s.endYear}`
+              : `${s.year} – ${s.endYear}`
           : s.status === 'ongoing'
             ? `depuis ${s.year}`
             : String(s.year);

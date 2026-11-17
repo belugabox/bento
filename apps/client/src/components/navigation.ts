@@ -25,8 +25,7 @@ const ME_PAGES = [
 
 /** Onglet d'une page : la fiche d'une série est dans la bibliothèque. */
 export const navSection = (pathname: string): NavSection | null => {
-    // « Pour toi » en entier : depuis l'accueil.
-    if (pathname === '/' || pathname === '/for-you') return '/';
+    if (pathname === '/') return '/';
     if (pathname.startsWith('/library') || /^\/series\/\d+$/.test(pathname)) {
         return '/library';
     }

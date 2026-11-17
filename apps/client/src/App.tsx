@@ -15,7 +15,6 @@ import {
 } from '@/components/navigation';
 import { useScrollToTop } from '@/components/scrollToTop';
 import { DownloadsPage } from '@/pages/DownloadsPage';
-import { ForYouPage } from '@/pages/ForYouPage';
 import { HomePage } from '@/pages/HomePage';
 import { JoinPage } from '@/pages/JoinPage';
 import { LibraryPage } from '@/pages/LibraryPage';
@@ -130,7 +129,6 @@ export const App = () => (
         >
             <Route element={<Layout />}>
                 <Route index element={<HomePage />} />
-                <Route path="for-you" element={<ForYouPage />} />
                 <Route path="library" element={<LibraryPage />} />
                 <Route path="me" element={<MePage />} />
                 <Route path="series/:id" element={<SeriesPage />} />

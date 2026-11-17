@@ -426,7 +426,7 @@ export const HomePage = () => {
             <SuggestionRow
                 {...row}
                 title="Pour toi"
-                more="/for-you"
+                more={libraryLink({ reading: ['foryou'] })}
                 items={blocks.forYou.map((s) => ({
                     series: s,
                     reason: blocks.reasons.get(s.id),

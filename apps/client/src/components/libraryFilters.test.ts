@@ -90,6 +90,16 @@ describe('library filters', () => {
         ]);
     });
 
+    it('keeps the suggestions « Pour toi »', () => {
+        expect(
+            kept(
+                { reading: ['foryou'] },
+                { forYou: new Map([[3, 'Comme Gantz']]) },
+            ),
+        ).toEqual(['Blacksad']);
+        expect(kept({ reading: ['foryou'] })).toEqual([]);
+    });
+
     it('filters by family reader and by what is on this device', () => {
         const readers = [
             { id: 7, seriesIds: [1] },

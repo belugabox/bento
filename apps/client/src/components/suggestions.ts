@@ -170,6 +170,10 @@ const liking = (s: SeriesSummary, now: number) => {
     return abandoned ? base * 0.3 : base;
 };
 
+/** « survie » → « Survie » (début d'une raison). */
+const capitalize = (text: string) =>
+    text.charAt(0).toLocaleUpperCase('fr') + text.slice(1);
+
 /** Nom en mots (sans casse, accents ni ponctuation), pour « même univers ». */
 const words = (name: string) =>
     ` ${key(name)
@@ -188,13 +192,14 @@ const FREQUENT_TAG = 3;
  * lit, pesés par son goût pour chaque série), puis les séries pas
  * commencées qui y ressemblent le plus. La raison, la première qui
  * s'applique :
- * 1. même univers qu'une série lue (son nom la contient) : « Dans
- *    l'univers de Naruto » ;
- * 2. même scénariste ou dessinateur : « De l'auteur de Gantz » ;
+ * 1. même univers qu'une série lue (son nom la contient) : « Univers de
+ *    Naruto » ;
+ * 2. même scénariste ou dessinateur : « Auteur de Gantz » ;
  * 3. un genre ou un thème qui revient dans les lectures (au moins 3
- *    séries) et pèse le plus : « Souvent dans tes lectures : survie » ;
+ *    séries) et pèse le plus : « Survie : tu en lis souvent » ;
  * 4. la série lue qui lui ressemble le plus : « Comme Spirale ».
- * Courtes : elles tiennent sous la carte. Les deux premières font aussi
+ * Courtes, le mot qui compte d'abord : une carte de téléphone n'a que
+ * deux lignes d'une douzaine de lettres (signalé : coupées). Les deux premières font aussi
  * monter la série, même sans genre en commun. Rien sans lecture.
  */
 export const forYou = (
@@ -260,13 +265,13 @@ export const forYou = (
             .sort((a, b) => b.closeness - a.closeness)[0];
 
         const reason = universe
-            ? `Dans l’univers de ${universe.series.name}`
+            ? `Univers de ${universe.series.name}`
             : author
-              ? `De l’auteur de ${author.series.name}`
+              ? `Auteur de ${author.series.name}`
               : top &&
                   part(top) > 0 &&
                   (readCount.get(top.key) ?? 0) >= FREQUENT_TAG
-                ? `Souvent dans tes lectures : ${top.name}`
+                ? `${capitalize(top.name)} : tu en lis souvent`
                 : closest && closest.closeness > 0
                   ? `Comme ${closest.name}`
                   : undefined;

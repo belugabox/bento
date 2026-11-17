@@ -331,6 +331,17 @@ describe('LibraryPage', () => {
         expect(screen.getByText('1 série')).toBeTruthy();
     });
 
+    it('shows the suggestions « Pour toi » with their reason (« Tout voir » of the home page)', async () => {
+        show('/library?reading=foryou');
+
+        // Berserk est lue : Akira, qui partage ses genres, est suggérée.
+        await vi.waitFor(() => expect(titles()).toEqual(['/series/1']));
+        expect(screen.getByText('Comme Berserk')).toBeTruthy();
+        expect(
+            screen.getByRole('button', { name: 'Retirer le filtre Pour toi' }),
+        ).toBeTruthy();
+    });
+
     it('says when no series matches the filters', async () => {
         show('/library?reading=new');
 

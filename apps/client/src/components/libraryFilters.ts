@@ -3,10 +3,12 @@ import { type ListedSeries, readingStateOf } from '@/components/seriesFilters';
 
 /** Où en est la personne dans la série (filtre « Ma lecture »). */
 export type ReadingFilter =
-    'toread' | 'unread' | 'started' | 'new' | 'read' | 'notforme';
+    'toread' | 'unread' | 'started' | 'new' | 'read' | 'notforme' | 'foryou';
 
 export const READING_FILTERS: { value: ReadingFilter; label: string }[] = [
     { value: 'toread', label: 'À lire' },
+    // Les suggestions de l'accueil (« Tout voir » de « Pour toi »).
+    { value: 'foryou', label: 'Pour toi' },
     { value: 'unread', label: 'Pas commencés' },
     { value: 'started', label: 'En cours' },
     { value: 'new', label: 'Nouveaux tomes' },
@@ -116,26 +118,33 @@ export type FilterContext = {
     readers?: Pick<FamilyReader, 'id' | 'seriesIds'>[];
     /** Séries dont un tome est sur l'appareil. */
     downloaded?: Set<number>;
+    /** Suggestions « Pour toi » : série → raison. */
+    forYou?: Map<number, string>;
 };
 
-const READING_TESTS: Record<ReadingFilter, (s: ListedSeries) => boolean> = {
+const READING_TESTS: Record<
+    ReadingFilter,
+    (s: ListedSeries & { id: number }, context: FilterContext) => boolean
+> = {
     toread: (s) => !!s.toRead,
     unread: (s) => readingStateOf(s) === 'unread',
     started: (s) => readingStateOf(s) === 'started',
     new: (s) => (s.newCount ?? 0) > 0,
     read: (s) => readingStateOf(s) === 'read',
     notforme: (s) => !!s.notForMe,
+    foryou: (s, { forYou }) => !!forYou?.has(s.id),
 };
 
 /** La série passe-t-elle tous les filtres ? */
 export const matchesFilters = (
     s: ListedSeries & { id: number },
     filters: LibraryFilters,
-    { readers = [], downloaded = new Set() }: FilterContext = {},
+    context: FilterContext = {},
 ) => {
+    const { readers = [], downloaded = new Set() } = context;
     if (
         filters.reading.length &&
-        !filters.reading.some((value) => READING_TESTS[value](s))
+        !filters.reading.some((value) => READING_TESTS[value](s, context))
     ) {
         return false;
     }

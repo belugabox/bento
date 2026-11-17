@@ -56,6 +56,7 @@ import {
     readingStateOf,
     sortSeries,
 } from '@/components/seriesFilters';
+import { forYou } from '@/components/suggestions';
 import { useDownloads } from '@/offline/downloads';
 import { DownloadedVolumes } from '@/pages/DownloadsPage';
 import {
@@ -66,6 +67,9 @@ import {
 import { UserContext } from '@/services/auth';
 import { useOnline } from '@/services/network';
 import { useQuery } from '@/services/useQuery';
+
+// Suggestions « Pour toi » : assez pour choisir, pas toute la bibliothèque.
+const FOR_YOU_LIMIT = 48;
 
 // Dernière bibliothèque ouverte, gardée sur l'appareil.
 const LIBRARY_KEY = 'bento:library';
@@ -187,17 +191,35 @@ export const LibraryPage = () => {
 
     const all = series.data ?? [];
     const downloaded = new Set(downloads.map((volume) => volume.seriesId));
-    const visible = sortSeries(
-        all.filter(
-            (s) =>
-                !(display.hideRead && readingStateOf(s) === 'read') &&
-                matchesFilters(s, filters, {
-                    readers: readers.data,
-                    downloaded,
-                }),
-        ),
-        sort,
+    // Filtre « Pour toi » (« Tout voir » de l'accueil) : les suggestions et
+    // leur raison, dans leur ordre tant qu'aucun tri n'est choisi.
+    const forYouOn = filters.reading.includes('foryou');
+    const suggestions = forYouOn
+        ? new Map(
+              forYou(all, { limit: FOR_YOU_LIMIT })
+                  .filter((s) => !s.series.notForMe)
+                  .map((s) => [s.series.id, s.reason]),
+          )
+        : undefined;
+    const bySuggestion = !!suggestions && sortParam === null;
+    const rank = new Map(
+        [...(suggestions?.keys() ?? [])].map((id, i) => [id, i]),
     );
+    const kept = all.filter(
+        (s) =>
+            !(display.hideRead && readingStateOf(s) === 'read') &&
+            matchesFilters(s, filters, {
+                readers: readers.data,
+                downloaded,
+                forYou: suggestions,
+            }),
+    );
+    const visible = bySuggestion
+        ? [...kept].sort(
+              (a, b) =>
+                  (rank.get(a.id) ?? Infinity) - (rank.get(b.id) ?? Infinity),
+          )
+        : sortSeries(kept, sort);
     const groups = groupSeries(visible, display.groupBy, {
         readers: readers.data,
     });
@@ -231,6 +253,7 @@ export const LibraryPage = () => {
     // repère sur la première série de chaque lettre.
     const byName =
         sort === 'name' &&
+        !bySuggestion &&
         (display.groupBy === 'none' || display.groupBy === 'letter');
     const firstOfLetter = new Map<number, string>();
     if (byName) {
@@ -450,9 +473,19 @@ export const LibraryPage = () => {
                                                         ? `${ratingLabel(item.rating)} · ${reviewsLabel(item.ratingCount ?? 0)}`
                                                         : 'Pas de note'
                                                     : sort === 'year'
-                                                      ? releaseLabel(item) ||
-                                                        'Année inconnue'
-                                                      : undefined
+                                                      ? releaseLabel(item, {
+                                                            compact: true,
+                                                        }) || 'Année inconnue'
+                                                      : suggestions?.get(
+                                                            item.id,
+                                                        )
+                                            }
+                                            // Une raison « Pour toi » : deux
+                                            // lignes.
+                                            subtitleLines={
+                                                suggestions?.has(item.id)
+                                                    ? 2
+                                                    : undefined
                                             }
                                         />
                                     </div>

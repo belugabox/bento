@@ -104,7 +104,7 @@ describe('forYou', () => {
         expect(names(suggestions)).not.toContain('Gantz');
         expect(names(suggestions)).not.toContain('Blacksad');
         // Même univers (son nom contient « Gantz ») : la raison la plus parlante.
-        expect(suggestions[0]!.reason).toBe('Dans l’univers de Gantz');
+        expect(suggestions[0]!.reason).toBe('Univers de Gantz');
     });
 
     it('counts an abandoned series much less than a finished one', () => {
@@ -140,7 +140,7 @@ describe('forYou', () => {
         const gantz = forYou(list, { now: NOW }).find(
             (s) => s.series.name === 'Gantz',
         );
-        expect(gantz!.reason).toBe('De l’auteur de Inuyashiki');
+        expect(gantz!.reason).toBe('Auteur de Inuyashiki');
     });
 
     it('names a theme that comes back in the readings', () => {
@@ -155,7 +155,7 @@ describe('forYou', () => {
         expect(forYou(list, { now: NOW })).toEqual([
             {
                 series: list[3],
-                reason: 'Souvent dans tes lectures : survie',
+                reason: 'Survie : tu en lis souvent',
             },
         ]);
     });
@@ -168,7 +168,7 @@ describe('forYou', () => {
             series(3, 'Ballroom'),
         ];
         expect(forYou(list, { now: NOW })).toEqual([
-            { series: list[1], reason: 'Dans l’univers de Dragon Ball' },
+            { series: list[1], reason: 'Univers de Dragon Ball' },
         ]);
     });
 });
