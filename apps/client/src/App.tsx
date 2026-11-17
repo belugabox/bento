@@ -12,6 +12,7 @@ import { OfflineBanner } from '@/components/OfflineBanner';
 import { PageLoader } from '@/components/PageLoader';
 import { RequireUser } from '@/components/RequireUser';
 import { BOTTOM_NAV_HEIGHT, useBottomNav } from '@/components/navigation';
+import { useScrollToTop } from '@/components/scrollToTop';
 import { DownloadsPage } from '@/pages/DownloadsPage';
 import { HomePage } from '@/pages/HomePage';
 import { JoinPage } from '@/pages/JoinPage';
@@ -72,6 +73,8 @@ const AdminOnly = ({ children }: { children: React.ReactNode }) =>
  */
 const Layout = () => {
     const bottomNav = useBottomNav();
+    // Une page ouverte commence en haut (pas au défilement de la précédente).
+    useScrollToTop();
     return (
         <AppShell
             header={{ height: 56 }}
