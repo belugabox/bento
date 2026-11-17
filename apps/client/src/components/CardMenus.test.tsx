@@ -105,6 +105,58 @@ describe('SeriesCardMenu', () => {
         await vi.waitFor(() => expect(onChanged).toHaveBeenCalledTimes(2));
     });
 
+    it('takes a series out of the suggestions, then puts it back', async () => {
+        const onChanged = vi.fn();
+        const { unmount } = show(
+            <SeriesCardMenu
+                series={SERIES}
+                isAdmin={false}
+                onChanged={onChanged}
+            />,
+        );
+
+        await choose('Actions pour Gantz', 'Pas pour moi');
+        expect(requests).toEqual([
+            ['PUT', '/api/series/3/lists', { notForMe: true }],
+        ]);
+        expect(
+            await screen.findByText('Retirée des suggestions.'),
+        ).toBeTruthy();
+        unmount();
+
+        // Retirée : le menu propose de l'y remettre.
+        show(
+            <SeriesCardMenu
+                series={{ ...SERIES, notForMe: true }}
+                isAdmin={false}
+                onChanged={onChanged}
+            />,
+        );
+        await choose('Actions pour Gantz', 'Remettre dans les suggestions');
+        expect(requests.at(-1)).toEqual([
+            'PUT',
+            '/api/series/3/lists',
+            { notForMe: false },
+        ]);
+    });
+
+    it('offers « Pas pour moi » only for a series not started', async () => {
+        show(
+            <SeriesCardMenu
+                series={{ ...SERIES, readCount: 1, startedCount: 1 }}
+                isAdmin={false}
+                onChanged={() => {}}
+            />,
+        );
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Actions pour Gantz' }),
+        );
+        await screen.findByRole('menuitem', { name: 'Reprendre' });
+        expect(
+            screen.queryByRole('menuitem', { name: 'Pas pour moi' }),
+        ).toBeNull();
+    });
+
     it('marks the series read up to a volume', async () => {
         show(<SeriesCardMenu series={SERIES} isAdmin onChanged={() => {}} />);
 

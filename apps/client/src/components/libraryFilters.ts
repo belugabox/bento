@@ -2,7 +2,8 @@ import type { FamilyReader } from '@/components/homeGroups';
 import { type ListedSeries, readingStateOf } from '@/components/seriesFilters';
 
 /** Où en est la personne dans la série (filtre « Ma lecture »). */
-export type ReadingFilter = 'toread' | 'unread' | 'started' | 'new' | 'read';
+export type ReadingFilter =
+    'toread' | 'unread' | 'started' | 'new' | 'read' | 'notforme';
 
 export const READING_FILTERS: { value: ReadingFilter; label: string }[] = [
     { value: 'toread', label: 'À lire' },
@@ -10,6 +11,8 @@ export const READING_FILTERS: { value: ReadingFilter; label: string }[] = [
     { value: 'started', label: 'En cours' },
     { value: 'new', label: 'Nouveaux tomes' },
     { value: 'read', label: 'Lues' },
+    // Retirées des suggestions : de quoi les y remettre.
+    { value: 'notforme', label: 'Pas pour moi' },
 ];
 
 export type ReleaseFilter = 'ongoing' | 'completed';
@@ -121,6 +124,7 @@ const READING_TESTS: Record<ReadingFilter, (s: ListedSeries) => boolean> = {
     started: (s) => readingStateOf(s) === 'started',
     new: (s) => (s.newCount ?? 0) > 0,
     read: (s) => readingStateOf(s) === 'read',
+    notforme: (s) => !!s.notForMe,
 };
 
 /** La série passe-t-elle tous les filtres ? */

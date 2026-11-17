@@ -189,9 +189,11 @@ export type InProgressVolume = Awaited<
     ReturnType<typeof fetchInProgress>
 >[number];
 
-/** Liste « à lire » de la personne. */
-export const setSeriesLists = (seriesId: number, lists: { toRead?: boolean }) =>
-    json(api.series[':id'].lists.$put({ ...id(seriesId), json: lists }));
+/** Listes de la personne : « à lire », « pas pour moi » (suggestions). */
+export const setSeriesLists = (
+    seriesId: number,
+    lists: { toRead?: boolean; notForMe?: boolean },
+) => json(api.series[':id'].lists.$put({ ...id(seriesId), json: lists }));
 
 // --- Comptes -------------------------------------------------------------------
 

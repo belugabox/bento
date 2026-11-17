@@ -83,6 +83,7 @@ describe('library filters', () => {
         expect(kept({ reading: ['unread'] })).toEqual(['Akira']);
         expect(kept({ reading: ['started'] })).toEqual(['Berserk']);
         expect(kept({ reading: ['read'] })).toEqual(['Blacksad']);
+        expect(kept({ reading: ['notforme'] })).toEqual([]);
         expect(kept({ reading: ['toread', 'new'] })).toEqual([
             'Berserk',
             'Blacksad',

@@ -25,11 +25,14 @@ export const SeriesSuggestions = ({
     });
     const target = data?.find((s) => s.id === seriesId);
     if (!data || !target) return null;
-    const sameAuthor = sameAuthorSeries(target, data);
+    // Jamais une série retirée des suggestions (« Pas pour moi »).
+    const sameAuthor = sameAuthorSeries(target, data).filter(
+        (s) => !s.series.notForMe,
+    );
     // Un même auteur ne revient pas dans le bloc d'après.
     const shown = new Set(sameAuthor.map((s) => s.series.id));
     const similar = similarSeries(target, data).filter(
-        (s) => !shown.has(s.series.id),
+        (s) => !shown.has(s.series.id) && !s.series.notForMe,
     );
     const author = sameAuthor[0]?.reason;
     return (

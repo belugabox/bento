@@ -512,11 +512,17 @@ export const createApi = ({
                     ),
                 ),
         )
-        // Liste « à lire » de la personne.
+        // Listes de la personne : « à lire », « pas pour moi ».
         .put(
             '/series/:id/lists',
             zValidator('param', idParam),
-            zValidator('json', z.object({ toRead: z.boolean().optional() })),
+            zValidator(
+                'json',
+                z.object({
+                    toRead: z.boolean().optional(),
+                    notForMe: z.boolean().optional(),
+                }),
+            ),
             (c) =>
                 c.json(
                     setSeriesLists(

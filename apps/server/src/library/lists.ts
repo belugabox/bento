@@ -1,4 +1,4 @@
-import { and, eq } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 
 import type { Db } from '../db';
 import { series, seriesLists } from '../db/schema';
@@ -16,17 +16,21 @@ const checkVisible = (db: Db, viewer: Viewer, seriesId: number) => {
 };
 
 /**
- * Ajoute ou retire une série de la liste « à lire ». (Les favoris ont été
- * retirés le 6 novembre 2026 ; leurs lignes restent en base, ignorées.)
+ * Ajoute ou retire une série de la liste « à lire », ou de « pas pour
+ * moi » (retirée des suggestions). (Les favoris ont été retirés le
+ * 6 novembre 2026 ; leurs lignes restent en base, ignorées.)
  */
 export const setSeriesLists = (
     db: Db,
     viewer: Viewer,
     seriesId: number,
-    changes: { toRead?: boolean },
+    changes: { toRead?: boolean; notForMe?: boolean },
 ) => {
     checkVisible(db, viewer, seriesId);
-    const lists = [['toread', changes.toRead]] as const;
+    const lists = [
+        ['toread', changes.toRead],
+        ['notforme', changes.notForMe],
+    ] as const;
     for (const [list, member] of lists) {
         if (member === undefined) continue;
         if (member) {
@@ -57,7 +61,10 @@ export const setSeriesLists = (
         )
         .all()
         .map((row) => row.list);
-    return { toRead: kept.includes('toread') };
+    return {
+        toRead: kept.includes('toread'),
+        notForMe: kept.includes('notforme'),
+    };
 };
 
 /**
@@ -71,7 +78,7 @@ export const listsSnapshot = (db: Db, seriesId: number) => ({
         .where(
             and(
                 eq(seriesLists.seriesId, seriesId),
-                eq(seriesLists.list, 'toread'),
+                inArray(seriesLists.list, ['toread', 'notforme']),
             ),
         )
         .all(),

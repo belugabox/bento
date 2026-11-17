@@ -22,6 +22,8 @@ import {
     IconPlayerPlay,
     IconPlayerSkipBack,
     IconRotate,
+    IconThumbDown,
+    IconThumbUp,
     IconTrash,
     IconX,
 } from '@tabler/icons-react';
@@ -233,6 +235,7 @@ export const SeriesCardMenu = ({
         readCount: number;
         startedCount: number;
         toRead?: boolean;
+        notForMe?: boolean;
     };
     isAdmin: boolean;
     onChanged: () => void;
@@ -285,6 +288,18 @@ export const SeriesCardMenu = ({
                     ? 'Ajoutée à « À lire ».'
                     : 'Retirée de « À lire ».',
                 undo: () => setSeriesLists(series.id, { toRead: !toRead }),
+            };
+        }, onChanged);
+
+    /** Retirée des suggestions (accueil, fiche), ou remise. */
+    const toggleNotForMe = (notForMe: boolean) =>
+        void runAction(async () => {
+            await setSeriesLists(series.id, { notForMe });
+            return {
+                message: notForMe
+                    ? 'Retirée des suggestions.'
+                    : 'Remise dans les suggestions.',
+                undo: () => setSeriesLists(series.id, { notForMe: !notForMe }),
             };
         }, onChanged);
 
@@ -344,6 +359,26 @@ export const SeriesCardMenu = ({
                         >
                             Ajouter à « À lire »
                         </Menu.Item>
+                    )}
+                    {/* Pas commencée (les suggestions), ou déjà retirée. */}
+                    {series.notForMe ? (
+                        <Menu.Item
+                            leftSection={<IconThumbUp size={14} />}
+                            disabled={readOnly}
+                            onClick={() => toggleNotForMe(false)}
+                        >
+                            Remettre dans les suggestions
+                        </Menu.Item>
+                    ) : (
+                        !started && (
+                            <Menu.Item
+                                leftSection={<IconThumbDown size={14} />}
+                                disabled={readOnly}
+                                onClick={() => toggleNotForMe(true)}
+                            >
+                                Pas pour moi
+                            </Menu.Item>
+                        )
                     )}
                     {isAdmin && (
                         <>

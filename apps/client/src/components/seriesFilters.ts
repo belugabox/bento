@@ -16,6 +16,8 @@ export type ListedSeries = {
     format?: string | null;
     status?: 'ongoing' | 'completed' | null;
     toRead?: boolean;
+    // Retirée des suggestions par la personne (« Pas pour moi »).
+    notForMe?: boolean;
     // Note des lecteurs, sur 5, et son nombre d'avis (tri « Mieux notées »).
     rating?: number | null;
     ratingCount?: number;

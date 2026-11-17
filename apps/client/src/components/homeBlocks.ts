@@ -49,14 +49,19 @@ export const homeBlocks = (
         ),
     );
     // D'après ce que la personne lit (rien sans lecture).
-    const suggested = forYou(series, { limit: 50, now });
+    const suggested = forYou(series, { limit: 50, now }).filter(
+        (s) => !s.series.notForMe,
+    );
     const reasons = new Map(suggested.map((s) => [s.series.id, s.reason]));
     const mine = take(suggested.map((s) => s.series));
     // Lues par d'autres, pas commencées : les plus lues d'abord.
     const family = take(
         sortSeries(
             series.filter(
-                (s) => s.startedCount === 0 && readersOf(s).length > 0,
+                (s) =>
+                    s.startedCount === 0 &&
+                    !s.notForMe &&
+                    readersOf(s).length > 0,
             ),
             'recent',
         ).sort((a, b) => readersOf(b).length - readersOf(a).length),
@@ -65,7 +70,7 @@ export const homeBlocks = (
     const rated = take(
         gems.flatMap((gem) => {
             const found = byId.get(gem.id);
-            return found ? [found] : [];
+            return found && !found.notForMe ? [found] : [];
         }),
     );
     const recent = take(sortSeries(series, 'recent'));

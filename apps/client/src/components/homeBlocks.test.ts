@@ -76,6 +76,23 @@ describe('homeBlocks', () => {
         expect(ids(blocks.family)).toEqual([2, 1]);
     });
 
+    it('never suggests a series taken out of the suggestions', () => {
+        const list = [
+            series(1, { readCount: 3, startedCount: 3, genres: ['Horreur'] }),
+            series(2, { genres: ['Horreur'], notForMe: true }),
+            series(3, { notForMe: true }),
+            series(4, { notForMe: true }),
+        ];
+        const blocks = homeBlocks(list, [], [{ id: 7, seriesIds: [3] }], {
+            gems: [{ id: 4, rating: 4.8, reviews: 50 }],
+        });
+        expect(ids(blocks.forYou)).toEqual([]);
+        expect(ids(blocks.family)).toEqual([]);
+        expect(ids(blocks.gems)).toEqual([]);
+        // Elles restent dans les ajouts récents (pas une suggestion).
+        expect(ids(blocks.recent)).toContain(2);
+    });
+
     it('orders the new volumes by the last reading', () => {
         const list = [
             series(1, { newCount: 1, lastReadAt: 100 }),

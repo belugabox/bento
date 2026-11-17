@@ -99,6 +99,11 @@ const listsOf = (viewer: Viewer) => ({
     toRead: sql<boolean>`exists(select 1 from series_lists sl where sl.series_id = series.id and sl.user_id = ${viewer.id} and sl.list = 'toread')`.mapWith(
         Boolean,
     ),
+    // Retirée des suggestions par la personne (« Pas pour moi »).
+    notForMe:
+        sql<boolean>`exists(select 1 from series_lists sl where sl.series_id = series.id and sl.user_id = ${viewer.id} and sl.list = 'notforme')`.mapWith(
+            Boolean,
+        ),
 });
 
 /**
