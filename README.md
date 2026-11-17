@@ -40,7 +40,7 @@ Toute la configuration passe par des variables d'environnement :
 | `LIBRARIES` | `[]` | Bibliothèques, en JSON : `[{"name":"Mangas","path":"/manga","type":"manga"}]`. Type `manga` ou `comics` : mode de lecture par défaut « Manga (gauche → droite) » ou « BD » |
 | `SCAN_INTERVAL_MINUTES` | `30` | Scan automatique des bibliothèques (`0` = seulement au démarrage et à la demande) |
 | `PUBLIC_URL` | — (requis) | Adresse publique de Bento : liens d'invitation, cookies `Secure` en HTTPS |
-| `LIBRARIES_OFFLINE` | `0` | `1` : fichiers des bibliothèques absents (copie de la prod sur un poste). Ni alignement des bibliothèques sur `LIBRARIES`, ni scan (au démarrage, périodique ou demandé), ni mise à jour de nuit des fiches ; un bandeau le rappelle. Sans cela, le premier scan croirait tous les tomes disparus et les effacerait de la copie |
+| `LIBRARIES_OFFLINE` | `0` | `1` : fichiers des bibliothèques absents (copie de la prod sur un poste). Ni alignement des bibliothèques sur `LIBRARIES`, ni scan (au démarrage, périodique ou demandé), ni mise à jour de nuit des fiches ; une pastille violette « Copie de la prod » à côté du logo et un liseré violet en haut de l'écran le rappellent. Sans cela, le premier scan croirait tous les tomes disparus et les effacerait de la copie |
 
 ### Parcourir une copie de la prod
 
@@ -185,7 +185,7 @@ Dans la page Moi, pour tous les comptes : sa propre fiche (lecture sur une péri
 - **Âge maximal** : l'admin le règle pour chaque personne dans « Comptes », depuis la page Moi, parmi les âges de la grille.
 - **Âge d'une série** : celui choisi dans l'éditeur (grille des réglages), sinon la classification la plus restrictive de ses tomes (`AgeRating` du ComicInfo).
 - **Comptes limités** : ils ne voient que les séries classées sous leur limite. Une série sans classification leur est masquée, partout : liste, fiche, tomes, pages, couvertures, « Reprendre la lecture ».
-- **Admins** : ils voient tout. « Voir comme un lecteur… », dans la page Moi, leur permet de **voir l'appli comme un compte lecteur** (ses séries, ses lectures, sa liste « À lire », en lecture seule : rien n'est enregistré, les boutons qui modifient sont grisés) ou comme un lecteur fictif d'un âge donné ; un bandeau permet de revenir à la vue admin.
+- **Admins** : ils voient tout. « Voir comme un lecteur… », dans la page Moi, leur permet de **voir l'appli comme un compte lecteur** (ses séries, ses lectures, sa liste « À lire », en lecture seule : rien n'est enregistré, les boutons qui modifient sont grisés) ou comme un lecteur fictif d'un âge donné ; une pastille orange à côté du logo (« Vue de Léa », ou « Vue jusqu’à 10 ans » ; l'icône seule sur téléphone) et un liseré orange en haut de l'écran le rappellent, sans pousser la page ; un toucher sur la pastille l'explique et propose « Revenir à la vue admin ».
 - **Classifications** : les variantes du ComicInfo sont regroupées par âge (« 10 ans et + » regroupe « Everyone 10+ » et « PG », par exemple).
 
 ### Comptes et connexion

@@ -21,20 +21,16 @@ import { Link, useLocation, useNavigate } from 'react-router';
 
 import logo from '@/assets/logo.svg';
 import { DownloadIndicator } from '@/components/DownloadIndicator';
+import { ModeBadges } from '@/components/ModeBadges';
 import { UserAvatar } from '@/components/accounts/UserAvatar';
-import { ageLimitLabel } from '@/components/ageLimits';
 import { NAV_ITEMS, navSection, useBottomNav } from '@/components/navigation';
-import { switchView } from '@/components/switchView';
 import {
     DRAFTS_CHANGED,
     type Task,
-    fetchHealth,
     fetchPendingDrafts,
     fetchTasks,
-    stopPreview,
 } from '@/services/api';
 import { useCurrentUser } from '@/services/auth';
-import { useQuery } from '@/services/useQuery';
 
 const REFRESH_MS = 60_000;
 // Tâches : suivies de près pendant qu'il y en a, sinon de temps en temps.
@@ -277,6 +273,8 @@ export const AppHeader = () => {
                         </Title>
                     </Group>
                 </Anchor>
+                {/* Vue lecteur, copie de la prod : à côté du logo. */}
+                <ModeBadges />
                 {!bottomNav && <HeaderLinks />}
             </Group>
             <Group gap="sm" wrap="nowrap">
@@ -299,7 +297,6 @@ export const AppHeader = () => {
     );
 };
 
-/** Rappel de la vue lecteur d'un admin, avec retour à la vue admin. */
 /**
  * Compte venu de Pocket ID, encore connecté : il doit choisir son
  * identifiant et son mot de passe pour pouvoir se reconnecter.
@@ -326,57 +323,6 @@ export const ActivationBanner = () => {
                     Choisir
                 </Button>
             </Group>
-        </Alert>
-    );
-};
-
-export const PreviewBanner = () => {
-    const { preview } = useCurrentUser();
-    if (!preview) return null;
-    return (
-        <Alert color="orange" variant="light" mb="md" py="xs">
-            <Group justify="space-between">
-                <Text size="sm">
-                    {preview.user ? (
-                        <>
-                            Vue de <b>{preview.user.name}</b>, en lecture seule
-                            : rien n’est enregistré.
-                        </>
-                    ) : (
-                        <>
-                            Vue lecteur :{' '}
-                            {ageLimitLabel(preview.maxAge).toLowerCase()}. Les
-                            écrans d’administration sont masqués.
-                        </>
-                    )}
-                </Text>
-                <Button
-                    size="xs"
-                    variant="light"
-                    color="orange"
-                    onClick={() => void switchView(stopPreview)}
-                >
-                    Revenir à la vue admin
-                </Button>
-            </Group>
-        </Alert>
-    );
-};
-
-/**
- * Copie de la prod sur un poste (`LIBRARIES_OFFLINE`) : pour parcourir, pas
- * pour lire ; à ne pas confondre avec le serveur de dev.
- */
-export const ProductionCopyBanner = () => {
-    const { data } = useQuery(fetchHealth, [], { cacheKey: 'health' });
-    if (!data?.offlineLibraries) return null;
-    return (
-        <Alert color="grape" variant="light" mb="md" py="xs">
-            <Text size="sm">
-                Copie de la prod : les fichiers des bibliothèques sont absents.
-                On parcourt, sans lire de tome ; aucun scan ni mise à jour des
-                fiches.
-            </Text>
         </Alert>
     );
 };

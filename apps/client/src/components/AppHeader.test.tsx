@@ -5,7 +5,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { type CurrentUser, UserContext } from '@/services/auth';
 
-import { AppHeader, PreviewBanner, ProductionCopyBanner } from './AppHeader';
+import { AppHeader } from './AppHeader';
+import { ModeLine } from './ModeBadges';
 
 const user = (overrides: Partial<CurrentUser> = {}): CurrentUser => ({
     id: 1,
@@ -43,8 +44,7 @@ const show = (current: CurrentUser, path = '/') =>
             <MemoryRouter initialEntries={[path]}>
                 <UserContext.Provider value={current}>
                     <AppHeader />
-                    <PreviewBanner />
-                    <ProductionCopyBanner />
+                    <ModeLine />
                     <Address />
                 </UserContext.Provider>
             </MemoryRouter>
@@ -150,21 +150,36 @@ describe('AppHeader', () => {
         expect(requests.filter(([, url]) => url !== '/api/health')).toEqual([]);
     });
 
-    it('says when the server is a copy of the production without files', async () => {
+    it('says in the header when the server is a copy of the production', async () => {
         health = true;
-        show(user());
+        const { container } = show(user());
 
-        expect(await screen.findByText(/Copie de la prod/)).toBeTruthy();
+        // Une pastille à côté du logo ; l'explication au toucher.
+        fireEvent.click(
+            await screen.findByRole('button', { name: 'Copie de la prod' }),
+        );
+        expect(
+            await screen.findByText(/fichiers des bibliothèques sont absents/),
+        ).toBeTruthy();
+        // Et un liseré de sa couleur en haut de l'écran.
+        expect(
+            container.querySelector('[style*="--mantine-color-grape-6"]'),
+        ).toBeTruthy();
     });
 
     it('says nothing on a normal server', async () => {
-        show(user());
+        const { container } = show(user());
 
         await screen.findByText('3');
-        expect(screen.queryByText(/Copie de la prod/)).toBeNull();
+        expect(
+            screen.queryByRole('button', { name: 'Copie de la prod' }),
+        ).toBeNull();
+        expect(
+            container.querySelector('[style*="-6)"][aria-hidden]'),
+        ).toBeNull();
     });
 
-    it('reminds a simulated account', () => {
+    it('reminds a simulated account in the header', async () => {
         show(
             user({
                 id: 5,
@@ -175,14 +190,19 @@ describe('AppHeader', () => {
             }),
         );
 
-        expect(screen.getByText(/en lecture seule/)).toBeTruthy();
-        expect(screen.getByText('Léa')).toBeTruthy();
+        fireEvent.click(screen.getByRole('button', { name: 'Vue de Léa' }));
+        expect(await screen.findByText(/en lecture seule/)).toBeTruthy();
     });
 
     it('reminds the reader view, and goes back to the admin view', async () => {
         show(user({ role: 'reader', maxAge: 10, preview: { maxAge: 10 } }));
 
-        expect(screen.getByText(/Vue lecteur : jusqu’à 10 ans/)).toBeTruthy();
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Vue jusqu’à 10 ans' }),
+        );
+        expect(
+            await screen.findByText(/Vue lecteur : jusqu’à 10 ans/),
+        ).toBeTruthy();
         await act(async () => {
             fireEvent.click(
                 screen.getByRole('button', { name: 'Revenir à la vue admin' }),

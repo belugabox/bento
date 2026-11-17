@@ -2,13 +2,9 @@ import { AppShell, Container } from '@mantine/core';
 import { Suspense, lazy } from 'react';
 import { Navigate, Outlet, Route, Routes } from 'react-router';
 
-import {
-    ActivationBanner,
-    AppHeader,
-    PreviewBanner,
-    ProductionCopyBanner,
-} from '@/components/AppHeader';
+import { ActivationBanner, AppHeader } from '@/components/AppHeader';
 import { BottomNav } from '@/components/AppNav';
+import { ModeLine } from '@/components/ModeBadges';
 import { OfflineBanner } from '@/components/OfflineBanner';
 import { PageLoader } from '@/components/PageLoader';
 import { RequireUser } from '@/components/RequireUser';
@@ -108,9 +104,7 @@ const Layout = () => {
             )}
             <AppShell.Main>
                 <Container size="xl">
-                    <ProductionCopyBanner />
                     <OfflineBanner />
-                    <PreviewBanner />
                     <ActivationBanner />
                     <Outlet />
                 </Container>
@@ -127,6 +121,8 @@ export const App = () => (
         <Route
             element={
                 <RequireUser>
+                    {/* Vue lecteur, copie de la prod : un liseré partout. */}
+                    <ModeLine />
                     <Outlet />
                 </RequireUser>
             }
