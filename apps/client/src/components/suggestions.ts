@@ -170,12 +170,32 @@ const liking = (s: SeriesSummary, now: number) => {
     return abandoned ? base * 0.3 : base;
 };
 
+/** Nom en mots (sans casse, accents ni ponctuation), pour « même univers ». */
+const words = (name: string) =>
+    ` ${key(name)
+        .replace(/[^a-z0-9]+/g, ' ')
+        .trim()} `;
+
+// Une série du même univers ou du même auteur qu'une lue monte d'autant.
+const UNIVERSE_BOOST = 1.5;
+const AUTHOR_BOOST = 1.3;
+// Un genre ou un thème « revient » dans les lectures : au moins tant de
+// séries lues.
+const FREQUENT_TAG = 3;
+
 /**
  * « Pour toi » : le profil de la personne (genres et thèmes de ce qu'elle
  * lit, pesés par son goût pour chaque série), puis les séries pas
- * commencées qui y ressemblent le plus. Raison : la série lue qui lui
- * ressemble le plus (« Comme Spirale », court : il tient sous la carte).
- * Rien sans lecture.
+ * commencées qui y ressemblent le plus. La raison, la première qui
+ * s'applique :
+ * 1. même univers qu'une série lue (son nom la contient) : « Dans
+ *    l'univers de Naruto » ;
+ * 2. même scénariste ou dessinateur : « De l'auteur de Gantz » ;
+ * 3. un genre ou un thème qui revient dans les lectures (au moins 3
+ *    séries) et pèse le plus : « Souvent dans tes lectures : survie » ;
+ * 4. la série lue qui lui ressemble le plus : « Comme Spirale ».
+ * Courtes : elles tiennent sous la carte. Les deux premières font aussi
+ * monter la série, même sans genre en commun. Rien sans lecture.
  */
 export const forYou = (
     all: SeriesSummary[],
@@ -184,12 +204,17 @@ export const forYou = (
     const weights = tagWeights(all);
     const read = all
         .map((s) => ({ series: s, liking: liking(s, now) }))
-        .filter((r) => r.liking > 0);
+        // Les plus aimées d'abord : elles donnent les raisons.
+        .filter((r) => r.liking > 0)
+        .sort((a, b) => b.liking - a.liking);
     if (read.length === 0) return [];
     const profile = new Map<string, number>();
+    // Séries lues de chaque genre ou thème.
+    const readCount = new Map<string, number>();
     for (const { series, liking: like } of read) {
         for (const tag of tagsOf(series)) {
             profile.set(tag.key, (profile.get(tag.key) ?? 0) + like);
+            readCount.set(tag.key, (readCount.get(tag.key) ?? 0) + 1);
         }
     }
     const scores = new Map<number, number>();
@@ -197,14 +222,31 @@ export const forYou = (
     for (const s of all) {
         if (readingStateOf(s) !== 'unread') continue;
         const tags = tagsOf(s);
-        const score = tags.reduce(
-            (sum, tag) =>
-                sum + (profile.get(tag.key) ?? 0) * (weights.get(tag.key) ?? 0),
-            0,
+        const part = (tag: Tag) =>
+            (profile.get(tag.key) ?? 0) * (weights.get(tag.key) ?? 0);
+        let score = tags.reduce((sum, tag) => sum + part(tag), 0);
+
+        // 1. Même univers : le nom d'une série lue, en mots entiers.
+        const name = words(s.name);
+        const universe = read.find((r) => {
+            const other = words(r.series.name);
+            return other.trim().length >= 3 && name.includes(other);
+        });
+        // 2. Même auteur.
+        const authors = new Set(authorsOf(s).map((a) => a.key));
+        const author = read.find((r) =>
+            authorsOf(r.series).some((a) => authors.has(a.key)),
         );
+        if (universe || author) {
+            // Même sans genre en commun.
+            score =
+                Math.max(score, 1) * (universe ? UNIVERSE_BOOST : AUTHOR_BOOST);
+        }
         if (score <= 0) continue;
-        scores.set(s.id, score);
-        // La série lue la plus proche, pesée par le goût pour elle.
+
+        // 3. Le genre ou thème qui pèse le plus, s'il revient souvent.
+        const top = [...tags].sort((a, b) => part(b) - part(a))[0];
+        // 4. La série lue la plus proche, pesée par le goût pour elle.
         const keys = new Set(tags.map((t) => t.key));
         const closest = read
             .map((r) => ({
@@ -216,12 +258,24 @@ export const forYou = (
                         .reduce((sum, t) => sum + (weights.get(t.key) ?? 0), 0),
             }))
             .sort((a, b) => b.closeness - a.closeness)[0];
-        if (closest && closest.closeness > 0) {
-            reasons.set(s.id, `Comme ${closest.name}`);
-        }
+
+        const reason = universe
+            ? `Dans l’univers de ${universe.series.name}`
+            : author
+              ? `De l’auteur de ${author.series.name}`
+              : top &&
+                  part(top) > 0 &&
+                  (readCount.get(top.key) ?? 0) >= FREQUENT_TAG
+                ? `Souvent dans tes lectures : ${top.name}`
+                : closest && closest.closeness > 0
+                  ? `Comme ${closest.name}`
+                  : undefined;
+        if (!reason) continue;
+        scores.set(s.id, score);
+        reasons.set(s.id, reason);
     }
     return all
-        .filter((s) => scores.has(s.id) && reasons.has(s.id))
+        .filter((s) => scores.has(s.id))
         .sort(byScore(scores))
         .slice(0, limit)
         .map((series) => ({ series, reason: reasons.get(series.id)! }));

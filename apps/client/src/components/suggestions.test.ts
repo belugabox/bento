@@ -103,7 +103,8 @@ describe('forYou', () => {
         expect(names(suggestions)[0]).toBe('Gantz G');
         expect(names(suggestions)).not.toContain('Gantz');
         expect(names(suggestions)).not.toContain('Blacksad');
-        expect(suggestions[0]!.reason).toBe('Comme Gantz');
+        // Même univers (son nom contient « Gantz ») : la raison la plus parlante.
+        expect(suggestions[0]!.reason).toBe('Dans l’univers de Gantz');
     });
 
     it('counts an abandoned series much less than a finished one', () => {
@@ -130,5 +131,44 @@ describe('forYou', () => {
         expect(fresh.find((s) => s.series.name === 'Gantz')!.reason).toBe(
             'Comme Spirale',
         );
+    });
+
+    it('names the author in common with a series read', () => {
+        const list = LIST.map((s) =>
+            s.id === 3 ? { ...s, readCount: 3, startedCount: 3 } : s,
+        );
+        const gantz = forYou(list, { now: NOW }).find(
+            (s) => s.series.name === 'Gantz',
+        );
+        expect(gantz!.reason).toBe('De l’auteur de Inuyashiki');
+    });
+
+    it('names a theme that comes back in the readings', () => {
+        const read = { readCount: 3, startedCount: 3 };
+        const list = [
+            series(1, 'Battle Royale', { themes: ['survie'], ...read }),
+            series(2, 'Dragon Head', { themes: ['survie'], ...read }),
+            series(3, 'Btooom!', { themes: ['survie'], ...read }),
+            series(4, 'Kaiji', { themes: ['survie', 'jeu'] }),
+            series(5, 'Hikaru no Go', { themes: ['jeu'] }),
+        ];
+        expect(forYou(list, { now: NOW })).toEqual([
+            {
+                series: list[3],
+                reason: 'Souvent dans tes lectures : survie',
+            },
+        ]);
+    });
+
+    it('suggests a series of the same universe, even without a genre in common', () => {
+        const list = [
+            series(1, 'Dragon Ball', { readCount: 3, startedCount: 3 }),
+            series(2, 'Dragon Ball Super'),
+            // « Ball » seul n'est pas le même univers.
+            series(3, 'Ballroom'),
+        ];
+        expect(forYou(list, { now: NOW })).toEqual([
+            { series: list[1], reason: 'Dans l’univers de Dragon Ball' },
+        ]);
     });
 });
