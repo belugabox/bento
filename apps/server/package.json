@@ -7,6 +7,7 @@
         "build": "tsc",
         "start": "node dist/main.js",
         "admin-link": "node dist/adminLink.js",
+        "prod-copy": "node dist/prodCopy.js",
         "dev": "tsx watch ./src/main.ts",
         "test": "tsc -p tsconfig.test.json && vitest run",
         "db:generate": "drizzle-kit generate"

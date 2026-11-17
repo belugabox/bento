@@ -44,12 +44,13 @@ Toute la configuration passe par des variables d'environnement :
 
 ### Parcourir une copie de la prod
 
-Avec une copie du dossier de données de la prod (`bento.db` et ses fichiers `-wal` et `-shm`, `covers/`) dans un dossier à part, jamais celui du développement. Le serveur y applique les migrations de la branche et y ouvre des sessions : garder une autre copie pour recommencer. Après `pnpm build` :
+Avec une copie du dossier de données de la prod (`bento.db` et ses fichiers `-wal` et `-shm`, `covers/`) dans `bento-prod`, à côté du dépôt (`PROD_COPY_PATH` pour un autre dossier), jamais celui du développement. Le serveur y applique les migrations de la branche et y ouvre des sessions : garder une autre copie pour recommencer.
 
 ```sh
-cd apps/server
-PORT=3200 DATA_PATH=O:/PERSO/bento-prod LIBRARIES='[]' LIBRARIES_OFFLINE=1 PUBLIC_URL=http://127.0.0.1:3200 node dist/main.js
+pnpm prod-copy
 ```
+
+Le build, puis le serveur sur le port 3200 (`PROD_COPY_PORT` pour un autre), en mode `LIBRARIES_OFFLINE`, sans le `.env` du développement pour ces variables (`apps/server/src/prodCopy.ts`).
 
 Ouvrir `http://127.0.0.1:3200` (pas `localhost` : le cookie de session serait celui du serveur de développement) et se connecter avec son compte de la prod. Accueil, bibliothèque, fiches, statistiques et suggestions marchent ; les tomes ne se lisent pas (pages absentes, sauf celles déjà réduites dans `pages/`).
 
