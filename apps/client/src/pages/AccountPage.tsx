@@ -269,7 +269,8 @@ const PasswordSection = () => {
 export const AccountPage = () => {
     const user = useCurrentUser();
     return (
-        <Stack maw={560}>
+        // Centrée, à la largeur de « Moi ».
+        <Stack maw={640} mx="auto" w="100%">
             <PageHeader back="/me" title="Mon compte" />
             {user.preview?.user ? (
                 <Alert color="orange" variant="light">

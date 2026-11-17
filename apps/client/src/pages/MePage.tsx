@@ -162,7 +162,7 @@ export const MePage = () => {
     const bytes = downloads.reduce((sum, volume) => sum + volume.bytes, 0);
 
     return (
-        <Stack gap="lg" maw={640} mx="auto">
+        <Stack gap="lg" maw={640} mx="auto" w="100%">
             <PreviewModal opened={previewOpened} onClose={previewModal.close} />
             <AppearanceModal
                 opened={appearanceOpened}

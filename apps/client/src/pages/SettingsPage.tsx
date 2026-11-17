@@ -301,7 +301,7 @@ export const SettingsPage = () => {
     if (!current) return <PageLoader />;
 
     return (
-        <Stack maw={720}>
+        <Stack maw={720} mx="auto" w="100%">
             <PageHeader back="/me" title="Réglages" />
             <Tabs
                 value={tab}

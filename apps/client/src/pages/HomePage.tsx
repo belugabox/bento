@@ -13,7 +13,9 @@ import {
     Stack,
     Text,
     Title,
+    useMatches,
 } from '@mantine/core';
+import { useElementSize } from '@mantine/hooks';
 import {
     IconBook,
     IconChevronRight,
@@ -29,6 +31,7 @@ import { SuggestionRow } from '@/components/SuggestionRow';
 import { UserAvatar } from '@/components/accounts/UserAvatar';
 import { ratingLabel, reviewsLabel } from '@/components/format';
 import { homeBlocks } from '@/components/homeBlocks';
+import { gridColumns, useLibraryDisplay } from '@/components/libraryDisplay';
 import { libraryLink } from '@/components/libraryFilters';
 import { volumeLabel, volumeShortLabel } from '@/components/readingStatus';
 import { useScrollMemory } from '@/components/scrollMemory';
@@ -76,21 +79,27 @@ const VolumeCover = ({ volume }: { volume: InProgressVolume }) => (
     </AspectRatio>
 );
 
+// Espace entre deux cartes des blocs (`spacing="sm"` de leur grille).
+const CARD_GAP = 12;
+
 /** Grande carte du dernier tome en cours : « Continuer ». */
 const ResumeHero = ({
     volume,
     onChanged,
+    coverWidth,
 }: {
     volume: InProgressVolume;
     onChanged: () => void;
+    /** Largeur d'une carte des autres blocs ; inconnue : une taille fixe. */
+    coverWidth?: number;
 }) => (
     <Paper withBorder radius="md" p={{ base: 'sm', sm: 'md' }}>
         <Group wrap="nowrap" align="center" gap="md">
             <Box
                 component={Link}
                 to={`/read/${volume.volumeId}`}
-                // Au moins la taille des cartes des autres blocs (signalé).
-                w={{ base: 120, xs: 140, sm: 170 }}
+                // La taille des couvertures des autres blocs (demandé).
+                w={coverWidth ?? { base: 120, xs: 140, sm: 170 }}
                 style={{ flexShrink: 0 }}
                 aria-label={`Lire ${volume.seriesName}`}
             >
@@ -276,6 +285,15 @@ const ReadersTag = ({ readers }: { readers: FamilyReader[] }) => (
  */
 export const HomePage = () => {
     const isAdmin = useContext(UserContext)?.role === 'admin';
+    // Largeur d'une carte des blocs : celle de la page, partagée entre les
+    // cartes d'une ligne et leurs espaces (comme leur grille).
+    const display = useLibraryDisplay();
+    const perRow = useMatches(gridColumns(display.size));
+    const { ref: page, width } = useElementSize();
+    const coverWidth = width
+        ? // Moins la bordure de la carte, de chaque côté de sa couverture.
+          (width - (perRow - 1) * CARD_GAP) / perRow - 2
+        : undefined;
     const online = useOnline();
     // Gardées en mémoire : revenir à l'accueil l'affiche tout de suite.
     const inProgress = useQuery(fetchInProgress, [], {
@@ -331,7 +349,7 @@ export const HomePage = () => {
     }
 
     return (
-        <Stack gap="xl">
+        <Stack gap="xl" ref={page}>
             {first && (
                 <PageSection
                     title="En cours"
@@ -346,7 +364,11 @@ export const HomePage = () => {
                         spacing="sm"
                         data-testid="resume"
                     >
-                        <ResumeHero volume={first} onChanged={reload} />
+                        <ResumeHero
+                            volume={first}
+                            onChanged={reload}
+                            coverWidth={coverWidth}
+                        />
                         {others.length > 0 && (
                             <SimpleGrid
                                 cols={{ base: 1, xs: 2 }}
