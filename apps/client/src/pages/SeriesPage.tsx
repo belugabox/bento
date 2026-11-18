@@ -25,6 +25,7 @@ import {
     IconDownload,
     IconPencil,
     IconPlayerPlay,
+    IconPlayerStop,
     IconRestore,
     IconThumbDown,
     IconThumbUp,
@@ -60,6 +61,7 @@ import {
     progressRatio,
     volumeCountLabel,
     volumeLabel,
+    volumeShortLabel,
     volumeTitleOf,
 } from '@/components/readingStatus';
 import { NEXT_VOLUME_COUNTS, nextVolumesLabel } from '@/offline/auto';
@@ -163,6 +165,8 @@ export const SeriesPage = () => {
 
     const first = series.volumes[0];
     const next = nextToRead(series.volumes);
+    // Relecture en cours : le tome à relire.
+    const rereadNext = series.volumes.find((v) => v.id === series.rereadNextId);
     // « N lus » : comme sur la carte, sans hors-séries ni spéciaux.
     const readCount = countedVolumes(series.volumes).filter(
         (v) => v.progress?.completed,
@@ -259,6 +263,13 @@ export const SeriesPage = () => {
         } catch (e) {
             notifications.show({ color: 'red', message: (e as Error).message });
         }
+    };
+
+    /** Fin de la relecture : « En cours » ne la propose plus. */
+    const stopRereading = async () => {
+        await setSeriesLists(series.id, { rereading: false });
+        notifications.show({ message: 'Relecture arrêtée.' });
+        reload();
     };
 
     /** Coche « lu » d'un tome (sans ouvrir le lecteur). */
@@ -411,19 +422,47 @@ export const SeriesPage = () => {
                     {/* Boutons de lecture, et « Lu par » à droite. */}
                     <Group justify="space-between" gap="xs">
                         <Group gap="xs">
-                            {next && (
+                            {rereadNext ? (
+                                // Relecture en cours : son tome suivant.
                                 <Button
                                     component={Link}
-                                    // Relire : repartir de la première page.
-                                    to={`/read/${next.volume.id}${next.action === 'reread' ? '?page=1' : ''}`}
+                                    to={`/read/${rereadNext.id}`}
                                     leftSection={<IconPlayerPlay size={16} />}
                                     w="fit-content"
                                 >
-                                    {ACTION_LABELS[next.action]}
-                                    {/* One-shot : « Lire » seul. */}
-                                    {!isStandalone(next.volume) &&
-                                        ` ${volumeLabel(next.volume).toLowerCase()}`}
+                                    Reprendre la relecture
+                                    {!isStandalone(rereadNext) &&
+                                        ` · ${volumeShortLabel(rereadNext)}`}
                                 </Button>
+                            ) : (
+                                next && (
+                                    <Button
+                                        component={Link}
+                                        // Relire : repartir de la première
+                                        // page, et commencer une relecture
+                                        // (« En cours » suit les tomes).
+                                        to={`/read/${next.volume.id}${next.action === 'reread' ? '?page=1' : ''}`}
+                                        onClick={() => {
+                                            if (
+                                                next.action === 'reread' &&
+                                                !readOnly
+                                            ) {
+                                                void setSeriesLists(series.id, {
+                                                    rereading: true,
+                                                });
+                                            }
+                                        }}
+                                        leftSection={
+                                            <IconPlayerPlay size={16} />
+                                        }
+                                        w="fit-content"
+                                    >
+                                        {ACTION_LABELS[next.action]}
+                                        {/* One-shot : « Lire » seul. */}
+                                        {!isStandalone(next.volume) &&
+                                            ` ${volumeLabel(next.volume).toLowerCase()}`}
+                                    </Button>
+                                )
                             )}
                             <Tooltip
                                 label={
@@ -482,6 +521,16 @@ export const SeriesPage = () => {
                                     >
                                         Marquer toute la série comme non lue
                                     </Menu.Item>
+                                    {series.rereading && (
+                                        <Menu.Item
+                                            leftSection={
+                                                <IconPlayerStop size={14} />
+                                            }
+                                            onClick={() => void stopRereading()}
+                                        >
+                                            Arrêter la relecture
+                                        </Menu.Item>
+                                    )}
                                     {/* Comme le menu des cartes : pas
                                         commencée, ou déjà retirée. */}
                                     {series.notForMe ? (

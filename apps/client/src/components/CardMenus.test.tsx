@@ -138,6 +138,60 @@ describe('SeriesCardMenu', () => {
         ]);
     });
 
+    it('starts a reread from « Relire », and stops it', async () => {
+        const read = { ...SERIES, readCount: 2, startedCount: 2 };
+        // Tous les tomes lus : « Relire » reprend au premier.
+        const answer = vi.mocked(fetch).getMockImplementation()!;
+        vi.mocked(fetch).mockImplementation(async (input, init) =>
+            String(input) === '/api/series/3'
+                ? new Response(
+                      JSON.stringify({
+                          id: 3,
+                          volumes: [11, 12].map((id) => ({
+                              id,
+                              number: String(id - 10),
+                              title: null,
+                              progress: { page: 9, completed: true },
+                          })),
+                      }),
+                      { headers: { 'Content-Type': 'application/json' } },
+                  )
+                : answer(input, init),
+        );
+        const { unmount } = show(
+            <SeriesCardMenu
+                series={read}
+                isAdmin={false}
+                onChanged={() => {}}
+            />,
+        );
+
+        await choose('Actions pour Gantz', 'Relire');
+        await vi.waitFor(() =>
+            expect(requests).toContainEqual([
+                'PUT',
+                '/api/series/3/lists',
+                { rereading: true },
+            ]),
+        );
+        await vi.waitFor(() => expect(location).toBe('/read/11'));
+        unmount();
+
+        show(
+            <SeriesCardMenu
+                series={{ ...read, rereading: true }}
+                isAdmin={false}
+                onChanged={() => {}}
+            />,
+        );
+        await choose('Actions pour Gantz', 'Arrêter la relecture');
+        expect(requests.at(-1)).toEqual([
+            'PUT',
+            '/api/series/3/lists',
+            { rereading: false },
+        ]);
+    });
+
     it('offers « Pas pour moi » only for a series not started', async () => {
         show(
             <SeriesCardMenu

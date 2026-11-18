@@ -81,11 +81,13 @@ const seriesProgressLabel = (volume: InProgressVolume) => {
     return `${read} tome${read > 1 ? 's' : ''} lu${read > 1 ? 's' : ''} sur ${volume.volumeCount} · ${Math.round(seriesProgress(volume) * 100)} % de la série`;
 };
 
-/** « Tome 5 · page 45 / 190 », ou « Tome 6 · à commencer ». */
+/** « Tome 5 · page 45 / 190 », ou « Tome 6 · à commencer » (« à relire »). */
 const resumeLabel = (volume: InProgressVolume) =>
     `${volumeLabel(volume)} · ${
         volume.page === null
-            ? 'à commencer'
+            ? volume.rereading
+                ? 'à relire'
+                : 'à commencer'
             : `page ${volume.page + 1} / ${volume.pageCount}`
     }`;
 
@@ -138,7 +140,7 @@ const ResumeHero = ({
                     tt="uppercase"
                     style={{ letterSpacing: '0.08em' }}
                 >
-                    Reprendre
+                    {volume.rereading ? 'Relecture' : 'Reprendre'}
                 </Text>
                 <Group gap={8} wrap="nowrap">
                     <Text
@@ -169,7 +171,11 @@ const ResumeHero = ({
                         to={`/read/${volume.volumeId}`}
                         leftSection={<IconPlayerPlayFilled size={14} />}
                     >
-                        {volume.page === null ? 'Commencer' : 'Continuer'}
+                        {volume.page === null
+                            ? volume.rereading
+                                ? 'Relire'
+                                : 'Commencer'
+                            : 'Continuer'}
                     </Button>
                     <VolumeCardMenu volume={volume} onChanged={onChanged} />
                 </Group>
@@ -200,6 +206,7 @@ const ResumeLine = ({ volume }: { volume: InProgressVolume }) => (
                     {newBadge(volume.newCount)}
                 </Group>
                 <Text size="xs" c="dimmed" truncate>
+                    {volume.rereading && 'Relecture · '}
                     {volumeShortLabel(volume)} ·{' '}
                     {volume.page === null
                         ? 'à commencer'

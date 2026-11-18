@@ -192,7 +192,7 @@ export type InProgressVolume = Awaited<
 /** Listes de la personne : « à lire », « pas pour moi » (suggestions). */
 export const setSeriesLists = (
     seriesId: number,
-    lists: { toRead?: boolean; notForMe?: boolean },
+    lists: { toRead?: boolean; notForMe?: boolean; rereading?: boolean },
 ) => json(api.series[':id'].lists.$put({ ...id(seriesId), json: lists }));
 
 // --- Comptes -------------------------------------------------------------------

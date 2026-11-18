@@ -294,8 +294,9 @@ export const draftSettings = sqliteTable(
 );
 
 /**
- * Listes personnelles, par personne : « à lire », et « pas pour moi »
- * (série retirée des suggestions) ; les favoris ont été retirés. Le type
+ * Listes personnelles, par personne : « à lire », « pas pour moi »
+ * (série retirée des suggestions), « relecture » (sa date d'ajout est son
+ * début) ; les favoris ont été retirés. Le type
  * n'existe qu'en TypeScript : un nouveau ne demande pas de migration.
  */
 export const seriesLists = sqliteTable(
@@ -308,7 +309,7 @@ export const seriesLists = sqliteTable(
             .notNull()
             .references(() => series.id, { onDelete: 'cascade' }),
         list: text('list', {
-            enum: ['favorite', 'toread', 'notforme'],
+            enum: ['favorite', 'toread', 'notforme', 'rereading'],
         }).notNull(),
         addedAt: integer('added_at', { mode: 'timestamp' })
             .notNull()

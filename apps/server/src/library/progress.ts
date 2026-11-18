@@ -9,6 +9,7 @@ import {
     volumeOrder,
     volumeVersion,
 } from './catalog';
+import { listRereading } from './rereading';
 import { type Viewer, visibleTo } from './visibility';
 import { isMainKind } from './volumeKind';
 
@@ -420,11 +421,23 @@ export const listContinue = (
     db: Db,
     viewer: Viewer,
     limit = Number.MAX_SAFE_INTEGER,
-) =>
-    [
-        ...listInProgress(db, viewer, limit),
-        ...listNextVolumes(db, viewer, limit),
-    ]
-        // Tri stable : à date égale, le tome en cours d'abord.
-        .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
-        .slice(0, limit);
+) => {
+    // Relectures : leur tome en cours est marqué ; sinon le suivant à
+    // relire, à la place de la suite habituelle.
+    const rereading = listRereading(db, viewer);
+    return (
+        [
+            ...listInProgress(db, viewer, limit).map((v) => ({
+                ...v,
+                rereading: rereading.series.has(v.seriesId),
+            })),
+            ...listNextVolumes(db, viewer, limit)
+                .filter((v) => !rereading.series.has(v.seriesId))
+                .map((v) => ({ ...v, rereading: false })),
+            ...rereading.next,
+        ]
+            // Tri stable : à date égale, le tome en cours d'abord.
+            .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
+            .slice(0, limit)
+    );
+};

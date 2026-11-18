@@ -24,18 +24,37 @@ export const setSeriesLists = (
     db: Db,
     viewer: Viewer,
     seriesId: number,
-    changes: { toRead?: boolean; notForMe?: boolean },
+    changes: { toRead?: boolean; notForMe?: boolean; rereading?: boolean },
 ) => {
     checkVisible(db, viewer, seriesId);
     const lists = [
         ['toread', changes.toRead],
         ['notforme', changes.notForMe],
+        ['rereading', changes.rereading],
     ] as const;
     for (const [list, member] of lists) {
         if (member === undefined) continue;
+        // Une relecture recommencée repart de maintenant.
+        if (member && list === 'rereading') {
+            db.delete(seriesLists)
+                .where(
+                    and(
+                        eq(seriesLists.userId, viewer.id),
+                        eq(seriesLists.seriesId, seriesId),
+                        eq(seriesLists.list, list),
+                    ),
+                )
+                .run();
+        }
         if (member) {
             db.insert(seriesLists)
-                .values({ userId: viewer.id, seriesId, list })
+                .values({
+                    userId: viewer.id,
+                    seriesId,
+                    list,
+                    // L'heure du serveur (début d'une relecture).
+                    addedAt: new Date(),
+                })
                 .onConflictDoNothing()
                 .run();
         } else {
@@ -64,6 +83,7 @@ export const setSeriesLists = (
     return {
         toRead: kept.includes('toread'),
         notForMe: kept.includes('notforme'),
+        rereading: kept.includes('rereading'),
     };
 };
 
