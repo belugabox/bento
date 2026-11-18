@@ -18,6 +18,7 @@ const user = (overrides: Partial<CurrentUser> = {}): CurrentUser => ({
     role: 'admin',
     maxAge: null,
     preview: null,
+    canInvite: false,
     ...overrides,
 });
 

@@ -6,6 +6,7 @@ import {
     Group,
     Menu,
     Modal,
+    Paper,
     SegmentedControl,
     Select,
     Stack,
@@ -40,6 +41,7 @@ import {
 } from '@/components/ageLimits';
 import {
     type Account,
+    approveUser,
     createInvitation,
     createUserLink,
     deleteInvitation,
@@ -195,6 +197,64 @@ const formatDate = (value: string) =>
         month: 'long',
     });
 
+/**
+ * Compte invité par un lecteur, à valider : l'âge maximal proposé (jamais
+ * plus que celui qui invite) se change avant « Valider » ; « Refuser » le
+ * supprime.
+ */
+const PendingAccount = ({
+    user,
+    onApprove,
+    onRefuse,
+}: {
+    user: Account;
+    onApprove: (maxAge: number | null) => void;
+    onRefuse: () => void;
+}) => {
+    const [maxAge, setMaxAge] = useState(user.maxAge);
+    return (
+        <Group justify="space-between" gap="sm">
+            <Group gap="sm" wrap="nowrap">
+                <UserAvatar
+                    name={user.name}
+                    seed={user.avatarSeed}
+                    radius="xl"
+                />
+                <div>
+                    <Text size="sm" fw={500}>
+                        {user.name}
+                    </Text>
+                    <Text size="xs" c="dimmed">
+                        {user.invitedBy
+                            ? `Invité par ${user.invitedBy}`
+                            : 'Invité par un lecteur'}
+                        {user.pendingSince &&
+                            ` · le ${formatDate(user.pendingSince)}`}
+                    </Text>
+                </div>
+            </Group>
+            <Group gap="xs">
+                <AgeSelect
+                    aria-label={`Âge maximal de ${user.name}`}
+                    value={maxAge}
+                    onChange={setMaxAge}
+                />
+                <Button size="xs" onClick={() => onApprove(maxAge)}>
+                    Valider
+                </Button>
+                <Button
+                    size="xs"
+                    variant="subtle"
+                    color="red"
+                    onClick={onRefuse}
+                >
+                    Refuser
+                </Button>
+            </Group>
+        </Group>
+    );
+};
+
 /** Comptes, invitations et contrôle parental (admin). */
 export const UsersPage = () => {
     const me = useCurrentUser();
@@ -230,6 +290,9 @@ export const UsersPage = () => {
 
     if (error) return <Alert color="red">{error.message}</Alert>;
     if (!users) return <PageLoader />;
+    // Invités par des lecteurs : à valider, à part.
+    const pending = users.filter((user) => user.pendingSince);
+    const accounts = users.filter((user) => !user.pendingSince);
 
     return (
         <Stack>
@@ -248,6 +311,27 @@ export const UsersPage = () => {
                 masquées. Les administrateurs voient tout.
             </Text>
             {actionError && <Alert color="red">{actionError}</Alert>}
+            {pending.length > 0 && (
+                <Paper withBorder radius="md" p="md">
+                    <Stack gap="sm">
+                        <Title order={4}>À valider ({pending.length})</Title>
+                        <Text size="sm" c="dimmed">
+                            Comptes créés par une invitation d’un lecteur : ils
+                            ne peuvent pas se connecter avant d’être validés.
+                        </Text>
+                        {pending.map((user) => (
+                            <PendingAccount
+                                key={user.id}
+                                user={user}
+                                onApprove={(maxAge) =>
+                                    void run(() => approveUser(user.id, maxAge))
+                                }
+                                onRefuse={() => setDeleting(user)}
+                            />
+                        ))}
+                    </Stack>
+                </Paper>
+            )}
             <Table.ScrollContainer minWidth={560}>
                 <Table verticalSpacing="sm">
                     <Table.Thead>
@@ -259,7 +343,7 @@ export const UsersPage = () => {
                         </Table.Tr>
                     </Table.Thead>
                     <Table.Tbody>
-                        {users.map((user) => {
+                        {accounts.map((user) => {
                             const self = user.id === me.id;
                             return (
                                 <Table.Tr key={user.id}>
@@ -399,7 +483,8 @@ export const UsersPage = () => {
                                     ? 'Admin'
                                     : `Lecteur · ${ageLimitLabel(invitation.maxAge).toLowerCase()}`}
                                 <Text span size="xs" c="dimmed">
-                                    {' '}
+                                    {invitation.invitedBy &&
+                                        ` · par ${invitation.invitedBy}`}{' '}
                                     · valable jusqu’au{' '}
                                     {formatDate(invitation.expiresAt)}
                                 </Text>
@@ -442,13 +527,23 @@ export const UsersPage = () => {
             <Modal
                 opened={deleting !== undefined}
                 onClose={() => setDeleting(undefined)}
-                title="Supprimer le compte"
+                title={
+                    deleting?.pendingSince
+                        ? 'Refuser le compte'
+                        : 'Supprimer le compte'
+                }
             >
                 <Stack>
-                    <Text size="sm">
-                        Supprimer le compte de <b>{deleting?.name}</b> ? Ses
-                        lectures et sa liste « À lire » seront effacées.
-                    </Text>
+                    {deleting?.pendingSince ? (
+                        <Text size="sm">
+                            Le compte de <b>{deleting.name}</b> sera supprimé.
+                        </Text>
+                    ) : (
+                        <Text size="sm">
+                            Supprimer le compte de <b>{deleting?.name}</b> ? Ses
+                            lectures et sa liste « À lire » seront effacées.
+                        </Text>
+                    )}
                     <Group justify="flex-end">
                         <Button
                             variant="default"
@@ -464,7 +559,7 @@ export const UsersPage = () => {
                                 void run(() => deleteUser(user.id));
                             }}
                         >
-                            Supprimer
+                            {deleting?.pendingSince ? 'Refuser' : 'Supprimer'}
                         </Button>
                     </Group>
                 </Stack>

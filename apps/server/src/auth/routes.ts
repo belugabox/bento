@@ -115,6 +115,11 @@ export const createAuthRoutes = ({
                         password,
                         account?.passwordHash ?? (await decoyHash()),
                     );
+                    if (account && ok && account.pendingSince) {
+                        throw badRequest(
+                            'Ton compte attend encore la validation de l’admin.',
+                        );
+                    }
                     if (!account || !ok) {
                         limiter.fail(key);
                         logger.info(`Connexion refusée pour « ${username} »`);
@@ -140,20 +145,23 @@ export const createAuthRoutes = ({
                 c.json(linkInfo(db, c.req.param('token'))),
             )
             .post('/links/:token', zValidator('json', linkForm), async (c) => {
-                const { id, kind } = await useLink(
+                const { id, kind, pending } = await useLink(
                     db,
                     c.req.param('token'),
                     c.req.valid('json'),
                 );
-                openSession(c, id);
+                // Invité par un lecteur : connecté une fois validé par l'admin.
+                if (!pending) openSession(c, id);
                 logger.info(
-                    kind === 'invite'
-                        ? `Nouveau compte ${id}`
-                        : kind === 'activate'
-                          ? `Compte ${id} activé`
-                          : `Nouveau mot de passe pour le compte ${id}`,
+                    pending
+                        ? `Nouveau compte ${id}, à valider`
+                        : kind === 'invite'
+                          ? `Nouveau compte ${id}`
+                          : kind === 'activate'
+                            ? `Compte ${id} activé`
+                            : `Nouveau mot de passe pour le compte ${id}`,
                 );
-                return c.json({ kind });
+                return c.json({ kind, pending: pending as boolean });
             })
     );
 };

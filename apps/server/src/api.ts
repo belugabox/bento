@@ -26,6 +26,7 @@ import { isAvatarSeed } from './auth/rules';
 import { deleteUser, listUsers, updateAccount, updateUser } from './auth/users';
 import { READING_MODES } from './classification';
 import type { Db } from './db';
+import { createInvitationRoutes } from './invitationRoutes';
 import {
     getSeries,
     getVolume,
@@ -312,7 +313,17 @@ export const createApi = ({
         })
         // Tout ce qui suit exige une session.
         .use('*', requireUser(db))
-        .get('/me', (c) => c.json({ ...c.var.user, preview: c.var.preview }))
+        .get('/me', (c) =>
+            c.json({
+                ...c.var.user,
+                preview: c.var.preview,
+                // « Inviter quelqu'un » dans Moi (lecteurs, si permis).
+                canInvite:
+                    c.var.user.role === 'reader' &&
+                    !c.var.preview &&
+                    settings.get().readersCanInvite,
+            }),
+        )
         // « Mon compte » : identifiant, e-mail, avatar, mot de passe.
         .patch(
             '/me',
@@ -868,6 +879,7 @@ export const createApi = ({
         // Suggestions (module à part).
         .route('/suggestions', createSuggestionRoutes(db))
         .route('/', createSeriesFileRoutes(files))
+        .route('/', createInvitationRoutes(db, settings))
         // Nombre de séries en attente (pastille de l'en-tête).
         .get('/drafts/pending', requireAdmin, async (c) =>
             c.json({ series: await files.pendingSeries() }),

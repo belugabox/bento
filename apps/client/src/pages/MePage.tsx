@@ -21,6 +21,7 @@ import {
     IconPalette,
     IconSettings,
     IconTags,
+    IconUserPlus,
     IconUsers,
 } from '@tabler/icons-react';
 import type { ReactNode } from 'react';
@@ -28,6 +29,7 @@ import { Link } from 'react-router';
 
 import { AppearanceModal } from '@/components/AppearanceModal';
 import { PreviewModal } from '@/components/PreviewModal';
+import { ReaderInviteModal } from '@/components/accounts/ReaderInviteModal';
 import { UserAvatar } from '@/components/accounts/UserAvatar';
 import { ageLimitLabel } from '@/components/ageLimits';
 import { formatSize } from '@/components/format';
@@ -36,6 +38,7 @@ import { useWeekLabel } from '@/components/weekLabel';
 import { useDownloads } from '@/offline/downloads';
 import {
     fetchPendingDrafts,
+    fetchPendingUsers,
     fetchToClassifyCount,
     stopPreview,
 } from '@/services/api';
@@ -107,6 +110,7 @@ const downloadsLabel = (count: number, bytes: number) =>
 const AdminLinks = () => {
     const toClassify = useQuery(fetchToClassifyCount, []);
     const drafts = useQuery(fetchPendingDrafts, []);
+    const accounts = useQuery(fetchPendingUsers, []);
     const pill = (count: number | undefined) =>
         count ? (
             <Badge size="sm" variant="light" circle>
@@ -137,6 +141,10 @@ const AdminLinks = () => {
                 to="/users"
                 icon={<IconUsers size={18} />}
                 label="Comptes"
+                description={
+                    accounts.data?.count ? 'Invités à valider' : undefined
+                }
+                side={pill(accounts.data?.count)}
             />
             <PageLink
                 to="/settings"
@@ -159,6 +167,7 @@ export const MePage = () => {
     const week = useWeekLabel();
     const [previewOpened, previewModal] = useDisclosure(false);
     const [appearanceOpened, appearanceModal] = useDisclosure(false);
+    const [inviteOpened, inviteModal] = useDisclosure(false);
     const bytes = downloads.reduce((sum, volume) => sum + volume.bytes, 0);
 
     return (
@@ -167,6 +176,10 @@ export const MePage = () => {
             <AppearanceModal
                 opened={appearanceOpened}
                 onClose={appearanceModal.close}
+            />
+            <ReaderInviteModal
+                opened={inviteOpened}
+                onClose={inviteModal.close}
             />
             {/* Son compte, avec son avatar et son nom (demandé) : un
                 toucher ouvre « Mon compte » ; dessous, le thème. */}
@@ -241,6 +254,18 @@ export const MePage = () => {
                     description={downloadsLabel(downloads.length, bytes)}
                 />
             </LinkGroup>
+
+            {user.canInvite && (
+                <LinkGroup title="Famille">
+                    <NavLink
+                        component="button"
+                        leftSection={<IconUserPlus size={18} />}
+                        label="Inviter quelqu’un…"
+                        description="Son compte sera validé par l’admin"
+                        onClick={inviteModal.open}
+                    />
+                </LinkGroup>
+            )}
 
             {isAdmin && <AdminLinks />}
 

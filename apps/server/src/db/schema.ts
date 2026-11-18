@@ -35,6 +35,12 @@ export const users = sqliteTable('users', {
         .notNull()
         .default(sql`(unixepoch())`),
     lastLoginAt: integer('last_login_at', { mode: 'timestamp' }),
+    // Lecteur qui l'a invité (sans clé étrangère : un compte supprimé
+    // laisse ses invités).
+    invitedBy: integer('invited_by'),
+    // Invité par un lecteur : en attente de la validation de l'admin
+    // (connexion refusée d'ici là).
+    pendingSince: integer('pending_since', { mode: 'timestamp' }),
 });
 
 /** Bibliothèque : un dossier de tomes, déclaré dans la configuration. */
@@ -188,6 +194,9 @@ export const invitations = sqliteTable('invitations', {
     maxAge: integer('max_age'),
     // Identifiant proposé par l'admin (tel que tapé), modifiable à l'inscription.
     username: text('username'),
+    // Lecteur qui invite (le compte créé attend la validation de l'admin) ;
+    // ses invitations partent avec lui (`deleteUser`).
+    invitedBy: integer('invited_by'),
     createdAt: integer('created_at', { mode: 'timestamp' })
         .notNull()
         .default(sql`(unixepoch())`),

@@ -17,6 +17,7 @@ const user = (overrides: Partial<CurrentUser> = {}): CurrentUser => ({
     role: 'admin',
     maxAge: null,
     preview: null,
+    canInvite: false,
     ...overrides,
 });
 
@@ -24,6 +25,8 @@ const user = (overrides: Partial<CurrentUser> = {}): CurrentUser => ({
 let requests: [string, string, unknown][] = [];
 // Comptes que l'admin peut simuler.
 let accounts: unknown[] = [];
+// Invitations du lecteur.
+let invitations: unknown = { links: [], pending: [], max: 2 };
 const assign = vi.fn();
 
 const show = (current: CurrentUser, path = '/me') =>
@@ -51,7 +54,13 @@ beforeEach(() => {
             ? { series: 3 }
             : url.endsWith('/preview/accounts')
               ? accounts
-              : { preview: null };
+              : url.endsWith('/users/pending')
+                ? { count: 2 }
+                : url.endsWith('/me/invitations')
+                  ? init?.method === 'POST'
+                      ? { id: 1, token: 'tok', expiresAt: '2026-11-25' }
+                      : invitations
+                  : { preview: null };
         return new Response(JSON.stringify(body), {
             headers: { 'Content-Type': 'application/json' },
         });
@@ -68,6 +77,66 @@ afterEach(() => {
 });
 
 describe('MePage', () => {
+    it('lets a reader invite someone, when the admin allows it', async () => {
+        invitations = { links: [], pending: [], max: 2 };
+        show(user({ role: 'reader', canInvite: true }));
+
+        fireEvent.click(
+            await screen.findByRole('button', { name: /Inviter quelqu’un/ }),
+        );
+        fireEvent.click(
+            await screen.findByRole('button', { name: 'Créer le lien' }),
+        );
+        expect(
+            ((await screen.findByLabelText('Lien')) as HTMLInputElement).value,
+        ).toMatch(/\/join\/tok$/);
+        expect(requests).toContainEqual([
+            'POST',
+            '/api/me/invitations',
+            { maxAge: null, username: null },
+        ]);
+    });
+
+    it('stops a reader at two invitations waiting', async () => {
+        invitations = {
+            links: [
+                {
+                    id: 1,
+                    username: 'Sam',
+                    maxAge: 12,
+                    createdAt: '2026-11-18',
+                    expiresAt: '2026-11-25',
+                },
+            ],
+            pending: [
+                { id: 7, name: 'Max', avatarSeed: null, pendingSince: null },
+            ],
+            max: 2,
+        };
+        show(user({ role: 'reader', canInvite: true }));
+
+        fireEvent.click(
+            await screen.findByRole('button', { name: /Inviter quelqu’un/ }),
+        );
+        expect(await screen.findByText(/attends que l’admin/)).toBeTruthy();
+        expect(screen.getByText(/attend l’admin/)).toBeTruthy();
+        expect(
+            (
+                screen.getByRole('button', {
+                    name: 'Créer le lien',
+                }) as HTMLButtonElement
+            ).disabled,
+        ).toBe(true);
+    });
+
+    it('hides invitations from a reader when the admin does not allow them', async () => {
+        show(user({ role: 'reader' }));
+        expect(
+            await screen.findByRole('heading', { name: 'Ben' }),
+        ).toBeTruthy();
+        expect(screen.queryByText(/Inviter quelqu’un/)).toBeNull();
+    });
+
     it('links the account, the downloads and, for an admin, the admin pages', async () => {
         show(user());
 

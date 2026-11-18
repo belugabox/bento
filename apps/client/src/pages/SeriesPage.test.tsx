@@ -18,6 +18,7 @@ const READER: CurrentUser = {
     role: 'reader',
     maxAge: null,
     preview: null,
+    canInvite: false,
 };
 
 const volume = (

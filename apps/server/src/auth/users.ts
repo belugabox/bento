@@ -1,7 +1,7 @@
 import { and, count, eq, isNotNull, ne, sql } from 'drizzle-orm';
 
 import type { Db } from '../db';
-import { users } from '../db/schema';
+import { invitations, users } from '../db/schema';
 import { badRequest, conflict, forbidden, notFound } from '../tools/errors';
 import { hashPassword, verifyPassword } from './passwords';
 import { PASSWORD_MIN_LENGTH, USERNAME_PATTERN, USERNAME_RULE } from './rules';
@@ -84,6 +84,11 @@ export const listUsers = (db: Db) =>
             // Faux : compte venu de Pocket ID, pas encore activé.
             hasPassword: sql<number>`${users.passwordHash} is not null`,
             lastLoginAt: users.lastLoginAt,
+            // Invité par un lecteur, à valider (date de l'inscription).
+            pendingSince: users.pendingSince,
+            invitedBy: sql<
+                string | null
+            >`(select i.name from users i where i.id = users.invited_by)`,
         })
         .from(users)
         .orderBy(sql`${users.name} collate nocase`)
@@ -131,8 +136,33 @@ export const deleteUser = (db: Db, id: number, actingUserId: number) => {
     if (user.role === 'admin' && adminCount(db) <= 1) {
         throw forbidden('Il faut garder au moins un admin');
     }
+    // Ses invitations pas encore utilisées partent avec lui.
+    db.delete(invitations).where(eq(invitations.invitedBy, id)).run();
     db.delete(users).where(eq(users.id, id)).run();
 };
+
+/**
+ * Compte invité par un lecteur, validé par l'admin (avec l'âge maximal
+ * choisi) : il peut se connecter.
+ */
+export const approveUser = (db: Db, id: number, maxAge: number | null) => {
+    const approved = db
+        .update(users)
+        .set({ pendingSince: null, maxAge })
+        .where(and(eq(users.id, id), isNotNull(users.pendingSince)))
+        .returning({ id: users.id })
+        .get();
+    if (!approved) throw notFound('Aucun compte à valider');
+    return approved;
+};
+
+/** Comptes à valider (pastille de « Comptes »). */
+export const pendingUserCount = (db: Db) =>
+    db
+        .select({ n: count() })
+        .from(users)
+        .where(isNotNull(users.pendingSince))
+        .get()?.n ?? 0;
 
 /**
  * Identifiant et mot de passe du compte qui se connecte, ou `undefined`.
@@ -140,7 +170,11 @@ export const deleteUser = (db: Db, id: number, actingUserId: number) => {
  */
 export const findLogin = (db: Db, rawUsername: string) =>
     db
-        .select({ id: users.id, passwordHash: users.passwordHash })
+        .select({
+            id: users.id,
+            passwordHash: users.passwordHash,
+            pendingSince: users.pendingSince,
+        })
         .from(users)
         .where(
             and(
