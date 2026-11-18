@@ -648,6 +648,15 @@ export const deleteDraft = (library: number, folder: string) =>
         }),
     );
 
+/** Brouillons d'une même série réunis dans `into` (dossier obtenu). */
+export const mergeDrafts = (library: number, into: string, from: string[]) =>
+    json(
+        api.libraries[':id'].drafts.merge.$post({
+            ...libraryId(library),
+            json: { into, from },
+        }),
+    );
+
 /** Série remise en brouillon : son dossier dans `_draft`. */
 export const seriesToDraft = (seriesId: number) =>
     json(api.series[':id'].draft.$post(id(seriesId)));

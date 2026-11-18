@@ -1,5 +1,5 @@
 import { MantineProvider } from '@mantine/core';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -306,5 +306,80 @@ describe('DraftsPage', () => {
         expect(requests).toContain(
             'DELETE /api/libraries/1/drafts?folder=_draft%2FGantz',
         );
+    });
+    it('offers to merge drafts of one series, received one folder per volume', async () => {
+        let merged = false;
+        const sent: unknown[] = [];
+        const draft = (folder: string, seriesName: string) => ({
+            folder,
+            files: [{ path: `${folder}/T.cbz`, name: 'T.cbz', size: 10 }],
+            archivedAt: null,
+            seriesName,
+            mergeKey: seriesName.toLowerCase(),
+        });
+        vi.spyOn(globalThis, 'fetch').mockImplementation(
+            async (input, init) => {
+                const url = String(input);
+                if (url === '/api/libraries') {
+                    return respond([{ id: 1, name: 'Mangas', type: 'manga' }]);
+                }
+                if (url === '/api/libraries/1/drafts/merge') {
+                    sent.push(JSON.parse(String(init!.body)));
+                    merged = true;
+                    return respond({
+                        folder: '_draft/Gantz T01',
+                        moved: 2,
+                        failures: [],
+                    });
+                }
+                if (url === '/api/libraries/1/drafts') {
+                    return respond(
+                        merged
+                            ? [draft('_draft/Gantz T01', 'Gantz')]
+                            : [
+                                  draft('_draft/Gantz T01', 'Gantz'),
+                                  draft('_draft/Gantz T02', 'Gantz'),
+                                  draft('_draft/Gantz T03', 'Gantz'),
+                                  draft('_draft/Spirale', 'Spirale'),
+                              ],
+                    );
+                }
+                if (url.startsWith('/api/libraries/1/drafts/files?')) {
+                    return respond([]);
+                }
+                if (url === '/api/drafts/pending')
+                    return respond({ series: 1 });
+                throw new Error(`requête inattendue : ${url}`);
+            },
+        );
+
+        render(
+            <MantineProvider>
+                <MemoryRouter initialEntries={['/drafts']}>
+                    <DraftsPage />
+                </MemoryRouter>
+            </MantineProvider>,
+        );
+
+        expect(
+            await screen.findByText('3 brouillons semblent être « Gantz »'),
+        ).toBeTruthy();
+        fireEvent.click(screen.getByRole('button', { name: 'Fusionner' }));
+        const dialog = await screen.findByRole('dialog');
+        fireEvent.click(
+            await within(dialog).findByRole('button', { name: 'Fusionner' }),
+        );
+
+        await vi.waitFor(() =>
+            expect(screen.queryByText(/semblent être/)).toBeNull(),
+        );
+        expect(sent).toEqual([
+            {
+                into: '_draft/Gantz T01',
+                from: ['_draft/Gantz T02', '_draft/Gantz T03'],
+            },
+        ]);
+        // Le dossier obtenu est ouvert.
+        expect(await screen.findByText('Ce dossier est vide.')).toBeTruthy();
     });
 });

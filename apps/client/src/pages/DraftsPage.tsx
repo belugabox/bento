@@ -2,6 +2,7 @@ import {
     Accordion,
     Alert,
     Badge,
+    Button,
     Grid,
     Group,
     Loader,
@@ -17,6 +18,7 @@ import { useDisclosure } from '@mantine/hooks';
 import {
     IconArchive,
     IconArchiveOff,
+    IconArrowMerge,
     IconFile,
     IconFolder,
     IconTrash,
@@ -25,9 +27,11 @@ import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router';
 
 import { DeleteDraftModal } from '@/components/DeleteDraftModal';
+import { MergeDraftsModal } from '@/components/MergeDraftsModal';
 import { PageHeader } from '@/components/PageHeader';
 import { PageLoader } from '@/components/PageLoader';
 import { completenessColor } from '@/components/completeness';
+import { draftLabel } from '@/components/draftLabel';
 import { CoverPicker } from '@/components/metadata/CoverPicker';
 import { MetadataEditor } from '@/components/metadata/MetadataEditor';
 import {
@@ -53,10 +57,33 @@ import { useQuery } from '@/services/useQuery';
  */
 const isLoneFile = (folder: string) => /^_draft\/[^/]+\.cb[zr]$/i.test(folder);
 
-const folderLabel = (folder: string) =>
-    folder === '_draft'
-        ? '(racine de _draft)'
-        : folder.replace(/^_draft\//, '');
+const folderLabel = draftLabel;
+
+/**
+ * Brouillons en attente qui semblent être une même série (même nom reconnu,
+ * reçue un dossier par tome) : à fusionner. Le premier dossier les reçoit
+ * (un vrai dossier plutôt qu'un tome seul).
+ */
+const mergeGroups = (drafts: DraftFolder[]) => {
+    const byKey = new Map<string, DraftFolder[]>();
+    for (const draft of drafts) {
+        if (draft.archivedAt || !draft.mergeKey) continue;
+        byKey.set(draft.mergeKey, [
+            ...(byKey.get(draft.mergeKey) ?? []),
+            draft,
+        ]);
+    }
+    return [...byKey.values()]
+        .filter((group) => group.length > 1)
+        .map((group) => {
+            const into = group.find((d) => !isLoneFile(d.folder)) ?? group[0]!;
+            return {
+                name: into.seriesName,
+                into: into.folder,
+                from: group.filter((d) => d !== into).map((d) => d.folder),
+            };
+        });
+};
 
 /** Relecture du dossier pendant la conversion de ses PDF. */
 const CONVERSION_POLL_MS = 3000;
@@ -76,6 +103,8 @@ export const DraftsPage = () => {
         () => params.get('folder') ?? undefined,
     );
     const [deleteOpened, setDeleteOpened] = useState(false);
+    // Fusion ouverte : dossier qui reçoit, brouillons cochés.
+    const [merge, setMerge] = useState<{ into: string; initial: string[] }>();
     const [coverOpened, cover] = useDisclosure(false);
 
     // Liste des dossiers : rapide (les archives ne sont pas ouvertes).
@@ -126,6 +155,21 @@ export const DraftsPage = () => {
     // Mis de côté : en bas, sous une liste repliée.
     const waiting = drafts.data?.filter((f) => !f.archivedAt) ?? [];
     const archived = drafts.data?.filter((f) => f.archivedAt) ?? [];
+
+    const groups = mergeGroups(drafts.data ?? []);
+    /** « Fusionner avec… » : les brouillons du même nom déjà cochés. */
+    const mergeSelected = () => {
+        if (!selected) return;
+        const group = groups.find(
+            (g) => g.into === selected || g.from.includes(selected),
+        );
+        setMerge({
+            into: selected,
+            initial: group
+                ? [group.into, ...group.from].filter((f) => f !== selected)
+                : [],
+        });
+    };
 
     const archive = async (value: boolean) => {
         if (!libraryId || !selected) return;
@@ -212,6 +256,53 @@ export const DraftsPage = () => {
                 <Text c="dimmed" ta="center">
                     Aucun brouillon.
                 </Text>
+            )}
+            {groups.map((group) => (
+                <Alert
+                    key={group.into}
+                    color="blue"
+                    icon={<IconArrowMerge size={18} />}
+                    title={`${group.from.length + 1} brouillons semblent être « ${group.name} »`}
+                >
+                    <Group justify="space-between" gap="xs">
+                        <Text size="sm">
+                            {[group.into, ...group.from]
+                                .map(folderLabel)
+                                .join(', ')}
+                        </Text>
+                        <Button
+                            size="xs"
+                            variant="light"
+                            onClick={() =>
+                                setMerge({
+                                    into: group.into,
+                                    initial: group.from,
+                                })
+                            }
+                        >
+                            Fusionner
+                        </Button>
+                    </Group>
+                </Alert>
+            ))}
+            {libraryId && merge && (
+                <MergeDraftsModal
+                    key={`${merge.into}:${merge.initial.join('|')}`}
+                    opened
+                    onClose={() => setMerge(undefined)}
+                    libraryId={libraryId}
+                    into={merge.into}
+                    candidates={(drafts.data ?? [])
+                        .map((d) => d.folder)
+                        .filter((f) => f !== merge.into)}
+                    initial={merge.initial}
+                    onMerged={(folder) => {
+                        setSelected(folder);
+                        drafts.reload();
+                        folderFiles.reload();
+                        notifyDraftsChanged();
+                    }}
+                />
             )}
             {!!drafts.data?.length && (
                 <Grid>
@@ -383,6 +474,20 @@ export const DraftsPage = () => {
                                                     {draft?.archivedAt
                                                         ? 'Remettre en attente'
                                                         : 'Archiver'}
+                                                </Menu.Item>
+                                                <Menu.Item
+                                                    leftSection={
+                                                        <IconArrowMerge
+                                                            size={16}
+                                                        />
+                                                    }
+                                                    disabled={
+                                                        (drafts.data?.length ??
+                                                            0) < 2
+                                                    }
+                                                    onClick={mergeSelected}
+                                                >
+                                                    Fusionner avec…
                                                 </Menu.Item>
                                                 <Menu.Item
                                                     color="red"

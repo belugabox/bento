@@ -32,12 +32,14 @@ import { updateComicInfo } from '../archive/write';
 import { classify } from '../classification';
 import type { Db } from '../db';
 import { libraries, series, volumes } from '../db/schema';
+import { seriesNameKey } from '../metadata/seriesNames';
 import { parseSources, sourcesText } from '../metadata/sourceLink';
-import { conflict, notFound } from '../tools/errors';
+import { badRequest, conflict, notFound } from '../tools/errors';
 import type { Logger } from '../tools/logger';
 import { minAgeOf } from './ageRating';
 import { completenessOf, fieldsFromVolumes } from './completeness';
 import { draftCoverFile, seriesCoverFile } from './covers';
+import { guessSeriesName, safeFolderName } from './draftNames';
 import {
     type DraftSettings,
     checkDraftFolder,
@@ -498,9 +500,16 @@ export class LibraryFiles {
                 .map((info) => info.AgeRating)
                 .find((value) => !!value?.trim());
             const name = fields.name?.trim().toLowerCase();
+            // Nom de série (ComicInfo, sinon deviné du dossier) : des
+            // dossiers de même clé sont sans doute une même série, reçue un
+            // dossier par tome (« Fusionner »).
+            const seriesName =
+                fields.name?.trim() || guessSeriesName(folder) || folder;
             return {
                 folder,
                 files,
+                seriesName,
+                mergeKey: seriesNameKey(seriesName),
                 // Série publiée du même nom, que ces tomes rejoindront.
                 seriesId: (name && published.get(name)) || null,
                 status: draft?.status ?? null,
@@ -593,6 +602,119 @@ export class LibraryFiles {
             `Brouillon supprimé du disque : ${folder} (${archives.length} tome(s))`,
         );
         return { deleted: archives.length };
+    };
+
+    /**
+     * Réunit des dossiers de brouillons d'une même série (reçue un dossier
+     * par tome) : leurs fichiers rejoignent `into` (un dossier au nom de la
+     * série si `into` est un tome seul à la racine de _draft), sans jamais
+     * en écraser un ; les dossiers vidés disparaissent, avec leurs réglages
+     * (ceux de `into` restent).
+     */
+    mergeDrafts = async (libraryId: number, into: string, from: string[]) => {
+        const library = this.library(libraryId);
+        const groups = [into, ...from.filter((folder) => folder !== into)];
+        if (groups.length < 2) {
+            throw badRequest('Choisis au moins un autre brouillon');
+        }
+        for (const folder of groups) {
+            checkDraftFolder(folder);
+            if (folder === DRAFT_FOLDER) {
+                throw notFound('Dossier de brouillons introuvable');
+            }
+        }
+        const all = await this.archivesUnder(
+            library.path,
+            path.join(library.path, DRAFT_FOLDER),
+        );
+        const archivesOf = (folder: string) =>
+            all.filter((archive) => draftGroupOf(archive.path) === folder);
+        for (const folder of groups) {
+            if (archivesOf(folder).length === 0) {
+                throw notFound(`Brouillon introuvable : ${folder}`);
+            }
+        }
+        if (all.some((archive) => this.pdfConverting.has(archive.fullPath))) {
+            throw conflict('Conversion d’un PDF en cours : réessaie à la fin');
+        }
+        const dirOf = (folder: string) =>
+            path.join(library.path, ...folder.split('/'));
+        const isDir = (folder: string) =>
+            stat(dirOf(folder)).then(
+                (stats) => stats.isDirectory(),
+                () => false,
+            );
+
+        // Arrivée : `into`, ou un dossier au nom de la série (tome seul).
+        let target = into;
+        if (!(await isDir(into))) {
+            const [first] = archivesOf(into);
+            const info = await this.comicInfoOnly(first!.fullPath);
+            const name = safeFolderName(
+                info?.Series?.trim() || guessSeriesName(into) || 'Série',
+            );
+            target = `${DRAFT_FOLDER}/${name}`;
+            await mkdir(dirOf(target), { recursive: true });
+        }
+        const targetDir = dirOf(target);
+        const exists = (file: string) =>
+            access(file).then(
+                () => true,
+                () => false,
+            );
+
+        let moved = 0;
+        const failures: Failure[] = [];
+        for (const folder of groups) {
+            if (folder === target) continue;
+            // Un dossier : tous ses fichiers ; un tome seul : lui.
+            const files = (await isDir(folder))
+                ? (await readdir(dirOf(folder), { withFileTypes: true }))
+                      .filter((entry) => entry.isFile())
+                      .map((entry) => path.join(dirOf(folder), entry.name))
+                : archivesOf(folder).map((archive) => archive.fullPath);
+            for (const file of files) {
+                const to = path.join(targetDir, path.basename(file));
+                if (await exists(to)) {
+                    failures.push({
+                        path: relativeTo(library.path, file),
+                        reason: 'Un fichier du même nom y est déjà',
+                    });
+                    continue;
+                }
+                await rename(file, to);
+                this.cache.delete(file);
+                this.infos.delete(file);
+                this.conversionErrors.delete(file);
+                await rm(this.coverPath(file), { force: true });
+                moved++;
+            }
+            if (await isDir(folder)) await rmdir(dirOf(folder)).catch(() => {});
+        }
+        // Réglages : ceux de `into` (qui suivent un tome seul dans son
+        // nouveau dossier) ; ceux des autres disparaissent.
+        const settings = draftSettingsOf(this.db, libraryId);
+        const kept = settings.get(into);
+        for (const folder of groups) {
+            if (folder === target) continue;
+            deleteDraftSettings(this.db, libraryId, folder);
+            if (folder !== into) {
+                await rm(draftCoverFile(this.coversPath, libraryId, folder), {
+                    force: true,
+                });
+            }
+        }
+        if (target !== into) {
+            if (kept) saveDraftSettings(this.db, libraryId, target, kept);
+            await rename(
+                draftCoverFile(this.coversPath, libraryId, into),
+                draftCoverFile(this.coversPath, libraryId, target),
+            ).catch(() => {});
+        }
+        this.logger.info(
+            `Brouillons réunis dans ${target} : ${moved} fichier(s) de ${groups.length - 1} autre(s) dossier(s)`,
+        );
+        return { folder: target, moved, failures };
     };
 
     /** Tomes d'une série et sa bibliothèque (opérations sur ses fichiers). */
