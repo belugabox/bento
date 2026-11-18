@@ -32,6 +32,29 @@ export const createSeriesFileRoutes = (files: LibraryFiles) =>
                 return c.json({ archived });
             },
         )
+        // Brouillons d'une même série réunis dans un dossier.
+        .post(
+            '/libraries/:id/drafts/merge',
+            requireAdmin,
+            zValidator('param', idParam),
+            zValidator(
+                'json',
+                z.object({
+                    into: z.string().min(1),
+                    from: z.array(z.string().min(1)).min(1),
+                }),
+            ),
+            async (c) => {
+                const { into, from } = c.req.valid('json');
+                return c.json(
+                    await files.mergeDrafts(
+                        c.req.valid('param').id,
+                        into,
+                        from,
+                    ),
+                );
+            },
+        )
         // Brouillon supprimé du disque, pour de bon.
         .delete(
             '/libraries/:id/drafts',

@@ -25,7 +25,10 @@ import {
     IconDownload,
     IconPencil,
     IconPlayerPlay,
+    IconPlayerStop,
     IconRestore,
+    IconThumbDown,
+    IconThumbUp,
 } from '@tabler/icons-react';
 import { Fragment, useState } from 'react';
 import { Link, useParams } from 'react-router';
@@ -43,6 +46,7 @@ import { SeriesVolumeMenu } from '@/components/CardMenus';
 import { CompletenessBadge } from '@/components/CompletenessBadge';
 import { CoverCard } from '@/components/CoverCard';
 import { DownloadRing } from '@/components/DownloadIndicator';
+import { DownloadSeriesModal } from '@/components/DownloadSeriesModal';
 import { PageHeader } from '@/components/PageHeader';
 import { PageLoader } from '@/components/PageLoader';
 import { RatingBadge } from '@/components/RatingBadge';
@@ -58,9 +62,9 @@ import {
     progressRatio,
     volumeCountLabel,
     volumeLabel,
+    volumeShortLabel,
     volumeTitleOf,
 } from '@/components/readingStatus';
-import { NEXT_VOLUME_COUNTS, nextVolumesLabel } from '@/offline/auto';
 import { queueDownloads, useDownloads } from '@/offline/downloads';
 import {
     coverUrl,
@@ -143,6 +147,7 @@ export const SeriesPage = () => {
     } = useQuery(() => fetchSeries(seriesId), [seriesId]);
     // Liste en cours d'enregistrement (bouton désactivé).
     const [savingList, setSavingList] = useState(false);
+    const [downloadOpened, setDownloadOpened] = useState(false);
 
     // Sans réseau : la fiche n'est pas sur l'appareil, ses tomes
     // téléchargés si.
@@ -161,6 +166,8 @@ export const SeriesPage = () => {
 
     const first = series.volumes[0];
     const next = nextToRead(series.volumes);
+    // Relecture en cours : le tome à relire.
+    const rereadNext = series.volumes.find((v) => v.id === series.rereadNextId);
     // « N lus » : comme sur la carte, sans hors-séries ni spéciaux.
     const readCount = countedVolumes(series.volumes).filter(
         (v) => v.progress?.completed,
@@ -242,6 +249,28 @@ export const SeriesPage = () => {
         } finally {
             setSavingList(false);
         }
+    };
+
+    /** Retire la série des suggestions (« Pas pour moi »), ou l'y remet. */
+    const toggleNotForMe = async (notForMe: boolean) => {
+        try {
+            await setSeriesLists(series.id, { notForMe });
+            notifications.show({
+                message: notForMe
+                    ? 'Retiré des suggestions.'
+                    : 'Remis dans les suggestions.',
+            });
+            reload();
+        } catch (e) {
+            notifications.show({ color: 'red', message: (e as Error).message });
+        }
+    };
+
+    /** Fin de la relecture : « En cours » ne la propose plus. */
+    const stopRereading = async () => {
+        await setSeriesLists(series.id, { rereading: false });
+        notifications.show({ message: 'Relecture arrêtée.' });
+        reload();
     };
 
     /** Coche « lu » d'un tome (sans ouvrir le lecteur). */
@@ -394,19 +423,47 @@ export const SeriesPage = () => {
                     {/* Boutons de lecture, et « Lu par » à droite. */}
                     <Group justify="space-between" gap="xs">
                         <Group gap="xs">
-                            {next && (
+                            {rereadNext ? (
+                                // Relecture en cours : son tome suivant.
                                 <Button
                                     component={Link}
-                                    // Relire : repartir de la première page.
-                                    to={`/read/${next.volume.id}${next.action === 'reread' ? '?page=1' : ''}`}
+                                    to={`/read/${rereadNext.id}`}
                                     leftSection={<IconPlayerPlay size={16} />}
                                     w="fit-content"
                                 >
-                                    {ACTION_LABELS[next.action]}
-                                    {/* One-shot : « Lire » seul. */}
-                                    {!isStandalone(next.volume) &&
-                                        ` ${volumeLabel(next.volume).toLowerCase()}`}
+                                    Reprendre la relecture
+                                    {!isStandalone(rereadNext) &&
+                                        ` · ${volumeShortLabel(rereadNext)}`}
                                 </Button>
+                            ) : (
+                                next && (
+                                    <Button
+                                        component={Link}
+                                        // Relire : repartir de la première
+                                        // page, et commencer une relecture
+                                        // (« En cours » suit les tomes).
+                                        to={`/read/${next.volume.id}${next.action === 'reread' ? '?page=1' : ''}`}
+                                        onClick={() => {
+                                            if (
+                                                next.action === 'reread' &&
+                                                !readOnly
+                                            ) {
+                                                void setSeriesLists(series.id, {
+                                                    rereading: true,
+                                                });
+                                            }
+                                        }}
+                                        leftSection={
+                                            <IconPlayerPlay size={16} />
+                                        }
+                                        w="fit-content"
+                                    >
+                                        {ACTION_LABELS[next.action]}
+                                        {/* One-shot : « Lire » seul. */}
+                                        {!isStandalone(next.volume) &&
+                                            ` ${volumeLabel(next.volume).toLowerCase()}`}
+                                    </Button>
+                                )
                             )}
                             <Tooltip
                                 label={
@@ -465,37 +522,67 @@ export const SeriesPage = () => {
                                     >
                                         Marquer toute la série comme non lue
                                     </Menu.Item>
-                                    <Menu.Divider />
-                                    <Menu.Label>
-                                        Télécharger sur l’appareil
-                                    </Menu.Label>
-                                    {[
-                                        ...NEXT_VOLUME_COUNTS.map((count) => ({
-                                            count,
-                                            label: nextVolumesLabel(count),
-                                        })),
-                                        {
-                                            count: Infinity,
-                                            label: 'Tous les tomes pas lus',
-                                        },
-                                    ].map((option) => (
+                                    {series.rereading && (
                                         <Menu.Item
-                                            key={option.label}
                                             leftSection={
-                                                <IconDownload size={14} />
+                                                <IconPlayerStop size={14} />
                                             }
-                                            disabled={toDownload.length === 0}
+                                            onClick={() => void stopRereading()}
+                                        >
+                                            Arrêter la relecture
+                                        </Menu.Item>
+                                    )}
+                                    {/* Comme le menu des cartes : pas
+                                        commencée, ou déjà retirée. */}
+                                    {series.notForMe ? (
+                                        <Menu.Item
+                                            leftSection={
+                                                <IconThumbUp size={14} />
+                                            }
                                             onClick={() =>
-                                                downloadNext(option.count)
+                                                void toggleNotForMe(false)
                                             }
                                         >
-                                            {option.label}
+                                            Remettre dans les suggestions
                                         </Menu.Item>
-                                    ))}
+                                    ) : (
+                                        !series.volumes.some(
+                                            (v) => v.progress,
+                                        ) && (
+                                            <Menu.Item
+                                                leftSection={
+                                                    <IconThumbDown size={14} />
+                                                }
+                                                onClick={() =>
+                                                    void toggleNotForMe(true)
+                                                }
+                                            >
+                                                Pas pour moi
+                                            </Menu.Item>
+                                        )
+                                    )}
+                                    <Menu.Divider />
+                                    {/* Une seule entrée : le nombre de tomes
+                                        se choisit dans la fenêtre. */}
+                                    <Menu.Item
+                                        leftSection={<IconDownload size={14} />}
+                                        onClick={() => setDownloadOpened(true)}
+                                    >
+                                        Télécharger…
+                                    </Menu.Item>
                                 </Menu.Dropdown>
                             </Menu>
                         </Group>
                         <SeriesReaders seriesId={series.id} />
+                        <DownloadSeriesModal
+                            opened={downloadOpened}
+                            onClose={() => setDownloadOpened(false)}
+                            volumes={toDownload.map((v) => ({
+                                id: v.id,
+                                short: volumeShortLabel(v),
+                            }))}
+                            onDownload={downloadNext}
+                        />
                     </Group>
                 </Stack>
             </Flex>

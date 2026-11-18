@@ -1,5 +1,5 @@
 import { MantineProvider } from '@mantine/core';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -32,6 +32,7 @@ const ADMIN: CurrentUser = {
     role: 'admin',
     maxAge: null,
     preview: null,
+    canInvite: false,
 };
 
 const show = (path: string) =>
@@ -153,6 +154,33 @@ describe('JoinPage', () => {
             email: 'lea@example.com',
             avatarSeed: expect.any(String),
         });
+    });
+
+    it('tells an account invited by a reader to wait for the admin', async () => {
+        responses['GET /api/auth/links/tok'] = {
+            body: {
+                kind: 'invite',
+                invitedBy: 'Lou',
+                username: null,
+                email: null,
+                avatarSeed: null,
+            },
+        };
+        responses['POST /api/auth/links/tok'] = {
+            body: { kind: 'invite', pending: true },
+        };
+        show('/join/tok');
+
+        expect(await screen.findByText(/Lou t’invite sur Bento/)).toBeTruthy();
+        type(/Identifiant/, 'Sam');
+        type(/^Mot de passe/, 'un mot de passe');
+        type(/Encore une fois/, 'un mot de passe');
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Créer mon compte' }),
+        );
+
+        expect(await screen.findByText('Compte créé')).toBeTruthy();
+        expect(address).toBe('/join/tok');
     });
 
     it('fills in the identifier proposed by the admin', async () => {
@@ -308,6 +336,55 @@ describe('UsersPage', () => {
         expect(
             (screen.getByLabelText('Lien') as HTMLInputElement).value,
         ).toMatch(/\/join\/act$/);
+    });
+
+    it('validates an account invited by a reader, with its age limit', async () => {
+        const users = responses['GET /api/users']!.body as unknown[];
+        responses['GET /api/users'] = {
+            body: [
+                ...users,
+                {
+                    id: 3,
+                    name: 'Sam',
+                    username: 'sam',
+                    email: null,
+                    avatarSeed: null,
+                    role: 'reader',
+                    maxAge: 12,
+                    hasPassword: true,
+                    lastLoginAt: null,
+                    pendingSince: '2026-11-18T09:00:00.000Z',
+                    invitedBy: 'Zoé Martin',
+                },
+            ],
+        };
+        responses['POST /api/users/3/approve'] = { body: { id: 3 } };
+        show('/users');
+
+        expect(await screen.findByText('À valider (1)')).toBeTruthy();
+        expect(screen.getByText(/Invité par Zoé Martin/)).toBeTruthy();
+        fireEvent.click(screen.getByRole('button', { name: 'Valider' }));
+        await vi.waitFor(() =>
+            expect(requests).toContainEqual([
+                'POST',
+                '/api/users/3/approve',
+                { maxAge: 12 },
+            ]),
+        );
+
+        // Refuser : confirmé, puis supprimé.
+        fireEvent.click(screen.getByRole('button', { name: 'Refuser' }));
+        const dialog = await screen.findByRole('dialog');
+        fireEvent.click(
+            within(dialog).getByRole('button', { name: 'Refuser' }),
+        );
+        await vi.waitFor(() =>
+            expect(requests).toContainEqual([
+                'DELETE',
+                '/api/users/3',
+                undefined,
+            ]),
+        );
     });
 
     it('does not let the admin change their own role', async () => {

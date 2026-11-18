@@ -1,5 +1,5 @@
-import { AppShell, Container } from '@mantine/core';
-import { Suspense, lazy } from 'react';
+import { AppShell, Center, Container, Loader } from '@mantine/core';
+import { Suspense, lazy, useEffect } from 'react';
 import { Navigate, Outlet, Route, Routes } from 'react-router';
 
 import { ActivationBanner, AppHeader } from '@/components/AppHeader';
@@ -16,13 +16,60 @@ import {
 import { useScrollToTop } from '@/components/scrollToTop';
 import { DownloadsPage } from '@/pages/DownloadsPage';
 import { HomePage } from '@/pages/HomePage';
-import { JoinPage } from '@/pages/JoinPage';
-import { LibraryPage } from '@/pages/LibraryPage';
-import { LoginPage } from '@/pages/LoginPage';
-import { MePage } from '@/pages/MePage';
-import { SeriesPage } from '@/pages/SeriesPage';
-import { ReaderPage } from '@/reader/ReaderPage';
 import { useCurrentUser } from '@/services/auth';
+
+// Dans le fichier principal : l'accueil, et les téléchargements (l'accueil
+// les montre hors ligne). Le reste est chargé à la demande, pour que
+// l'accueil s'ouvre plus vite ; le service worker garde tous les fichiers,
+// hors ligne compris.
+const loadLibrary = () => import('@/pages/LibraryPage');
+const loadSeries = () => import('@/pages/SeriesPage');
+const loadMe = () => import('@/pages/MePage');
+const loadReader = () => import('@/reader/ReaderPage');
+
+const LibraryPage = lazy(() =>
+    loadLibrary().then((m) => ({ default: m.LibraryPage })),
+);
+const SeriesPage = lazy(() =>
+    loadSeries().then((m) => ({ default: m.SeriesPage })),
+);
+const MePage = lazy(() => loadMe().then((m) => ({ default: m.MePage })));
+const ReaderPage = lazy(() =>
+    loadReader().then((m) => ({ default: m.ReaderPage })),
+);
+const LoginPage = lazy(() =>
+    import('@/pages/LoginPage').then((m) => ({ default: m.LoginPage })),
+);
+const JoinPage = lazy(() =>
+    import('@/pages/JoinPage').then((m) => ({ default: m.JoinPage })),
+);
+
+/**
+ * Une fois l'appli affichée, les pages principales se chargent en
+ * arrière-plan : passer d'un onglet à l'autre reste immédiat.
+ */
+const usePreloadPages = () =>
+    useEffect(() => {
+        const preload = () => {
+            void loadLibrary();
+            void loadSeries();
+            void loadMe();
+            void loadReader();
+        };
+        if ('requestIdleCallback' in window) {
+            const id = window.requestIdleCallback(preload, { timeout: 3000 });
+            return () => window.cancelIdleCallback(id);
+        }
+        const timer = setTimeout(preload, 1500);
+        return () => clearTimeout(timer);
+    }, []);
+
+/** Chargement du lecteur : plein écran noir, comme lui. */
+const ReaderLoader = () => (
+    <Center h="100dvh" bg="black">
+        <Loader color="gray" />
+    </Center>
+);
 
 // Pages de l'admin : chargées à la demande, les lecteurs n'en téléchargent
 // pas le code (éditeur, recherche de métadonnées…).
@@ -78,6 +125,7 @@ const Layout = () => {
     useScrollToTop();
     // Retour d'une fiche série : la page parcourue avant.
     useBrowsePage();
+    usePreloadPages();
     return (
         <AppShell
             header={{ height: 56 }}
@@ -106,7 +154,10 @@ const Layout = () => {
                 <Container size="xl">
                     <OfflineBanner />
                     <ActivationBanner />
-                    <Outlet />
+                    {/* Pages chargées à la demande. */}
+                    <Suspense fallback={<PageLoader />}>
+                        <Outlet />
+                    </Suspense>
                 </Container>
             </AppShell.Main>
         </AppShell>
@@ -116,8 +167,22 @@ const Layout = () => {
 export const App = () => (
     <Routes>
         {/* Publiques : connexion, et liens envoyés par l'admin. */}
-        <Route path="login" element={<LoginPage />} />
-        <Route path="join/:token" element={<JoinPage />} />
+        <Route
+            path="login"
+            element={
+                <Suspense fallback={<PageLoader />}>
+                    <LoginPage />
+                </Suspense>
+            }
+        />
+        <Route
+            path="join/:token"
+            element={
+                <Suspense fallback={<PageLoader />}>
+                    <JoinPage />
+                </Suspense>
+            }
+        />
         <Route
             element={
                 <RequireUser>
@@ -132,7 +197,8 @@ export const App = () => (
                 <Route path="library" element={<LibraryPage />} />
                 <Route path="me" element={<MePage />} />
                 <Route path="series/:id" element={<SeriesPage />} />
-                {/* Pas chargée à la demande : sert aussi hors ligne. */}
+                {/* Dans le fichier principal : l'accueil la montre hors
+                    ligne. */}
                 <Route path="downloads" element={<DownloadsPage />} />
                 <Route
                     path="account"
@@ -205,7 +271,14 @@ export const App = () => (
                     }
                 />
             </Route>
-            <Route path="read/:id" element={<ReaderPage />} />
+            <Route
+                path="read/:id"
+                element={
+                    <Suspense fallback={<ReaderLoader />}>
+                        <ReaderPage />
+                    </Suspense>
+                }
+            />
         </Route>
     </Routes>
 );

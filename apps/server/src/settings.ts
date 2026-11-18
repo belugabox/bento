@@ -58,6 +58,8 @@ export const settingsSchema = z.object({
     sheetRefreshMinutes: z.number().int().min(5).max(120),
     // « Lu par » d'une fiche série : à partir de cette part des pages lues.
     readByPercent: z.number().int().min(1).max(100),
+    // Les lecteurs invitent (comptes validés ensuite par l'admin).
+    readersCanInvite: z.boolean(),
 });
 
 export type Settings = z.infer<typeof settingsSchema>;
@@ -73,6 +75,7 @@ export const settingsUpdateSchema = z.object({
     sheetRefresh: settingsSchema.shape.sheetRefresh.optional(),
     sheetRefreshMinutes: settingsSchema.shape.sheetRefreshMinutes.optional(),
     readByPercent: settingsSchema.shape.readByPercent.optional(),
+    readersCanInvite: settingsSchema.shape.readersCanInvite.optional(),
 });
 
 export type SettingsUpdate = z.infer<typeof settingsUpdateSchema>;
@@ -87,6 +90,7 @@ export const defaultSettings = (scanIntervalMinutes = 30): Settings => ({
     sheetRefresh: false,
     sheetRefreshMinutes: 10,
     readByPercent: 10,
+    readersCanInvite: false,
 });
 
 const KEY = 'settings';

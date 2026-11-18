@@ -167,6 +167,101 @@ describe('a draft deleted from the disk', () => {
     });
 });
 
+describe('draft folders of one series merged', () => {
+    const merge = (into: string, from: string[]) =>
+        call(`/libraries/${ctx.library.id}/drafts/merge`, {
+            method: 'POST',
+            json: { into, from },
+        });
+
+    it('are recognised by their series name, then merged into one folder', async () => {
+        await writeCbz(ctx.file('_draft/Gantz T01 [team]/Gantz T01.cbz'), {
+            comicInfo: info('1'),
+        });
+        await writeCbz(ctx.file('_draft/Gantz T02/Gantz T02.cbz'));
+        await writeFile(ctx.file('_draft/Gantz T02/release.nfo'), 'team');
+        await writeCbz(ctx.file('_draft/Spirale/Spirale.cbz'));
+        ctx.files.archiveDraft(ctx.library.id, '_draft/Gantz T02', false);
+
+        const drafts = await ctx.files.drafts(ctx.library.id);
+        // Même série : nom du ComicInfo, ou deviné du dossier.
+        expect(drafts.map((d) => [d.folder, d.seriesName, d.mergeKey])).toEqual(
+            [
+                ['_draft/Gantz T01 [team]', 'Gantz', 'gantz'],
+                ['_draft/Gantz T02', 'Gantz', 'gantz'],
+                ['_draft/Spirale', 'Spirale', 'spirale'],
+            ],
+        );
+
+        const { status, body } = await merge('_draft/Gantz T01 [team]', [
+            '_draft/Gantz T02',
+        ]);
+        expect(status).toBe(200);
+        expect(body).toEqual({
+            folder: '_draft/Gantz T01 [team]',
+            moved: 2,
+            failures: [],
+        });
+        expect(await exists('_draft/Gantz T01 [team]/Gantz T02.cbz')).toBe(
+            true,
+        );
+        expect(await exists('_draft/Gantz T01 [team]/release.nfo')).toBe(true);
+        expect(await exists('_draft/Gantz T02')).toBe(false);
+        expect(
+            (await ctx.files.drafts(ctx.library.id)).map((d) => d.folder),
+        ).toEqual(['_draft/Gantz T01 [team]', '_draft/Spirale']);
+    });
+
+    it('puts lone volumes in a folder named after their series', async () => {
+        await writeCbz(ctx.file('_draft/Gantz T01.cbz'), {
+            comicInfo: info('1'),
+        });
+        await writeCbz(ctx.file('_draft/Gantz T02.cbz'), {
+            comicInfo: info('2'),
+        });
+        ctx.files.setDraftSettings(ctx.library.id, '_draft/Gantz T01.cbz', {
+            status: 'completed',
+        });
+
+        const { body } = await merge('_draft/Gantz T01.cbz', [
+            '_draft/Gantz T02.cbz',
+        ]);
+
+        expect(body).toMatchObject({ folder: '_draft/Gantz', moved: 2 });
+        expect(await exists('_draft/Gantz/Gantz T01.cbz')).toBe(true);
+        expect(await exists('_draft/Gantz T01.cbz')).toBe(false);
+        const drafts = await ctx.files.drafts(ctx.library.id);
+        expect(drafts).toEqual([
+            expect.objectContaining({
+                folder: '_draft/Gantz',
+                // Les réglages du premier le suivent.
+                status: 'completed',
+            }),
+        ]);
+        expect(drafts[0]!.files.map((f) => f.name)).toEqual([
+            'Gantz T01.cbz',
+            'Gantz T02.cbz',
+        ]);
+    });
+
+    it('never overwrites a file, and never leaves _draft', async () => {
+        await writeCbz(ctx.file('_draft/Gantz A/Gantz T01.cbz'));
+        await writeCbz(ctx.file('_draft/Gantz B/Gantz T01.cbz'));
+        await writeCbz(ctx.file('Gantz/Gantz #01.cbz'));
+
+        const { body } = await merge('_draft/Gantz A', ['_draft/Gantz B']);
+        expect(body).toMatchObject({
+            moved: 0,
+            failures: [{ path: '_draft/Gantz B/Gantz T01.cbz' }],
+        });
+        expect(await exists('_draft/Gantz B/Gantz T01.cbz')).toBe(true);
+
+        const outside = await merge('_draft/Gantz A', ['_draft/../Gantz']);
+        expect(outside.status).toBe(404);
+        expect(await exists('Gantz/Gantz #01.cbz')).toBe(true);
+    });
+});
+
 describe('a series deleted from the disk', () => {
     it('loses its files and disappears, its reading time stays in the stats', async () => {
         const { gantz, first } = await publishedGantz();
@@ -271,7 +366,7 @@ describe('a series put back in the drafts', () => {
                 back.id,
                 {},
             ),
-        ).toEqual({ toRead: true, notForMe: false });
+        ).toEqual({ toRead: true, notForMe: false, rereading: false });
         // Dossier publié en entier : plus de réglages en attente.
         expect(await ctx.files.drafts(ctx.library.id)).toEqual([]);
     });

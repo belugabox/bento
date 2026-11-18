@@ -19,6 +19,7 @@ export const SuggestionRow = ({
     isAdmin,
     onChanged,
     tag,
+    smaller = false,
 }: {
     title: string;
     /** Nombre affiché à côté du titre (aucun sans). */
@@ -30,9 +31,13 @@ export const SuggestionRow = ({
     onChanged: () => void;
     /** En haut à gauche de la couverture (avatars…). */
     tag?: (series: SeriesSummary) => ReactNode;
+    /** Cartes un cran plus petites que l'affichage choisi (fiche série). */
+    smaller?: boolean;
 }) => {
     const display = useLibraryDisplay();
-    const columns = gridColumns(display.size);
+    const columns = gridColumns(
+        smaller ? Math.max(display.size - 1, 0) : display.size,
+    );
     const perRow = useMatches(columns);
     if (items.length === 0) return null;
     return (

@@ -1,5 +1,5 @@
 import { eq } from 'drizzle-orm';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createApi } from '../src/api';
 import { volumes } from '../src/db/schema';
@@ -224,6 +224,69 @@ describe('reading progress', () => {
         expect(body.map((v: { volumeId: number }) => v.volumeId)).toEqual([
             gantz[0],
         ]);
+    });
+
+    it('follows a reread: the next volume to reread, until the last one', async () => {
+        vi.useFakeTimers({ toFake: ['Date'] });
+        try {
+            vi.setSystemTime(new Date('2026-11-01T10:00:00Z'));
+            for (const id of gantz) await save(id, { completed: true });
+            // « Relire » une heure plus tard.
+            vi.setSystemTime(new Date('2026-11-01T11:00:00Z'));
+            const lists = await call(`/series/${gantzSeries}/lists`, alice, {
+                method: 'PUT',
+                json: { rereading: true },
+            });
+            expect(lists.body).toMatchObject({ rereading: true });
+            const resume = async () =>
+                (await call('/continue', alice)).body.map(
+                    (v: {
+                        volumeId: number;
+                        page: number | null;
+                        rereading: boolean;
+                    }) => [v.volumeId, v.page, v.rereading],
+                );
+            expect(await resume()).toEqual([[gantz[0], null, true]]);
+            expect(
+                (await call(`/series/${gantzSeries}`, alice)).body.rereadNextId,
+            ).toBe(gantz[0]);
+
+            vi.setSystemTime(new Date('2026-11-01T11:10:00Z'));
+            await save(gantz[0]!, { page: 1 });
+            expect(await resume()).toEqual([[gantz[0], 1, true]]);
+
+            // Tome 1 relu : le tome 2.
+            await save(gantz[0]!, { page: 2 });
+            expect(await resume()).toEqual([[gantz[1], null, true]]);
+
+            // Les autres relus : la relecture s'arrête d'elle-même.
+            await save(gantz[1]!, { page: 2 });
+            await save(gantz[2]!, { page: 2 });
+            expect(await resume()).toEqual([]);
+            expect(
+                (await call('/series', alice)).body.find(
+                    (s: { name: string }) => s.name === 'Gantz',
+                ),
+            ).toMatchObject({ rereading: false });
+            expect(
+                (await call(`/series/${gantzSeries}`, alice)).body.rereadNextId,
+            ).toBeNull();
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it('stops a reread on demand', async () => {
+        for (const id of gantz) await save(id, { completed: true });
+        await call(`/series/${gantzSeries}/lists`, alice, {
+            method: 'PUT',
+            json: { rereading: true },
+        });
+        await call(`/series/${gantzSeries}/lists`, alice, {
+            method: 'PUT',
+            json: { rereading: false },
+        });
+        expect((await call('/continue', alice)).body).toEqual([]);
     });
 
     it('keeps only the latest volume of each series to resume', async () => {

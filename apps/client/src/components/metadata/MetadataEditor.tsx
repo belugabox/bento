@@ -351,6 +351,7 @@ export const MetadataEditor = ({
     autoFill = false,
     next,
     menu,
+    existingSeriesId,
 }: {
     libraryId: number;
     kind: 'manga' | 'comics';
@@ -399,6 +400,11 @@ export const MetadataEditor = ({
     /** Série suivante à traiter (ordre de la page Séries). */
     next?: { name: string; go: () => void };
     /**
+     * Brouillons : série publiée du même nom, que ces tomes rejoignent ;
+     * choisie d'elle-même dans « Ajouter à une série existante ».
+     */
+    existingSeriesId?: number;
+    /**
      * Actions de la page (`Menu.Item` : archiver, supprimer…), dans le menu
      * « ⋯ » de la barre, après « Compresser… ».
      */
@@ -424,8 +430,12 @@ export const MetadataEditor = ({
         age: string;
         status: string;
         mode: string;
+        period: string;
     }>(undefined);
     const [pickerKey, setPickerKey] = useState(0);
+    // Brouillons au nom d'une série publiée : choisie d'elle-même, une seule
+    // fois (pas après « Annuler » ni un choix effacé).
+    const [suggestSeries, setSuggestSeries] = useState(mode === 'drafts');
     // Après une fiche en ligne, compléter numéros, titres et années des tomes.
     const [alsoFileNames, setAlsoFileNames] = useState(true);
     // Titre et année de chaque tome, d'après les fiches qui les listent.
@@ -1134,6 +1144,10 @@ export const MetadataEditor = ({
                         <ExistingSeriesPicker
                             key={pickerKey}
                             libraryId={libraryId}
+                            suggestedId={
+                                suggestSeries ? existingSeriesId : undefined
+                            }
+                            onSuggested={() => setSuggestSeries(false)}
                             onJoin={(name, source, joined) => {
                                 // Toujours depuis l'état d'avant le premier
                                 // choix : une autre série ne garde rien de la
@@ -1144,6 +1158,7 @@ export const MetadataEditor = ({
                                         beforeJoin.current,
                                         name,
                                         source,
+                                        first,
                                     );
                                 });
                                 // Format, âge, statut et mode de la série :
@@ -1153,9 +1168,19 @@ export const MetadataEditor = ({
                                     age: ageValue,
                                     status,
                                     mode: modeValue,
+                                    period: periodValue,
                                 };
                                 const before = settingsBeforeJoin.current;
                                 if (classification) {
+                                    // Sa parution, sinon celle saisie.
+                                    setPeriodValue(
+                                        joined.startYear == null
+                                            ? before.period
+                                            : periodText({
+                                                  start: joined.startYear,
+                                                  end: joined.endYear,
+                                              }),
+                                    );
                                     setFormatValue(
                                         joined.formatId == null
                                             ? before.format
@@ -1187,6 +1212,7 @@ export const MetadataEditor = ({
                                     setAgeValue(before.age);
                                     setStatus(before.status);
                                     setModeValue(before.mode);
+                                    setPeriodValue(before.period);
                                 }
                                 settingsBeforeJoin.current = undefined;
                             }}

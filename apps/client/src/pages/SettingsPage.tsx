@@ -7,6 +7,7 @@ import {
     Select,
     Slider,
     Stack,
+    Switch,
     Tabs,
     Text,
 } from '@mantine/core';
@@ -62,7 +63,11 @@ const QUALITY_MARKS = [
 /** Réglages de l'onglet « Général » (la grille d'âges est à part). */
 type GeneralSettings = Pick<
     Settings,
-    'compression' | 'scanIntervalMinutes' | 'appearance' | 'readByPercent'
+    | 'compression'
+    | 'scanIntervalMinutes'
+    | 'appearance'
+    | 'readByPercent'
+    | 'readersCanInvite'
 >;
 
 const generalOf = ({
@@ -70,11 +75,13 @@ const generalOf = ({
     scanIntervalMinutes,
     appearance,
     readByPercent,
+    readersCanInvite,
 }: Settings): GeneralSettings => ({
     compression,
     scanIntervalMinutes,
     appearance,
     readByPercent,
+    readersCanInvite,
 });
 
 /** Section de réglages : titre, explication, puis les champs. */
@@ -233,6 +240,23 @@ const SettingsForm = ({
                             readByPercent: Number(value) || 1,
                         }))
                     }
+                />
+            </Section>
+
+            <Section
+                title="Invitations"
+                description="Les lecteurs envoient eux-mêmes un lien (deux au plus en attente). Le compte créé ne peut se connecter qu’une fois validé dans Comptes ; il ne voit jamais plus que celui qui l’invite."
+            >
+                <Switch
+                    label="Les lecteurs peuvent inviter"
+                    checked={values.readersCanInvite}
+                    onChange={(event) => {
+                        const { checked } = event.currentTarget;
+                        setValues((current) => ({
+                            ...current,
+                            readersCanInvite: checked,
+                        }));
+                    }}
                 />
             </Section>
 

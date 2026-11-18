@@ -1,4 +1,4 @@
-import { and, asc, eq, gt, isNull, lt } from 'drizzle-orm';
+import { and, asc, eq, gt, isNull, lt, sql } from 'drizzle-orm';
 
 import type { Db } from '../db';
 import { invitations, users } from '../db/schema';
@@ -31,6 +31,7 @@ const insertLink = (
         role?: Role;
         maxAge?: number | null;
         username?: string | null;
+        invitedBy?: number | null;
     },
 ) => {
     // Au passage, oublier les liens expirés.
@@ -55,7 +56,14 @@ export const createInvitation = (
         role,
         maxAge,
         username: rawUsername,
-    }: { role: Role; maxAge: number | null; username?: string | null },
+        invitedBy = null,
+    }: {
+        role: Role;
+        maxAge: number | null;
+        username?: string | null;
+        /** Lecteur qui invite : le compte créé attendra l'admin. */
+        invitedBy?: number | null;
+    },
 ) => {
     let username: string | null = null;
     if (rawUsername?.trim()) {
@@ -67,6 +75,7 @@ export const createInvitation = (
         role,
         maxAge: role === 'admin' ? null : maxAge,
         username,
+        invitedBy,
     });
 };
 
@@ -95,6 +104,10 @@ export const listInvitations = (db: Db) =>
             username: invitations.username,
             createdAt: invitations.createdAt,
             expiresAt: invitations.expiresAt,
+            // Lecteur qui a invité (null : l'admin).
+            invitedBy: sql<
+                string | null
+            >`(select i.name from users i where i.id = invitations.invited_by)`,
         })
         .from(invitations)
         .where(
@@ -124,6 +137,10 @@ const findLink = (db: Db, token: string) => {
             role: invitations.role,
             maxAge: invitations.maxAge,
             username: invitations.username,
+            invitedBy: invitations.invitedBy,
+            inviterName: sql<
+                string | null
+            >`(select i.name from users i where i.id = invitations.invited_by)`,
             user: {
                 id: users.id,
                 name: users.name,
@@ -153,9 +170,14 @@ const findLink = (db: Db, token: string) => {
 
 /** Ce qu'affiche la page d'un lien (page publique). */
 export const linkInfo = (db: Db, token: string) => {
-    const { kind, user, username } = findLink(db, token);
+    const { kind, user, username, invitedBy, inviterName } = findLink(
+        db,
+        token,
+    );
     return {
         kind,
+        // Invité par un lecteur : son nom, et le compte attendra l'admin.
+        invitedBy: invitedBy === null ? null : (inviterName ?? ''),
         // Compte existant : identifiant proposé, e-mail et avatar actuels ;
         // invitation : identifiant proposé par l'admin.
         username: user
@@ -193,7 +215,7 @@ export const useLink = async (db: Db, token: string, form: LinkForm) => {
                 .where(eq(users.id, link.user!.id))
                 .run();
             tx.delete(invitations).where(eq(invitations.id, link.id)).run();
-            return { id: link.user!.id, kind: link.kind };
+            return { id: link.user!.id, kind: link.kind, pending: false };
         });
     }
 
@@ -221,14 +243,23 @@ export const useLink = async (db: Db, token: string, form: LinkForm) => {
                 .set(account)
                 .where(eq(users.id, link.user.id))
                 .run();
-            return { id: link.user.id, kind: link.kind };
+            return { id: link.user.id, kind: link.kind, pending: false };
         }
+        // Invité par un lecteur : en attente de l'admin, pas encore connecté.
+        const pending = link.invitedBy !== null;
         const { id } = tx
             .insert(users)
-            .values({ ...account, role: link.role, maxAge: link.maxAge })
+            .values({
+                ...account,
+                role: link.role,
+                maxAge: link.maxAge,
+                invitedBy: link.invitedBy,
+                pendingSince: pending ? new Date() : null,
+                lastLoginAt: pending ? null : account.lastLoginAt,
+            })
             .returning({ id: users.id })
             .get();
-        return { id, kind: link.kind };
+        return { id, kind: link.kind, pending };
     });
 };
 

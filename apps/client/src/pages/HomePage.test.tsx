@@ -232,6 +232,25 @@ describe('HomePage', () => {
         ).toBe('/library?reading=foryou');
     });
 
+    it('shows a reread as such, with « Relire »', async () => {
+        resume = [
+            {
+                ...RESUME[1],
+                volumeId: 61,
+                seriesId: 2,
+                number: '2',
+                rereading: true,
+            },
+        ];
+        show();
+
+        expect(await screen.findByText('Relecture')).toBeTruthy();
+        expect(screen.getByText('Tome 2 · à relire')).toBeTruthy();
+        expect(
+            screen.getByRole('link', { name: 'Relire' }).getAttribute('href'),
+        ).toBe('/read/61');
+    });
+
     it('says when the library is empty', async () => {
         resume = [];
         series = [];

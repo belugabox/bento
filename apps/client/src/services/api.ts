@@ -192,7 +192,7 @@ export type InProgressVolume = Awaited<
 /** Listes de la personne : « à lire », « pas pour moi » (suggestions). */
 export const setSeriesLists = (
     seriesId: number,
-    lists: { toRead?: boolean; notForMe?: boolean },
+    lists: { toRead?: boolean; notForMe?: boolean; rereading?: boolean },
 ) => json(api.series[':id'].lists.$put({ ...id(seriesId), json: lists }));
 
 // --- Comptes -------------------------------------------------------------------
@@ -274,6 +274,23 @@ export const createInvitation = (invitation: {
 
 export const deleteInvitation = (invitationId: number) =>
     json(api.invitations[':id'].$delete(id(invitationId)));
+
+/** Invitations du lecteur connecté : liens en cours et comptes à valider. */
+export const fetchMyInvitations = () => json(api.me.invitations.$get());
+
+/** Invitation d'un lecteur (le compte créé attendra l'admin). */
+export const createMyInvitation = (username: string | null) =>
+    json(api.me.invitations.$post({ json: { maxAge: null, username } }));
+
+export const deleteMyInvitation = (invitationId: number) =>
+    json(api.me.invitations[':id'].$delete(id(invitationId)));
+
+/** Comptes invités par des lecteurs, à valider (pastille de « Comptes »). */
+export const fetchPendingUsers = () => json(api.users.pending.$get());
+
+/** Compte invité par un lecteur, validé avec cet âge maximal. */
+export const approveUser = (userId: number, maxAge: number | null) =>
+    json(api.users[':id'].approve.$post({ ...id(userId), json: { maxAge } }));
 
 /** Largeur et hauteur de chaque page (double page). */
 export const fetchPageSizes = (volumeId: number) =>
@@ -645,6 +662,15 @@ export const deleteDraft = (library: number, folder: string) =>
         api.libraries[':id'].drafts.$delete({
             ...libraryId(library),
             query: { folder },
+        }),
+    );
+
+/** Brouillons d'une même série réunis dans `into` (dossier obtenu). */
+export const mergeDrafts = (library: number, into: string, from: string[]) =>
+    json(
+        api.libraries[':id'].drafts.merge.$post({
+            ...libraryId(library),
+            json: { into, from },
         }),
     );
 

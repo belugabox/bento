@@ -108,6 +108,7 @@ describe('invitations', () => {
 
         expect(await (await call(`/auth/links/${token}`)).json()).toEqual({
             kind: 'invite',
+            invitedBy: null,
             username: null,
             email: null,
             avatarSeed: null,
@@ -304,6 +305,7 @@ describe('account links', () => {
 
         expect(await (await call(`/auth/links/${token}`)).json()).toEqual({
             kind: 'activate',
+            invitedBy: null,
             username: 'Benjamin',
             email: 'Benjamin Corbeel@example.com',
             avatarSeed: null,

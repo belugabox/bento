@@ -87,14 +87,16 @@ export const setSeriesField = <F extends SeriesField>(
 
 /**
  * Rattache les tomes à une série publiée : son nom et ses champs de série
- * (ceux de son premier tome), à la place de ceux saisis.
+ * (ceux de son premier tome), à la place de ceux saisis ; son résumé sur
+ * le premier tome (`first`), s'il n'en a pas (signalé : pas repris).
  */
 export const joinSeries = (
     edits: Edits,
     name: string,
     source: ComicInfo,
-): Edits =>
-    SERIES_FIELDS.reduce(
+    first?: string,
+): Edits => {
+    const joined = SERIES_FIELDS.reduce(
         (next, field) =>
             field === 'Series'
                 ? setSeriesField(next, field, name)
@@ -103,6 +105,10 @@ export const joinSeries = (
                   : setSeriesField(next, field, source[field] as never),
         edits,
     );
+    return first && !isEmpty(source.Summary) && isEmpty(joined[first]?.Summary)
+        ? setVolumeField(joined, first, 'Summary', source.Summary)
+        : joined;
+};
 
 /** Modifie un champ d'un seul tome. */
 export const setVolumeField = <F extends keyof ComicInfo>(

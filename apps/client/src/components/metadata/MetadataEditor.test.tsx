@@ -1249,6 +1249,84 @@ describe('MetadataEditor', () => {
         expect(save).not.toHaveBeenCalled();
     });
 
+    it('joins by itself the published series of the same name, with its release and summary', async () => {
+        vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+            const url = String(input);
+            const body = url.startsWith('/api/series?')
+                ? [{ id: 5, name: 'Gantz' }]
+                : url.startsWith('/api/series/5')
+                  ? {
+                        name: 'Gantz',
+                        formatId: 1,
+                        age: 16,
+                        status: 'completed',
+                        readingMode: null,
+                        startYear: 2000,
+                        endYear: 2013,
+                        volumes: [
+                            {
+                                number: '1',
+                                title: null,
+                                admin: {
+                                    comicInfo: {
+                                        Series: 'Gantz',
+                                        Summary: 'Kei Kurono meurt…',
+                                    },
+                                },
+                            },
+                        ],
+                    }
+                  : { updated: [], failures: [] };
+            return new Response(JSON.stringify(body), {
+                headers: { 'Content-Type': 'application/json' },
+            });
+        });
+        render(
+            <MantineProvider>
+                <MetadataEditor
+                    libraryId={1}
+                    kind="manga"
+                    mode="drafts"
+                    volumes={volumes()}
+                    classification={{
+                        formatId: null,
+                        age: null,
+                        startYear: null,
+                        endYear: null,
+                        save: vi.fn(),
+                    }}
+                    existingSeriesId={5}
+                    onChanged={() => {}}
+                />
+            </MantineProvider>,
+        );
+
+        // Choisie d'elle-même : sa parution et son résumé sont repris.
+        await waitFor(() =>
+            expect(
+                (
+                    screen.getByRole('textbox', {
+                        name: /^Parution/,
+                    }) as HTMLInputElement
+                ).value,
+            ).toBe('2000 – 2013'),
+        );
+        expect(
+            (
+                screen.getByRole('textbox', {
+                    name: 'Résumé (enregistré sur le premier tome)',
+                }) as HTMLTextAreaElement
+            ).value,
+        ).toBe('Kei Kurono meurt…');
+        expect(
+            (
+                screen.getByRole('textbox', {
+                    name: 'Ajouter à une série existante',
+                }) as HTMLInputElement
+            ).value,
+        ).toBe('Gantz');
+    });
+
     it('takes the format and age of the published series it joins', async () => {
         vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
             const url = String(input);

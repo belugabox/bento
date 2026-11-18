@@ -21,6 +21,7 @@ import {
     IconPhoto,
     IconPlayerPlay,
     IconPlayerSkipBack,
+    IconPlayerStop,
     IconRotate,
     IconThumbDown,
     IconThumbUp,
@@ -236,6 +237,7 @@ export const SeriesCardMenu = ({
         startedCount: number;
         toRead?: boolean;
         notForMe?: boolean;
+        rereading?: boolean;
     };
     isAdmin: boolean;
     onChanged: () => void;
@@ -249,7 +251,17 @@ export const SeriesCardMenu = ({
     /** Ouvre le tome à lire, comme le bouton de la fiche. */
     const read = async () => {
         try {
-            const next = nextToRead((await fetchSeries(series.id)).volumes);
+            const details = await fetchSeries(series.id);
+            // Relecture en cours : son tome à relire.
+            if (details.rereadNextId) {
+                navigate(`/read/${details.rereadNextId}`);
+                return;
+            }
+            const next = nextToRead(details.volumes);
+            // « Relire » commence une relecture (« En cours » la suit).
+            if (next?.action === 'reread' && !readOnly) {
+                await setSeriesLists(series.id, { rereading: true });
+            }
             if (next) {
                 navigate(
                     `/read/${next.volume.id}${next.action === 'reread' ? '?page=1' : ''}`,
@@ -312,7 +324,13 @@ export const SeriesCardMenu = ({
                         leftSection={<IconPlayerPlay size={14} />}
                         onClick={() => void read()}
                     >
-                        {allRead ? 'Relire' : started ? 'Reprendre' : 'Lire'}
+                        {series.rereading
+                            ? 'Reprendre la relecture'
+                            : allRead
+                              ? 'Relire'
+                              : started
+                                ? 'Reprendre'
+                                : 'Lire'}
                     </Menu.Item>
                     <Menu.Divider />
                     {!allRead && (
@@ -358,6 +376,15 @@ export const SeriesCardMenu = ({
                             onClick={() => toggleToRead(true)}
                         >
                             Ajouter à « À lire »
+                        </Menu.Item>
+                    )}
+                    {series.rereading && (
+                        <Menu.Item
+                            leftSection={<IconPlayerStop size={14} />}
+                            disabled={readOnly}
+                            onClick={() => stopRereading(series.id, onChanged)}
+                        >
+                            Arrêter la relecture
                         </Menu.Item>
                     )}
                     {/* Pas commencée (les suggestions), ou déjà retirée. */}
@@ -407,6 +434,16 @@ export const SeriesCardMenu = ({
     );
 };
 
+/** Arrête une relecture (« Annuler » la reprend). */
+const stopRereading = (seriesId: number, onChanged: () => void) =>
+    void runAction(async () => {
+        await setSeriesLists(seriesId, { rereading: false });
+        return {
+            message: 'Relecture arrêtée.',
+            undo: () => setSeriesLists(seriesId, { rereading: true }),
+        };
+    }, onChanged);
+
 /**
  * Menu ⋮ d'un tome à reprendre (accueil) : ce tome, la série (lue en entier
  * ou jusqu'à ce tome), « Reprendre », et la fiche.
@@ -423,6 +460,8 @@ export const VolumeCardMenu = ({
         title: string | null;
         /** Page atteinte ; null : tome suivant, pas encore ouvert. */
         page: number | null;
+        /** Tome d'une relecture. */
+        rereading?: boolean;
     };
     onChanged: () => void;
 }) => {
@@ -484,7 +523,19 @@ export const VolumeCardMenu = ({
                 >
                     Marquer la série comme lue
                 </Menu.Item>
-                {volume.page !== null && (
+                {volume.rereading && (
+                    <Menu.Item
+                        leftSection={<IconPlayerStop size={14} />}
+                        disabled={readOnly}
+                        onClick={() =>
+                            stopRereading(volume.seriesId, onChanged)
+                        }
+                    >
+                        Arrêter la relecture
+                    </Menu.Item>
+                )}
+                {/* Une relecture : retirer le tome le marquerait non lu. */}
+                {volume.page !== null && !volume.rereading && (
                     <Menu.Item
                         leftSection={<IconX size={14} />}
                         disabled={readOnly}

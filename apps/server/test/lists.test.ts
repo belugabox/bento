@@ -82,7 +82,11 @@ describe('personal lists', () => {
             method: 'PUT',
             json: { toRead: true },
         });
-        expect(set.body).toEqual({ toRead: true, notForMe: false });
+        expect(set.body).toEqual({
+            toRead: true,
+            notForMe: false,
+            rereading: false,
+        });
 
         expect(await seriesOf(alice, 'Gantz')).toMatchObject({ toRead: true });
         expect(
@@ -105,7 +109,11 @@ describe('personal lists', () => {
             method: 'PUT',
             json: { notForMe: true },
         });
-        expect(set.body).toEqual({ toRead: false, notForMe: true });
+        expect(set.body).toEqual({
+            toRead: false,
+            notForMe: true,
+            rereading: false,
+        });
         expect(await seriesOf(alice, 'Gantz')).toMatchObject({
             notForMe: true,
         });

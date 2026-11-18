@@ -45,12 +45,16 @@ export const SeriesSuggestions = ({
                 items={sameAuthor}
                 isAdmin={isAdmin}
                 onChanged={reload}
+                // Sous les tomes : plus petites (demandé).
+                smaller
             />
             <SuggestionRow
                 title="Dans le même genre"
                 items={similar}
                 isAdmin={isAdmin}
                 onChanged={reload}
+                // Sous les tomes : plus petites (demandé).
+                smaller
             />
         </Stack>
     );

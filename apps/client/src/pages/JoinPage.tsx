@@ -43,6 +43,8 @@ export const JoinPage = () => {
     const [confirm, setConfirm] = useState('');
     const [saveError, setSaveError] = useState<string>();
     const [busy, setBusy] = useState(false);
+    // Invité par un lecteur : compte créé, en attente de l'admin.
+    const [pending, setPending] = useState(false);
 
     // Compte existant : identifiant proposé, e-mail et avatar actuels.
     useEffect(() => {
@@ -70,6 +72,21 @@ export const JoinPage = () => {
         );
     }
 
+    if (pending) {
+        return (
+            <PublicFrame title="Compte créé">
+                <Text size="sm">
+                    Ton compte sera utilisable dès que l’admin l’aura validé. Tu
+                    pourras alors te connecter avec ton identifiant et ton mot
+                    de passe.
+                </Text>
+                <Button component={Link} to="/login" variant="light">
+                    Se connecter
+                </Button>
+            </PublicFrame>
+        );
+    }
+
     const full = link.kind !== 'reset';
     const ready =
         passwordReady(password, confirm) &&
@@ -80,13 +97,18 @@ export const JoinPage = () => {
         setBusy(true);
         setSaveError(undefined);
         try {
-            await submitLink(
+            const result = await submitLink(
                 token,
                 full ? { username, password, email, avatarSeed } : { password },
             );
+            if (result.pending) {
+                setPending(true);
+                return;
+            }
             navigate('/', { replace: true });
         } catch (e) {
             setSaveError((e as Error).message);
+        } finally {
             setBusy(false);
         }
     };
@@ -95,7 +117,12 @@ export const JoinPage = () => {
         <PublicFrame title={TITLES[link.kind]}>
             {link.kind === 'invite' && (
                 <Text size="sm" c="dimmed">
+                    {link.invitedBy
+                        ? `${link.invitedBy} t’invite sur Bento. `
+                        : ''}
                     Choisis ton avatar, ton identifiant et ton mot de passe.
+                    {link.invitedBy !== null &&
+                        ' Ton compte sera utilisable une fois validé par l’admin.'}
                 </Text>
             )}
             {link.kind === 'activate' && (

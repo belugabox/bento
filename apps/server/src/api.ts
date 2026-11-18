@@ -26,6 +26,7 @@ import { isAvatarSeed } from './auth/rules';
 import { deleteUser, listUsers, updateAccount, updateUser } from './auth/users';
 import { READING_MODES } from './classification';
 import type { Db } from './db';
+import { createInvitationRoutes } from './invitationRoutes';
 import {
     getSeries,
     getVolume,
@@ -78,6 +79,7 @@ import {
 import { saveSourceRating } from './library/ratings';
 import { familyReaders, seriesReaders } from './library/readers';
 import { addReadingTime } from './library/readingTime';
+import { endRereadingIfDone, rereadNextOf } from './library/rereading';
 import { ResizedPages } from './library/resizedPages';
 import { type LibraryScanner, coverFile } from './library/scanner';
 import { SEARCHED_SITES, answerProposal } from './library/sheetProposals';
@@ -311,7 +313,17 @@ export const createApi = ({
         })
         // Tout ce qui suit exige une session.
         .use('*', requireUser(db))
-        .get('/me', (c) => c.json({ ...c.var.user, preview: c.var.preview }))
+        .get('/me', (c) =>
+            c.json({
+                ...c.var.user,
+                preview: c.var.preview,
+                // « Inviter quelqu'un » dans Moi (lecteurs, si permis).
+                canInvite:
+                    c.var.user.role === 'reader' &&
+                    !c.var.preview &&
+                    settings.get().readersCanInvite,
+            }),
+        )
         // « Mon compte » : identifiant, e-mail, avatar, mot de passe.
         .patch(
             '/me',
@@ -377,7 +389,16 @@ export const createApi = ({
             (c) => c.json(listSeries(db, c.var.user, c.req.valid('query'))),
         )
         .get('/series/:id', zValidator('param', idParam), (c) =>
-            c.json(getSeries(db, c.var.user, c.req.valid('param').id)),
+            c.json({
+                ...getSeries(db, c.var.user, c.req.valid('param').id),
+                // Relecture en cours : le tome à relire (« Reprendre la
+                // relecture »).
+                rereadNextId: rereadNextOf(
+                    db,
+                    c.var.user,
+                    c.req.valid('param').id,
+                ),
+            }),
         )
         // Filtre « Lu par » de l'accueil : les autres comptes et leurs séries lues.
         .get('/readers', (c) =>
@@ -521,6 +542,7 @@ export const createApi = ({
                 z.object({
                     toRead: z.boolean().optional(),
                     notForMe: z.boolean().optional(),
+                    rereading: z.boolean().optional(),
                 }),
             ),
             (c) =>
@@ -740,16 +762,21 @@ export const createApi = ({
                 );
                 // État d'avant, pour annuler (menus de l'accueil).
                 const [previous] = snapshotProgress(db, c.var.user.id, [id]);
+                const progress = saveProgress(
+                    db,
+                    c.var.user.id,
+                    id,
+                    c.req.valid('json'),
+                    c.req.valid('json').at
+                        ? new Date(c.req.valid('json').at!)
+                        : undefined,
+                );
+                // Dernier tome d'une relecture : elle s'arrête.
+                if (progress?.completed) {
+                    endRereadingIfDone(db, c.var.user, id);
+                }
                 return c.json({
-                    progress: saveProgress(
-                        db,
-                        c.var.user.id,
-                        id,
-                        c.req.valid('json'),
-                        c.req.valid('json').at
-                            ? new Date(c.req.valid('json').at!)
-                            : undefined,
-                    ),
+                    progress,
                     previous: previous!,
                 });
             },
@@ -852,6 +879,7 @@ export const createApi = ({
         // Suggestions (module à part).
         .route('/suggestions', createSuggestionRoutes(db))
         .route('/', createSeriesFileRoutes(files))
+        .route('/', createInvitationRoutes(db, settings))
         // Nombre de séries en attente (pastille de l'en-tête).
         .get('/drafts/pending', requireAdmin, async (c) =>
             c.json({ series: await files.pendingSeries() }),
