@@ -46,6 +46,7 @@ import { SeriesVolumeMenu } from '@/components/CardMenus';
 import { CompletenessBadge } from '@/components/CompletenessBadge';
 import { CoverCard } from '@/components/CoverCard';
 import { DownloadRing } from '@/components/DownloadIndicator';
+import { DownloadSeriesModal } from '@/components/DownloadSeriesModal';
 import { PageHeader } from '@/components/PageHeader';
 import { PageLoader } from '@/components/PageLoader';
 import { RatingBadge } from '@/components/RatingBadge';
@@ -64,7 +65,6 @@ import {
     volumeShortLabel,
     volumeTitleOf,
 } from '@/components/readingStatus';
-import { NEXT_VOLUME_COUNTS, nextVolumesLabel } from '@/offline/auto';
 import { queueDownloads, useDownloads } from '@/offline/downloads';
 import {
     coverUrl,
@@ -147,6 +147,7 @@ export const SeriesPage = () => {
     } = useQuery(() => fetchSeries(seriesId), [seriesId]);
     // Liste en cours d'enregistrement (bouton désactivé).
     const [savingList, setSavingList] = useState(false);
+    const [downloadOpened, setDownloadOpened] = useState(false);
 
     // Sans réseau : la fiche n'est pas sur l'appareil, ses tomes
     // téléchargés si.
@@ -561,36 +562,27 @@ export const SeriesPage = () => {
                                         )
                                     )}
                                     <Menu.Divider />
-                                    <Menu.Label>
-                                        Télécharger sur l’appareil
-                                    </Menu.Label>
-                                    {[
-                                        ...NEXT_VOLUME_COUNTS.map((count) => ({
-                                            count,
-                                            label: nextVolumesLabel(count),
-                                        })),
-                                        {
-                                            count: Infinity,
-                                            label: 'Tous les tomes pas lus',
-                                        },
-                                    ].map((option) => (
-                                        <Menu.Item
-                                            key={option.label}
-                                            leftSection={
-                                                <IconDownload size={14} />
-                                            }
-                                            disabled={toDownload.length === 0}
-                                            onClick={() =>
-                                                downloadNext(option.count)
-                                            }
-                                        >
-                                            {option.label}
-                                        </Menu.Item>
-                                    ))}
+                                    {/* Une seule entrée : le nombre de tomes
+                                        se choisit dans la fenêtre. */}
+                                    <Menu.Item
+                                        leftSection={<IconDownload size={14} />}
+                                        onClick={() => setDownloadOpened(true)}
+                                    >
+                                        Télécharger…
+                                    </Menu.Item>
                                 </Menu.Dropdown>
                             </Menu>
                         </Group>
                         <SeriesReaders seriesId={series.id} />
+                        <DownloadSeriesModal
+                            opened={downloadOpened}
+                            onClose={() => setDownloadOpened(false)}
+                            volumes={toDownload.map((v) => ({
+                                id: v.id,
+                                short: volumeShortLabel(v),
+                            }))}
+                            onDownload={downloadNext}
+                        />
                     </Group>
                 </Stack>
             </Flex>

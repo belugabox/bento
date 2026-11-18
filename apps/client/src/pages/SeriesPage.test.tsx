@@ -385,13 +385,17 @@ describe('SeriesPage', () => {
         ).toEqual([
             'Marquer toute la série comme lue',
             'Marquer toute la série comme non lue',
-            'Le prochain tome',
-            'Les 2 prochains tomes',
-            'Les 3 prochains tomes',
-            'Les 5 prochains tomes',
-            'Tous les tomes pas lus',
+            'Télécharger…',
         ]);
-        expect(screen.getByText('Télécharger sur l’appareil')).toBeTruthy();
+        // Le nombre de tomes se choisit dans une fenêtre.
+        fireEvent.click(screen.getByRole('menuitem', { name: 'Télécharger…' }));
+        expect(
+            await screen.findByText('Télécharger sur l’appareil'),
+        ).toBeTruthy();
+        // Un seul tome pas lu (le hors-série n'en est pas) : un seul choix.
+        expect(screen.getAllByRole('radio')).toHaveLength(1);
+        expect(screen.getByText('Le prochain tome')).toBeTruthy();
+        expect(screen.getByText('T2')).toBeTruthy();
     });
 
     it('offers a menu on each volume', async () => {
