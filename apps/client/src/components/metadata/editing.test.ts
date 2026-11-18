@@ -23,6 +23,7 @@ import {
     searchNameOf,
     seriesValue,
     setSeriesField,
+    setVolumeField,
     setVolumeKind,
     sharedTargets,
     sheetFromBedetheque,
@@ -92,6 +93,26 @@ describe('joinSeries', () => {
         });
         // Le numéro de chaque tome ne change pas.
         expect(edits[first]?.Number).toBe('1');
+    });
+});
+
+describe('joinSeries, summary', () => {
+    it('takes the summary of the series on the first volume, if it has none', () => {
+        const source = { Series: 'Gantz', Summary: 'Kei Kurono meurt…' };
+        expect(
+            joinSeries(initialEdits(volumes), 'Gantz', source, first)[first]
+                ?.Summary,
+        ).toBe('Kei Kurono meurt…');
+        // Un résumé déjà saisi est gardé.
+        const typed = setVolumeField(
+            initialEdits(volumes),
+            first,
+            'Summary',
+            'Le mien',
+        );
+        expect(joinSeries(typed, 'Gantz', source, first)[first]?.Summary).toBe(
+            'Le mien',
+        );
     });
 });
 

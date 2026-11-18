@@ -156,6 +156,7 @@ describe('drafts', () => {
                 files: [
                     { path: '_draft/broken.cbz', name: 'broken.cbz', size: 15 },
                 ],
+                seriesId: null,
                 status: null,
                 readingMode: null,
                 formatId: null,
@@ -175,6 +176,7 @@ describe('drafts', () => {
                         path: '_draft/Gantz (01-18)/Gantz T01.cbz',
                     }),
                 ],
+                seriesId: null,
                 status: null,
                 readingMode: null,
                 formatId: null,
@@ -197,6 +199,7 @@ describe('drafts', () => {
                         size: 10,
                     },
                 ],
+                seriesId: null,
                 status: null,
                 readingMode: null,
                 formatId: null,
@@ -209,6 +212,36 @@ describe('drafts', () => {
                 archivedAt: null,
                 completeness: null,
             },
+        ]);
+    });
+
+    it('names the published series that a draft folder joins', async () => {
+        await writeCbz(ctx.file('Gantz/Gantz T01.cbz'), {
+            comicInfo: '<Series>Gantz</Series><Number>1</Number>',
+        });
+        await ctx.scanner.scan(ctx.library.id);
+        await writeCbz(ctx.file('_draft/Gantz T02/Gantz T02.cbz'), {
+            comicInfo: '<Series>gantz </Series><Number>2</Number>',
+        });
+        await writeCbz(ctx.file('_draft/Spirale/Spirale.cbz'), {
+            comicInfo: '<Series>Spirale</Series>',
+        });
+        const gantz = (await call('/series')).body.find(
+            (s: { name: string }) => s.name === 'Gantz',
+        );
+
+        const { body } = await call(`/libraries/${ctx.library.id}/drafts`);
+
+        // Même nom, à la casse et aux espaces près ; pas de série publiée :
+        // aucune.
+        expect(
+            body.map((d: { folder: string; seriesId: number | null }) => [
+                d.folder,
+                d.seriesId,
+            ]),
+        ).toEqual([
+            ['_draft/Gantz T02', gantz.id],
+            ['_draft/Spirale', null],
         ]);
     });
 

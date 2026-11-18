@@ -1,5 +1,5 @@
 import { Select } from '@mantine/core';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { type ComicInfo, compareNames } from '@server/types';
 
@@ -13,25 +13,35 @@ export type JoinedSeries = {
     age: number | null;
     status: 'ongoing' | 'completed' | null;
     readingMode: string | null;
+    /** Parution de l'édition d'origine (signalé : pas reprise). */
+    startYear: number | null;
+    endYear: number | null;
 };
 
 /**
  * Choix d'une série déjà publiée, pour y ajouter les tomes d'un dossier de
  * brouillons : `onJoin` reçoit son nom, le ComicInfo de son premier tome et
- * ses réglages de Bento (format, âge, statut, mode de lecture) ; `onLeave`
- * est appelé quand le choix est effacé.
+ * ses réglages de Bento (format, âge, statut, mode de lecture, parution) ;
+ * `onLeave` est appelé quand le choix est effacé. `suggestedId` : série
+ * publiée du nom des brouillons, choisie d'elle-même (une fois :
+ * `onSuggested`).
  */
 export const ExistingSeriesPicker = ({
     libraryId,
     onJoin,
     onLeave,
+    suggestedId,
+    onSuggested,
 }: {
     libraryId: number;
     onJoin: (name: string, source: ComicInfo, settings: JoinedSeries) => void;
     onLeave: () => void;
+    suggestedId?: number;
+    onSuggested?: () => void;
 }) => {
-    // Liste chargée à la première ouverture seulement.
-    const [opened, setOpened] = useState(false);
+    // Liste chargée à la première ouverture (tout de suite pour une série
+    // choisie d'elle-même : son nom s'affiche).
+    const [opened, setOpened] = useState(!!suggestedId);
     const series = useQuery(
         () =>
             opened
@@ -67,11 +77,22 @@ export const ExistingSeriesPicker = ({
                 age: details.age,
                 status: details.status,
                 readingMode: details.readingMode,
+                startYear: details.startYear,
+                endYear: details.endYear,
             });
         } catch (e) {
             if (latest.current === value) setError((e as Error).message);
         }
     };
+
+    // Brouillons au nom d'une série publiée : elle est choisie d'elle-même
+    // (une fois).
+    useEffect(() => {
+        if (!suggestedId) return;
+        onSuggested?.();
+        void join(String(suggestedId));
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     return (
         <Select

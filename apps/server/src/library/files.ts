@@ -477,6 +477,16 @@ export class LibraryFiles {
         const catalog = genreCatalog(this.db);
         const settings = draftSettingsOf(this.db, libraryId);
         const ratings = sourceRatingsMap(this.db);
+        // Séries publiées, par nom (sans casse) : un dossier de ce nom les
+        // rejoint (l'éditeur reprend leurs informations).
+        const published = new Map(
+            this.db
+                .select({ id: series.id, name: series.name })
+                .from(series)
+                .where(eq(series.libraryId, libraryId))
+                .all()
+                .map((s) => [s.name.trim().toLowerCase(), s.id]),
+        );
         return [...folders].map(([folder, files]) => {
             const draft = settings.get(folder);
             const sources = parseSources(draft?.sources);
@@ -487,9 +497,12 @@ export class LibraryFiles {
             const ageRating = volumeInfos
                 .map((info) => info.AgeRating)
                 .find((value) => !!value?.trim());
+            const name = fields.name?.trim().toLowerCase();
             return {
                 folder,
                 files,
+                // Série publiée du même nom, que ces tomes rejoindront.
+                seriesId: (name && published.get(name)) || null,
                 status: draft?.status ?? null,
                 readingMode: draft?.readingMode ?? null,
                 formatId: draft?.formatId ?? null,

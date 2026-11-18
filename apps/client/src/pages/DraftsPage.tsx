@@ -305,6 +305,11 @@ export const DraftsPage = () => {
                                         libraryId={libraryId}
                                         kind={library.type}
                                         mode="drafts"
+                                        // Série publiée du même nom : ses
+                                        // informations sont reprises.
+                                        existingSeriesId={
+                                            draft?.seriesId ?? undefined
+                                        }
                                         status={{
                                             value: draft?.status ?? null,
                                             save: (status) =>
