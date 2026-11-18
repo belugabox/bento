@@ -1,4 +1,5 @@
 import { MantineProvider } from '@mantine/core';
+import { Notifications } from '@mantine/notifications';
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -529,5 +530,59 @@ describe('SeriesPage', () => {
         expect(within(genre).getByText('Hajime no Ippo')).toBeTruthy();
         expect(within(genre).getByText('boxe · Sport')).toBeTruthy();
         expect(within(genre).queryByText('Blacksad')).toBeNull();
+    });
+
+    it('takes a series not started out of the suggestions, from its menu', async () => {
+        const requests: [string, string, unknown][] = [];
+        vi.spyOn(globalThis, 'fetch').mockImplementation(
+            async (input, init) => {
+                const url = String(input);
+                if (url === '/api/series') return listResponse();
+                requests.push([
+                    init?.method ?? 'GET',
+                    url,
+                    init?.body ? JSON.parse(String(init.body)) : undefined,
+                ]);
+                const body = url.endsWith('/lists')
+                    ? { toRead: false, notForMe: true }
+                    : {
+                          ...SERIES,
+                          volumes: [volume(1, null), volume(2, null)],
+                      };
+                return new Response(JSON.stringify(body), {
+                    headers: { 'Content-Type': 'application/json' },
+                });
+            },
+        );
+        render(
+            <MantineProvider>
+                <Notifications />
+                <UserContext.Provider value={READER}>
+                    <MemoryRouter initialEntries={['/series/3']}>
+                        <Routes>
+                            <Route
+                                path="/series/:id"
+                                element={<SeriesPage />}
+                            />
+                        </Routes>
+                    </MemoryRouter>
+                </UserContext.Provider>
+            </MantineProvider>,
+        );
+
+        fireEvent.click(
+            await screen.findByRole('button', { name: 'Plus d’actions' }),
+        );
+        fireEvent.click(
+            await screen.findByRole('menuitem', { name: 'Pas pour moi' }),
+        );
+        await vi.waitFor(() =>
+            expect(requests).toContainEqual([
+                'PUT',
+                '/api/series/3/lists',
+                { notForMe: true },
+            ]),
+        );
+        expect(await screen.findByText('Retiré des suggestions.')).toBeTruthy();
     });
 });

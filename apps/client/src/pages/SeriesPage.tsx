@@ -26,6 +26,8 @@ import {
     IconPencil,
     IconPlayerPlay,
     IconRestore,
+    IconThumbDown,
+    IconThumbUp,
 } from '@tabler/icons-react';
 import { Fragment, useState } from 'react';
 import { Link, useParams } from 'react-router';
@@ -241,6 +243,21 @@ export const SeriesPage = () => {
             reload();
         } finally {
             setSavingList(false);
+        }
+    };
+
+    /** Retire la série des suggestions (« Pas pour moi »), ou l'y remet. */
+    const toggleNotForMe = async (notForMe: boolean) => {
+        try {
+            await setSeriesLists(series.id, { notForMe });
+            notifications.show({
+                message: notForMe
+                    ? 'Retiré des suggestions.'
+                    : 'Remis dans les suggestions.',
+            });
+            reload();
+        } catch (e) {
+            notifications.show({ color: 'red', message: (e as Error).message });
         }
     };
 
@@ -465,6 +482,35 @@ export const SeriesPage = () => {
                                     >
                                         Marquer toute la série comme non lue
                                     </Menu.Item>
+                                    {/* Comme le menu des cartes : pas
+                                        commencée, ou déjà retirée. */}
+                                    {series.notForMe ? (
+                                        <Menu.Item
+                                            leftSection={
+                                                <IconThumbUp size={14} />
+                                            }
+                                            onClick={() =>
+                                                void toggleNotForMe(false)
+                                            }
+                                        >
+                                            Remettre dans les suggestions
+                                        </Menu.Item>
+                                    ) : (
+                                        !series.volumes.some(
+                                            (v) => v.progress,
+                                        ) && (
+                                            <Menu.Item
+                                                leftSection={
+                                                    <IconThumbDown size={14} />
+                                                }
+                                                onClick={() =>
+                                                    void toggleNotForMe(true)
+                                                }
+                                            >
+                                                Pas pour moi
+                                            </Menu.Item>
+                                        )
+                                    )}
                                     <Menu.Divider />
                                     <Menu.Label>
                                         Télécharger sur l’appareil
